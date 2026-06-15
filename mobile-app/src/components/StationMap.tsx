@@ -5,6 +5,8 @@ import { colors, radii, shadow, spacing } from "../theme";
 import { MapPoint, StationViewModel } from "../types";
 import { BrandBadge } from "./BrandBadge";
 
+const maxStationMarkers = 240;
+
 type CameraInsets = {
   top?: number;
   right?: number;
@@ -18,7 +20,7 @@ export function StationMap({
   selectedStationCode,
   onSelect,
   onViewportStationsChange,
-  onMapCentreChange: _onMapCentreChange,
+  onMapSearchAreaChange: _onMapSearchAreaChange,
   cameraFocusKey: _cameraFocusKey,
   showCentreMarker = true,
   routeEndpoints,
@@ -30,7 +32,7 @@ export function StationMap({
   selectedStationCode?: string;
   onSelect: (stationCode: string) => void;
   onViewportStationsChange?: (stationCodes: string[]) => void;
-  onMapCentreChange?: (centre: MapPoint) => void;
+  onMapSearchAreaChange?: (area: { centre: MapPoint; radiusKm: number }) => void;
   cameraFocusKey?: string;
   showCentreMarker?: boolean;
   routeEndpoints?: { from: MapPoint; to: MapPoint };
@@ -71,7 +73,7 @@ export function StationMap({
           style={[styles.routeDot, positionForPoint(point, bounds, activeInsets)]}
         />
       ))}
-      {stations.slice(0, 60).map((item) => {
+      {stations.slice(0, maxStationMarkers).map((item) => {
         const selected = item.station.stationCode === selectedStationCode;
         return (
           <Pressable

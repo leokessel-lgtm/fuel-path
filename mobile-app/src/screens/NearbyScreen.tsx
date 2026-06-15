@@ -24,8 +24,14 @@ const defaultNearbyCentre: MapPoint = {
   label: "66B Easton Ave, Sylvania NSW 2224",
 };
 const defaultNearbyRadiusKm = 8;
-const mapSearchRadiusKm = 18;
+const minMapSearchRadiusKm = 10;
 const emptyMapRetryRadiusKm = 32;
+const maxMapSearchRadiusKm = 90;
+
+type MapSearchArea = {
+  centre: MapPoint;
+  radiusKm: number;
+};
 
 type SortMode = "distance" | "price" | "value";
 
@@ -93,6 +99,7 @@ export function NearbyScreen({
         fuel: preferences.fuel,
         centre,
         radiusKm: nearbyRadiusKm,
+        limit: stationLimitForRadius(nearbyRadiusKm),
       });
       let priced = response.stations
         .map((station) => stationPriceView(station, preferences.fuel, preferences))
@@ -102,6 +109,7 @@ export function NearbyScreen({
           fuel: preferences.fuel,
           centre,
           radiusKm: emptyMapRetryRadiusKm,
+          limit: stationLimitForRadius(emptyMapRetryRadiusKm),
         });
         priced = retryResponse.stations
           .map((station) => stationPriceView(station, preferences.fuel, preferences))
@@ -213,15 +221,22 @@ export function NearbyScreen({
     );
   }, []);
 
-  const handleMapCentreChange = useCallback((nextCentre: MapPoint) => {
-    setNearbyRadiusKm(mapSearchRadiusKm);
+  const handleMapSearchAreaChange = useCallback((area: MapSearchArea) => {
+    const nextRadiusKm = Math.max(
+      minMapSearchRadiusKm,
+      Math.min(maxMapSearchRadiusKm, Math.ceil(area.radiusKm * 1.15)),
+    );
     setCentre((current) => {
-      if (distanceKm(current, nextCentre) < 0.8) return current;
+      const centreMovedKm = distanceKm(current, area.centre);
+      if (centreMovedKm < 0.8) return current;
       return {
-        ...nextCentre,
+        ...area.centre,
         label: "Map area",
       };
     });
+    setNearbyRadiusKm((current) =>
+      Math.abs(current - nextRadiusKm) < 2 ? current : nextRadiusKm,
+    );
     setLocationQuery("");
     setLocationSuggestions([]);
     setLocationSearchActive(false);
@@ -310,7 +325,7 @@ export function NearbyScreen({
           selectedStationCode={selectedCode}
           onSelect={setSelectedCode}
           onViewportStationsChange={handleViewportStationsChange}
-          onMapCentreChange={handleMapCentreChange}
+          onMapSearchAreaChange={handleMapSearchAreaChange}
           cameraFocusKey={`nearby-${cameraFocusVersion}`}
           showCentreMarker={centre.label === "Current location"}
           cameraInsets={nearbyCameraInsets}
@@ -531,6 +546,13 @@ function distanceKm(left: MapPoint, right: MapPoint) {
 
 function toRad(value: number) {
   return (value * Math.PI) / 180;
+}
+
+function stationLimitForRadius(radiusKm: number) {
+  if (radiusKm >= 60) return 420;
+  if (radiusKm >= 35) return 320;
+  if (radiusKm >= 20) return 240;
+  return 160;
 }
 
 function shortLocationLabel(query: string, resolvedLabel: string) {

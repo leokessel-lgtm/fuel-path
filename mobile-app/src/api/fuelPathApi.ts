@@ -68,10 +68,12 @@ export async function getNearbyStations({
   fuel,
   centre,
   radiusKm = 8,
+  limit = 160,
 }: {
   fuel: FuelCode;
   centre: MapPoint;
   radiusKm?: number;
+  limit?: number;
 }) {
   return fetchJson<NearbyResponse>(
     `/api/stations?${query({
@@ -83,7 +85,7 @@ export async function getNearbyStations({
       radiusKm,
       includeMemberPrices: 0,
       includeClosed: 0,
-      limit: 120,
+      limit,
     })}`,
   );
 }

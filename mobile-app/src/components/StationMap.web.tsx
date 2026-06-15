@@ -8,6 +8,7 @@ import { MapPoint, StationViewModel } from "../types";
 
 const LEAFLET_CSS_ID = "fuel-path-leaflet-css";
 const LEAFLET_CUSTOM_CSS_ID = "fuel-path-leaflet-custom-css";
+const maxStationMarkers = 240;
 
 type CameraInsets = {
   top?: number;
@@ -22,7 +23,7 @@ export function StationMap({
   selectedStationCode,
   onSelect,
   onViewportStationsChange,
-  onMapCentreChange,
+  onMapSearchAreaChange,
   cameraFocusKey,
   showCentreMarker = true,
   routeEndpoints,
@@ -34,7 +35,7 @@ export function StationMap({
   selectedStationCode?: string;
   onSelect: (stationCode: string) => void;
   onViewportStationsChange?: (stationCodes: string[]) => void;
-  onMapCentreChange?: (centre: MapPoint) => void;
+  onMapSearchAreaChange?: (area: { centre: MapPoint; radiusKm: number }) => void;
   cameraFocusKey?: string;
   showCentreMarker?: boolean;
   routeEndpoints?: { from: MapPoint; to: MapPoint };
@@ -121,7 +122,7 @@ export function StationMap({
       : [
           [centre.lat, centre.lon] as [number, number],
           ...stations
-            .slice(0, 60)
+            .slice(0, maxStationMarkers)
             .map((item) => [item.station.lat, item.station.lon] as [number, number]),
         ];
     const cameraContextKey = routeEndpoints
@@ -161,7 +162,7 @@ export function StationMap({
       addLocationMarker(L, markerLayer, centre);
     }
 
-    stations.slice(0, 60).forEach((item) => {
+    stations.slice(0, maxStationMarkers).forEach((item) => {
       const selected = item.station.stationCode === selectedStationCode;
       const marker = L.marker([item.station.lat, item.station.lon], {
         icon: L.divIcon({
@@ -221,13 +222,19 @@ export function StationMap({
       onViewportStationsChange(visibleCodes);
       if (!routeEndpoints && userMovedMapRef.current && !programmaticMoveRef.current) {
         const nextCentre = map.getCenter();
-        const centreKey = `${nextCentre.lat.toFixed(4)}:${nextCentre.lng.toFixed(4)}`;
+        const radiusKm = radiusKmForBounds(map.getBounds(), nextCentre);
+        const centreKey = `${nextCentre.lat.toFixed(4)}:${nextCentre.lng.toFixed(
+          4,
+        )}:${Math.round(radiusKm)}`;
         if (centreKey !== lastReportedUserCentreKeyRef.current) {
           lastReportedUserCentreKeyRef.current = centreKey;
-          onMapCentreChange?.({
-            lat: nextCentre.lat,
-            lon: nextCentre.lng,
-            label: "Map area",
+          onMapSearchAreaChange?.({
+            centre: {
+              lat: nextCentre.lat,
+              lon: nextCentre.lng,
+              label: "Map area",
+            },
+            radiusKm,
           });
         }
       }
@@ -245,7 +252,7 @@ export function StationMap({
     mapReady,
     onSelect,
     onViewportStationsChange,
-    onMapCentreChange,
+    onMapSearchAreaChange,
     cameraFocusKey,
     showCentreMarker,
     routeEndpoints,
@@ -369,6 +376,42 @@ function leafletPadding(insets: Required<CameraInsets>) {
     paddingBottomRight: [insets.right, insets.bottom] as [number, number],
     paddingTopLeft: [insets.left, insets.top] as [number, number],
   };
+}
+
+function radiusKmForBounds(bounds: Leaflet.LatLngBounds, centre: Leaflet.LatLng) {
+  const corners = [
+    bounds.getNorthEast(),
+    bounds.getNorthWest(),
+    bounds.getSouthEast(),
+    bounds.getSouthWest(),
+  ];
+  return Math.max(
+    ...corners.map((corner) =>
+      distanceKm(
+        { lat: centre.lat, lon: centre.lng },
+        { lat: corner.lat, lon: corner.lng },
+      ),
+    ),
+  );
+}
+
+function distanceKm(
+  left: { lat: number; lon: number },
+  right: { lat: number; lon: number },
+) {
+  const radiusKm = 6371;
+  const dLat = toRad(right.lat - left.lat);
+  const dLon = toRad(right.lon - left.lon);
+  const lat1 = toRad(left.lat);
+  const lat2 = toRad(right.lat);
+  const hav =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
+  return 2 * radiusKm * Math.asin(Math.sqrt(hav));
+}
+
+function toRad(value: number) {
+  return (value * Math.PI) / 180;
 }
 
 function runProgrammaticMapMove(

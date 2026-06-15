@@ -12,6 +12,8 @@ import { colors, radii, shadow, spacing } from "../theme";
 import { MapPoint, StationViewModel } from "../types";
 import { BrandBadge } from "./BrandBadge";
 
+const maxStationMarkers = 240;
+
 type CameraInsets = {
   top?: number;
   right?: number;
@@ -25,7 +27,7 @@ export function StationMap({
   selectedStationCode,
   onSelect,
   onViewportStationsChange,
-  onMapCentreChange,
+  onMapSearchAreaChange,
   cameraFocusKey,
   showCentreMarker = true,
   routeEndpoints,
@@ -37,7 +39,7 @@ export function StationMap({
   selectedStationCode?: string;
   onSelect: (stationCode: string) => void;
   onViewportStationsChange?: (stationCodes: string[]) => void;
-  onMapCentreChange?: (centre: MapPoint) => void;
+  onMapSearchAreaChange?: (area: { centre: MapPoint; radiusKm: number }) => void;
   cameraFocusKey?: string;
   showCentreMarker?: boolean;
   routeEndpoints?: { from: MapPoint; to: MapPoint };
@@ -70,7 +72,7 @@ export function StationMap({
     }
     return [
       centre,
-      ...stations.slice(0, 60).map((item) => ({
+      ...stations.slice(0, maxStationMarkers).map((item) => ({
         lat: item.station.lat,
         lon: item.station.lon,
         label: item.station.name,
@@ -140,13 +142,19 @@ export function StationMap({
       userMovedMapRef.current = true;
       setMapMovedByUser(true);
       if (!routeEndpoints) {
-        const centreKey = `${region.latitude.toFixed(4)}:${region.longitude.toFixed(4)}`;
+        const radiusKm = radiusKmForRegion(region);
+        const centreKey = `${region.latitude.toFixed(4)}:${region.longitude.toFixed(
+          4,
+        )}:${Math.round(radiusKm)}`;
         if (centreKey !== lastReportedUserCentreKeyRef.current) {
           lastReportedUserCentreKeyRef.current = centreKey;
-          onMapCentreChange?.({
-            lat: region.latitude,
-            lon: region.longitude,
-            label: "Map area",
+          onMapSearchAreaChange?.({
+            centre: {
+              lat: region.latitude,
+              lon: region.longitude,
+              label: "Map area",
+            },
+            radiusKm,
           });
         }
       }
@@ -219,7 +227,7 @@ export function StationMap({
           </Marker>
         ) : null}
 
-        {stations.slice(0, 60).map((item) => {
+        {stations.slice(0, maxStationMarkers).map((item) => {
           const selected = item.station.stationCode === selectedStationCode;
           return (
             <Marker
@@ -317,6 +325,41 @@ function resolveCameraInsets(mode: "nearby" | "route", insets?: CameraInsets): R
 
 function cameraInsetsKey(insets: Required<CameraInsets>) {
   return `${insets.top}:${insets.right}:${insets.bottom}:${insets.left}`;
+}
+
+function radiusKmForRegion(region: Region) {
+  const centre = {
+    lat: region.latitude,
+    lon: region.longitude,
+  };
+  const halfLat = region.latitudeDelta / 2;
+  const halfLon = region.longitudeDelta / 2;
+  const corners = [
+    { lat: region.latitude + halfLat, lon: region.longitude + halfLon },
+    { lat: region.latitude + halfLat, lon: region.longitude - halfLon },
+    { lat: region.latitude - halfLat, lon: region.longitude + halfLon },
+    { lat: region.latitude - halfLat, lon: region.longitude - halfLon },
+  ];
+  return Math.max(...corners.map((corner) => distanceKm(centre, corner)));
+}
+
+function distanceKm(
+  left: { lat: number; lon: number },
+  right: { lat: number; lon: number },
+) {
+  const radiusKm = 6371;
+  const dLat = toRad(right.lat - left.lat);
+  const dLon = toRad(right.lon - left.lon);
+  const lat1 = toRad(left.lat);
+  const lat2 = toRad(right.lat);
+  const hav =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
+  return 2 * radiusKm * Math.asin(Math.sqrt(hav));
+}
+
+function toRad(value: number) {
+  return (value * Math.PI) / 180;
 }
 
 function runProgrammaticMapMove(

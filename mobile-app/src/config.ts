@@ -10,6 +10,9 @@ function defaultApiBaseUrl() {
   if (Platform.OS === "android") {
     return "http://10.0.2.2:4174";
   }
+  if (Platform.OS === "web" && typeof globalThis.location?.origin === "string") {
+    return globalThis.location.origin;
+  }
   return "http://127.0.0.1:4174";
 }
 

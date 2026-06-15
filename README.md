@@ -41,15 +41,15 @@ Open:
 http://127.0.0.1:8082
 ```
 
-## Vercel Static Demo
+## Vercel Web Demo
 
-The first public Vercel deployment serves the browser validation demo with sample data only.
+The public Vercel deployment serves the Expo web build with sample API endpoints.
 
 ```sh
 sh scripts/build-vercel-static.sh
 ```
 
-Vercel uses `vercel.json` to publish the generated `public/` folder. Live API.NSW credentials and the local Python backend are intentionally not part of the public static deployment.
+Vercel uses `vercel.json` to publish the generated `public/` folder and same-origin `/api/*` sample endpoints. Live API.NSW credentials and the local Python backend are intentionally not part of the public deployment.
 
 ## Boundaries
 

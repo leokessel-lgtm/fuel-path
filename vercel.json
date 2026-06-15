@@ -1,6 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "installCommand": "echo \"No install required for static Fuel Path demo\"",
+  "installCommand": "cd mobile-app && npm ci --cache .npm-cache",
   "buildCommand": "sh scripts/build-vercel-static.sh",
   "outputDirectory": "public",
   "cleanUrls": true,

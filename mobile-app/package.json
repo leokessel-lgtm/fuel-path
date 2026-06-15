@@ -29,6 +29,7 @@
     "doctor": "npm_config_cache=.npm-cache npx expo-doctor",
     "eas:preview:android": "npm_config_cache=.npm-cache npx eas-cli build --profile preview --platform android",
     "eas:preview:ios": "npm_config_cache=.npm-cache npx eas-cli build --profile preview --platform ios",
+    "baseline:eas": "node scripts/record-preview-baseline.mjs",
     "perf:deps": "npm ls --depth=0",
     "typecheck": "tsc --noEmit"
   },

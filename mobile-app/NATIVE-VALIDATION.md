@@ -89,6 +89,13 @@ Run these checks on both iOS and Android:
 
 Record these after the first successful preview builds:
 
+```sh
+npm run baseline:eas -- --platform android --build-id BUILD_ID --install-size-mb INSTALL_MB --download-size-mb DOWNLOAD_MB --cold-start-ms COLD_START_MS --notes "First preview APK"
+npm run baseline:eas -- --platform ios --build-id BUILD_ID --install-size-mb INSTALL_MB --download-size-mb DOWNLOAD_MB --cold-start-ms COLD_START_MS --notes "First preview build"
+```
+
+Replace the placeholders with measured values before running. The records are stored in `build-baselines/eas-preview.json`; later entries warn when install or download size grows by more than 10 percent from the first platform baseline.
+
 | Platform | Build ID | Install size | Download size | Cold start | Notes |
 | --- | --- | ---: | ---: | ---: | --- |
 | iOS | Pending | Pending | Pending | Pending | Pending |

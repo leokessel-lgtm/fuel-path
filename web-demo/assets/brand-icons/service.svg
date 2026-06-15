@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" role="img" aria-label="Service fuel">
+  <rect width="48" height="48" rx="24" fill="#00838f"/>
+  <path d="M16 35V14h14a5 5 0 0 1 5 5v16h-6v-8h-7v8h-6Zm6-13h7v-3h-7v3Z" fill="#fff"/>
+</svg>

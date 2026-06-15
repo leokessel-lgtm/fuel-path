@@ -1,0 +1,36 @@
+{
+  "name": "fuel-path-mobile",
+  "version": "1.0.0",
+  "main": "index.ts",
+  "dependencies": {
+    "@expo/metro-runtime": "~56.0.15",
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "@types/leaflet": "^1.9.21",
+    "expo": "~56.0.11",
+    "expo-location": "~56.0.17",
+    "expo-notifications": "~56.0.17",
+    "expo-status-bar": "~56.0.4",
+    "leaflet": "^1.9.4",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-native": "0.85.3",
+    "react-native-maps": "1.27.2",
+    "react-native-web": "^0.21.2"
+  },
+  "devDependencies": {
+    "@types/react": "~19.2.2",
+    "typescript": "~6.0.3"
+  },
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
+    "doctor": "npm_config_cache=.npm-cache npx expo-doctor",
+    "eas:preview:android": "npm_config_cache=.npm-cache npx eas-cli build --profile preview --platform android",
+    "eas:preview:ios": "npm_config_cache=.npm-cache npx eas-cli build --profile preview --platform ios",
+    "perf:deps": "npm ls --depth=0",
+    "typecheck": "tsc --noEmit"
+  },
+  "private": true
+}

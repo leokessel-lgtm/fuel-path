@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="en-AU">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#f6f7f4" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Fuel Path" />
+    <title>Fuel Path Demo</title>
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main id="controls" class="app-shell">
+      <header class="app-header">
+        <div class="header-inner">
+          <div class="brand-lockup">
+            <span class="brand-mark" aria-hidden="true">FP</span>
+            <div>
+              <h1>Fuel Path</h1>
+              <p>Native app prototype.</p>
+            </div>
+          </div>
+
+          <nav class="workspace-tabs" id="workspaceTabs" role="tablist" aria-label="Fuel Path sections">
+            <button id="tab-plan" type="button" role="tab" aria-controls="panel-plan" aria-selected="true" data-tab="plan">
+              Plan
+            </button>
+            <button id="tab-nearby" type="button" role="tab" aria-controls="panel-nearby" aria-selected="false" data-tab="nearby">
+              Nearby
+            </button>
+            <button id="tab-account" type="button" role="tab" aria-controls="panel-account" aria-selected="false" data-tab="account">
+              Account
+            </button>
+          </nav>
+        </div>
+      </header>
+
+      <section class="workspace" aria-live="polite">
+        <section id="panel-plan" class="tab-panel plan-native-panel" role="tabpanel" aria-labelledby="tab-plan">
+          <section id="routeResultsPanel" class="map-panel route-results-panel native-plan-map" aria-labelledby="mapPanelTitle">
+            <div id="routeMapView" class="map-view native-route-map-view">
+              <div class="route-map-shell">
+                <div id="routeVisual" class="route-map"></div>
+                <div id="routeMapFallback" class="map-fallback" hidden></div>
+              </div>
+              <div class="route-map-legend" aria-label="Route map legend">
+                <span><b class="legend-swatch route-stop"></b> Ranked</span>
+                <span><b class="legend-swatch nearby-stop"></b> Nearby</span>
+                <span><b class="legend-swatch selected-stop"></b> Selected</span>
+              </div>
+            </div>
+
+            <section class="plan-controls route-search-card" aria-label="Trip planning controls">
+              <button id="routeSearchToggle" class="destination-field" type="button" aria-expanded="false" aria-controls="routeSearchExpanded">
+                <span>Destination</span>
+                <strong id="routeSearchSummary">Sydney CBD NSW</strong>
+                <small id="routeSearchMeta">Tap to edit route, vehicle and fuel</small>
+              </button>
+
+              <div id="routeSearchExpanded" class="route-search-expanded" hidden>
+                <div class="plan-control-grid">
+                  <div class="trip-context-row">
+                    <section id="planVehicleCard" class="plan-vehicle-card" aria-label="Vehicle used for this plan"></section>
+
+                    <label class="field fuel-field">
+                      <span>Fuel</span>
+                      <select id="fuelSelect" aria-describedby="planVehicleCard"></select>
+                    </label>
+                  </div>
+
+                  <label class="field address-field">
+                    <span>From</span>
+                    <div class="address-input-row">
+                      <input
+                        id="fromAddress"
+                        type="text"
+                        list="demoAddressOptions"
+                        value="Parramatta NSW"
+                        placeholder="Start address"
+                        autocomplete="off"
+                      />
+                      <button class="address-lookup-button" type="button" data-lookup-address="from">Lookup</button>
+                    </div>
+                  </label>
+
+                  <label class="field address-field">
+                    <span>To</span>
+                    <div class="address-input-row">
+                      <input
+                        id="toAddress"
+                        type="text"
+                        list="demoAddressOptions"
+                        value="Sydney CBD NSW"
+                        placeholder="Destination address"
+                        autocomplete="off"
+                      />
+                      <button class="address-lookup-button" type="button" data-lookup-address="to">Lookup</button>
+                    </div>
+                  </label>
+                  <datalist id="demoAddressOptions"></datalist>
+
+                  <div
+                    id="savedRouteSuggestions"
+                    class="saved-route-suggestions"
+                    aria-label="Saved route suggestions"
+                    hidden
+                  ></div>
+
+                  <button id="planRoute" class="primary-button plan-route-button" type="button">Plan route</button>
+
+                  <details class="trip-settings-drawer saved-route-drawer">
+                    <summary>Saved routes</summary>
+                    <div class="trip-settings-body">
+                      <label class="field saved-route-field">
+                        <span>Saved route</span>
+                        <select id="savedRouteSelect"></select>
+                      </label>
+                    </div>
+                  </details>
+
+                  <details class="trip-settings-drawer">
+                    <summary>Trip settings</summary>
+                    <div class="trip-settings-body">
+                      <label class="field range-field tank-field">
+                        <span>Tank level</span>
+                        <input id="tankPercent" type="range" min="5" max="100" step="5" value="45" />
+                        <output id="tankPercentOutput" for="tankPercent">45%</output>
+                      </label>
+                    </div>
+                  </details>
+
+                  <input id="reserveKm" type="hidden" value="35" />
+                  <input id="corridorKm" type="hidden" value="2.5" />
+                  <input id="mapRadiusKm" type="hidden" value="8" />
+                </div>
+              </div>
+              <p id="routeMatchStatus" class="route-match-status" hidden>Using sample corridor.</p>
+            </section>
+
+            <aside class="route-stop-panel plan-bottom-sheet" aria-labelledby="stationListTitle">
+              <div class="sheet-grabber" aria-hidden="true"></div>
+              <div class="sheet-heading">
+                <div>
+                  <span class="eyebrow">Fuel decision</span>
+                  <h2 id="mapPanelTitle">Map and ranked stops</h2>
+                </div>
+                <div class="sheet-status-actions">
+                  <div id="summaryStats" class="summary-stats"></div>
+                  <button id="refreshPrices" class="mini-button refresh-prices-button" type="button">
+                    Refresh prices
+                  </button>
+                </div>
+              </div>
+
+              <section class="decision-panel decision-strip" aria-labelledby="recommendationTitle">
+                <div class="panel-heading">
+                  <span class="eyebrow">Recommendation</span>
+                </div>
+                <h2 id="recommendationTitle">Calculating...</h2>
+                <p id="recommendationReason" class="reason"></p>
+                <div class="metric-row" id="decisionMetrics"></div>
+                <details class="decision-details">
+                  <summary>Why this recommendation</summary>
+                  <p id="recommendationWhy" class="decision-why"></p>
+                  <div id="decisionExplain" class="decision-explain"></div>
+                </details>
+              </section>
+
+              <div id="routeSelectedStation" class="route-selected-station"></div>
+
+              <section class="commute-panel saved-route-alert-card" aria-labelledby="commuteTitle">
+                <div class="commute-copy">
+                  <span class="eyebrow">Saved route alert</span>
+                  <h2 id="commuteTitle">Saved route</h2>
+                  <p id="commuteInsight">Choose or match a saved route to check alert rules.</p>
+                  <span id="savedRouteSignal" class="saved-route-signal"></span>
+                </div>
+                <div class="commute-actions">
+                  <span id="commuteImpact" class="status-pill muted">Not active</span>
+                  <button id="applyCommute" class="mini-button" type="button">Apply saved route</button>
+                </div>
+              </section>
+
+              <div class="route-stop-heading">
+                <div>
+                  <span class="eyebrow">Ranked list</span>
+                  <h3 id="stationListTitle">Best stops on this route</h3>
+                </div>
+                <label class="field route-sort-field">
+                  <span>Sort</span>
+                  <select id="routeSort">
+                    <option value="smart">Smart</option>
+                    <option value="price">Price</option>
+                    <option value="saving">Saving</option>
+                    <option value="detour">Detour</option>
+                  </select>
+                </label>
+              </div>
+              <div id="stationRows" class="route-stop-list"></div>
+            </aside>
+          </section>
+        </section>
+
+        <section id="panel-nearby" class="tab-panel" role="tabpanel" aria-labelledby="tab-nearby" hidden>
+          <section class="map-panel nearby-experience" aria-labelledby="nearMeTitle">
+            <h2 id="nearMeTitle" class="sr-only">Stations around me</h2>
+            <div id="exploreMapView" class="map-view">
+              <div class="explore-layout">
+                <div class="explore-map-wrap">
+                  <div id="exploreMap" class="explore-map"></div>
+                  <div class="nearby-map-chrome" aria-label="Nearby map controls">
+                    <label class="nearby-map-fuel">
+                      <span class="sr-only">Fuel</span>
+                      <select id="nearbyFuelSelect" aria-label="Nearby fuel type"></select>
+                    </label>
+                    <div id="nearbyCentreLabel" class="nearby-centre-field" role="status">Current location</div>
+                    <button
+                      id="centreNearbyLocation"
+                      class="map-location-button"
+                      type="button"
+                      aria-label="Centre map on my location"
+                      title="Centre map on my location"
+                    >
+                      <span class="location-target-icon" aria-hidden="true"></span>
+                    </button>
+                  </div>
+                  <input id="nearbyRadiusKm" type="hidden" value="8" />
+                  <div id="mapFallback" class="map-fallback" hidden></div>
+                </div>
+                <aside class="nearby-panel" aria-labelledby="nearbyTitle">
+                  <h3 id="nearbyTitle" class="sr-only">Nearby stations</h3>
+                  <div id="nearbySortTabs" class="nearby-sort-tabs" role="group" aria-label="Sort nearby stations">
+                    <button type="button" data-nearby-sort="distance" aria-pressed="false">Distance</button>
+                    <button type="button" data-nearby-sort="price" aria-pressed="false">Price</button>
+                    <button type="button" data-nearby-sort="value" aria-pressed="false">km + $</button>
+                  </div>
+                  <div id="nearbyRows" class="nearby-rows"></div>
+                  <div id="selectedStation" class="selected-station" hidden></div>
+                </aside>
+              </div>
+            </div>
+          </section>
+        </section>
+
+        <section id="panel-account" class="tab-panel" role="tabpanel" aria-labelledby="tab-account" hidden>
+          <section class="account-panel" aria-labelledby="accountTitle">
+            <div class="account-heading">
+              <div>
+                <span class="eyebrow">Account</span>
+                <h2 id="accountTitle">Your vehicle, discounts and filters</h2>
+              </div>
+              <span class="status-pill muted">Demo profile</span>
+            </div>
+
+            <div class="account-grid">
+              <section class="account-card" aria-labelledby="regoTitle">
+                <h3 id="regoTitle">Vehicle profile</h3>
+                <form id="vehicleLookupForm" class="vehicle-lookup">
+                  <label class="field">
+                    <span>State</span>
+                    <select id="regoState">
+                      <option>NSW</option>
+                      <option>ACT</option>
+                      <option>VIC</option>
+                      <option>QLD</option>
+                      <option>SA</option>
+                      <option>WA</option>
+                      <option>TAS</option>
+                      <option>NT</option>
+                    </select>
+                  </label>
+                  <label class="field">
+                    <span>Registration</span>
+                    <input id="regoInput" type="text" value="FP123" autocapitalize="characters" autocomplete="off" />
+                  </label>
+                  <button id="lookupVehicle" class="primary-button" type="submit">Find vehicle</button>
+                </form>
+                <p id="vehicleLookupStatus" class="account-status">Demo examples: FP123, UTE456, VAN789, ACT321.</p>
+              </section>
+
+              <section class="account-card vehicle-profile-card" aria-labelledby="profileTitle">
+                <div class="profile-heading">
+                  <h3 id="profileTitle">Saved vehicle</h3>
+                  <span id="vehicleProfileBadge" class="status-pill muted">None</span>
+                </div>
+                <div id="vehicleProfile" class="vehicle-profile"></div>
+                <div class="vehicle-settings" aria-label="Vehicle settings">
+                  <label class="field">
+                    <span>Tank size</span>
+                    <input id="tankLitres" type="number" min="20" max="160" step="1" value="55" />
+                  </label>
+                  <label class="field">
+                    <span>Economy</span>
+                    <input id="economy" type="number" min="3" max="30" step="0.1" value="8.2" />
+                  </label>
+                </div>
+                <div class="profile-actions">
+                  <button id="applyVehicle" class="primary-button" type="button" disabled>Apply to plan</button>
+                  <button id="clearVehicle" class="ghost-button compact" type="button" disabled>Clear</button>
+                </div>
+              </section>
+
+              <section class="account-card" aria-labelledby="brandsTitle">
+                <div class="account-card-heading">
+                  <h3 id="brandsTitle">Brands</h3>
+                  <div class="filter-actions">
+                    <button id="selectAllBrands" class="mini-button" type="button">All</button>
+                    <button id="clearBrands" class="mini-button" type="button">None</button>
+                  </div>
+                </div>
+                <div class="brand-list" id="brandFilters"></div>
+              </section>
+
+              <section class="account-card" aria-labelledby="discountsTitle">
+                <h3 id="discountsTitle">Discount programs</h3>
+                <fieldset class="field check-list discount-programs">
+                  <legend>Active programs</legend>
+                </fieldset>
+              </section>
+
+              <section class="account-card" aria-labelledby="eligibilityTitle">
+                <h3 id="eligibilityTitle">Price eligibilities</h3>
+                <fieldset class="field check-list">
+                  <legend>Include in results</legend>
+                  <label><input id="includeMemberPrices" type="checkbox" /> Member-only prices</label>
+                  <label><input id="includeClosed" type="checkbox" /> Closed stations</label>
+                </fieldset>
+              </section>
+
+              <section class="account-card" aria-labelledby="notificationsTitle">
+                <h3 id="notificationsTitle">Notifications</h3>
+                <div class="notification-list">
+                  <label><input type="checkbox" checked /> Route price drops</label>
+                  <label><input type="checkbox" checked /> Saved commute cycle alerts</label>
+                  <label><input type="checkbox" /> Discount eligibility reminders</label>
+                </div>
+              </section>
+
+              <section class="account-card" aria-labelledby="savedRoutesTitle">
+                <h3 id="savedRoutesTitle">Saved routes</h3>
+                <div id="savedRouteList" class="saved-route-list"></div>
+              </section>
+            </div>
+          </section>
+
+          <section class="source-panel" aria-label="Data source status">
+            <div>
+              <span class="eyebrow">Data source</span>
+              <strong id="sourceStatus">Checking...</strong>
+            </div>
+            <div id="sourceDetails" class="source-details"></div>
+          </section>
+
+          <section class="debug-panel" aria-labelledby="debugTitle">
+            <button id="toggleDebug" class="ghost-button" type="button" aria-expanded="false">
+              Show debug JSON
+            </button>
+            <pre id="debugJson" hidden></pre>
+          </section>
+        </section>
+      </section>
+    </main>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="./app.js?v=20260614-nearby-logo-pins"></script>
+  </body>
+</html>

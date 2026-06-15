@@ -1,0 +1,55 @@
+{
+  "routes": [
+    {
+      "id": "parramatta-to-sydney-cbd",
+      "name": "Parramatta to Sydney CBD",
+      "routeType": "commute",
+      "defaultCorridorKm": 2.5,
+      "defaultDetourSpeedKmh": 38,
+      "points": [
+        { "label": "Parramatta", "lat": -33.8136, "lon": 151.0034 },
+        { "label": "Granville", "lat": -33.8351, "lon": 151.0117 },
+        { "label": "Auburn", "lat": -33.8496, "lon": 151.0328 },
+        { "label": "Lidcombe", "lat": -33.8649, "lon": 151.0437 },
+        { "label": "Strathfield", "lat": -33.8714, "lon": 151.0947 },
+        { "label": "Burwood", "lat": -33.8770, "lon": 151.1037 },
+        { "label": "Ashfield", "lat": -33.8886, "lon": 151.1240 },
+        { "label": "Camperdown", "lat": -33.8896, "lon": 151.1763 },
+        { "label": "Sydney CBD", "lat": -33.8688, "lon": 151.2093 }
+      ]
+    },
+    {
+      "id": "penrith-to-sydney-cbd",
+      "name": "Penrith to Sydney CBD",
+      "routeType": "high_frequency",
+      "defaultCorridorKm": 4.0,
+      "defaultDetourSpeedKmh": 45,
+      "points": [
+        { "label": "Penrith", "lat": -33.7511, "lon": 150.6942 },
+        { "label": "St Marys", "lat": -33.7688, "lon": 150.7750 },
+        { "label": "Eastern Creek", "lat": -33.8064, "lon": 150.8709 },
+        { "label": "Blacktown", "lat": -33.7710, "lon": 150.9063 },
+        { "label": "Parramatta", "lat": -33.8136, "lon": 151.0034 },
+        { "label": "Strathfield", "lat": -33.8714, "lon": 151.0947 },
+        { "label": "Camperdown", "lat": -33.8896, "lon": 151.1763 },
+        { "label": "Sydney CBD", "lat": -33.8688, "lon": 151.2093 }
+      ]
+    },
+    {
+      "id": "canberra-to-sydney-cbd",
+      "name": "Canberra to Sydney CBD",
+      "routeType": "road_trip",
+      "defaultCorridorKm": 8.0,
+      "defaultDetourSpeedKmh": 70,
+      "points": [
+        { "label": "Canberra", "lat": -35.2809, "lon": 149.1300 },
+        { "label": "Goulburn", "lat": -34.7516, "lon": 149.7209 },
+        { "label": "Marulan", "lat": -34.7102, "lon": 150.0096 },
+        { "label": "Mittagong", "lat": -34.4500, "lon": 150.4500 },
+        { "label": "Campbelltown", "lat": -34.0667, "lon": 150.8142 },
+        { "label": "Liverpool", "lat": -33.9209, "lon": 150.9230 },
+        { "label": "Sydney CBD", "lat": -33.8688, "lon": 151.2093 }
+      ]
+    }
+  ]
+}

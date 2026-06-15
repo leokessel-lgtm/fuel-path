@@ -1,0 +1,41 @@
+# Local secrets
+.env
+.env.*
+!.env.example
+prototype/.env
+
+# Dependency caches and installs
+node_modules/
+**/node_modules/
+.npm-cache/
+**/.npm-cache/
+
+# Expo and generated native output
+.expo/
+**/.expo/
+dist/
+web-build/
+expo-env.d.ts
+ios/
+android/
+
+# Build and tool caches
+.metro-health-check*
+*.tsbuildinfo
+.DS_Store
+
+# Credentials and signing material
+*.pem
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Local Git history backups made during monorepo migration
+.git-backups/
+
+# Logs
+npm-debug.*
+yarn-debug.*
+yarn-error.*

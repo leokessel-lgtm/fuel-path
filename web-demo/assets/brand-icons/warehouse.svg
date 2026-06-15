@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" role="img" aria-label="Warehouse fuel">
+  <rect width="48" height="48" rx="24" fill="#6a4fb3"/>
+  <path d="M11 19 24 10l13 9v18H11V19Z" fill="#fff"/>
+  <path d="M16 24h16v13H16z" fill="#6a4fb3"/>
+  <path d="M19 27h10v3H19zm0 5h10v3H19z" fill="#fff"/>
+</svg>

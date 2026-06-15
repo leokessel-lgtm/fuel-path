@@ -1,0 +1,46 @@
+{
+  "expo": {
+    "name": "Fuel Path",
+    "slug": "fuel-path",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "bundleIdentifier": "com.fuelpath.app",
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.fuelpath.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#E8F0EC",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Fuel Path uses your location to show nearby fuel prices and start trip planning from where you are."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#177A4D",
+          "defaultChannel": "route-alerts",
+          "enableBackgroundRemoteNotifications": false
+        }
+      ]
+    ],
+    "extra": {
+      "apiBaseUrlHint": "Set EXPO_PUBLIC_FUEL_PATH_API_BASE_URL for device testing."
+    }
+  }
+}

@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" role="img" aria-label="Regional fuel">
+  <rect width="48" height="48" rx="24" fill="#607d8b"/>
+  <path d="M11 32 20 16l7 10 4-6 6 12H11Z" fill="#fff"/>
+  <circle cx="15" cy="15" r="3" fill="#dff2e5"/>
+</svg>

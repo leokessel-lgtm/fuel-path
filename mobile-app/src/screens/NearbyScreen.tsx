@@ -284,7 +284,7 @@ export function NearbyScreen({
     () => sortStations(listSourceStations, sortMode),
     [listSourceStations, sortMode],
   );
-  const selected = sortedStations.find((item) => item.station.stationCode === selectedCode);
+  const selected = stations.find((item) => item.station.stationCode === selectedCode);
   const nearbyCameraInsets = useMemo(
     () => ({
       top: 170,
@@ -300,6 +300,11 @@ export function NearbyScreen({
     setSheetExpanded(true);
   };
 
+  const handleMapStationSelect = useCallback((stationCode: string) => {
+    setSelectedCode(stationCode);
+    setSheetExpanded(false);
+  }, []);
+
   useEffect(() => {
     if (!sortedStations.length) {
       setSelectedCode(undefined);
@@ -307,14 +312,15 @@ export function NearbyScreen({
     }
     const sortChanged = previousSortMode.current !== sortMode;
     previousSortMode.current = sortMode;
+    const selectedExists = stations.some((item) => item.station.stationCode === selectedCode);
     if (
       sortChanged ||
       !selectedCode ||
-      !sortedStations.some((item) => item.station.stationCode === selectedCode)
+      !selectedExists
     ) {
       setSelectedCode(sortedStations[0].station.stationCode);
     }
-  }, [selectedCode, sortMode, sortedStations]);
+  }, [selectedCode, sortMode, sortedStations, stations]);
 
   return (
     <View style={styles.screen}>
@@ -323,7 +329,7 @@ export function NearbyScreen({
           centre={centre}
           stations={stations}
           selectedStationCode={selectedCode}
-          onSelect={setSelectedCode}
+          onSelect={handleMapStationSelect}
           onViewportStationsChange={handleViewportStationsChange}
           onMapSearchAreaChange={handleMapSearchAreaChange}
           cameraFocusKey={`nearby-${cameraFocusVersion}`}
@@ -452,23 +458,6 @@ export function NearbyScreen({
             </Pressable>
           ) : null}
         </View>
-        <View style={styles.sortRow}>
-          {sortOptions.map((option) => {
-            const selectedSort = sortMode === option.key;
-            return (
-              <Pressable
-                accessibilityLabel={option.accessibilityLabel}
-                key={option.key}
-                onPress={() => handleSortPress(option.key)}
-                style={[styles.sortButton, selectedSort && styles.sortButtonSelected]}
-              >
-                <Text style={[styles.sortText, selectedSort && styles.sortTextSelected]}>
-                  {option.label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
 
         {loading ? (
           <View style={styles.loadingState}>
@@ -499,6 +488,25 @@ export function NearbyScreen({
                   <Text style={styles.priceValue}>{selected.adjustedCpl.toFixed(1)}</Text>
                   <Text style={styles.priceUnit}>c/L</Text>
                 </View>
+              </View>
+            ) : null}
+            {sheetExpanded ? (
+              <View style={styles.sortRow}>
+                {sortOptions.map((option) => {
+                  const selectedSort = sortMode === option.key;
+                  return (
+                    <Pressable
+                      accessibilityLabel={option.accessibilityLabel}
+                      key={option.key}
+                      onPress={() => handleSortPress(option.key)}
+                      style={[styles.sortButton, selectedSort && styles.sortButtonSelected]}
+                    >
+                      <Text style={[styles.sortText, selectedSort && styles.sortTextSelected]}>
+                        {option.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
               </View>
             ) : null}
             {sheetExpanded ? (

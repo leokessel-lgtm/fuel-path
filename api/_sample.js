@@ -1,4 +1,5 @@
 const stationsPayload = require("../prototype/data/sample-stations.json");
+const demoStationsPayload = require("../prototype/data/vercel-demo-stations.json");
 const routesPayload = require("../prototype/data/routes.json");
 
 const places = [
@@ -36,8 +37,15 @@ function stringParam(value, fallback = "") {
   return value || fallback;
 }
 
-function sampleStations() {
-  return stationsPayload.stations.map((station) => ({
+function sampleStations({ includeFixtureFallback = true } = {}) {
+  const stationsByCode = new Map();
+  const sourceStations = includeFixtureFallback
+    ? [...demoStationsPayload.stations, ...stationsPayload.stations]
+    : demoStationsPayload.stations;
+  for (const station of sourceStations) {
+    stationsByCode.set(station.stationCode, station);
+  }
+  return [...stationsByCode.values()].map((station) => ({
     ...station,
     address: station.address || `${station.suburb || "NSW"} sample address`,
   }));

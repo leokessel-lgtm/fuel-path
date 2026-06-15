@@ -1,0 +1,1867 @@
+{
+  "notice": "Public Vercel demo snapshot generated from local validation data. Prices are stale demo values and must not be treated as live fuel information.",
+  "generatedAt": "2026-06-15T10:10:40.338345+00:00",
+  "centre": {
+    "lat": -34.0114122,
+    "lon": 151.0993847,
+    "label": "66B Easton Ave, Sylvania NSW 2224"
+  },
+  "stations": [
+    {
+      "stationCode": "18216",
+      "name": "Metro Bexley",
+      "brand": "Metro Fuel",
+      "suburb": "Bexley",
+      "address": "630 Forest Road, BEXLEY NSW 2207",
+      "lat": -33.9594103,
+      "lon": 151.1177521,
+      "openNow": true,
+      "membershipRequired": false,
+      "updatedAt": "2026-06-13T14:12:16+00:00",
+      "prices": {
+        "DL": 185.9,
+        "E10": 149.9,
+        "PDL": 185.9,
+        "U91": 154.9
+      },
+      "discounts": [
+        {
+          "id": "fleet_card",
+          "label": "Fleet card",
+          "centsPerLitre": 3.0,
+          "inferred": true
+        }
+      ],
+      "pumpCpl": 154.9,
+      "distanceKm": 6.03,
+      "source": "public_demo_snapshot"
+    },
+    {
+      "stationCode": "557",
+      "name": "Shell Reddy Express Captain Cook Bridge",
+      "brand": "Reddy Express",
+      "suburb": "Taren Point",
+      "address": "102-108 Taren Point Road, Taren Point NSW 2229",
+      "lat": -34.020123,
+      "lon": 151.122117,
+      "openNow": true,
+      "membershipRequired": false,
+      "updatedAt": "2026-06-14T10:00:41+00:00",
+      "prices": {
+        "DL": 195.9,
+        "E10": 153.9,
+        "P95": 173.4,
+        "P98": 182.9,
+        "U91": 155.9
+      },
+      "discounts": [
+        {
+          "id": "flybuys",
+          "label": "Flybuys docket",
+          "centsPerLitre": 4.0,
+          "inferred": true
+        },
+        {
+          "id": "fleet_card",
+          "label": "Fleet card",
+          "centsPerLitre": 3.0,
+          "inferred": true
+        }
+      ],
+      "pumpCpl": 155.9,
+      "distanceKm": 2.31,
+      "source": "public_demo_snapshot"
+    },
+    {
+      "stationCode": "16887",
+      "name": "U-Go Taren Point",
+      "brand": "U-Go",
+      "suburb": "Taren Point",
+      "address": "114 Taren Point Rd, TAREN POINT NSW 2229",
+      "lat": -34.0206558,
+      "lon": 151.1218918,
+      "openNow": true,
+      "membershipRequired": false,
+      "updatedAt": "2026-06-14T10:37:24+00:00",
+      "prices": {
+        "P98": 182.9,
+        "PDL": 198.3,
+        "U91": 155.9
+      },
+      "discounts": [],
+      "pumpCpl": 155.9,
+      "distanceKm": 2.32,
+      "source": "public_demo_snapshot"
+    },
+    {
+      "stationCode": "20632",
+      "name": "Budget Bexley South",
+      "brand": "Budget",
+      "suburb": "Bexley",
+      "address": "474 FOREST RD, BEXLEY NSW 2207",
+      "lat": -33.95159933,
+      "lon": 151.12523431,
+      "openNow": true,
+      "membershipRequired": false,
+      "updatedAt": "2026-06-14T15:27:56+00:00",
+      "prices": {
+        "E10": 151.9,
+        "LPG": 105.9,
+        "P95": 170.3,
+        "P98": 177.9,
+        "PDL": 185.8,
+        "U91": 155.9
+      },
+      "discounts": [],
+      "pumpCpl": 155.9,
+      "distanceKm": 7.07,
+      "source": "public_demo_snapshot"
+    },
+    {
+      "stationCode": "20562",
+      "name": "Metro Petroleum Jannali",
+      "brand": "Metro Fuel",
+      "suburb": "Jannali",
+      "address": "97-99 WATTLE RD, JANNALI NSW 2226",
+      "lat": -34.01671377,
+      "lon": 151.06741713,
+      "openNow": true,
+      "membershipRequired": false,
+      "updatedAt": "2026-06-14T14:04:45+00:00",
+      "prices": {
+        "E10": 155.7,
+        "P98": 184.7,
+        "PDL": 194.7,
+        "U91": 157.7
+      },
+      "discounts": [
+        {
+          "id": "fleet_card",
+          "label": "Fleet card",
+          "centsPerLitre": 3.0,
+          "inferred": true
+        }
+      ],
+      "pumpCpl": 157.7,
+      "distanceKm": 3.0,
+      "source": "public_demo_snapshot"
+    },
+    {
+      "stationCode": "1362",
+      "name": "Budget Kingsgrove",
+      "brand": "Budget",
+      "suburb": "Kingsgrove",
+      "address": "2 Commercial Rd, Kingsgrove NSW 2208",
+      "lat": -33.939641,
+      "lon": 151.100524,
+      "openNow": true,
+      "membershipRequired": false,
+      "updatedAt": "2026-06-14T14:19:37+00:00",
+      "prices": {
+        "E10": 153.9,
+        "P95": 171.9,
+        "P98": 181.9,
+        "PDL": 189.9,
+        "U91": 157.9
+      },
+      "discounts": [],
+      "pumpCpl": 157.9,
+      "distanceKm": 7.98,
+      "source": "public_demo_snapshot"
+    },
+    {
+      "stationCode": "1716",
+      "name": "Metro Fuel Miranda",
+      "brand": "Metro Fuel",
+      "suburb": "Miranda",
+      "address": "220 Port Hacking Road, Miranda NSW 2228",
+      "lat": -34.02758,
+      "lon": 151.106042,
+      "openNow": true,
+      "membershipRequired": false,
+      "updatedAt": "2026-06-10T12:35:49+00:00",
+      "prices": {
+        "E10": 156.9,
+        "P98": 182.9,
+        "PDL": 197.9,
+        "U91": 158.9
+      },
+      "discounts": [
+        {
+          "id": "fleet_card",
+          "label": "Fleet card",
+          "centsPerLitre": 3.0,
+          "inferred": true
+        }
+      ],
+      "pumpCpl": 158.9,
+      "distanceKm": 1.9,
+      "source": "public_demo_snapshot"
+    },
+    {
+      "stationCode": "1282",
+      "name": "Speedway Miranda",
+      "brand": "Speedway",
+      "suburb": "Miranda",
+      "address": "181 The Boulevarde, Miranda NSW 2228",
+      "lat": -34.030177,
+      "lon": 151.109664,
+      "openNow": true,
+      "membershipRequired": false,
+      "updatedAt": "2026-06-14T22:36:37+00:00",
+      "prices": {
+        "E10": 156.9,
+        "P98": 182.9,
+        "PDL": 193.9,
+        "U91": 158.9
+      },
+      "discounts": [],
+      "pumpCpl": 158.9,
+      "distanceKm": 2.29,
+      "source": "public_demo_snapshot"
+    },
+    {
+      "stationCode": "1111",
+      "name": "Speedway Caringbah",
+      "brand": "Speedway",
+      "suburb": "Caringbah",
+      "address": "66 Captain Cook Drive, Caringbah NSW 2229",
+      "lat": -34.032778,
+      "lon": 151.123995,
+      "openNow": true,
+      "membershipRequired": false,
+      "updatedAt": "2026-06-09T15:13:40+00:00",
+      "prices": {
+        "E10": 156.9,
+        "P98": 182.9,
+        "PDL": 197.9,
+        "U91": 158.9
+      },
+      "discounts": [],
+      "pumpCpl": 158.9,
+      "distanceKm": 3.28,
+      "source": "public_demo_snapshot"
+    },
+    {
+      "stationCode": "18328",
+      "name": "Prime Blakehurst",
+      "brand": "Prime",
+      "suburb": "Blakehurst",
+      "address": "338 Princes Hwy, BLAKEHURST NSW 2221",
+      "lat": -33.986619,
+      "lon": 151.112644,
+      "openNow": true,
+      "membershipRequired": false,
+      "updatedAt": "2026-06-14T16:24:46+00:00",
+      "prices": {
+        "DL": 192.5,
+        "P95": 176.7,
+        "U91": 159.3
+      },
+      "discounts": [],
+      "pumpCpl": 159.3,
+      "distanceKm": 3.02,
+      "source": "public_demo_snapshot"
+    },
+    {
+      "stationCode": "18696",
+      "name": "Speedway Carss Park",
+      "brand": "Speedway",
+      "suburb": "Carss Park",
+      "address": "294 PRINCES HWY, CARSS PARK NSW 2221",
+      "lat": -33.9820022,
+      "lon": 151.11782,
+      "openNow": true,
+      "membershipRequired": false,
+      "updatedAt": "2026-06-14T14:56:45+00:00",
+      "prices": {
+        "DL": 192.5,
+        "E10": 157.5,
+        "P98": 181.5,
+        "U91": 159.5
+      },
+      "discounts": [],
+      "pumpCpl": 159.5,
+      "distanceKm": 3.69,
+      "source": "public_demo_snapshot"
+    },
+    {
+      "stationCode": "1517",
+      "name": "Budget Kogarah",
+      "brand": "Budget",
+      "suburb": "Kogarah",
+      "address": "132 Princes Hway, Kogarah NSW 2217",
+      "lat": -33.974841,
+      "lon": 151.12831,
+      "openNow": true,
+      "membershipRequired": false,
+      "updatedAt": "2026-06-11T11:41:10+00:00",
+      "prices": {
+        "E10": 157.5,
+        "P98": 181.5,
+        "PDL": 194.5,
+        "U91": 159.5
+      },
+      "discounts": [],
+      "pumpCpl": 159.5,
+      "distanceKm": 4.86,
+      "source": "public_demo_snapshot"
+    },
+    {
+      "stationCode": "20045",
+      "name": "Budget petrol",
+      "brand": "Budget",
+      "suburb": "Brighton-Le-Sands",
+      "address": "275 BAY ST, BRIGHTON-LE-SANDS NSW 2216",
+      "lat": -33.95991294,
+      "lon": 151.15311443,
+      "openNow": true,
+      "membershipRequired": false,
+      "updatedAt": "2026-06-09T16:18:54+00:00",
+      "prices": {
+        "E10": 155.5,
+        "P98": 181.5,
+        "PDL": 195.5,
+        "U91": 159.5
+      },
+      "discounts": [],
+      "pumpCpl": 159.5,
+      "distanceKm": 7.57,
+      "source": "public_demo_snapshot"
+    },
+    {
+      "stationCode": "18653",
+      "name": "Metro Petroleum South Hurstville",
+      "brand": "Metro Fuel",
+      "suburb": "Blakehurst",
+      "address": "928-930 KING GEORGES RD, BLAKEHURST NSW 2221",
+      "lat": -33.9810848,
+      "lon": 151.1084759,
+      "openNow": true,
+      "membershipRequired": false,
+      "updatedAt": "2026-06-14T21:04:57+00:00",
+      "prices": {
+        "E10": 157.7,
+        "P98": 181.7,
+        "PDL": 177.9,
+        "U91": 159.7
+      },
+      "discounts": [
+        {
+          "id": "fleet_card",
+          "label": "Fleet card",
+          "centsPerLitre": 3.0,
+          "inferred": true
+        }
+      ],
+      "pumpCpl": 159.7,
+      "distanceKm": 3.47,
+      "source": "public_demo_snapshot"
+    },
+    {
+      "stationCode": "3",
+      "name": "Shell Reddy Express Oyster Bay",
+      "brand": "Reddy Express",
+      "suburb": "Oyster Bay",
+      "address": "26-28 Georges River Rd (Cnr Carvers Rd), Oyster Bay NSW 2225",
+      "lat": -34.00934,
+      "lon": 151.07548,
+      "openNow": true,
+      "membershipRequired": false,
+      "updatedAt": "2026-06-14T10:00:41+00:00",
+      "prices": {
+        "E10": 157.9,
+        "P95": 177.4,
+        "P98": 186.9,
+        "PDL": 198.9,
+        "U91": 159.9
+      },
+      "discounts": [
+        {
+          "id": "flybuys",
+          "label": "Flybuys docket",
+          "centsPerLitre": 4.0,
+          "inferred": true
+        },
+        {
+          "id": "fleet_card",
+          "label": "Fleet card",
+          "centsPerLitre": 3.0,
+          "inferred": true
+        }
+      ],
+      "pumpCpl": 159.9,
+      "distanceKm": 2.22,
+      "source": "public_demo_snapshot"
+    },
+    {
+      "stationCode": "20626",
+      "name": "OTR Kirrawee",
+      "brand": "Shell",
+      "suburb": "Gymea",
+      "address": "470 PRINCES HWY, GYMEA NSW 2227",
+      "lat": -34.02740126,
+      "lon": 151.08444914,
+      "openNow": true,
+      "membershipRequired": false,
+      "updatedAt": "2026-06-13T23:54:14+00:00",
+      "prices": {
+        "E10": 157.9,
+        "P95": 177.9,
+        "P98": 186.9,
+        "PDL": 194.9,
+        "U91": 159.9
+      },
+      "discounts": [
+        {
+          "id": "flybuys",
+          "label": "Flybuys docket",
+          "centsPerLitre": 4.0,
+          "inferred": true
+        },
+        {
+          "id": "fleet_card",
+          "label": "Fleet card",
+          "centsPerLitre": 3.0,
+          "inferred": true
+        }
+      ],
+      "pumpCpl": 159.9,
+      "distanceKm": 2.25,
+      "source": "public_demo_snapshot"
+    },
+    {
+      "stationCode": "14",
+      "name": "Shell Reddy Express  Taren Point",
+      "brand": "Reddy Express",
+      "suburb": "Miranda",
+      "address": "99 Parraweena Rd (Cnr Taren Point Rd), Miranda NSW 2228",
+      "lat": -34.026377,
+      "lon": 151.120108,
+      "openNow": true,
+      "membershipRequired": false,
+      "updatedAt": "2026-06-14T10:00:41+00:00",
+      "prices": {
+        "DL": 194.9,
+        "E10": 157.9,
+        "P95": 177.4,
+        "P98": 186.9,
+        "PDL": 198.9,
+        "U91": 159.9
+      },
+      "discounts": [
+        {
+          "id": "flybuys",
+          "label": "Flybuys docket",
+          "centsPerLitre": 4.0,
+          "inferred": true
+        },
+        {
+          "id": "fleet_card",
+          "label": "Fleet card",
+          "centsPerLitre": 3.0,
+          "inferred": true
+        }
+      ],
+      "pumpCpl": 159.9,
+      "distanceKm": 2.53,
+      "source": "public_demo_snapshot"
+    },
+    {
+      "stationCode": "18272",
+      "name": "Ampol Foodary Kirrawee",
+      "brand": "Ampol Foodary",
+      "suburb": "Kirrawee",
+      "address": "487 Princess Hwy, Kirrawee NSW 2232",
+      "lat": -34.029162,
+      "lon": 151.080854,
+      "openNow": true,
+      "membershipRequired": false,
+      "updatedAt": "2026-06-14T10:32:27+00:00",
+      "prices": {
+        "P95": 177.9,
+        "P98": 186.9,
+        "PDL": 194.9,
+        "U91": 159.9
+      },
+      "discounts": [
+        {
+          "id": "everyday_rewards",
+          "label": "Everyday Rewards",
+          "centsPerLitre": 4.0,
+          "inferred": true
+        },
+        {
+          "id": "nrma_ampol",
+          "label": "NRMA / Ampol",
+          "centsPerLitre": 5.0,
+          "inferred": true
+        },
+        {
+          "id": "fleet_card",
+          "label": "Fleet card",
+          "centsPerLitre": 3.0,
+          "inferred": true
+        }
+      ],
+      "pumpCpl": 159.9,
+      "distanceKm": 2.61,
+      "source": "public_demo_snapshot"
+    },
+    {
+      "stationCode": "47",
+      "name": "Shell Reddy Express Carlton",
+      "brand": "Reddy Express",
+      "suburb": "Carlton",
+      "address": "277-281 Princes Highway, Carlton NSW 2218",
+      "lat": -33.974858,
+      "lon": 151.127273,
+      "openNow": true,
+      "membershipRequired": false,
+      "updatedAt": "2026-06-14T10:00:41+00:00",
+      "prices": {
+        "DL": 198.9,
+        "P98": 186.9,
+        "U91": 159.9
+      },
+      "discounts": [
+        {
+          "id": "flybuys",
+          "label": "Flybuys docket",
+          "centsPerLitre": 4.0,
+          "inferred": true
+        },
+        {
+          "id": "fleet_card",
+          "label": "Fleet card",
+          "centsPerLitre": 3.0,
+          "inferred": true
+        }
+      ],
+      "pumpCpl": 159.9,
+      "distanceKm": 4.81,
+      "source": "public_demo_snapshot"
+    },
+    {
+      "stationCode": "1574",
+      "name": "7 Express Carlton",
+      "brand": "Independent",
+      "suburb": "Carlton",
+      "address": "370 Railway Parade, Carlton NSW 2216",
+      "lat": -33.969142,
+      "lon": 151.122205,
+      "openNow": true,
+      "membershipRequired": false,
+      "updatedAt": "2026-06-12T12:34:37+00:00",
+      "prices": {
+        "E10": 156.9,
+        "P95": 179.9,
+        "PDL": 194.9,
+        "U91": 159.9
+      },
+      "discounts": [],
+      "pumpCpl": 159.9,
+      "distanceKm": 5.15,
+      "source": "public_demo_snapshot"
+    },
+    {
+      "stationCode": "20652",
+      "name": "OTR Hurstville",
+      "brand": "Shell",
+      "suburb": "Hurstville",
+      "address": "396 FOREST RD, HURSTVILLE NSW 2220",
+      "lat": -33.96483766,
+      "lon": 151.09950212,
+      "openNow": true,
+      "membershipRequired": false,
+      "updatedAt": "2026-06-13T23:54:14+00:00",
+      "prices": {
+        "E10": 157.9,
+        "P95": 177.4,
+        "P98": 186.9,
+        "PDL": 194.9,
+        "U91": 159.9
+      },
+      "discounts": [
+        {
+          "id": "flybuys",
+          "label": "Flybuys docket",
+          "centsPerLitre": 4.0,
+          "inferred": true
+        },
+        {
+          "id": "fleet_card",
+          "label": "Fleet card",
+          "centsPerLitre": 3.0,
+          "inferred": true
+        }
+      ],
+      "pumpCpl": 159.9,
+      "distanceKm": 5.18,
+      "source": "public_demo_snapshot"
+    },
+    {
+      "stationCode": "17593",
+      "name": "Budget Carlton",
+      "brand": "Budget",
+      "suburb": "Kogarah",
+      "address": "3 Railway Pde, KOGARAH NSW 2217",
+      "lat": -33.9617137,
+      "lon": 151.1331812,
+      "openNow": true,
+      "membershipRequired": false,
+      "updatedAt": "2026-06-10T14:24:50+00:00",
+      "prices": {
+        "E10": 156.9,
+        "P98": 183.9,
+        "PDL": 194.9,
+        "U91": 159.9
+      },
+      "discounts": [],
+      "pumpCpl": 159.9,
+      "distanceKm": 6.34,
+      "source": "public_demo_snapshot"
+    },
+    {
+      "stationCode": "2474",
+      "name": "Ampol Foodary Kogarah",
+      "brand": "Ampol Foodary",
+      "suburb": "Kogarah",
+      "address": "29 President Ave, KOGARAH NSW 2217",
+      "lat": -33.965163,
+      "lon": 151.14115,
+      "openNow": true,
+      "membershipRequired": false,
+      "updatedAt": "2026-06-14T21:17:25+00:00",
+      "prices": {
+        "E10": 157.9,
+        "P95": 176.9,
+        "P98": 186.9,
+        "PDL": 198.9,
+        "U91": 159.9
+      },
+      "discounts": [
+        {
+          "id": "everyday_rewards",
+          "label": "Everyday Rewards",
+          "centsPerLitre": 4.0,
+          "inferred": true
+        },
+        {
+          "id": "nrma_ampol",
+          "label": "NRMA / Ampol",
+          "centsPerLitre": 5.0,
+          "inferred": true
+        },
+        {
+          "id": "fleet_card",
+          "label": "Fleet card",
+          "centsPerLitre": 3.0,
+          "inferred": true
+        }
+      ],
+      "pumpCpl": 159.9,
+      "distanceKm": 6.42,
+      "source": "public_demo_snapshot"
+    },
+    {
+      "stationCode": "2383",
+      "name": "Ampol Foodary Kingsgrove",
+      "brand": "Ampol Foodary",
+      "suburb": "Kingsgrove",
+      "address": "351-357 Stoney Creek, KINGSGROVE NSW 2208",
+      "lat": -33.951446,
+      "lon": 151.092424,
+      "openNow": true,
+      "membershipRequired": false,
+      "updatedAt": "2026-06-14T21:32:25+00:00",
+      "prices": {
+        "E10": 157.9,
+        "P95": 177.4,
+        "P98": 186.9,
+        "PDL": 194.9,
+        "U91": 159.9
+      },
+      "discounts": [
+        {
+          "id": "everyday_rewards",
+          "label": "Everyday Rewards",
+          "centsPerLitre": 4.0,
+          "inferred": true
+        },
+        {
+          "id": "nrma_ampol",
+          "label": "NRMA / Ampol",
+          "centsPerLitre": 5.0,
+          "inferred": true
+        },
+        {
+          "id": "fleet_card",
+          "label": "Fleet card",
+          "centsPerLitre": 3.0,
+          "inferred": true
+        }
+      ],
+      "pumpCpl": 159.9,
+      "distanceKm": 6.7,
+      "source": "public_demo_snapshot"
+    },
+    {
+      "stationCode": "1989",
+      "name": "Speedway Rockdale",
+      "brand": "Speedway",
+      "suburb": "Rockdale",
+      "address": "651 Princes Highway, Rockdale NSW 2216",
+      "lat": -33.959161,
+      "lon": 151.137703,
+      "openNow": true,
+      "membershipRequired": false,
+      "updatedAt": "2026-06-11T17:59:58+00:00",
+      "prices": {
+        "DL": 193.9,
+        "E10": 156.9,
+        "P98": 181.9,
+        "PDL": 195.9,
+        "U91": 159.9
+      },
+      "discounts": [],
+      "pumpCpl": 159.9,
+      "distanceKm": 6.8,
+      "source": "public_demo_snapshot"
+    },
+    {
+      "stationCode": "17808",
+      "name": "Metro Petroleum Narwee",
+      "brand": "Metro Fuel",
+      "suburb": "Narwee",
+      "address": "32 Bryant St, NARWEE NSW 2209",
+      "lat": -33.9485538,
+      "lon": 151.0715124,
+      "openNow": true,
+      "membershipRequired": false,
+      "updatedAt": "2026-06-14T23:01:21+00:00",
+      "prices": {
+        "DL": 182.9,
+        "E10": 150.9,
+        "PDL": 182.9,
+        "U91": 159.9
+      },
+      "discounts": [
+        {
+          "id": "fleet_card",
+          "label": "Fleet card",
+          "centsPerLitre": 3.0,
+          "inferred": true
+        }
+      ],
+      "pumpCpl": 159.9,
+      "distanceKm": 7.45,
+      "source": "public_demo_snapshot"
+    },
+    {
+      "stationCode": "17798",
+      "name": "Metro Peakhurst East",
+      "brand": "Metro Fuel",
+      "suburb": "Peakhurst",
+      "address": "637 Forest Rd, PEAKHURST NSW 2210",
+      "lat": -33.958374,
+      "lon": 151.068773,
+      "openNow": true,
+      "membershipRequired": false,
+      "updatedAt": "2026-06-14T11:52:22+00:00",
+      "prices": {
+        "DL": 187.9,
+        "E10": 156.7,
+        "P98": 182.7,
+        "PDL": 187.9,
+        "U91": 160.7
+      },
+      "discounts": [
+        {
+          "id": "fleet_card",
+          "label": "Fleet card",
+          "centsPerLitre": 3.0,
+          "inferred": true
+        }
+      ],
+      "pumpCpl": 160.7,
+      "distanceKm": 6.54,
+      "source": "public_demo_snapshot"
+    },
+    {
+      "stationCode": "299",
+      "name": "BP Mortdale",
+      "brand": "BP",
+      "suburb": "Mortdale",
+      "address": "21 Boundary Road, Mortdale NSW 2223",
+      "lat": -33.970669,
+      "lon": 151.073689,
+      "openNow": true,
+      "membershipRequired": false,
+      "updatedAt": "2026-06-12T20:52:33+00:00",
+      "prices": {
+        "P95": 178.9,
+        "P98": 187.9,
+        "PDL": 199.9,
+        "U91": 160.9
+      },
+      "discounts": [
+        {
+          "id": "fleet_card",
+          "label": "Fleet card",
+          "centsPerLitre": 3.0,
+          "inferred": true
+        }
+      ],
+      "pumpCpl": 160.9,
+      "distanceKm": 5.11,
+      "source": "public_demo_snapshot"
+    },
+    {
+      "stationCode": "18163",
+      "name": "Metro Peakhurst",
+      "brand": "Metro Fuel",
+      "suburb": "Peakhurst",
+      "address": "114 Boundary Road, PEAKHURST NSW 2210",
+      "lat": -33.9633195,
+      "lon": 151.0680491,
+      "openNow": true,
+      "membershipRequired": false,
+      "updatedAt": "2026-06-14T20:52:29+00:00",
+      "prices": {
+        "E10": 152.9,
+        "P98": 182.9,
+        "PDL": 183.9,
+        "U91": 160.9
+      },
+      "discounts": [
+        {
+          "id": "fleet_card",
+          "label": "Fleet card",
+          "centsPerLitre": 3.0,
+          "inferred": true
+        }
+      ],
+      "pumpCpl": 160.9,
+      "distanceKm": 6.08,
+      "source": "public_demo_snapshot"
+    },
+    {
+      "stationCode": "1338",
+      "name": "Metro Peakhurst",
+      "brand": "Metro Fuel",
+      "suburb": "Peakhurst",
+      "address": "836 FOREST RD, PEAKHURST NSW 2210",
+      "lat": -33.9599634,
+      "lon": 151.0607363,
+      "openNow": true,
+      "membershipRequired": false,
+      "updatedAt": "2026-06-14T11:57:45+00:00",
+      "prices": {
+        "E10": 156.9,
+        "P98": 182.9,
+        "PDL": 187.9,
+        "U91": 160.9
+      },
+      "discounts": [
+        {
+          "id": "fleet_card",
+          "label": "Fleet card",
+          "centsPerLitre": 3.0,
+          "inferred": true
+        }
+      ],
+      "pumpCpl": 160.9,
+      "distanceKm": 6.74,
+      "source": "public_demo_snapshot"
+    },
+    {
+      "stationCode": "15",
+      "name": "BP Cronulla",
+      "brand": "BP",
+      "suburb": "Cronulla",
+      "address": "Cnr Wilbur & Kingsway Streets, Cronulla NSW 2230",
+      "lat": -34.050956,
+      "lon": 151.150759,
+      "openNow": true,
+      "membershipRequired": false,
+      "updatedAt": "2026-06-14T14:40:26+00:00",
+      "prices": {
+        "P95": 177.9,
+        "P98": 186.9,
+        "PDL": 201.9,
+        "U91": 161.9
+      },
+      "discounts": [
+        {
+          "id": "fleet_card",
+          "label": "Fleet card",
+          "centsPerLitre": 3.0,
+          "inferred": true
+        }
+      ],
+      "pumpCpl": 161.9,
+      "distanceKm": 6.46,
+      "source": "public_demo_snapshot"
+    },
+    {
+      "stationCode": "20650",
+      "name": "Ampol Narwee",
+      "brand": "Ampol",
+      "suburb": "Narwee",
+      "address": "41 BROADARROW RD, NARWEE NSW 2209",
+      "lat": -33.94814945,
+      "lon": 151.07097292,
+      "openNow": true,
+      "membershipRequired": false,
+      "updatedAt": "2026-06-14T23:25:53+00:00",
+      "prices": {
+        "E10": 153.7,
+        "P95": 179.7,
+        "P98": 189.7,
+        "PDL": 190.9,
+        "U91": 163.7
+      },
+      "discounts": [
+        {
+          "id": "everyday_rewards",
+          "label": "Everyday Rewards",
+          "centsPerLitre": 4.0,
+          "inferred": true
+        },
+        {
+          "id": "nrma_ampol",
+          "label": "NRMA / Ampol",
+          "centsPerLitre": 5.0,
+          "inferred": true
+        },
+        {
+          "id": "fleet_card",
+          "label": "Fleet card",
+          "centsPerLitre": 3.0,
+          "inferred": true
+        }
+      ],
+      "pumpCpl": 163.7,
+      "distanceKm": 7.51,
+      "source": "public_demo_snapshot"
+    },
+    {
+      "stationCode": "243",
+      "name": "7-Eleven Kirrawee",
+      "brand": "7-Eleven",
+      "suburb": "Kirrawee",
+      "address": "529-531 Princes Highway & Bath Road, Kirrawee NSW 2232",
+      "lat": -34.031465,
+      "lon": 151.076694,
+      "openNow": true,
+      "membershipRequired": false,
+      "updatedAt": "2026-06-14T21:54:14+00:00",
+      "prices": {
+        "E10": 163.9,
+        "LPG": 113.9,
+        "P98": 189.9,
+        "PDL": 199.9,
+        "U91": 163.9
+      },
+      "discounts": [
+        {
+          "id": "linkt_rewards",
+          "label": "Linkt Rewards",
+          "centsPerLitre": 6.0,
+          "inferred": true
+        },
+        {
+          "id": "linkt_bonus",
+          "label": "Linkt toll-trip bonus",
+          "centsPerLitre": 26.0,
+          "inferred": true
+        }
+      ],
+      "pumpCpl": 163.9,
+      "distanceKm": 3.06,
+      "source": "public_demo_snapshot"
+    },
+    {
+      "stationCode": "244",
+      "name": "7-Eleven Kirrawee",
+      "brand": "7-Eleven",
+      "suburb": "Kirrawee",
+      "address": "542 Princes Highway, Kirrawee NSW 2232",
+      "lat": -34.032382,
+      "lon": 151.075805,
+      "openNow": true,
+      "membershipRequired": false,
+      "updatedAt": "2026-06-14T21:54:14+00:00",
+      "prices": {
+        "E10": 163.9,
+        "P95": 180.9,
+        "P98": 189.9,
+        "PDL": 199.9,
+        "U91": 163.9
+      },
+      "discounts": [
+        {
+          "id": "linkt_rewards",
+          "label": "Linkt Rewards",
+          "centsPerLitre": 6.0,
+          "inferred": true
+        },
+        {
+          "id": "linkt_bonus",
+          "label": "Linkt toll-trip bonus",
+          "centsPerLitre": 26.0,
+          "inferred": true
+        }
+      ],
+      "pumpCpl": 163.9,
+      "distanceKm": 3.19,
+      "source": "public_demo_snapshot"
+    },
+    {
+      "stationCode": "233",
+      "name": "7-Eleven Gymea",
+      "brand": "7-Eleven",
+      "suburb": "Gymea",
+      "address": "110 Gymea Bay Rd (Cnr 337-339 President Avenue), Gymea NSW 2227",
+      "lat": -34.037679,
+      "lon": 151.084491,
+      "openNow": true,
+      "membershipRequired": false,
+      "updatedAt": "2026-06-11T12:57:14+00:00",
+      "prices": {
+        "E10": 161.9,
+        "P98": 189.9,
+        "PDL": 207.9,
+        "U91": 163.9
+      },
+      "discounts": [
+        {
+          "id": "linkt_rewards",
+          "label": "Linkt Rewards",
+          "centsPerLitre": 6.0,
+          "inferred": true
+        },
+        {
+          "id": "linkt_bonus",
+          "label": "Linkt toll-trip bonus",
+          "centsPerLitre": 26.0,
+          "inferred": true
+        }
+      ],
+      "pumpCpl": 163.9,
+      "distanceKm": 3.23,
+      "source": "public_demo_snapshot"
+    },
+    {
+      "stationCode": "58",
+      "name": "Shell Reddy  Express South Hurstville",
+      "brand": "Reddy Express",
+      "suburb": "South Hurstville",
+      "address": "835 King Georges Road, South Hurstville NSW 2221",
+      "lat": -33.978745,
+      "lon": 151.105526,
+      "openNow": true,
+      "membershipRequired": false,
+      "updatedAt": "2026-06-14T10:00:41+00:00",
+      "prices": {
+        "E10": 161.9,
+        "P95": 181.4,
+        "P98": 190.9,
+        "PDL": 193.9,
+        "U91": 163.9
+      },
+      "discounts": [
+        {
+          "id": "flybuys",
+          "label": "Flybuys docket",
+          "centsPerLitre": 4.0,
+          "inferred": true
+        },
+        {
+          "id": "fleet_card",
+          "label": "Fleet card",
+          "centsPerLitre": 3.0,
+          "inferred": true
+        }
+      ],
+      "pumpCpl": 163.9,
+      "distanceKm": 3.68,
+      "source": "public_demo_snapshot"
+    },
+    {
+      "stationCode": "1540",
+      "name": "Budget Oatley",
+      "brand": "Budget",
+      "suburb": "Oatley",
+      "address": "12B Oatley Parade, Oatley NSW 2223",
+      "lat": -33.982328,
+      "lon": 151.079144,
+      "openNow": true,
+      "membershipRequired": false,
+      "updatedAt": "2026-06-12T20:29:48+00:00",
+      "prices": {
+        "DL": 193.9,
+        "E10": 156.9,
+        "P95": 178.9,
+        "U91": 163.9
+      },
+      "discounts": [],
+      "pumpCpl": 163.9,
+      "distanceKm": 3.73,
+      "source": "public_demo_snapshot"
+    },
+    {
+      "stationCode": "189",
+      "name": "7-Eleven Carlton",
+      "brand": "7-Eleven",
+      "suburb": "Carlton",
+      "address": "439 Princes Highway (Corner Massey Street), Carlton NSW 2218",
+      "lat": -33.98081,
+      "lon": 151.119076,
+      "openNow": true,
+      "membershipRequired": false,
+      "updatedAt": "2026-06-10T16:09:15+00:00",
+      "prices": {
+        "P98": 189.9,
+        "PDL": 201.9,
+        "U91": 163.9
+      },
+      "discounts": [
+        {
+          "id": "linkt_rewards",
+          "label": "Linkt Rewards",
+          "centsPerLitre": 6.0,
+          "inferred": true
+        },
+        {
+          "id": "linkt_bonus",
+          "label": "Linkt toll-trip bonus",
+          "centsPerLitre": 26.0,
+          "inferred": true
+        }
+      ],
+      "pumpCpl": 163.9,
+      "distanceKm": 3.86,
+      "source": "public_demo_snapshot"
+    },
+    {
+      "stationCode": "17127",
+      "name": "7-Eleven Sans Souci",
+      "brand": "7-Eleven",
+      "suburb": "Sans Souci",
+      "address": "474-478 Rocky Point Rd, SANS SOUCI NSW 2219",
+      "lat": -33.9908775,
+      "lon": 151.1333852,
+      "openNow": true,
+      "membershipRequired": false,
+      "updatedAt": "2026-06-10T17:36:15+00:00",
+      "prices": {
+        "E10": 161.9,
+        "P95": 186.9,
+        "P98": 195.9,
+        "PDL": 205.9,
+        "U91": 163.9
+      },
+      "discounts": [
+        {
+          "id": "linkt_rewards",
+          "label": "Linkt Rewards",
+          "centsPerLitre": 6.0,
+          "inferred": true
+        },
+        {
+          "id": "linkt_bonus",
+          "label": "Linkt toll-trip bonus",
+          "centsPerLitre": 26.0,
+          "inferred": true
+        }
+      ],
+      "pumpCpl": 163.9,
+      "distanceKm": 3.88,
+      "source": "public_demo_snapshot"
+    },
+    {
+      "stationCode": "185",
+      "name": "7-Eleven South Hurstville",
+      "brand": "7-Eleven",
+      "suburb": "South Hurstville",
+      "address": "822 King Georges Road & Joffre St, South Hurstville NSW 2220",
+      "lat": -33.975997,
+      "lon": 151.10364,
+      "openNow": true,
+      "membershipRequired": false,
+      "updatedAt": "2026-06-10T16:06:13+00:00",
+      "prices": {
+        "E10": 161.9,
+        "LPG": 109.9,
+        "P95": 180.9,
+        "P98": 189.9,
+        "PDL": 203.9,
+        "U91": 163.9
+      },
+      "discounts": [
+        {
+          "id": "linkt_rewards",
+          "label": "Linkt Rewards",
+          "centsPerLitre": 6.0,
+          "inferred": true
+        },
+        {
+          "id": "linkt_bonus",
+          "label": "Linkt toll-trip bonus",
+          "centsPerLitre": 26.0,
+          "inferred": true
+        }
+      ],
+      "pumpCpl": 163.9,
+      "distanceKm": 3.96,
+      "source": "public_demo_snapshot"
+    },
+    {
+      "stationCode": "17122",
+      "name": "7-Eleven Woolooware",
+      "brand": "7-Eleven",
+      "suburb": "Woolooware",
+      "address": "192-198 The Kingsway, WOOLOOWARE NSW 2230",
+      "lat": -34.046318,
+      "lon": 151.133545,
+      "openNow": true,
+      "membershipRequired": false,
+      "updatedAt": "2026-06-11T18:24:15+00:00",
+      "prices": {
+        "E10": 161.9,
+        "P98": 189.9,
+        "PDL": 205.9,
+        "U91": 163.9
+      },
+      "discounts": [
+        {
+          "id": "linkt_rewards",
+          "label": "Linkt Rewards",
+          "centsPerLitre": 6.0,
+          "inferred": true
+        },
+        {
+          "id": "linkt_bonus",
+          "label": "Linkt toll-trip bonus",
+          "centsPerLitre": 26.0,
+          "inferred": true
+        }
+      ],
+      "pumpCpl": 163.9,
+      "distanceKm": 5.0,
+      "source": "public_demo_snapshot"
+    },
+    {
+      "stationCode": "18181",
+      "name": "Ampol Foodary Woolooware",
+      "brand": "Ampol Foodary",
+      "suburb": "Woolooware",
+      "address": "100 Woolooware Road, WOOLOOWARE NSW 2230",
+      "lat": -34.052747,
+      "lon": 151.1408431,
+      "openNow": true,
+      "membershipRequired": false,
+      "updatedAt": "2026-06-14T21:32:25+00:00",
+      "prices": {
+        "E10": 161.9,
+        "P98": 190.9,
+        "PDL": 201.9,
+        "U91": 163.9
+      },
+      "discounts": [
+        {
+          "id": "everyday_rewards",
+          "label": "Everyday Rewards",
+          "centsPerLitre": 4.0,
+          "inferred": true
+        },
+        {
+          "id": "nrma_ampol",
+          "label": "NRMA / Ampol",
+          "centsPerLitre": 5.0,
+          "inferred": true
+        },
+        {
+          "id": "fleet_card",
+          "label": "Fleet card",
+          "centsPerLitre": 3.0,
+          "inferred": true
+        }
+      ],
+      "pumpCpl": 163.9,
+      "distanceKm": 5.98,
+      "source": "public_demo_snapshot"
+    },
+    {
+      "stationCode": "1539",
+      "name": "Budget Bexley",
+      "brand": "Budget",
+      "suburb": "Bexley",
+      "address": "295 FOREST RD, BEXLEY NSW 2207",
+      "lat": -33.9444759,
+      "lon": 151.1283492,
+      "openNow": true,
+      "membershipRequired": false,
+      "updatedAt": "2026-06-14T12:07:08+00:00",
+      "prices": {
+        "DL": 193.9,
+        "E10": 152.9,
+        "P95": 179.9,
+        "U91": 163.9
+      },
+      "discounts": [],
+      "pumpCpl": 163.9,
+      "distanceKm": 7.91,
+      "source": "public_demo_snapshot"
+    },
+    {
+      "stationCode": "18296",
+      "name": "BP South Hurstville",
+      "brand": "BP",
+      "suburb": "South Hurstville",
+      "address": "63 CONNELLS POINT RD, SOUTH HURSTVILLE NSW 2221",
+      "lat": -33.9779803,
+      "lon": 151.103984,
+      "openNow": true,
+      "membershipRequired": false,
+      "updatedAt": "2026-06-13T16:19:19+00:00",
+      "prices": {
+        "E10": 161.9,
+        "P95": 182.9,
+        "P98": 191.9,
+        "PDL": 201.9,
+        "U91": 164.9
+      },
+      "discounts": [
+        {
+          "id": "fleet_card",
+          "label": "Fleet card",
+          "centsPerLitre": 3.0,
+          "inferred": true
+        }
+      ],
+      "pumpCpl": 164.9,
+      "distanceKm": 3.74,
+      "source": "public_demo_snapshot"
+    },
+    {
+      "stationCode": "1641",
+      "name": "BP Sans Souci",
+      "brand": "BP",
+      "suburb": "Sans Souci",
+      "address": "518 Rocky Point Road, Sans Souci NSW 2219",
+      "lat": -33.992469,
+      "lon": 151.132408,
+      "openNow": true,
+      "membershipRequired": false,
+      "updatedAt": "2026-06-13T15:19:51+00:00",
+      "prices": {
+        "DL": 199.7,
+        "E10": 159.7,
+        "P95": 186.7,
+        "P98": 195.7,
+        "PDL": 201.7,
+        "U91": 165.7
+      },
+      "discounts": [
+        {
+          "id": "fleet_card",
+          "label": "Fleet card",
+          "centsPerLitre": 3.0,
+          "inferred": true
+        }
+      ],
+      "pumpCpl": 165.7,
+      "distanceKm": 3.7,
+      "source": "public_demo_snapshot"
+    },
+    {
+      "stationCode": "142",
+      "name": "7-Eleven Caringbah",
+      "brand": "7-Eleven",
+      "suburb": "Caringbah",
+      "address": "367 The Kingsway (Corner Willarong Road), Caringbah NSW 2229",
+      "lat": -34.039547,
+      "lon": 151.120355,
+      "openNow": true,
+      "membershipRequired": false,
+      "updatedAt": "2026-06-12T16:36:13+00:00",
+      "prices": {
+        "E10": 163.9,
+        "P95": 184.9,
+        "P98": 193.9,
+        "PDL": 205.9,
+        "U91": 165.9
+      },
+      "discounts": [
+        {
+          "id": "linkt_rewards",
+          "label": "Linkt Rewards",
+          "centsPerLitre": 6.0,
+          "inferred": true
+        },
+        {
+          "id": "linkt_bonus",
+          "label": "Linkt toll-trip bonus",
+          "centsPerLitre": 26.0,
+          "inferred": true
+        }
+      ],
+      "pumpCpl": 165.9,
+      "distanceKm": 3.68,
+      "source": "public_demo_snapshot"
+    },
+    {
+      "stationCode": "17831",
+      "name": "Ampol Foodary Lilli Pilli",
+      "brand": "Ampol Foodary",
+      "suburb": "Lilli Pilli",
+      "address": "481 Port Hacking Road, LILLI PILLI NSW 2229",
+      "lat": -34.052346,
+      "lon": 151.121541,
+      "openNow": true,
+      "membershipRequired": false,
+      "updatedAt": "2026-06-14T16:57:24+00:00",
+      "prices": {
+        "E10": 163.9,
+        "P95": 182.9,
+        "P98": 192.9,
+        "PDL": 205.9,
+        "U91": 165.9
+      },
+      "discounts": [
+        {
+          "id": "everyday_rewards",
+          "label": "Everyday Rewards",
+          "centsPerLitre": 4.0,
+          "inferred": true
+        },
+        {
+          "id": "nrma_ampol",
+          "label": "NRMA / Ampol",
+          "centsPerLitre": 5.0,
+          "inferred": true
+        },
+        {
+          "id": "fleet_card",
+          "label": "Fleet card",
+          "centsPerLitre": 3.0,
+          "inferred": true
+        }
+      ],
+      "pumpCpl": 165.9,
+      "distanceKm": 4.99,
+      "source": "public_demo_snapshot"
+    },
+    {
+      "stationCode": "2331",
+      "name": "BP Penshurst",
+      "brand": "BP",
+      "suburb": "Penshurst",
+      "address": "494 Forest Rd, PENSHURST NSW 2222",
+      "lat": -33.96333,
+      "lon": 151.090139,
+      "openNow": true,
+      "membershipRequired": false,
+      "updatedAt": "2026-06-09T17:04:36+00:00",
+      "prices": {
+        "P98": 186.9,
+        "PDL": 203.9,
+        "U91": 165.9
+      },
+      "discounts": [
+        {
+          "id": "fleet_card",
+          "label": "Fleet card",
+          "centsPerLitre": 3.0,
+          "inferred": true
+        }
+      ],
+      "pumpCpl": 165.9,
+      "distanceKm": 5.41,
+      "source": "public_demo_snapshot"
+    },
+    {
+      "stationCode": "148",
+      "name": "7-Eleven Penshurst",
+      "brand": "7-Eleven",
+      "suburb": "Penshurst",
+      "address": "612 Forest Road, Penshurst NSW 2222",
+      "lat": -33.961504,
+      "lon": 151.079228,
+      "openNow": true,
+      "membershipRequired": false,
+      "updatedAt": "2026-06-09T18:33:19+00:00",
+      "prices": {
+        "E10": 163.9,
+        "P95": 182.9,
+        "P98": 191.9,
+        "PDL": 203.9,
+        "U91": 165.9
+      },
+      "discounts": [
+        {
+          "id": "linkt_rewards",
+          "label": "Linkt Rewards",
+          "centsPerLitre": 6.0,
+          "inferred": true
+        },
+        {
+          "id": "linkt_bonus",
+          "label": "Linkt toll-trip bonus",
+          "centsPerLitre": 26.0,
+          "inferred": true
+        }
+      ],
+      "pumpCpl": 165.9,
+      "distanceKm": 5.85,
+      "source": "public_demo_snapshot"
+    },
+    {
+      "stationCode": "18086",
+      "name": "BP Rockdale",
+      "brand": "BP",
+      "suburb": "Rockdale",
+      "address": "444 West Botany Street, ROCKDALE NSW 2216",
+      "lat": -33.9599094,
+      "lon": 151.1457386,
+      "openNow": true,
+      "membershipRequired": false,
+      "updatedAt": "2026-06-14T22:46:16+00:00",
+      "prices": {
+        "E10": 157.9,
+        "P95": 180.9,
+        "P98": 190.9,
+        "PDL": 195.9,
+        "U91": 165.9
+      },
+      "discounts": [
+        {
+          "id": "fleet_card",
+          "label": "Fleet card",
+          "centsPerLitre": 3.0,
+          "inferred": true
+        }
+      ],
+      "pumpCpl": 165.9,
+      "distanceKm": 7.15,
+      "source": "public_demo_snapshot"
+    },
+    {
+      "stationCode": "274",
+      "name": "7-Eleven Riverwood",
+      "brand": "7-Eleven",
+      "suburb": "Riverwood",
+      "address": "30 Bonds Road (Corner Romilly Street), Riverwood NSW 2210",
+      "lat": -33.9523,
+      "lon": 151.058345,
+      "openNow": true,
+      "membershipRequired": false,
+      "updatedAt": "2026-06-09T18:12:15+00:00",
+      "prices": {
+        "E10": 165.9,
+        "P95": 180.9,
+        "P98": 189.9,
+        "PDL": 205.9,
+        "U91": 165.9
+      },
+      "discounts": [
+        {
+          "id": "linkt_rewards",
+          "label": "Linkt Rewards",
+          "centsPerLitre": 6.0,
+          "inferred": true
+        },
+        {
+          "id": "linkt_bonus",
+          "label": "Linkt toll-trip bonus",
+          "centsPerLitre": 26.0,
+          "inferred": true
+        }
+      ],
+      "pumpCpl": 165.9,
+      "distanceKm": 7.58,
+      "source": "public_demo_snapshot"
+    },
+    {
+      "stationCode": "197",
+      "name": "7-Eleven Bexley",
+      "brand": "7-Eleven",
+      "suburb": "Bexley",
+      "address": "611-615  Mimosa Street (Corner Forest Road), Bexley NSW 2207",
+      "lat": -33.955531,
+      "lon": 151.118478,
+      "openNow": true,
+      "membershipRequired": false,
+      "updatedAt": "2026-06-09T17:21:14+00:00",
+      "prices": {
+        "E10": 165.9,
+        "P98": 191.9,
+        "PDL": 210.9,
+        "U91": 167.9
+      },
+      "discounts": [
+        {
+          "id": "linkt_rewards",
+          "label": "Linkt Rewards",
+          "centsPerLitre": 6.0,
+          "inferred": true
+        },
+        {
+          "id": "linkt_bonus",
+          "label": "Linkt toll-trip bonus",
+          "centsPerLitre": 26.0,
+          "inferred": true
+        }
+      ],
+      "pumpCpl": 167.9,
+      "distanceKm": 6.46,
+      "source": "public_demo_snapshot"
+    },
+    {
+      "stationCode": "1625",
+      "name": "BP Bexley North",
+      "brand": "BP",
+      "suburb": "Bexley",
+      "address": "369C Bexley Road, Bexley NSW 2207",
+      "lat": -33.945827,
+      "lon": 151.12302,
+      "openNow": true,
+      "membershipRequired": false,
+      "updatedAt": "2026-06-09T19:24:24+00:00",
+      "prices": {
+        "E10": 165.9,
+        "P95": 180.9,
+        "P98": 190.9,
+        "PDL": 209.9,
+        "U91": 167.9
+      },
+      "discounts": [
+        {
+          "id": "fleet_card",
+          "label": "Fleet card",
+          "centsPerLitre": 3.0,
+          "inferred": true
+        }
+      ],
+      "pumpCpl": 167.9,
+      "distanceKm": 7.61,
+      "source": "public_demo_snapshot"
+    },
+    {
+      "stationCode": "20266",
+      "name": "Enhance Lugarno",
+      "brand": "Enhance",
+      "suburb": "Lugarno",
+      "address": "1046 FOREST RD, LUGARNO NSW 2210",
+      "lat": -33.97740986,
+      "lon": 151.04692261,
+      "openNow": true,
+      "membershipRequired": false,
+      "updatedAt": "2026-06-09T17:08:29+00:00",
+      "prices": {
+        "E10": 158.7,
+        "P98": 184.7,
+        "PDL": 190.7,
+        "U91": 168.7
+      },
+      "discounts": [],
+      "pumpCpl": 168.7,
+      "distanceKm": 6.14,
+      "source": "public_demo_snapshot"
+    },
+    {
+      "stationCode": "530",
+      "name": "EG Ampol Blakehurst",
+      "brand": "EG Ampol",
+      "suburb": "Blakehurst",
+      "address": "390 Princes Highway, Blakehurst NSW 2221",
+      "lat": -33.990209,
+      "lon": 151.113624,
+      "openNow": true,
+      "membershipRequired": false,
+      "updatedAt": "2026-06-14T17:30:31+00:00",
+      "prices": {
+        "E10": 167.9,
+        "P95": 184.9,
+        "P98": 193.9,
+        "PDL": 205.9,
+        "U91": 169.9
+      },
+      "discounts": [
+        {
+          "id": "everyday_rewards",
+          "label": "Everyday Rewards",
+          "centsPerLitre": 4.0,
+          "inferred": true
+        },
+        {
+          "id": "nrma_ampol",
+          "label": "NRMA / Ampol",
+          "centsPerLitre": 5.0,
+          "inferred": true
+        },
+        {
+          "id": "fleet_card",
+          "label": "Fleet card",
+          "centsPerLitre": 3.0,
+          "inferred": true
+        }
+      ],
+      "pumpCpl": 169.9,
+      "distanceKm": 2.7,
+      "source": "public_demo_snapshot"
+    },
+    {
+      "stationCode": "651",
+      "name": "EG Ampol Miranda",
+      "brand": "EG Ampol",
+      "suburb": "Miranda",
+      "address": "Cnr The Kingsway & Port Hacking Road, Miranda NSW 2228",
+      "lat": -34.034961,
+      "lon": 151.112571,
+      "openNow": true,
+      "membershipRequired": false,
+      "updatedAt": "2026-06-14T17:30:31+00:00",
+      "prices": {
+        "P95": 184.9,
+        "P98": 193.9,
+        "PDL": 205.9,
+        "U91": 169.9
+      },
+      "discounts": [
+        {
+          "id": "everyday_rewards",
+          "label": "Everyday Rewards",
+          "centsPerLitre": 4.0,
+          "inferred": true
+        },
+        {
+          "id": "nrma_ampol",
+          "label": "NRMA / Ampol",
+          "centsPerLitre": 5.0,
+          "inferred": true
+        },
+        {
+          "id": "fleet_card",
+          "label": "Fleet card",
+          "centsPerLitre": 3.0,
+          "inferred": true
+        }
+      ],
+      "pumpCpl": 169.9,
+      "distanceKm": 2.89,
+      "source": "public_demo_snapshot"
+    },
+    {
+      "stationCode": "529",
+      "name": "EG Ampol Woolooware",
+      "brand": "EG Ampol",
+      "suburb": "Woolooware",
+      "address": "449 Captain Cook Drive, Woolooware NSW 2230",
+      "lat": -34.038651,
+      "lon": 151.143747,
+      "openNow": true,
+      "membershipRequired": false,
+      "updatedAt": "2026-06-14T17:48:16+00:00",
+      "prices": {
+        "E10": 167.9,
+        "P95": 185.9,
+        "P98": 194.9,
+        "PDL": 205.9,
+        "U91": 169.9
+      },
+      "discounts": [
+        {
+          "id": "everyday_rewards",
+          "label": "Everyday Rewards",
+          "centsPerLitre": 4.0,
+          "inferred": true
+        },
+        {
+          "id": "nrma_ampol",
+          "label": "NRMA / Ampol",
+          "centsPerLitre": 5.0,
+          "inferred": true
+        },
+        {
+          "id": "fleet_card",
+          "label": "Fleet card",
+          "centsPerLitre": 3.0,
+          "inferred": true
+        }
+      ],
+      "pumpCpl": 169.9,
+      "distanceKm": 5.09,
+      "source": "public_demo_snapshot"
+    },
+    {
+      "stationCode": "162",
+      "name": "7-Eleven Sutherland",
+      "brand": "7-Eleven",
+      "suburb": "Sutherland",
+      "address": "693 Old Princes Highway (Retank Reopens 23 Jun'16), Sutherland NSW 2232",
+      "lat": -34.029795,
+      "lon": 151.058951,
+      "openNow": true,
+      "membershipRequired": false,
+      "updatedAt": "2026-06-11T18:21:14+00:00",
+      "prices": {
+        "E10": 197.9,
+        "P95": 216.9,
+        "P98": 225.9,
+        "PDL": 205.9,
+        "U91": 199.9
+      },
+      "discounts": [
+        {
+          "id": "linkt_rewards",
+          "label": "Linkt Rewards",
+          "centsPerLitre": 6.0,
+          "inferred": true
+        },
+        {
+          "id": "linkt_bonus",
+          "label": "Linkt toll-trip bonus",
+          "centsPerLitre": 26.0,
+          "inferred": true
+        }
+      ],
+      "pumpCpl": 199.9,
+      "distanceKm": 4.25,
+      "source": "public_demo_snapshot"
+    },
+    {
+      "stationCode": "1112",
+      "name": "BP Loftus",
+      "brand": "BP",
+      "suburb": "Loftus",
+      "address": "127 Loftus Ave, Loftus NSW 2232",
+      "lat": -34.045708,
+      "lon": 151.0507991,
+      "openNow": true,
+      "membershipRequired": false,
+      "updatedAt": "2026-06-14T21:36:48+00:00",
+      "prices": {
+        "E10": 197.9,
+        "P95": 213.9,
+        "P98": 217.9,
+        "PDL": 194.9,
+        "U91": 199.9
+      },
+      "discounts": [
+        {
+          "id": "fleet_card",
+          "label": "Fleet card",
+          "centsPerLitre": 3.0,
+          "inferred": true
+        }
+      ],
+      "pumpCpl": 199.9,
+      "distanceKm": 5.88,
+      "source": "public_demo_snapshot"
+    }
+  ]
+}

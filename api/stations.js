@@ -16,7 +16,7 @@ module.exports = function handler(req, res) {
   const fuel = stringParam(req.query.fuel, "U91");
   const radiusKm = numberParam(req.query.radiusKm, 8);
   const limit = numberParam(req.query.limit, 120);
-  const stations = sampleStations()
+  const stations = sampleStations({ includeFixtureFallback: false })
     .map((station) => ({
       ...station,
       distanceKm: distanceKm(centre, station),

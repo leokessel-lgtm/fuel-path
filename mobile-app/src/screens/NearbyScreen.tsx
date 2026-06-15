@@ -62,9 +62,9 @@ export function NearbyScreen({
   const [selectedCode, setSelectedCode] = useState<string>();
   const [selectionDismissed, setSelectionDismissed] = useState(false);
   const [visibleStationCodes, setVisibleStationCodes] = useState<string[]>([]);
-  const [sortMode, setSortMode] = useState<SortMode>("value");
+  const [sortMode, setSortMode] = useState<SortMode>();
   const [sheetExpanded, setSheetExpanded] = useState(false);
-  const previousSortMode = useRef<SortMode>(sortMode);
+  const previousSortMode = useRef<SortMode | undefined>(sortMode);
   const [loading, setLoading] = useState(true);
   const [resolvingLocation, setResolvingLocation] = useState(false);
   const [error, setError] = useState("");
@@ -125,7 +125,7 @@ export function NearbyScreen({
       .then((priced) => {
         if (!active) return;
         setStations(priced);
-        setSelectedCode(priced[0]?.station.stationCode);
+        setSelectedCode(undefined);
         setSelectionDismissed(false);
       })
       .catch((err: Error) => {
@@ -192,6 +192,7 @@ export function NearbyScreen({
       setLocationSearchActive(false);
       addressSessionTokenRef.current = makeLocationSessionToken();
       setSheetExpanded(false);
+      setSortMode(undefined);
     } catch (err) {
       setLocationError(err instanceof Error ? err.message : "Could not find that location");
     } finally {
@@ -212,6 +213,7 @@ export function NearbyScreen({
       setLocationSearchActive(false);
       addressSessionTokenRef.current = makeLocationSessionToken();
       setSheetExpanded(false);
+      setSortMode(undefined);
     } catch (err) {
       setLocationError(err instanceof Error ? err.message : "Current location is not available.");
     } finally {
@@ -256,6 +258,7 @@ export function NearbyScreen({
     setLocationSearchActive(false);
     setLocationError("");
     setSheetExpanded(false);
+    setSortMode(undefined);
   };
 
   const selectLocationSuggestion = (location: MapPoint) => {
@@ -274,18 +277,19 @@ export function NearbyScreen({
     setLocationError("");
     addressSessionTokenRef.current = makeLocationSessionToken();
     setSheetExpanded(false);
+    setSortMode(undefined);
   };
 
   const visibleStationSet = useMemo(() => new Set(visibleStationCodes), [visibleStationCodes]);
 
   const listSourceStations = useMemo(() => {
-    if (sortMode === "distance" || visibleStationSet.size === 0) return stations;
+    if (!sortMode || sortMode === "distance" || visibleStationSet.size === 0) return stations;
     const visible = stations.filter((item) => visibleStationSet.has(item.station.stationCode));
     return visible.length ? visible : stations;
   }, [sortMode, stations, visibleStationSet]);
 
   const sortedStations = useMemo(
-    () => sortStations(listSourceStations, sortMode),
+    () => (sortMode ? sortStations(listSourceStations, sortMode) : listSourceStations),
     [listSourceStations, sortMode],
   );
   const selected = stations.find((item) => item.station.stationCode === selectedCode);
@@ -293,10 +297,10 @@ export function NearbyScreen({
     () => ({
       top: 170,
       right: 18,
-      bottom: sheetExpanded ? 330 : 285,
+      bottom: sheetExpanded ? 330 : selected ? 285 : 150,
       left: 18,
     }),
-    [sheetExpanded],
+    [selected, sheetExpanded],
   );
 
   const handleSortPress = (nextSortMode: SortMode) => {
@@ -345,10 +349,15 @@ export function NearbyScreen({
       setSelectedCode(undefined);
       return;
     }
+    const selectedExists = stations.some((item) => item.station.stationCode === selectedCode);
+    if (!sortMode) {
+      if (selectedCode && !selectedExists) setSelectedCode(undefined);
+      previousSortMode.current = sortMode;
+      return;
+    }
     if (selectionDismissed && !selectedCode) return;
     const sortChanged = previousSortMode.current !== sortMode;
     previousSortMode.current = sortMode;
-    const selectedExists = stations.some((item) => item.station.stationCode === selectedCode);
     if (
       sortChanged ||
       !selectedCode ||

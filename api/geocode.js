@@ -1,22 +1,21 @@
-const { methodAllowed, places, numberParam, sendJson, stringParam } = require("./_sample");
+const { geocode, methodAllowed, numberParam, sendJson, stringParam } = require("./_backend");
 
-module.exports = function handler(req, res) {
+module.exports = async function handler(req, res) {
   if (!methodAllowed(req, res)) return;
-  const q = stringParam(req.query.q).trim().toLowerCase();
-  const limit = numberParam(req.query.limit, 5);
-  const suggestions = places
-    .filter((place) => {
-      const label = place.label.toLowerCase();
-      return !q || label.includes(q) || q.split(/\s+/).some((part) => part.length > 2 && label.includes(part));
-    })
-    .slice(0, limit);
-  const fallback = suggestions[0] || places[0];
-
-  sendJson(res, 200, {
-    provider: "sample",
-    providerMode: "public-demo",
-    recommendedProductionProvider: "google_places_autocomplete_new",
-    location: fallback,
-    suggestions: suggestions.length ? suggestions : [fallback],
-  });
+  try {
+    const q = stringParam(req.query.q).trim();
+    if (!q) throw new Error("q is required");
+    const limit = Math.max(1, Math.min(8, numberParam(req.query.limit, 5)));
+    const payload = await geocode({
+      query: q,
+      limit,
+      sessionToken: stringParam(req.query.sessionToken),
+      provider: stringParam(req.query.provider),
+    });
+    sendJson(res, 200, payload);
+  } catch (error) {
+    sendJson(res, 404, {
+      error: error instanceof Error ? error.message : "No location found",
+    });
+  }
 };

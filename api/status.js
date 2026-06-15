@@ -1,29 +1,28 @@
-const { methodAllowed, sendJson } = require("./_sample");
+const {
+  alertsStatus,
+  cacheSeconds,
+  geocodeProviderStatus,
+  hasLiveCredentials,
+  methodAllowed,
+  routeProviderStatus,
+  sendJson,
+} = require("./_backend");
 
 module.exports = function handler(req, res) {
   if (!methodAllowed(req, res)) return;
   sendJson(res, 200, {
-    api: "fuel-path-vercel-sample",
-    credentialsConfigured: false,
-    defaultSource: "sample",
-    cacheSeconds: 300,
+    api: "fuel-path-hosted-backend-v1",
+    credentialsConfigured: hasLiveCredentials(),
+    defaultSource: hasLiveCredentials() ? "live" : "sample",
+    cacheSeconds: cacheSeconds(),
     maps: {
       provider: "osm",
-      googleMapsConfigured: false,
-      googleDirectionsEnabled: false,
+      googleMapsConfigured: Boolean(process.env.FUEL_PATH_GOOGLE_MAPS_API_KEY || process.env.GOOGLE_MAPS_API_KEY),
+      googleDirectionsEnabled: Boolean(process.env.FUEL_PATH_GOOGLE_ROUTES_API_KEY || process.env.FUEL_PATH_GOOGLE_MAPS_API_KEY || process.env.GOOGLE_MAPS_API_KEY),
       googleMapsApiKey: "",
     },
-    geocoding: {
-      activeProvider: "sample",
-      activeMode: "public-demo",
-      recommendedProductionProvider: "google_places_autocomplete_new",
-      requestedProvider: "sample",
-      supportedProviders: ["sample"],
-      fallbackProvider: "sample",
-      backendProxyRequired: true,
-      sessionTokenRequired: false,
-      googlePlacesConfigured: false,
-      mapboxConfigured: false,
-    },
+    geocoding: geocodeProviderStatus(),
+    routing: routeProviderStatus(),
+    alerts: alertsStatus(),
   });
 };

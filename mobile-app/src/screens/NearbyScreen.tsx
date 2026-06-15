@@ -45,6 +45,7 @@ export function NearbyScreen({
   const [stations, setStations] = useState<StationViewModel[]>([]);
   const [centre, setCentre] = useState<MapPoint>(defaultNearbyCentre);
   const [nearbyRadiusKm, setNearbyRadiusKm] = useState(defaultNearbyRadiusKm);
+  const [cameraFocusVersion, setCameraFocusVersion] = useState(0);
   const [locationQuery, setLocationQuery] = useState("");
   const [recentLocations, setRecentLocations] = useState<MapPoint[]>([]);
   const [locationSuggestions, setLocationSuggestions] = useState<MapPoint[]>([]);
@@ -65,7 +66,10 @@ export function NearbyScreen({
     let active = true;
     getGrantedCurrentMapPoint()
       .then((nextCentre) => {
-        if (active) setCentre(nextCentre);
+        if (active) {
+          setCentre(nextCentre);
+          setCameraFocusVersion((current) => current + 1);
+        }
       })
       .catch(() => undefined);
     return () => {
@@ -169,6 +173,7 @@ export function NearbyScreen({
       };
       setCentre(nextCentre);
       setNearbyRadiusKm(defaultNearbyRadiusKm);
+      setCameraFocusVersion((current) => current + 1);
       setLocationQuery(nextCentre.label);
       addRecentLocation(nextCentre);
       setLocationSuggestions([]);
@@ -189,6 +194,7 @@ export function NearbyScreen({
       const nextCentre = await getCurrentMapPoint();
       setCentre(nextCentre);
       setNearbyRadiusKm(defaultNearbyRadiusKm);
+      setCameraFocusVersion((current) => current + 1);
       setLocationQuery("");
       setLocationSuggestions([]);
       setLocationSearchActive(false);
@@ -225,6 +231,7 @@ export function NearbyScreen({
   const selectRecentLocation = (location: MapPoint) => {
     setCentre(location);
     setNearbyRadiusKm(defaultNearbyRadiusKm);
+    setCameraFocusVersion((current) => current + 1);
     setLocationQuery(location.label);
     setLocationSuggestions([]);
     setLocationSearchActive(false);
@@ -240,6 +247,7 @@ export function NearbyScreen({
     };
     setCentre(nextCentre);
     setNearbyRadiusKm(defaultNearbyRadiusKm);
+    setCameraFocusVersion((current) => current + 1);
     setLocationQuery(nextCentre.label);
     addRecentLocation(nextCentre);
     setLocationSuggestions([]);
@@ -303,6 +311,7 @@ export function NearbyScreen({
           onSelect={setSelectedCode}
           onViewportStationsChange={handleViewportStationsChange}
           onMapCentreChange={handleMapCentreChange}
+          cameraFocusKey={`nearby-${cameraFocusVersion}`}
           cameraInsets={nearbyCameraInsets}
         />
       </View>

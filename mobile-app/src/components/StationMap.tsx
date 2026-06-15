@@ -19,6 +19,7 @@ export function StationMap({
   onSelect,
   onViewportStationsChange,
   onMapCentreChange: _onMapCentreChange,
+  cameraFocusKey: _cameraFocusKey,
   routeEndpoints,
   routePoints = [],
   cameraInsets,
@@ -29,6 +30,7 @@ export function StationMap({
   onSelect: (stationCode: string) => void;
   onViewportStationsChange?: (stationCodes: string[]) => void;
   onMapCentreChange?: (centre: MapPoint) => void;
+  cameraFocusKey?: string;
   routeEndpoints?: { from: MapPoint; to: MapPoint };
   routePoints?: MapPoint[];
   cameraInsets?: CameraInsets;

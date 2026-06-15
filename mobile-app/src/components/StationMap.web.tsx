@@ -23,6 +23,7 @@ export function StationMap({
   onSelect,
   onViewportStationsChange,
   onMapCentreChange,
+  cameraFocusKey,
   routeEndpoints,
   routePoints = [],
   cameraInsets,
@@ -33,6 +34,7 @@ export function StationMap({
   onSelect: (stationCode: string) => void;
   onViewportStationsChange?: (stationCodes: string[]) => void;
   onMapCentreChange?: (centre: MapPoint) => void;
+  cameraFocusKey?: string;
   routeEndpoints?: { from: MapPoint; to: MapPoint };
   routePoints?: MapPoint[];
   cameraInsets?: CameraInsets;
@@ -123,13 +125,14 @@ export function StationMap({
     const cameraContextKey = routeEndpoints
       ? [
           "route",
+          cameraFocusKey || "route",
           routeEndpoints.from.lat.toFixed(4),
           routeEndpoints.from.lon.toFixed(4),
           routeEndpoints.to.lat.toFixed(4),
           routeEndpoints.to.lon.toFixed(4),
           routeLatLngs.length,
         ].join(":")
-      : ["nearby", centre.lat.toFixed(4), centre.lon.toFixed(4)].join(":");
+      : ["nearby", cameraFocusKey || "initial"].join(":");
     const cameraContextChanged = cameraContextKey !== lastCameraContextKeyRef.current;
     if (cameraContextChanged) {
       userMovedMapRef.current = false;
@@ -197,7 +200,7 @@ export function StationMap({
       lastFitKeyRef.current = fitKey;
     } else {
       const selected = stations.find((item) => item.station.stationCode === selectedStationCode);
-      if (selected) {
+      if (selected && !userMovedMapRef.current) {
         runProgrammaticMapMove(programmaticMoveRef, () => {
           map.panInside([selected.station.lat, selected.station.lon], {
             animate: true,
@@ -241,6 +244,7 @@ export function StationMap({
     onSelect,
     onViewportStationsChange,
     onMapCentreChange,
+    cameraFocusKey,
     routeEndpoints,
     routePoints,
     cameraInsets,

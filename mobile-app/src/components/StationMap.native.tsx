@@ -26,6 +26,7 @@ export function StationMap({
   onSelect,
   onViewportStationsChange,
   onMapCentreChange,
+  cameraFocusKey,
   routeEndpoints,
   routePoints = [],
   cameraInsets,
@@ -36,6 +37,7 @@ export function StationMap({
   onSelect: (stationCode: string) => void;
   onViewportStationsChange?: (stationCodes: string[]) => void;
   onMapCentreChange?: (centre: MapPoint) => void;
+  cameraFocusKey?: string;
   routeEndpoints?: { from: MapPoint; to: MapPoint };
   routePoints?: MapPoint[];
   cameraInsets?: CameraInsets;
@@ -78,9 +80,12 @@ export function StationMap({
   useEffect(() => {
     if (!mapReady || !mapRef.current || !cameraCoordinates.length) return;
 
-    const cameraKey = `${routeEndpoints ? "route" : "nearby"}|${fitKeyForPoints(
-      cameraCoordinates,
-    )}|${cameraInsetsKey(activeInsets)}`;
+    const cameraKey = [
+      routeEndpoints ? "route" : "nearby",
+      cameraFocusKey || "initial",
+      cameraResetVersion,
+      cameraInsetsKey(activeInsets),
+    ].join("|");
     const cameraContextChanged = cameraKey !== lastCameraKeyRef.current;
     if (!cameraContextChanged && userMovedMapRef.current) return;
 
@@ -98,7 +103,14 @@ export function StationMap({
     });
     lastCameraKeyRef.current = cameraKey;
     userMovedMapRef.current = false;
-  }, [activeInsets, cameraCoordinates, cameraResetVersion, mapReady, routeEndpoints]);
+  }, [
+    activeInsets,
+    cameraCoordinates,
+    cameraFocusKey,
+    cameraResetVersion,
+    mapReady,
+    routeEndpoints,
+  ]);
 
   useEffect(() => {
     if (!mapReady || !mapRef.current || !selectedStationCode) return;
@@ -303,20 +315,6 @@ function resolveCameraInsets(mode: "nearby" | "route", insets?: CameraInsets): R
 
 function cameraInsetsKey(insets: Required<CameraInsets>) {
   return `${insets.top}:${insets.right}:${insets.bottom}:${insets.left}`;
-}
-
-function fitKeyForPoints(points: MapPoint[]) {
-  if (points.length <= 24) {
-    return points.map((point) => `${point.lat.toFixed(4)},${point.lon.toFixed(4)}`).join("|");
-  }
-  const middle = points[Math.floor(points.length / 2)];
-  const last = points[points.length - 1];
-  return [
-    points.length,
-    `${points[0].lat.toFixed(4)},${points[0].lon.toFixed(4)}`,
-    `${middle.lat.toFixed(4)},${middle.lon.toFixed(4)}`,
-    `${last.lat.toFixed(4)},${last.lon.toFixed(4)}`,
-  ].join("|");
 }
 
 function runProgrammaticMapMove(

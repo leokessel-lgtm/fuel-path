@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Linking,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -16,7 +18,7 @@ import { StationRow } from "../components/StationRow";
 import { getCurrentMapPoint, getGrantedCurrentMapPoint } from "../services/currentLocation";
 import { colors, radii, shadow, spacing, typeScale } from "../theme";
 import { AppPreferences, FuelCode, MapPoint, StationViewModel } from "../types";
-import { formatUpdatedAt, sortStations, stationPriceView } from "../utils/pricing";
+import { formatRelativeUpdatedAt, sortStations, stationPriceView } from "../utils/pricing";
 
 const defaultNearbyCentre: MapPoint = {
   lat: -34.0114122,
@@ -58,6 +60,7 @@ export function NearbyScreen({
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   const [locationSearchActive, setLocationSearchActive] = useState(false);
   const [selectedCode, setSelectedCode] = useState<string>();
+  const [selectionDismissed, setSelectionDismissed] = useState(false);
   const [visibleStationCodes, setVisibleStationCodes] = useState<string[]>([]);
   const [sortMode, setSortMode] = useState<SortMode>("value");
   const [sheetExpanded, setSheetExpanded] = useState(false);
@@ -123,6 +126,7 @@ export function NearbyScreen({
         if (!active) return;
         setStations(priced);
         setSelectedCode(priced[0]?.station.stationCode);
+        setSelectionDismissed(false);
       })
       .catch((err: Error) => {
         if (active) setError(err.message);
@@ -289,7 +293,7 @@ export function NearbyScreen({
     () => ({
       top: 170,
       right: 18,
-      bottom: sheetExpanded ? 330 : 210,
+      bottom: sheetExpanded ? 330 : 285,
       left: 18,
     }),
     [sheetExpanded],
@@ -298,11 +302,42 @@ export function NearbyScreen({
   const handleSortPress = (nextSortMode: SortMode) => {
     setSortMode(nextSortMode);
     setSheetExpanded(true);
+    setSelectionDismissed(false);
   };
 
   const handleMapStationSelect = useCallback((stationCode: string) => {
     setSelectedCode(stationCode);
+    setSelectionDismissed(false);
     setSheetExpanded(false);
+  }, []);
+
+  const handleListStationSelect = useCallback((stationCode: string) => {
+    setSelectedCode(stationCode);
+    setSelectionDismissed(false);
+  }, []);
+
+  const handleCloseSelectedStation = useCallback(() => {
+    setSelectedCode(undefined);
+    setSelectionDismissed(true);
+  }, []);
+
+  const handleNavigateToStation = useCallback(async (item: StationViewModel) => {
+    const { station } = item;
+    const label = encodeURIComponent(station.address || station.name);
+    const lat = Number(station.lat);
+    const lon = Number(station.lon);
+    const url =
+      Platform.OS === "ios"
+        ? `http://maps.apple.com/?daddr=${lat},${lon}&q=${label}`
+        : Platform.OS === "android"
+          ? `geo:0,0?q=${lat},${lon}(${label})`
+          : `https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}&travelmode=driving`;
+
+    try {
+      await Linking.openURL(url);
+    } catch {
+      setLocationError("Could not open maps for this station.");
+    }
   }, []);
 
   useEffect(() => {
@@ -310,6 +345,7 @@ export function NearbyScreen({
       setSelectedCode(undefined);
       return;
     }
+    if (selectionDismissed && !selectedCode) return;
     const sortChanged = previousSortMode.current !== sortMode;
     previousSortMode.current = sortMode;
     const selectedExists = stations.some((item) => item.station.stationCode === selectedCode);
@@ -320,7 +356,7 @@ export function NearbyScreen({
     ) {
       setSelectedCode(sortedStations[0].station.stationCode);
     }
-  }, [selectedCode, sortMode, sortedStations, stations]);
+  }, [selectedCode, selectionDismissed, sortMode, sortedStations, stations]);
 
   return (
     <View style={styles.screen}>
@@ -477,16 +513,46 @@ export function NearbyScreen({
           <>
             {selected ? (
               <View style={[styles.selectedCard, !sheetExpanded && styles.selectedCardCollapsed]}>
-                <View>
-                  <Text style={styles.selectedTitle}>{selected.station.name}</Text>
-                  <Text style={styles.muted}>
-                    {selected.station.brand} | {selected.distanceKm.toFixed(1)} km | Last updated{" "}
-                    {formatUpdatedAt(selected.station.updatedAt)}
-                  </Text>
+                <View style={styles.selectedHeader}>
+                  <View style={styles.selectedCopy}>
+                    <Text numberOfLines={1} style={styles.selectedTitle}>
+                      {selected.station.name}
+                    </Text>
+                    {selected.station.address ? (
+                      <Text numberOfLines={2} style={styles.selectedDetail}>
+                        {selected.station.address}
+                      </Text>
+                    ) : null}
+                    {selected.station.phone ? (
+                      <Text numberOfLines={1} style={styles.selectedDetail}>
+                        {selected.station.phone}
+                      </Text>
+                    ) : null}
+                    <Text numberOfLines={1} style={styles.muted}>
+                      {selected.station.brand} | {selected.distanceKm.toFixed(1)} km |{" "}
+                      {formatRelativeUpdatedAt(selected.station.updatedAt)}
+                    </Text>
+                  </View>
+                  <Pressable
+                    accessibilityLabel="Close selected station"
+                    onPress={handleCloseSelectedStation}
+                    style={styles.closeButton}
+                  >
+                    <Text style={styles.closeButtonText}>X</Text>
+                  </Pressable>
                 </View>
-                <View style={styles.selectedPrice}>
-                  <Text style={styles.priceValue}>{selected.adjustedCpl.toFixed(1)}</Text>
-                  <Text style={styles.priceUnit}>c/L</Text>
+                <View style={styles.selectedActions}>
+                  <View style={styles.selectedPrice}>
+                    <Text style={styles.priceValue}>{selected.adjustedCpl.toFixed(1)}</Text>
+                    <Text style={styles.priceUnit}>c/L</Text>
+                  </View>
+                  <Pressable
+                    accessibilityLabel={`Navigate to ${selected.station.name}`}
+                    onPress={() => handleNavigateToStation(selected)}
+                    style={styles.navigateButton}
+                  >
+                    <Text style={styles.navigateButtonText}>Navigate</Text>
+                  </Pressable>
                 </View>
               </View>
             ) : null}
@@ -518,7 +584,7 @@ export function NearbyScreen({
                     item={item}
                     key={item.station.stationCode}
                     selected={item.station.stationCode === selectedCode}
-                    onPress={() => setSelectedCode(item.station.stationCode)}
+                    onPress={() => handleListStationSelect(item.station.stationCode)}
                   />
                 ))}
               </ScrollView>
@@ -771,7 +837,7 @@ const styles = StyleSheet.create({
     zIndex: 6,
   },
   sheetCollapsed: {
-    maxHeight: 230,
+    maxHeight: 305,
   },
   sheetExpanded: {
     height: "66%",
@@ -851,21 +917,53 @@ const styles = StyleSheet.create({
     lineHeight: 17,
   },
   selectedCard: {
-    alignItems: "center",
     backgroundColor: colors.greenSoft,
     borderRadius: radii.md,
-    flexDirection: "row",
-    gap: spacing.md,
-    justifyContent: "space-between",
+    gap: spacing.sm,
     padding: spacing.md,
   },
   selectedCardCollapsed: {
     paddingVertical: spacing.sm,
   },
+  selectedHeader: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    gap: spacing.sm,
+  },
+  selectedCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
   selectedTitle: {
     color: colors.ink,
     fontSize: typeScale.body,
     fontWeight: "900",
+  },
+  selectedDetail: {
+    color: colors.ink,
+    fontSize: typeScale.caption,
+    fontWeight: "700",
+    lineHeight: 17,
+    marginTop: 2,
+  },
+  closeButton: {
+    alignItems: "center",
+    backgroundColor: colors.white,
+    borderRadius: radii.pill,
+    height: 30,
+    justifyContent: "center",
+    width: 30,
+  },
+  closeButtonText: {
+    color: colors.ink,
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  selectedActions: {
+    alignItems: "flex-end",
+    flexDirection: "row",
+    gap: spacing.md,
+    justifyContent: "space-between",
   },
   selectedPrice: {
     alignItems: "flex-end",
@@ -878,6 +976,19 @@ const styles = StyleSheet.create({
   priceUnit: {
     color: colors.muted,
     fontSize: 10,
+    fontWeight: "900",
+  },
+  navigateButton: {
+    alignItems: "center",
+    backgroundColor: colors.green,
+    borderRadius: radii.pill,
+    minHeight: 38,
+    justifyContent: "center",
+    paddingHorizontal: spacing.lg,
+  },
+  navigateButtonText: {
+    color: colors.white,
+    fontSize: typeScale.caption,
     fontWeight: "900",
   },
   list: {

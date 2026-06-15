@@ -588,6 +588,7 @@ def normalise_nsw_payload(payload: dict[str, Any]) -> list[dict[str, Any]]:
             "brand": row.get("brand") or "Unknown",
             "suburb": suburb_from_address(address),
             "address": address,
+            "phone": station_phone(row),
             "lat": float(location.get("latitude") or row.get("latitude") or 0),
             "lon": float(location.get("longitude") or row.get("longitude") or 0),
             "openNow": True,
@@ -622,6 +623,8 @@ def normalise_nsw_payload(payload: dict[str, Any]) -> list[dict[str, Any]]:
                 or station_code,
                 "brand": row.get("brand") or row.get("Brand") or "Unknown",
                 "suburb": row.get("suburb") or row.get("Suburb") or "",
+                "address": row.get("address") or row.get("Address") or "",
+                "phone": station_phone(row),
                 "lat": float(row.get("latitude") or row.get("Latitude") or 0),
                 "lon": float(row.get("longitude") or row.get("Longitude") or 0),
                 "openNow": True,
@@ -634,6 +637,7 @@ def normalise_nsw_payload(payload: dict[str, Any]) -> list[dict[str, Any]]:
                 "discounts": [],
             },
         )
+        station["phone"] = station.get("phone") or station_phone(row)
         fuel_code = str(
             row.get("fueltype") or row.get("fuelType") or row.get("FuelCode") or ""
         ).upper()
@@ -648,6 +652,23 @@ def normalise_nsw_payload(payload: dict[str, Any]) -> list[dict[str, Any]]:
         ):
             station["updatedAt"] = updated_at
     return list(stations.values())
+
+
+def station_phone(row: dict[str, Any]) -> str | None:
+    value = (
+        row.get("phone")
+        or row.get("Phone")
+        or row.get("telephone")
+        or row.get("Telephone")
+        or row.get("contactNumber")
+        or row.get("ContactNumber")
+        or row.get("phoneNumber")
+        or row.get("PhoneNumber")
+        or row.get("contact")
+        or row.get("Contact")
+    )
+    phone = str(value or "").strip()
+    return phone or None
 
 
 def suburb_from_address(address: str) -> str:

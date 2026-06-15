@@ -59,6 +59,7 @@ export type Station = {
   brand: string;
   suburb?: string;
   address?: string;
+  phone?: string;
   lat: number;
   lon: number;
   openNow?: boolean;

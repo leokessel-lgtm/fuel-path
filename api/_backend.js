@@ -239,6 +239,7 @@ function normaliseNswPayload(payload) {
       brand: row.brand || "Unknown",
       suburb: suburbFromAddress(address),
       address,
+      phone: stationPhone(row),
       lat: Number(location.latitude || row.latitude || 0),
       lon: Number(location.longitude || row.longitude || 0),
       openNow: true,
@@ -270,6 +271,7 @@ function normaliseNswPayload(payload) {
         brand: row.brand || row.Brand || "Unknown",
         suburb: row.suburb || row.Suburb || "",
         address: row.address || row.Address || "",
+        phone: stationPhone(row),
         lat: Number(row.latitude || row.Latitude || 0),
         lon: Number(row.longitude || row.Longitude || 0),
         openNow: true,
@@ -279,6 +281,7 @@ function normaliseNswPayload(payload) {
         prices: {},
         discounts: [],
       };
+    station.phone = station.phone || stationPhone(row);
     const fuelCode = String(row.fueltype || row.fuelType || row.FuelCode || "").toUpperCase();
     const price = row.price ?? row.Price ?? row.fuelprice;
     if (fuelCode && price !== undefined && price !== null) {
@@ -292,6 +295,22 @@ function normaliseNswPayload(payload) {
   }
 
   return [...stations.values()].filter((station) => Number.isFinite(station.lat) && Number.isFinite(station.lon));
+}
+
+function stationPhone(row) {
+  const value =
+    row.phone ||
+    row.Phone ||
+    row.telephone ||
+    row.Telephone ||
+    row.contactNumber ||
+    row.ContactNumber ||
+    row.phoneNumber ||
+    row.PhoneNumber ||
+    row.contact ||
+    row.Contact;
+  const phone = String(value || "").trim();
+  return phone || undefined;
 }
 
 function suburbFromAddress(address) {
@@ -398,6 +417,7 @@ function stationPayload(station, { fuel, distanceKm, routeDistance } = {}) {
     brand: station.brand || "Unknown",
     suburb: station.suburb,
     address: station.address,
+    phone: station.phone,
     lat: Number(station.lat),
     lon: Number(station.lon),
     openNow: station.openNow !== false,

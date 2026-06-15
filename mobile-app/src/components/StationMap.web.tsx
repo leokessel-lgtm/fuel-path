@@ -24,6 +24,7 @@ export function StationMap({
   onViewportStationsChange,
   onMapCentreChange,
   cameraFocusKey,
+  showCentreMarker = true,
   routeEndpoints,
   routePoints = [],
   cameraInsets,
@@ -35,6 +36,7 @@ export function StationMap({
   onViewportStationsChange?: (stationCodes: string[]) => void;
   onMapCentreChange?: (centre: MapPoint) => void;
   cameraFocusKey?: string;
+  showCentreMarker?: boolean;
   routeEndpoints?: { from: MapPoint; to: MapPoint };
   routePoints?: MapPoint[];
   cameraInsets?: CameraInsets;
@@ -155,7 +157,7 @@ export function StationMap({
         [routeEndpoints.from.lat, routeEndpoints.from.lon],
         [routeEndpoints.to.lat, routeEndpoints.to.lon],
       );
-    } else {
+    } else if (showCentreMarker) {
       addLocationMarker(L, markerLayer, centre);
     }
 
@@ -245,6 +247,7 @@ export function StationMap({
     onViewportStationsChange,
     onMapCentreChange,
     cameraFocusKey,
+    showCentreMarker,
     routeEndpoints,
     routePoints,
     cameraInsets,

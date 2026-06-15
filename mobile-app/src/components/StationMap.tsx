@@ -20,6 +20,7 @@ export function StationMap({
   onViewportStationsChange,
   onMapCentreChange: _onMapCentreChange,
   cameraFocusKey: _cameraFocusKey,
+  showCentreMarker = true,
   routeEndpoints,
   routePoints = [],
   cameraInsets,
@@ -31,6 +32,7 @@ export function StationMap({
   onViewportStationsChange?: (stationCodes: string[]) => void;
   onMapCentreChange?: (centre: MapPoint) => void;
   cameraFocusKey?: string;
+  showCentreMarker?: boolean;
   routeEndpoints?: { from: MapPoint; to: MapPoint };
   routePoints?: MapPoint[];
   cameraInsets?: CameraInsets;
@@ -58,11 +60,11 @@ export function StationMap({
   return (
     <View style={styles.map}>
       <View style={styles.mapGrid} />
-      {routeEndpoints ? null : (
+      {!routeEndpoints && showCentreMarker ? (
         <View style={[styles.locationPin, positionForPoint(centre, bounds, activeInsets)]}>
           <View style={styles.locationPinInner} />
         </View>
-      )}
+      ) : null}
       {visibleRoutePoints.map((point, index) => (
         <View
           key={`${point.lat}-${point.lon}-${index}`}

@@ -312,6 +312,7 @@ export function NearbyScreen({
           onViewportStationsChange={handleViewportStationsChange}
           onMapCentreChange={handleMapCentreChange}
           cameraFocusKey={`nearby-${cameraFocusVersion}`}
+          showCentreMarker={centre.label === "Current location"}
           cameraInsets={nearbyCameraInsets}
         />
       </View>

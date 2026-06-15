@@ -27,6 +27,7 @@ export function StationMap({
   onViewportStationsChange,
   onMapCentreChange,
   cameraFocusKey,
+  showCentreMarker = true,
   routeEndpoints,
   routePoints = [],
   cameraInsets,
@@ -38,6 +39,7 @@ export function StationMap({
   onViewportStationsChange?: (stationCodes: string[]) => void;
   onMapCentreChange?: (centre: MapPoint) => void;
   cameraFocusKey?: string;
+  showCentreMarker?: boolean;
   routeEndpoints?: { from: MapPoint; to: MapPoint };
   routePoints?: MapPoint[];
   cameraInsets?: CameraInsets;
@@ -188,7 +190,7 @@ export function StationMap({
           />
         ) : null}
 
-        {!routeEndpoints ? (
+        {!routeEndpoints && showCentreMarker ? (
           <Marker
             coordinate={{ latitude: centre.lat, longitude: centre.lon }}
             title={centre.label}

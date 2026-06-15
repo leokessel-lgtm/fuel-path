@@ -490,25 +490,23 @@ export function NearbyScreen({
                 </View>
               </View>
             ) : null}
-            {sheetExpanded ? (
-              <View style={styles.sortRow}>
-                {sortOptions.map((option) => {
-                  const selectedSort = sortMode === option.key;
-                  return (
-                    <Pressable
-                      accessibilityLabel={option.accessibilityLabel}
-                      key={option.key}
-                      onPress={() => handleSortPress(option.key)}
-                      style={[styles.sortButton, selectedSort && styles.sortButtonSelected]}
-                    >
-                      <Text style={[styles.sortText, selectedSort && styles.sortTextSelected]}>
-                        {option.label}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            ) : null}
+            <View style={styles.sortRow}>
+              {sortOptions.map((option) => {
+                const selectedSort = sortMode === option.key;
+                return (
+                  <Pressable
+                    accessibilityLabel={option.accessibilityLabel}
+                    key={option.key}
+                    onPress={() => handleSortPress(option.key)}
+                    style={[styles.sortButton, selectedSort && styles.sortButtonSelected]}
+                  >
+                    <Text style={[styles.sortText, selectedSort && styles.sortTextSelected]}>
+                      {option.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
             {sheetExpanded ? (
               <ScrollView
                 style={styles.list}

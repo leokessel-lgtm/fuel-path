@@ -23,6 +23,9 @@ const defaultNearbyCentre: MapPoint = {
   lon: 151.0993847,
   label: "66B Easton Ave, Sylvania NSW 2224",
 };
+const defaultNearbyRadiusKm = 8;
+const mapSearchRadiusKm = 18;
+const emptyMapRetryRadiusKm = 32;
 
 type SortMode = "distance" | "price" | "value";
 
@@ -41,6 +44,7 @@ export function NearbyScreen({
 }) {
   const [stations, setStations] = useState<StationViewModel[]>([]);
   const [centre, setCentre] = useState<MapPoint>(defaultNearbyCentre);
+  const [nearbyRadiusKm, setNearbyRadiusKm] = useState(defaultNearbyRadiusKm);
   const [locationQuery, setLocationQuery] = useState("");
   const [recentLocations, setRecentLocations] = useState<MapPoint[]>([]);
   const [locationSuggestions, setLocationSuggestions] = useState<MapPoint[]>([]);
@@ -80,12 +84,31 @@ export function NearbyScreen({
     let active = true;
     setLoading(true);
     setError("");
-    getNearbyStations({ fuel: preferences.fuel, centre })
-      .then((response) => {
-        if (!active) return;
-        const priced = response.stations
+    async function loadStations() {
+      const response = await getNearbyStations({
+        fuel: preferences.fuel,
+        centre,
+        radiusKm: nearbyRadiusKm,
+      });
+      let priced = response.stations
+        .map((station) => stationPriceView(station, preferences.fuel, preferences))
+        .filter((item): item is StationViewModel => Boolean(item));
+      if (!priced.length && nearbyRadiusKm < emptyMapRetryRadiusKm) {
+        const retryResponse = await getNearbyStations({
+          fuel: preferences.fuel,
+          centre,
+          radiusKm: emptyMapRetryRadiusKm,
+        });
+        priced = retryResponse.stations
           .map((station) => stationPriceView(station, preferences.fuel, preferences))
           .filter((item): item is StationViewModel => Boolean(item));
+      }
+      return priced;
+    }
+
+    loadStations()
+      .then((priced) => {
+        if (!active) return;
         setStations(priced);
         setSelectedCode(priced[0]?.station.stationCode);
       })
@@ -98,7 +121,7 @@ export function NearbyScreen({
     return () => {
       active = false;
     };
-  }, [centre, preferences]);
+  }, [centre, nearbyRadiusKm, preferences]);
 
   useEffect(() => {
     if (!locationSearchActive) return;
@@ -145,6 +168,7 @@ export function NearbyScreen({
         label: shortLocationLabel(query, location.label),
       };
       setCentre(nextCentre);
+      setNearbyRadiusKm(defaultNearbyRadiusKm);
       setLocationQuery(nextCentre.label);
       addRecentLocation(nextCentre);
       setLocationSuggestions([]);
@@ -164,6 +188,7 @@ export function NearbyScreen({
     try {
       const nextCentre = await getCurrentMapPoint();
       setCentre(nextCentre);
+      setNearbyRadiusKm(defaultNearbyRadiusKm);
       setLocationQuery("");
       setLocationSuggestions([]);
       setLocationSearchActive(false);
@@ -182,8 +207,24 @@ export function NearbyScreen({
     );
   }, []);
 
+  const handleMapCentreChange = useCallback((nextCentre: MapPoint) => {
+    setNearbyRadiusKm(mapSearchRadiusKm);
+    setCentre((current) => {
+      if (distanceKm(current, nextCentre) < 0.8) return current;
+      return {
+        ...nextCentre,
+        label: "Map area",
+      };
+    });
+    setLocationQuery("");
+    setLocationSuggestions([]);
+    setLocationSearchActive(false);
+    setLocationError("");
+  }, []);
+
   const selectRecentLocation = (location: MapPoint) => {
     setCentre(location);
+    setNearbyRadiusKm(defaultNearbyRadiusKm);
     setLocationQuery(location.label);
     setLocationSuggestions([]);
     setLocationSearchActive(false);
@@ -198,6 +239,7 @@ export function NearbyScreen({
       label: shortLocationLabel(location.label, location.label),
     };
     setCentre(nextCentre);
+    setNearbyRadiusKm(defaultNearbyRadiusKm);
     setLocationQuery(nextCentre.label);
     addRecentLocation(nextCentre);
     setLocationSuggestions([]);
@@ -260,6 +302,7 @@ export function NearbyScreen({
           selectedStationCode={selectedCode}
           onSelect={setSelectedCode}
           onViewportStationsChange={handleViewportStationsChange}
+          onMapCentreChange={handleMapCentreChange}
           cameraInsets={nearbyCameraInsets}
         />
       </View>
@@ -462,6 +505,22 @@ function sameStationCodes(left: string[], right: string[]) {
     if (left[index] !== right[index]) return false;
   }
   return true;
+}
+
+function distanceKm(left: MapPoint, right: MapPoint) {
+  const radiusKm = 6371;
+  const dLat = toRad(right.lat - left.lat);
+  const dLon = toRad(right.lon - left.lon);
+  const lat1 = toRad(left.lat);
+  const lat2 = toRad(right.lat);
+  const hav =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
+  return 2 * radiusKm * Math.asin(Math.sqrt(hav));
+}
+
+function toRad(value: number) {
+  return (value * Math.PI) / 180;
 }
 
 function shortLocationLabel(query: string, resolvedLabel: string) {

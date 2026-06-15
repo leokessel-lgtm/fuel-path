@@ -25,6 +25,7 @@ export function StationMap({
   selectedStationCode,
   onSelect,
   onViewportStationsChange,
+  onMapCentreChange,
   routeEndpoints,
   routePoints = [],
   cameraInsets,
@@ -34,6 +35,7 @@ export function StationMap({
   selectedStationCode?: string;
   onSelect: (stationCode: string) => void;
   onViewportStationsChange?: (stationCodes: string[]) => void;
+  onMapCentreChange?: (centre: MapPoint) => void;
   routeEndpoints?: { from: MapPoint; to: MapPoint };
   routePoints?: MapPoint[];
   cameraInsets?: CameraInsets;
@@ -41,6 +43,7 @@ export function StationMap({
   const mapRef = useRef<MapView | null>(null);
   const markerRefs = useRef<Record<string, MapMarker | null>>({});
   const lastCameraKeyRef = useRef("");
+  const lastReportedUserCentreKeyRef = useRef("");
   const programmaticMoveRef = useRef(false);
   const userMovedMapRef = useRef(false);
   const userGestureStartedRef = useRef(false);
@@ -122,6 +125,17 @@ export function StationMap({
     if (!programmaticMoveRef.current && userGestureStartedRef.current) {
       userMovedMapRef.current = true;
       setMapMovedByUser(true);
+      if (!routeEndpoints) {
+        const centreKey = `${region.latitude.toFixed(4)}:${region.longitude.toFixed(4)}`;
+        if (centreKey !== lastReportedUserCentreKeyRef.current) {
+          lastReportedUserCentreKeyRef.current = centreKey;
+          onMapCentreChange?.({
+            lat: region.latitude,
+            lon: region.longitude,
+            label: "Map area",
+          });
+        }
+      }
     }
     onViewportStationsChange?.(stationCodesInRegion(stations, region));
   };

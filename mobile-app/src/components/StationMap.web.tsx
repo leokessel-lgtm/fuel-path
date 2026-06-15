@@ -22,6 +22,7 @@ export function StationMap({
   selectedStationCode,
   onSelect,
   onViewportStationsChange,
+  onMapCentreChange,
   routeEndpoints,
   routePoints = [],
   cameraInsets,
@@ -31,6 +32,7 @@ export function StationMap({
   selectedStationCode?: string;
   onSelect: (stationCode: string) => void;
   onViewportStationsChange?: (stationCodes: string[]) => void;
+  onMapCentreChange?: (centre: MapPoint) => void;
   routeEndpoints?: { from: MapPoint; to: MapPoint };
   routePoints?: MapPoint[];
   cameraInsets?: CameraInsets;
@@ -41,6 +43,7 @@ export function StationMap({
   const leafletRef = useRef<typeof Leaflet | null>(null);
   const lastFitKeyRef = useRef("");
   const lastCameraContextKeyRef = useRef("");
+  const lastReportedUserCentreKeyRef = useRef("");
   const programmaticMoveRef = useRef(false);
   const userMovedMapRef = useRef(false);
   const [mapReady, setMapReady] = useState(false);
@@ -85,6 +88,7 @@ export function StationMap({
       leafletRef.current = null;
       lastFitKeyRef.current = "";
       lastCameraContextKeyRef.current = "";
+      lastReportedUserCentreKeyRef.current = "";
       programmaticMoveRef.current = false;
       userMovedMapRef.current = false;
     };
@@ -210,6 +214,18 @@ export function StationMap({
         .filter((item) => bounds.contains([item.station.lat, item.station.lon]))
         .map((item) => item.station.stationCode);
       onViewportStationsChange(visibleCodes);
+      if (!routeEndpoints && userMovedMapRef.current && !programmaticMoveRef.current) {
+        const nextCentre = map.getCenter();
+        const centreKey = `${nextCentre.lat.toFixed(4)}:${nextCentre.lng.toFixed(4)}`;
+        if (centreKey !== lastReportedUserCentreKeyRef.current) {
+          lastReportedUserCentreKeyRef.current = centreKey;
+          onMapCentreChange?.({
+            lat: nextCentre.lat,
+            lon: nextCentre.lng,
+            label: "Map area",
+          });
+        }
+      }
     };
 
     map.on("moveend zoomend", notifyVisibleStations);
@@ -224,6 +240,7 @@ export function StationMap({
     mapReady,
     onSelect,
     onViewportStationsChange,
+    onMapCentreChange,
     routeEndpoints,
     routePoints,
     cameraInsets,

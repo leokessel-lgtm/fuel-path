@@ -68,6 +68,7 @@ export function NearbyScreen({
   const [loading, setLoading] = useState(true);
   const [resolvingLocation, setResolvingLocation] = useState(false);
   const [error, setError] = useState("");
+  const [stationNotice, setStationNotice] = useState("");
   const [locationError, setLocationError] = useState("");
   const addressSessionTokenRef = useRef(makeLocationSessionToken());
 
@@ -97,6 +98,7 @@ export function NearbyScreen({
     let active = true;
     setLoading(true);
     setError("");
+    setStationNotice("");
     async function loadStations() {
       const response = await getNearbyStations({
         fuel: preferences.fuel,
@@ -104,6 +106,7 @@ export function NearbyScreen({
         radiusKm: nearbyRadiusKm,
         limit: stationLimitForRadius(nearbyRadiusKm),
       });
+      let notice = response.context.warning || "";
       let priced = response.stations
         .map((station) => stationPriceView(station, preferences.fuel, preferences))
         .filter((item): item is StationViewModel => Boolean(item));
@@ -114,17 +117,22 @@ export function NearbyScreen({
           radiusKm: emptyMapRetryRadiusKm,
           limit: stationLimitForRadius(emptyMapRetryRadiusKm),
         });
+        notice = retryResponse.context.warning || notice;
         priced = retryResponse.stations
           .map((station) => stationPriceView(station, preferences.fuel, preferences))
           .filter((item): item is StationViewModel => Boolean(item));
       }
-      return priced;
+      if (!priced.length && !notice) {
+        notice = `No ${preferences.fuel} prices found around ${centre.label}.`;
+      }
+      return { notice, priced };
     }
 
     loadStations()
-      .then((priced) => {
+      .then(({ notice, priced }) => {
         if (!active) return;
         setStations(priced);
+        setStationNotice(notice);
         setSelectedCode(undefined);
         setSelectionDismissed(false);
       })
@@ -523,6 +531,13 @@ export function NearbyScreen({
           <View style={styles.emptyState}>
             <Text style={styles.emptyTitle}>Could not load stations</Text>
             <Text style={styles.muted}>{error}</Text>
+          </View>
+        ) : null}
+
+        {!loading && !error && stationNotice && !stations.length ? (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyTitle}>No priced stations found</Text>
+            <Text style={styles.muted}>{stationNotice}</Text>
           </View>
         ) : null}
 

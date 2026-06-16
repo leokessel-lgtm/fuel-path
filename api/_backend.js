@@ -15,9 +15,9 @@ const QLD_REGION_PARAMS = {
   geoRegionId: 1,
 };
 const QLD_BOUNDS = {
-  minLat: -29.5,
+  minLat: -29.1,
   maxLat: -9,
-  minLon: 137,
+  minLon: 138,
   maxLon: 154.2,
 };
 const QLD_FUEL_ID_TO_CODE = new Map([
@@ -33,7 +33,13 @@ const WA_BOUNDS = {
   minLat: -36,
   maxLat: -13,
   minLon: 112,
-  maxLon: 129.5,
+  maxLon: 129.05,
+};
+const NSW_BOUNDS = {
+  minLat: -37.7,
+  maxLat: -28,
+  minLon: 140.9,
+  maxLon: 154.2,
 };
 const VIC_BOUNDS = {
   minLat: -39.3,
@@ -41,6 +47,23 @@ const VIC_BOUNDS = {
   minLon: 140.9,
   maxLon: 150.2,
 };
+const ACT_BOUNDS = {
+  minLat: -35.95,
+  maxLat: -35.1,
+  minLon: 148.7,
+  maxLon: 149.45,
+};
+const NSW_VIC_BORDER_POINTS = [
+  { lon: 141.0, lat: -34.0 },
+  { lon: 142.2, lat: -34.18 },
+  { lon: 143.6, lat: -35.35 },
+  { lon: 144.75, lat: -36.12 },
+  { lon: 146.0, lat: -35.998 },
+  { lon: 146.45, lat: -36.03 },
+  { lon: 146.9, lat: -36.08 },
+  { lon: 148.25, lat: -36.65 },
+  { lon: 149.98, lat: -37.5 },
+];
 const WA_FUELWATCH_PRODUCTS = [
   ["U91", 1],
   ["P95", 2],
@@ -481,7 +504,7 @@ async function loadLiveQldStations({ forceRefresh = false } = {}) {
 
 function normaliseQldPayload(sitePayload, pricePayload, brandPayload = {}, regionPayload = {}) {
   const brands = qldLookupById(brandPayload, "Brands", "BrandId");
-  const regions = qldLookupById(regionPayload, "GeographicRegions", "GeoRegionId");
+  const regions = qldRegionLookupById(regionPayload);
   const stations = new Map();
 
   for (const row of sitePayload?.S || []) {
@@ -559,18 +582,56 @@ function qldLookupById(payload, listKey, idKey) {
   return lookup;
 }
 
-function qldRegionName(row, regions) {
-  for (const key of ["G1", "G2"]) {
-    const value = row?.[key];
-    if (value !== undefined && regions.has(String(value))) return regions.get(String(value));
+function qldRegionLookupById(payload) {
+  const rows = Array.isArray(payload?.GeographicRegions) ? payload.GeographicRegions : [];
+  const lookup = new Map();
+  for (const row of rows) {
+    if (row && row.GeoRegionId !== undefined && row.Name) lookup.set(String(row.GeoRegionId), row);
   }
-  return "";
+  return lookup;
+}
+
+function qldRegionName(row, regions) {
+  for (const key of ["G1", "G2", "G3", "G4", "G5"]) {
+    const value = row?.[key];
+    const region = regions.get(String(value));
+    if (region && Number(region.GeoRegionLevel) === 1 && !/^queensland$/i.test(String(region.Name))) {
+      return String(region.Name);
+    }
+  }
+  return qldSuburbFromAddress(row?.A, row?.P) || qldSuburbFromName(row?.N);
 }
 
 function qldAddress(row, suburb) {
-  return [String(row.A || "").trim(), suburb, `QLD ${String(row.P || "").trim()}`.trim()]
-    .filter(Boolean)
-    .join(", ");
+  const address = String(row.A || "").replace(/\s+/g, " ").replace(/,\s*Australia$/i, "").trim();
+  const postcode = String(row.P || "").trim();
+  if (/\b(?:QLD|Queensland)\s+\d{4}\b/i.test(address)) return address;
+  return [address, suburb, `QLD ${postcode}`.trim()].filter(Boolean).join(", ");
+}
+
+function qldSuburbFromAddress(address, postcode) {
+  const text = String(address || "").replace(/\s+/g, " ").trim();
+  const postcodeText = String(postcode || "").trim();
+  const postcodePattern = postcodeText || "\\d{4}";
+  const match = text.match(new RegExp(`,\\s*([^,]+?)\\s+(?:QLD|Queensland)\\s+${postcodePattern}\\b`, "i"));
+  return match ? cleanQldSuburb(match[1]) : "";
+}
+
+function qldSuburbFromName(name) {
+  const text = String(name || "").replace(/\s+/g, " ").trim();
+  const cleaned = text
+    .replace(/^(?:7-Eleven|Ampol(?: Foodary)?|BP|Caltex|Freedom Fuels|Liberty|Metro|Quill Petroleum|Shell Reddy Express|Shell|United|U-Go)\s+/i, "")
+    .replace(/\s+(?:Truckstop|Truck Stop|Service Centre|Service Station)$/i, "")
+    .trim();
+  if (!cleaned || cleaned === text || cleaned.length > 40 || /\b(?:Cnr|Corner|Highway|Road|Street|Drive)\b/i.test(cleaned)) return "";
+  return cleanQldSuburb(cleaned);
+}
+
+function cleanQldSuburb(value) {
+  return String(value || "")
+    .replace(/\b(?:QLD|Queensland)\b.*$/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function qldPriceCpl(value) {
@@ -916,11 +977,14 @@ function loadSampleStations() {
 }
 
 function pointInQld(point) {
+  const lat = Number(point?.lat);
+  const lon = Number(point?.lon);
+  if (lon < 141 && lat < -26) return false;
   return (
-    Number(point?.lat) >= QLD_BOUNDS.minLat &&
-    Number(point?.lat) <= QLD_BOUNDS.maxLat &&
-    Number(point?.lon) >= QLD_BOUNDS.minLon &&
-    Number(point?.lon) <= QLD_BOUNDS.maxLon
+    lat >= QLD_BOUNDS.minLat &&
+    lat <= QLD_BOUNDS.maxLat &&
+    lon >= QLD_BOUNDS.minLon &&
+    lon <= QLD_BOUNDS.maxLon
   );
 }
 
@@ -933,13 +997,77 @@ function pointInWa(point) {
   );
 }
 
-function pointInVic(point) {
+function pointInAct(point) {
   return (
-    Number(point?.lat) >= VIC_BOUNDS.minLat &&
-    Number(point?.lat) <= VIC_BOUNDS.maxLat &&
-    Number(point?.lon) >= VIC_BOUNDS.minLon &&
-    Number(point?.lon) <= VIC_BOUNDS.maxLon
+    Number(point?.lat) >= ACT_BOUNDS.minLat &&
+    Number(point?.lat) <= ACT_BOUNDS.maxLat &&
+    Number(point?.lon) >= ACT_BOUNDS.minLon &&
+    Number(point?.lon) <= ACT_BOUNDS.maxLon
   );
+}
+
+function pointInVic(point) {
+  const lat = Number(point?.lat);
+  const lon = Number(point?.lon);
+  if (pointInAct(point)) return false;
+  if (
+    !(
+      Number.isFinite(lat) &&
+      Number.isFinite(lon) &&
+      lat >= VIC_BOUNDS.minLat &&
+      lat <= VIC_BOUNDS.maxLat &&
+      lon >= VIC_BOUNDS.minLon &&
+      lon <= VIC_BOUNDS.maxLon
+    )
+  ) {
+    return false;
+  }
+
+  const borderLat = nswVicBorderLatAtLon(lon);
+  if (borderLat !== undefined) return lat < borderLat;
+
+  return (
+    lat >= VIC_BOUNDS.minLat &&
+    lat <= VIC_BOUNDS.maxLat &&
+    lon >= VIC_BOUNDS.minLon &&
+    lon <= VIC_BOUNDS.maxLon
+  );
+}
+
+function pointInNswOrAct(point) {
+  const lat = Number(point?.lat);
+  const lon = Number(point?.lon);
+  if (pointInAct(point)) return true;
+  if (
+    !(
+      Number.isFinite(lat) &&
+      Number.isFinite(lon) &&
+      lat >= NSW_BOUNDS.minLat &&
+      lat <= NSW_BOUNDS.maxLat &&
+      lon >= NSW_BOUNDS.minLon &&
+      lon <= NSW_BOUNDS.maxLon
+    )
+  ) {
+    return false;
+  }
+  return !pointInQld(point) && !pointInWa(point) && !pointInVic(point);
+}
+
+function nswVicBorderLatAtLon(lon) {
+  const first = NSW_VIC_BORDER_POINTS[0];
+  const last = NSW_VIC_BORDER_POINTS[NSW_VIC_BORDER_POINTS.length - 1];
+  if (lon < first.lon || lon > last.lon) return undefined;
+
+  for (let index = 1; index < NSW_VIC_BORDER_POINTS.length; index += 1) {
+    const left = NSW_VIC_BORDER_POINTS[index - 1];
+    const right = NSW_VIC_BORDER_POINTS[index];
+    if (lon < left.lon || lon > right.lon) continue;
+    const span = right.lon - left.lon;
+    const ratio = span ? (lon - left.lon) / span : 0;
+    return left.lat + (right.lat - left.lat) * ratio;
+  }
+
+  return undefined;
 }
 
 function qldNswBorderArea(point, radiusKm = 0) {
@@ -957,19 +1085,34 @@ function liveProviderKeysForArea(points = [], radiusKm = 0) {
   const hasQldPoint = points.some(pointInQld);
   const hasWaPoint = points.some(pointInWa);
   const hasVicPoint = points.some(pointInVic);
-  const hasNonQldPoint = points.some((point) => !pointInQld(point));
+  const hasNswPoint = points.some(pointInNswOrAct);
   if (hasWaPoint) return ["wa"];
-  if (hasVicPoint) return ["vic"];
-  if (hasQldPoint) {
-    const providers = ["qld"];
-    if (hasNonQldPoint || points.some((point) => qldNswBorderArea(point, radiusKm))) providers.push("nsw");
+  if (hasVicPoint) {
+    const providers = ["vic"];
+    if (hasNswPoint) providers.push("nsw");
     return providers;
   }
-  return ["nsw"];
+  if (hasQldPoint) {
+    const providers = ["qld"];
+    if (hasNswPoint || points.some((point) => qldNswBorderArea(point, radiusKm))) providers.push("nsw");
+    return providers;
+  }
+  if (hasNswPoint) return ["nsw"];
+  return [];
 }
 
-async function loadLiveStationsForArea({ forceRefresh = false, points = [], radiusKm = 0 } = {}) {
-  const providers = liveProviderKeysForArea(points, radiusKm);
+async function loadLiveStationsForArea({ forceRefresh = false, points = [], radiusKm = 0, providers: requestedProviders } = {}) {
+  const providers = requestedProviders || liveProviderKeysForArea(points, radiusKm);
+  if (!providers.length) {
+    return {
+      stations: [],
+      source: "unsupported_region",
+      provider: "unsupported_region",
+      cacheHit: false,
+      cacheAgeSeconds: 0,
+      warning: "No live fuel provider covers this area yet.",
+    };
+  }
   const stations = [];
   const loadedProviders = [];
   const errors = [];
@@ -1022,8 +1165,25 @@ async function loadStationData({ requestedSource = "auto", forceRefresh = false,
     };
   }
 
+  const requestedProvider = providerFromSource(source);
+  if (requestedProvider && points.length && !points.some((point) => pointInProviderCoverage(requestedProvider, point))) {
+    return {
+      stations: [],
+      source: "unsupported_region",
+      provider: requestedProvider,
+      cacheHit: false,
+      cacheAgeSeconds: 0,
+      warning: `Requested ${requestedProvider.toUpperCase()} fuel provider does not cover this area.`,
+    };
+  }
+
   try {
-    return await loadLiveStationsForArea({ forceRefresh, points, radiusKm });
+    return await loadLiveStationsForArea({
+      forceRefresh,
+      points,
+      radiusKm,
+      providers: requestedProvider ? [requestedProvider] : undefined,
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     liveCache.lastError = message;
@@ -1040,8 +1200,22 @@ async function loadStationData({ requestedSource = "auto", forceRefresh = false,
 
 function resolveSource(source) {
   const value = source === "auto" || !source ? (hasAnyLiveCredentials() ? "live" : "sample") : source;
-  if (!["live", "sample"].includes(value)) throw new Error("source must be live, sample or auto");
+  if (!["live", "sample", "nsw", "qld", "wa", "vic"].includes(value)) {
+    throw new Error("source must be live, sample, nsw, qld, wa, vic or auto");
+  }
   return value;
+}
+
+function providerFromSource(source) {
+  return ["nsw", "qld", "wa", "vic"].includes(source) ? source : "";
+}
+
+function pointInProviderCoverage(provider, point) {
+  if (provider === "nsw") return pointInNswOrAct(point);
+  if (provider === "qld") return pointInQld(point);
+  if (provider === "wa") return pointInWa(point);
+  if (provider === "vic") return pointInVic(point);
+  return false;
 }
 
 function stationPayload(station, { fuel, distanceKm, routeDistance } = {}) {
@@ -1398,16 +1572,20 @@ function selectGeocodeProvider(value, { allowFallback = false } = {}) {
 function geocodeProviderStatus() {
   const requestedProvider = process.env.FUEL_PATH_GEOCODE_PROVIDER || "auto";
   const activeProvider = selectGeocodeProvider(requestedProvider, { allowFallback: true });
+  const googlePlacesConfigured = Boolean(googlePlacesApiKey());
+  const billableRequestsEnabled = activeProvider === "google" && googlePlacesConfigured;
   return {
     activeProvider,
     activeMode: activeProvider === "nominatim" ? "validation" : "production_candidate",
+    costMode: billableRequestsEnabled ? "billable_provider_enabled" : "no_cost_validation",
+    billableRequestsEnabled,
     recommendedProductionProvider: RECOMMENDED_GEOCODE_PROVIDER,
     requestedProvider,
     supportedProviders: ["google", "mapbox", "here", "geoapify", "nominatim"],
     fallbackProvider: "nominatim",
     backendProxyRequired: true,
     sessionTokenRequired: activeProvider === "google",
-    googlePlacesConfigured: Boolean(googlePlacesApiKey()),
+    googlePlacesConfigured,
     mapboxConfigured: Boolean(mapboxAccessToken()),
     hereConfigured: Boolean(hereApiKey()),
     geoapifyConfigured: Boolean(geoapifyApiKey()),
@@ -1638,13 +1816,17 @@ function activeRouteProvider() {
 
 function routeProviderStatus() {
   const activeProvider = activeRouteProvider();
+  const googleRoutesConfigured = Boolean(googleRoutesApiKey());
+  const billableRequestsEnabled = activeProvider === "google" && googleRoutesConfigured;
   return {
     activeProvider,
     activeMode: activeProvider === "google" ? "production_candidate" : "validation",
+    costMode: billableRequestsEnabled ? "billable_provider_enabled" : "no_cost_validation",
+    billableRequestsEnabled,
     requestedProvider: process.env.FUEL_PATH_ROUTE_PROVIDER || "auto",
     supportedProviders: ["google", "osrm"],
     fallbackProvider: "osrm",
-    googleRoutesConfigured: Boolean(googleRoutesApiKey()),
+    googleRoutesConfigured,
   };
 }
 
@@ -1778,9 +1960,13 @@ module.exports = {
   hasVicCredentials,
   hasWaProvider,
   loadStationData,
+  liveProviderKeysForArea,
   methodAllowed,
+  normaliseQldPayload,
   numberParam,
+  pointInAct,
   pointFromQuery,
+  pointInVic,
   routeContextStations,
   routeFromPayload,
   routeProviderStatus,

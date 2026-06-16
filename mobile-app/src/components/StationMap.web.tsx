@@ -164,14 +164,17 @@ export function StationMap({
 
     stations.slice(0, maxStationMarkers).forEach((item) => {
       const selected = item.station.stationCode === selectedStationCode;
+      const accessibilityLabel = markerAccessibilityLabel(item);
       const marker = L.marker([item.station.lat, item.station.lon], {
         icon: L.divIcon({
           className: "",
-          html: markerHtml(item, selected),
+          html: markerHtml(item, selected, accessibilityLabel),
           iconAnchor: [42, 48],
           iconSize: [84, 48],
         }),
+        alt: accessibilityLabel,
         riseOnHover: true,
+        title: accessibilityLabel,
         zIndexOffset: selected ? 500 : 0,
       });
       marker.on("click", () => {
@@ -313,7 +316,7 @@ function addDestinationMarker(
   markerLayer.addLayer(marker);
 }
 
-function markerHtml(item: StationViewModel, selected: boolean) {
+function markerHtml(item: StationViewModel, selected: boolean, accessibilityLabel: string) {
   const style = brandStyleForStation(item.station);
   const iconUri = imageUri(style.icon);
   const logo = iconUri
@@ -322,11 +325,19 @@ function markerHtml(item: StationViewModel, selected: boolean) {
         style.initials,
       )}</span>`;
   return `
-    <div class="fuel-path-marker${selected ? " is-selected" : ""}">
+    <div class="fuel-path-marker${selected ? " is-selected" : ""}" role="button" aria-label="${escapeHtml(accessibilityLabel)}">
       ${logo}
       <span class="fuel-path-marker-price">${item.adjustedCpl.toFixed(1)}</span>
     </div>
   `;
+}
+
+function markerAccessibilityLabel(item: StationViewModel) {
+  const brand = item.station.brand || "Unknown brand";
+  const name = item.station.name || "Fuel station";
+  const price = `${item.adjustedCpl.toFixed(1)} cents per litre`;
+  const distance = `${item.distanceKm.toFixed(1)} kilometres away`;
+  return `${name}, ${brand}, ${price}, ${distance}`;
 }
 
 function imageUri(icon: unknown) {

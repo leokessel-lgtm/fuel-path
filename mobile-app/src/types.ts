@@ -99,6 +99,7 @@ export type NearbyResponse = {
     stationCount: number;
     returnedCount: number;
     generatedAt: string;
+    warning?: string;
   };
   stations: Station[];
 };

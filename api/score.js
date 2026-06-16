@@ -60,6 +60,8 @@ module.exports = async function handler(req, res) {
         ...scored.context,
         source: data.source,
         provider: data.provider,
+        capability: data.capability,
+        regionCapabilities: data.regionCapabilities || [],
         routeProvider: route.provider,
         generatedAt: new Date().toISOString(),
         cacheHit: data.cacheHit,

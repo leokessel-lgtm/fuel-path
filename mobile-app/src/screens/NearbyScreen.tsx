@@ -106,7 +106,7 @@ export function NearbyScreen({
         radiusKm: nearbyRadiusKm,
         limit: stationLimitForRadius(nearbyRadiusKm),
       });
-      let notice = response.context.warning || "";
+      let notice = stationContextNotice(response.context);
       let priced = response.stations
         .map((station) => stationPriceView(station, preferences.fuel, preferences))
         .filter((item): item is StationViewModel => Boolean(item));
@@ -117,7 +117,7 @@ export function NearbyScreen({
           radiusKm: emptyMapRetryRadiusKm,
           limit: stationLimitForRadius(emptyMapRetryRadiusKm),
         });
-        notice = retryResponse.context.warning || notice;
+        notice = stationContextNotice(retryResponse.context) || notice;
         priced = retryResponse.stations
           .map((station) => stationPriceView(station, preferences.fuel, preferences))
           .filter((item): item is StationViewModel => Boolean(item));
@@ -543,6 +543,11 @@ export function NearbyScreen({
 
         {!loading && !error ? (
           <>
+            {stationNotice && stations.length ? (
+              <View style={styles.noticeCard}>
+                <Text style={styles.noticeText}>{stationNotice}</Text>
+              </View>
+            ) : null}
             {selected ? (
               <View style={[styles.selectedCard, !sheetExpanded && styles.selectedCardCollapsed]}>
                 <View style={styles.selectedHeader}>
@@ -702,6 +707,28 @@ function stationOpenDotColor(openNow?: boolean) {
   if (openNow === false) return colors.red;
   if (openNow === true) return colors.green;
   return colors.muted;
+}
+
+function stationContextNotice(context: {
+  warning?: string;
+  capability?: string;
+  regionCapabilities?: Array<{ region: string; capability: string; blocker?: string }>;
+}) {
+  if (context.warning) return context.warning;
+  const limited = context.regionCapabilities?.find((item) =>
+    ["limited", "pending_access", "fallback", "unsupported"].includes(item.capability),
+  );
+  if (!limited) return "";
+  if (limited.capability === "pending_access") {
+    return `${limited.region} live prices are not enabled yet. ${limited.blocker || ""}`.trim();
+  }
+  if (limited.capability === "limited") {
+    return `${limited.region} live coverage is limited. Confirm freshness before driving.`;
+  }
+  if (limited.capability === "fallback") {
+    return `Using fallback data for ${limited.region}. Do not treat it as a live price recommendation.`;
+  }
+  return "No live fuel provider covers this area yet.";
 }
 
 const styles = StyleSheet.create({
@@ -935,6 +962,20 @@ const styles = StyleSheet.create({
   sortRow: {
     flexDirection: "row",
     gap: spacing.xs,
+  },
+  noticeCard: {
+    backgroundColor: "#fff7ed",
+    borderColor: "#fed7aa",
+    borderRadius: radii.md,
+    borderWidth: 1,
+    marginBottom: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  noticeText: {
+    color: colors.amber,
+    fontSize: typeScale.caption,
+    fontWeight: "800",
   },
   sortButton: {
     alignItems: "center",

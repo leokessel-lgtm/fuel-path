@@ -50,6 +50,8 @@ module.exports = async function handler(req, res) {
         fuel,
         source: data.source,
         provider: data.provider,
+        capability: data.capability,
+        regionCapabilities: data.regionCapabilities || [],
         radiusKm,
         centre,
         stationCount: stations.length,

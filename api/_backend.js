@@ -47,12 +47,32 @@ const VIC_BOUNDS = {
   minLon: 140.9,
   maxLon: 150.2,
 };
+const SA_BOUNDS = {
+  minLat: -38.2,
+  maxLat: -25.9,
+  minLon: 129,
+  maxLon: 141.1,
+};
+const TAS_BOUNDS = {
+  minLat: -43.8,
+  maxLat: -39,
+  minLon: 143.5,
+  maxLon: 148.6,
+};
+const NT_BOUNDS = {
+  minLat: -26.1,
+  maxLat: -10.8,
+  minLon: 129,
+  maxLon: 138.1,
+};
 const ACT_BOUNDS = {
   minLat: -35.95,
   maxLat: -35.1,
   minLon: 148.7,
   maxLon: 149.45,
 };
+const CAPABILITY_LABELS = ["live", "limited", "pending_access", "fallback", "unsupported"];
+const REGION_ORDER = ["NSW", "ACT", "QLD", "WA", "VIC", "SA", "TAS", "NT"];
 const NSW_VIC_BORDER_POINTS = [
   { lon: 141.0, lat: -34.0 },
   { lon: 142.2, lat: -34.18 },
@@ -256,6 +276,106 @@ function hasVicCredentials() {
 
 function hasAnyLiveCredentials() {
   return hasLiveCredentials() || hasQldCredentials() || hasWaProvider() || hasVicCredentials();
+}
+
+function fuelProviderCapabilityMatrix() {
+  return [
+    capabilityEntry({
+      region: "NSW",
+      name: "New South Wales",
+      provider: "api_nsw_fuelcheck",
+      capability: hasLiveCredentials() ? "live" : "pending_access",
+      configured: hasLiveCredentials(),
+      coverage: "NSW FuelCheck live prices.",
+      blocker: hasLiveCredentials() ? "" : "API.NSW FuelCheck credentials are not configured.",
+    }),
+    capabilityEntry({
+      region: "ACT",
+      name: "Australian Capital Territory",
+      provider: "api_nsw_fuelcheck",
+      capability: hasLiveCredentials() ? "live" : "pending_access",
+      configured: hasLiveCredentials(),
+      coverage: "ACT prices exposed through the API.NSW FuelCheck feed.",
+      blocker: hasLiveCredentials() ? "" : "API.NSW FuelCheck credentials are not configured.",
+    }),
+    capabilityEntry({
+      region: "QLD",
+      name: "Queensland",
+      provider: "api_qld_fuelprices",
+      capability: hasQldCredentials() ? "live" : "pending_access",
+      configured: hasQldCredentials(),
+      coverage: "QLD Fuel Prices Direct Outbound API.",
+      blocker: hasQldCredentials() ? "" : "QLD Fuel Prices API token is not configured.",
+    }),
+    capabilityEntry({
+      region: "WA",
+      name: "Western Australia",
+      provider: "api_wa_fuelwatch",
+      capability: hasWaProvider() ? "limited" : "unsupported",
+      configured: hasWaProvider(),
+      coverage: "WA FuelWatch RSS with current metro-first query support.",
+      blocker: hasWaProvider() ? "Regional WA expansion still needs request-volume guardrails." : "WA FuelWatch provider is disabled.",
+    }),
+    capabilityEntry({
+      region: "VIC",
+      name: "Victoria",
+      provider: "api_vic_servo_saver",
+      capability: "pending_access",
+      configured: hasVicCredentials(),
+      coverage: "VIC Servo Saver Public API planned.",
+      blocker: hasVicCredentials()
+        ? "VIC Servo Saver adapter needs the approved API schema before live prices can be enabled."
+        : "VIC Servo Saver API access is not configured.",
+    }),
+    capabilityEntry({
+      region: "SA",
+      name: "South Australia",
+      provider: "api_sa_fuel_price_reporting",
+      capability: "pending_access",
+      configured: false,
+      coverage: "SA fuel price reporting access planned.",
+      blocker: "SA fuel data/API access path needs confirmation.",
+    }),
+    capabilityEntry({
+      region: "TAS",
+      name: "Tasmania",
+      provider: "api_tas_fuelcheck",
+      capability: "pending_access",
+      configured: false,
+      coverage: "TAS live fuel provider access planned.",
+      blocker: "TAS fuel data/API access path needs confirmation.",
+    }),
+    capabilityEntry({
+      region: "NT",
+      name: "Northern Territory",
+      provider: "api_nt_myfuel",
+      capability: "pending_access",
+      configured: false,
+      coverage: "MyFuel NT access planned.",
+      blocker: "NT MyFuel data/API access path needs confirmation.",
+    }),
+  ];
+}
+
+function capabilityEntry({ region, name, provider, capability, configured, coverage, blocker }) {
+  const safeCapability = CAPABILITY_LABELS.includes(capability) ? capability : "unsupported";
+  return {
+    region,
+    name,
+    provider,
+    capability: safeCapability,
+    configured: Boolean(configured),
+    liveData: safeCapability === "live" || safeCapability === "limited",
+    coverage,
+    blocker,
+  };
+}
+
+function capabilitySummary(capabilities = fuelProviderCapabilityMatrix()) {
+  return capabilities.reduce((summary, item) => {
+    summary[item.capability] = (summary[item.capability] || 0) + 1;
+    return summary;
+  }, {});
 }
 
 function googleMapsApiKey() {
@@ -997,6 +1117,33 @@ function pointInWa(point) {
   );
 }
 
+function pointInSa(point) {
+  return (
+    Number(point?.lat) >= SA_BOUNDS.minLat &&
+    Number(point?.lat) <= SA_BOUNDS.maxLat &&
+    Number(point?.lon) >= SA_BOUNDS.minLon &&
+    Number(point?.lon) <= SA_BOUNDS.maxLon
+  );
+}
+
+function pointInTas(point) {
+  return (
+    Number(point?.lat) >= TAS_BOUNDS.minLat &&
+    Number(point?.lat) <= TAS_BOUNDS.maxLat &&
+    Number(point?.lon) >= TAS_BOUNDS.minLon &&
+    Number(point?.lon) <= TAS_BOUNDS.maxLon
+  );
+}
+
+function pointInNt(point) {
+  return (
+    Number(point?.lat) >= NT_BOUNDS.minLat &&
+    Number(point?.lat) <= NT_BOUNDS.maxLat &&
+    Number(point?.lon) >= NT_BOUNDS.minLon &&
+    Number(point?.lon) <= NT_BOUNDS.maxLon
+  );
+}
+
 function pointInAct(point) {
   return (
     Number(point?.lat) >= ACT_BOUNDS.minLat &&
@@ -1026,6 +1173,11 @@ function pointInVic(point) {
   const borderLat = nswVicBorderLatAtLon(lon);
   if (borderLat !== undefined) return lat < borderLat;
 
+  const firstBorderPoint = NSW_VIC_BORDER_POINTS[0];
+  const lastBorderPoint = NSW_VIC_BORDER_POINTS[NSW_VIC_BORDER_POINTS.length - 1];
+  if (lon > lastBorderPoint.lon) return lat <= lastBorderPoint.lat;
+  if (lon < firstBorderPoint.lon) return lat < firstBorderPoint.lat;
+
   return (
     lat >= VIC_BOUNDS.minLat &&
     lat <= VIC_BOUNDS.maxLat &&
@@ -1050,7 +1202,7 @@ function pointInNswOrAct(point) {
   ) {
     return false;
   }
-  return !pointInQld(point) && !pointInWa(point) && !pointInVic(point);
+  return !pointInQld(point) && !pointInWa(point) && !pointInVic(point) && !pointInSa(point) && !pointInTas(point) && !pointInNt(point);
 }
 
 function nswVicBorderLatAtLon(lon) {
@@ -1101,16 +1253,82 @@ function liveProviderKeysForArea(points = [], radiusKm = 0) {
   return [];
 }
 
+function regionCodeForPoint(point) {
+  if (pointInAct(point)) return "ACT";
+  if (pointInQld(point)) return "QLD";
+  if (pointInWa(point)) return "WA";
+  if (pointInVic(point)) return "VIC";
+  if (pointInTas(point)) return "TAS";
+  if (pointInNt(point)) return "NT";
+  if (pointInSa(point)) return "SA";
+  if (pointInNswOrAct(point)) return "NSW";
+  return "UNSUPPORTED";
+}
+
+function capabilitiesForPoints(points = []) {
+  const matrixByRegion = new Map(fuelProviderCapabilityMatrix().map((item) => [item.region, item]));
+  const regionCodes = new Set();
+  for (const point of points) regionCodes.add(regionCodeForPoint(point));
+  if (!regionCodes.size) return [];
+
+  const capabilities = REGION_ORDER.filter((region) => regionCodes.has(region)).map((region) => matrixByRegion.get(region));
+  if (regionCodes.has("UNSUPPORTED")) {
+    capabilities.push(
+      capabilityEntry({
+        region: "UNSUPPORTED",
+        name: "Unsupported area",
+        provider: "none",
+        capability: "unsupported",
+        configured: false,
+        coverage: "No Australian fuel provider coverage matched this location.",
+        blocker: "Fuel Path cannot identify this location as an Australian state or territory.",
+      }),
+    );
+  }
+  return capabilities.filter(Boolean);
+}
+
+function primaryCapability(capabilities = []) {
+  if (!capabilities.length) return "unsupported";
+  if (capabilities.some((item) => item.capability === "unsupported")) return "unsupported";
+  if (capabilities.some((item) => item.capability === "fallback")) return "fallback";
+  if (capabilities.some((item) => item.capability === "pending_access")) return "pending_access";
+  if (capabilities.some((item) => item.capability === "limited")) return "limited";
+  return "live";
+}
+
+function capabilityWarning(capabilities = []) {
+  if (!capabilities.length) return "No live fuel provider covers this area yet.";
+  const names = capabilities.map((item) => item.region).join("/");
+  const capability = primaryCapability(capabilities);
+  if (capability === "pending_access") {
+    return `Fuel Path has ${names} in the national provider matrix, but live prices are not enabled for this area yet.`;
+  }
+  if (capability === "limited") {
+    return `Fuel Path has limited live coverage for ${names}; confirm freshness before driving.`;
+  }
+  if (capability === "fallback") {
+    return `Fuel Path is using fallback data for ${names}; do not treat this as a live price recommendation.`;
+  }
+  if (capability === "unsupported") {
+    return "No live fuel provider covers this area yet.";
+  }
+  return "";
+}
+
 async function loadLiveStationsForArea({ forceRefresh = false, points = [], radiusKm = 0, providers: requestedProviders } = {}) {
   const providers = requestedProviders || liveProviderKeysForArea(points, radiusKm);
+  const regionCapabilities = capabilitiesForPoints(points);
   if (!providers.length) {
     return {
       stations: [],
       source: "unsupported_region",
       provider: "unsupported_region",
+      capability: primaryCapability(regionCapabilities),
+      regionCapabilities,
       cacheHit: false,
       cacheAgeSeconds: 0,
-      warning: "No live fuel provider covers this area yet.",
+      warning: capabilityWarning(regionCapabilities),
     };
   }
   const stations = [];
@@ -1146,6 +1364,8 @@ async function loadLiveStationsForArea({ forceRefresh = false, points = [], radi
     stations: [...byCode.values()],
     source: loadedProviders.join("+") || "live",
     provider: loadedProviders.join("+") || "live",
+    capability: primaryCapability(regionCapabilities),
+    regionCapabilities,
     cacheHit: false,
     cacheAgeSeconds: 0,
     warning: errors.length ? `Some live fuel providers unavailable: ${errors.join("; ")}` : "",
@@ -1155,22 +1375,28 @@ async function loadLiveStationsForArea({ forceRefresh = false, points = [], radi
 async function loadStationData({ requestedSource = "auto", forceRefresh = false, points = [], radiusKm = 0 } = {}) {
   const source = resolveSource(requestedSource);
   if (source === "sample") {
+    const regionCapabilities = capabilitiesForPoints(points);
     return {
       source: "sample",
       provider: "public_demo_snapshot",
+      capability: "fallback",
+      regionCapabilities,
       stations: loadSampleStations(),
       cacheHit: true,
       cacheAgeSeconds: null,
-      warning: "",
+      warning: points.length ? capabilityWarning(regionCapabilities.map((item) => ({ ...item, capability: "fallback" }))) : "",
     };
   }
 
   const requestedProvider = providerFromSource(source);
   if (requestedProvider && points.length && !points.some((point) => pointInProviderCoverage(requestedProvider, point))) {
+    const regionCapabilities = capabilitiesForPoints(points);
     return {
       stations: [],
       source: "unsupported_region",
       provider: requestedProvider,
+      capability: primaryCapability(regionCapabilities),
+      regionCapabilities,
       cacheHit: false,
       cacheAgeSeconds: 0,
       warning: `Requested ${requestedProvider.toUpperCase()} fuel provider does not cover this area.`,
@@ -1190,6 +1416,8 @@ async function loadStationData({ requestedSource = "auto", forceRefresh = false,
     return {
       source: "sample_fallback",
       provider: "public_demo_snapshot",
+      capability: "fallback",
+      regionCapabilities: capabilitiesForPoints(points),
       stations: loadSampleStations(),
       cacheHit: true,
       cacheAgeSeconds: null,
@@ -1951,7 +2179,10 @@ module.exports = {
   boolParam,
   buildRoute,
   cacheSeconds,
+  capabilitiesForPoints,
+  capabilitySummary,
   distanceKm,
+  fuelProviderCapabilityMatrix,
   geocode,
   geocodeProviderStatus,
   hasAnyLiveCredentials,
@@ -1966,6 +2197,9 @@ module.exports = {
   numberParam,
   pointInAct,
   pointFromQuery,
+  pointInNt,
+  pointInSa,
+  pointInTas,
   pointInVic,
   routeContextStations,
   routeFromPayload,

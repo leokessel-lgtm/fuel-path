@@ -91,10 +91,31 @@ export type MapPoint = {
   label: string;
 };
 
+export type RegionCapabilityStatus =
+  | "live"
+  | "limited"
+  | "pending_access"
+  | "fallback"
+  | "unsupported";
+
+export type RegionCapability = {
+  region: string;
+  name: string;
+  provider: string;
+  capability: RegionCapabilityStatus;
+  configured: boolean;
+  liveData: boolean;
+  coverage: string;
+  blocker?: string;
+};
+
 export type NearbyResponse = {
   context: {
     fuel: FuelCode;
     source: string;
+    provider?: string;
+    capability?: RegionCapabilityStatus;
+    regionCapabilities?: RegionCapability[];
     radiusKm: number;
     stationCount: number;
     returnedCount: number;
@@ -118,6 +139,10 @@ export type ScoreResponse = {
   context: {
     routeName: string;
     source: string;
+    provider?: string;
+    capability?: RegionCapabilityStatus;
+    regionCapabilities?: RegionCapability[];
+    warning?: string;
     fuel: FuelCode;
     routeDistanceKm: number;
     baselineCpl: number;

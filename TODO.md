@@ -22,9 +22,9 @@
 - [x] Record the three main project goals and Goal 1 build roadmap.
 - [x] Merge whole-of-Australia roadmap, success metrics and break-it testing regime into project docs.
 - [ ] Prove Goal 1: Best Fuel Decision, Not Another Map.
-- [ ] Build national provider capability matrix for NSW, ACT, QLD, VIC, SA, WA, TAS and NT.
-- [ ] Expose regional capability state in backend `/api/status` and user-facing empty/limited states.
-- [ ] Add provider contract tests for capability labels: live, limited, pending_access, fallback and unsupported.
+- [x] Build national provider capability matrix for NSW, ACT, QLD, VIC, SA, WA, TAS and NT.
+- [x] Expose regional capability state in backend `/api/status` and user-facing empty/limited states.
+- [x] Add provider contract tests for capability labels: live, limited, pending_access, fallback and unsupported.
 - [x] Fix empty-result handling for long routes such as Sydney to Canberra.
 - [x] Connect ranked results and map markers both ways.
 - [x] Simplify the recommendation card into one clear action, reason and trust cue.

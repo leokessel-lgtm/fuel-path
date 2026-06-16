@@ -288,6 +288,7 @@ export function PlanScreen({
   );
   const best = candidates[0];
   const selected = mapStations.find((item) => item.station.stationCode === selectedCode) || best;
+  const routeNotice = result ? routeContextNotice(result.context) : "";
   const currentRouteSaved = Boolean(
     routeEndpoints &&
       savedCommutes.some((commute) =>
@@ -507,32 +508,40 @@ export function PlanScreen({
             </>
           ) : null}
           {!loading && !error && best ? (
-            <Pressable
-              accessibilityLabel={`Open ${best.station.name} recommendation detail`}
-              accessibilityRole="button"
-              onPress={() => handleStationSelect(best.station.stationCode)}
-              style={styles.compactRecommendation}
-            >
-              <View style={styles.recommendationCopy}>
-                <Text style={styles.eyebrow}>Recommendation</Text>
-                <Text numberOfLines={1} style={styles.compactDecisionTitle}>
-                  {decisionTitle(best)}
-                </Text>
-                <Text numberOfLines={1} style={styles.compactReason}>
-                  {best.station.name} saves about {formatMoney(best.netSaving || 0)}
-                </Text>
-              </View>
-              <View style={styles.recommendationPrice}>
-                <Text style={styles.priceValue}>{best.adjustedCpl.toFixed(1)}</Text>
-                <Text style={styles.priceUnit}>c/L</Text>
-              </View>
-            </Pressable>
+            <>
+              {routeNotice ? (
+                <View style={styles.noticeCard}>
+                  <Text style={styles.noticeText}>{routeNotice}</Text>
+                </View>
+              ) : null}
+              <Pressable
+                accessibilityLabel={`Open ${best.station.name} recommendation detail`}
+                accessibilityRole="button"
+                onPress={() => handleStationSelect(best.station.stationCode)}
+                style={styles.compactRecommendation}
+              >
+                <View style={styles.recommendationCopy}>
+                  <Text style={styles.eyebrow}>Recommendation</Text>
+                  <Text numberOfLines={1} style={styles.compactDecisionTitle}>
+                    {decisionTitle(best)}
+                  </Text>
+                  <Text numberOfLines={1} style={styles.compactReason}>
+                    {best.station.name} saves about {formatMoney(best.netSaving || 0)}
+                  </Text>
+                </View>
+                <View style={styles.recommendationPrice}>
+                  <Text style={styles.priceValue}>{best.adjustedCpl.toFixed(1)}</Text>
+                  <Text style={styles.priceUnit}>c/L</Text>
+                </View>
+              </Pressable>
+            </>
           ) : null}
           {!loading && !error && !best ? (
             <View style={styles.emptyRouteState}>
               <Text style={styles.decisionTitle}>No fuel stops found</Text>
               <Text style={styles.muted}>
-                Route found, but no eligible stations match this fuel, freshness and open-station settings.
+                {routeNotice ||
+                  "Route found, but no eligible stations match this fuel, freshness and open-station settings."}
               </Text>
             </View>
           ) : null}
@@ -670,6 +679,24 @@ function decisionTitle(best: StationViewModel) {
 function formatMoney(value: number) {
   const sign = value < 0 ? "-" : "";
   return `${sign}$${Math.abs(value).toFixed(2)}`;
+}
+
+function routeContextNotice(context: ScoreResponse["context"]) {
+  if (context.warning) return context.warning;
+  const limited = context.regionCapabilities?.find((item) =>
+    ["limited", "pending_access", "fallback", "unsupported"].includes(item.capability),
+  );
+  if (!limited) return "";
+  if (limited.capability === "pending_access") {
+    return `${limited.region} live prices are not enabled yet. ${limited.blocker || ""}`.trim();
+  }
+  if (limited.capability === "limited") {
+    return `${limited.region} live coverage is limited. Confirm freshness before driving.`;
+  }
+  if (limited.capability === "fallback") {
+    return `Using fallback data for ${limited.region}. Do not treat it as a live price recommendation.`;
+  }
+  return "No live fuel provider covers this route yet.";
 }
 
 function makeLocationSessionToken() {
@@ -965,6 +992,19 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: spacing.md,
     padding: spacing.md,
+  },
+  noticeCard: {
+    backgroundColor: "#fff7ed",
+    borderColor: "#fed7aa",
+    borderRadius: radii.md,
+    borderWidth: 1,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  noticeText: {
+    color: colors.amber,
+    fontSize: typeScale.caption,
+    fontWeight: "800",
   },
   recommendationCopy: {
     flex: 1,

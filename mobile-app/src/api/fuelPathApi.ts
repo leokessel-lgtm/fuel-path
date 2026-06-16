@@ -3,6 +3,8 @@ import {
   FuelCode,
   MapPoint,
   NearbyResponse,
+  RegionCapability,
+  RegionCapabilityStatus,
   ScoreResponse,
   Station,
 } from "../types";
@@ -51,6 +53,12 @@ export async function getApiStatus() {
     defaultSource: "live" | "sample";
     credentialsConfigured: boolean;
     cacheSeconds: number;
+    fuelProviders?: {
+      selection: string;
+      capabilityLabels: RegionCapabilityStatus[];
+      capabilitySummary: Partial<Record<RegionCapabilityStatus, number>>;
+      capabilities: RegionCapability[];
+    };
     geocoding?: {
       activeProvider: string;
       activeMode: string;

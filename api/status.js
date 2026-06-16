@@ -7,6 +7,8 @@ const {
   hasQldCredentials,
   hasVicCredentials,
   hasWaProvider,
+  capabilitySummary,
+  fuelProviderCapabilityMatrix,
   methodAllowed,
   routeProviderStatus,
   sendJson,
@@ -14,6 +16,7 @@ const {
 
 module.exports = function handler(req, res) {
   if (!methodAllowed(req, res)) return;
+  const providerCapabilities = fuelProviderCapabilityMatrix();
   sendJson(res, 200, {
     api: "fuel-path-hosted-backend-v1",
     credentialsConfigured: hasAnyLiveCredentials(),
@@ -25,6 +28,9 @@ module.exports = function handler(req, res) {
       apiVicConfigured: hasVicCredentials(),
       vicStatus: hasVicCredentials() ? "configured_pending_adapter_schema" : "needs_servo_saver_api_access",
       selection: "region-aware",
+      capabilityLabels: ["live", "limited", "pending_access", "fallback", "unsupported"],
+      capabilitySummary: capabilitySummary(providerCapabilities),
+      capabilities: providerCapabilities,
     },
     cacheSeconds: cacheSeconds(),
     maps: {

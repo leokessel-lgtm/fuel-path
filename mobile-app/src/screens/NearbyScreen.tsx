@@ -293,6 +293,16 @@ export function NearbyScreen({
     [listSourceStations, sortMode],
   );
   const selected = stations.find((item) => item.station.stationCode === selectedCode);
+  const selectedMetaLine = selected
+    ? [
+        stationOpenLabel(selected.station.openNow),
+        selected.station.phone || selected.station.brand,
+        `${selected.distanceKm.toFixed(1)} km`,
+        formatRelativeUpdatedAt(selected.station.updatedAt),
+      ]
+        .filter(Boolean)
+        .join(" | ")
+    : "";
   const nearbyCameraInsets = useMemo(
     () => ({
       top: 170,
@@ -528,18 +538,12 @@ export function NearbyScreen({
                       {selected.station.name}
                     </Text>
                     {selected.station.address ? (
-                      <Text numberOfLines={2} style={styles.selectedDetail}>
+                      <Text numberOfLines={1} style={styles.selectedDetail}>
                         {selected.station.address}
                       </Text>
                     ) : null}
-                    {selected.station.phone ? (
-                      <Text numberOfLines={1} style={styles.selectedDetail}>
-                        {selected.station.phone}
-                      </Text>
-                    ) : null}
                     <Text numberOfLines={1} style={styles.muted}>
-                      {selected.station.brand} | {selected.distanceKm.toFixed(1)} km |{" "}
-                      {formatRelativeUpdatedAt(selected.station.updatedAt)}
+                      {selectedMetaLine}
                     </Text>
                   </View>
                   <Pressable
@@ -552,8 +556,10 @@ export function NearbyScreen({
                 </View>
                 <View style={styles.selectedActions}>
                   <View style={styles.selectedPrice}>
-                    <Text style={styles.priceValue}>{selected.adjustedCpl.toFixed(1)}</Text>
-                    <Text style={styles.priceUnit}>c/L</Text>
+                    <Text style={styles.priceValue}>
+                      {selected.adjustedCpl.toFixed(1)}
+                      <Text style={styles.priceUnitInline}> c/L</Text>
+                    </Text>
                   </View>
                   <Pressable
                     accessibilityLabel={`Navigate to ${selected.station.name}`}
@@ -652,6 +658,12 @@ function suggestionTitle(point: MapPoint) {
 function suggestionMeta(point: MapPoint) {
   const parts = point.label.split(",").map((part) => part.trim()).filter(Boolean);
   return parts.slice(1, 4).join(", ") || "Australia";
+}
+
+function stationOpenLabel(openNow?: boolean) {
+  if (openNow === false) return "Closed";
+  if (openNow === true) return "Open now";
+  return "Hours unknown";
 }
 
 const styles = StyleSheet.create({
@@ -928,7 +940,7 @@ const styles = StyleSheet.create({
   selectedCard: {
     backgroundColor: colors.greenSoft,
     borderRadius: radii.md,
-    gap: spacing.sm,
+    gap: spacing.xs,
     padding: spacing.md,
   },
   selectedCardCollapsed: {
@@ -953,7 +965,6 @@ const styles = StyleSheet.create({
     fontSize: typeScale.caption,
     fontWeight: "700",
     lineHeight: 17,
-    marginTop: 2,
   },
   closeButton: {
     alignItems: "center",
@@ -969,7 +980,7 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
   selectedActions: {
-    alignItems: "flex-end",
+    alignItems: "center",
     flexDirection: "row",
     gap: spacing.md,
     justifyContent: "space-between",
@@ -982,9 +993,9 @@ const styles = StyleSheet.create({
     fontSize: typeScale.title,
     fontWeight: "900",
   },
-  priceUnit: {
+  priceUnitInline: {
     color: colors.muted,
-    fontSize: 10,
+    fontSize: typeScale.caption,
     fontWeight: "900",
   },
   navigateButton: {

@@ -45,6 +45,13 @@ NSW_FUEL_PRICES_URL
 FUEL_PATH_LIVE_CACHE_SECONDS
 ```
 
+Queensland production access:
+
+```text
+QLD_FUEL_API_BASE_URL
+QLD_FUEL_API_TOKEN
+```
+
 Geocoding:
 
 ```text

@@ -5,6 +5,7 @@
 - [x] Prepare API.NSW unblock plan and credential validation script.
 - [x] Register/subscribe for API.NSW Fuel API credentials.
 - [x] Validate registered API.NSW credentials and live v1 price endpoint.
+- [x] Validate QLD Fuel Prices Direct Outbound API production access.
 - [x] Add local server-side proxy for live API.NSW scoring in the web demo.
 - [x] Prepare validation demo pack and paste-ready API.NSW support note.
 - [x] Stop and capture strategic reflection against initial objectives.
@@ -56,6 +57,7 @@
 - [x] Make Plan Trip address lookup session-token aware for future production autocomplete billing.
 - [x] Add backend `/api/geocode` provider adapter for Google, Mapbox, HERE, Geoapify and Nominatim fallback.
 - [ ] Implement Google Places Autocomplete (New) backend adapter after billing/API-key controls are approved.
+- [ ] Add QLD provider adapter after fuel ID and region mapping are confirmed.
 - [ ] Add saved commutes and notification permission flow.
 - [x] Design backend push scheduler for price-triggered saved-route alerts.
 - [ ] Implement backend push scheduler for price-triggered saved-route alerts after native notification validation.
@@ -65,4 +67,5 @@
 
 - Real validation sessions need recruited participants and scheduled sessions.
 - FuelCheck app/commercial usage, caching rules and public-sharing permission need API.NSW confirmation.
+- QLD fuel ID mapping, region coverage and usage constraints need confirmation against the API manual or Postman collection.
 - Google Places production autocomplete still needs billing controls, restricted keys, backend adapter and device validation.

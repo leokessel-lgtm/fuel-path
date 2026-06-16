@@ -139,6 +139,12 @@ python3 prototype/scripts/validate_api_nsw.py \
   --save-sample prototype/data/live-sample-redacted.json
 ```
 
+Validate Queensland Fuel Prices Direct Outbound API access:
+
+```bash
+python3 prototype/scripts/validate_api_qld.py --env prototype/.env
+```
+
 The scoring script also includes a live mode stub:
 
 ```bash

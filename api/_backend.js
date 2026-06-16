@@ -1,5 +1,16 @@
 const sample = require("./_sample");
 const {
+  alertStorageStatus,
+  appendRouteAlertEvaluation,
+  counts: alertStorageCounts,
+  listPushDevices,
+  listRouteAlertEvaluations,
+  listSavedRoutes,
+  setAlertStorageForTests,
+  upsertPushDevice,
+  upsertSavedRoute,
+} = require("./_alertStorage");
+const {
   appendPredictionBacktestRecord,
   listPredictionBacktestRecords,
   predictionStorageStatus,
@@ -18,6 +29,9 @@ const DEFAULT_WA_FUELWATCH_RSS_URL = "https://www.fuelwatch.wa.gov.au/fuelwatch/
 const WA_DEFAULT_MAX_REGION_IDS = 18;
 const WA_DEFAULT_FETCH_CONCURRENCY = 6;
 const PREDICTION_BACKTEST_MAX_RECORDS = 500;
+const ALERT_MAX_RECORDS = 500;
+const ALERT_FRESHNESS_MAX_MINUTES = 120;
+const ALERT_DUPLICATE_COOLDOWN_HOURS = 12;
 const QLD_REGION_PARAMS = {
   countryId: 21,
   geoRegionLevel: 3,
@@ -2360,15 +2374,289 @@ function decodePolylineChunk(encoded, startIndex) {
   return { delta, index };
 }
 
-function alertsStatus() {
+async function alertsStatus() {
+  const storage = alertStorageStatus({ maxRecords: ALERT_MAX_RECORDS });
+  let storageCounts = {};
+  let storageError = "";
+  try {
+    storageCounts = await alertStorageCounts();
+  } catch (error) {
+    storageError = error instanceof Error ? error.message : "Alert storage is unavailable";
+  }
   return {
-    mode: "contract_only",
+    mode: "backend_foundation",
     schedulerEnabled: false,
-    storageConfigured: false,
+    evaluatorEnabled: true,
+    pushDeliveryEnabled: false,
+    storageConfigured: Boolean(storage.configured),
+    storage: {
+      ...storage,
+      ...storageCounts,
+      health: storageError ? "error" : "ok",
+      lastError: storageError,
+    },
+    writeSecurity: alertsWriteSecurity(),
     pushProviderConfigured: false,
     cronConfigured: false,
-    nextBuildStep: "Add saved-route storage and a scheduled backend evaluator before enabling smart push alerts.",
+    supportedDecisionStatuses: [
+      "send_alert",
+      "alert_disabled",
+      "quiet_today",
+      "saving_below_threshold",
+      "detour_above_threshold",
+      "stale_price",
+      "station_closed",
+      "region_unsupported",
+      "provider_access_pending",
+      "missing_push_token",
+      "permission_missing",
+      "not_evaluated",
+      "failed",
+    ],
+    nextBuildStep: "Add scheduled evaluation and Expo push delivery after native device-token validation.",
   };
+}
+
+function alertsWriteSecurity() {
+  const tokenConfigured = Boolean(process.env.ALERTS_WRITE_TOKEN);
+  const storage = alertStorageStatus({ maxRecords: ALERT_MAX_RECORDS });
+  const tokenRequired = tokenConfigured || Boolean(storage.durable);
+  return {
+    tokenConfigured,
+    tokenRequired,
+    writeEnabled: !tokenRequired || tokenConfigured,
+    acceptedHeaders: ["Authorization: Bearer <token>", "X-Fuel-Path-Alerts-Token"],
+  };
+}
+
+function alertsWriteAuthorised(req = {}) {
+  const security = alertsWriteSecurity();
+  if (!security.tokenRequired) return true;
+  if (!security.tokenConfigured) return false;
+  const expected = process.env.ALERTS_WRITE_TOKEN;
+  const headers = req.headers || {};
+  const auth = headers.authorization || headers.Authorization || "";
+  const direct = headers["x-fuel-path-alerts-token"] || headers["X-Fuel-Path-Alerts-Token"] || "";
+  const bearer = String(auth).replace(/^Bearer\s+/i, "").trim();
+  return bearer === expected || String(direct).trim() === expected;
+}
+
+async function registerPushDevice(input = {}) {
+  const record = normalisePushDevice(input);
+  await upsertPushDevice(record);
+  return {
+    accepted: true,
+    device: record,
+    alerts: await alertsStatus(),
+  };
+}
+
+async function saveBackendSavedRoute(input = {}) {
+  const route = normaliseBackendSavedRoute(input);
+  await upsertSavedRoute(route);
+  return {
+    accepted: true,
+    route,
+    alerts: await alertsStatus(),
+  };
+}
+
+async function listBackendSavedRoutes({ userId = "", enabledOnly = false, limit = 50 } = {}) {
+  const routes = await listSavedRoutes({ userId, enabledOnly, limit });
+  return {
+    routes,
+    alerts: await alertsStatus(),
+  };
+}
+
+async function listBackendPushDevices({ userId = "", status = "active", limit = 50 } = {}) {
+  const devices = await listPushDevices({ userId, status, limit });
+  return {
+    devices,
+    alerts: await alertsStatus(),
+  };
+}
+
+async function listBackendAlertEvaluations({ routeId = "", userId = "", limit = 50 } = {}) {
+  const evaluations = await listRouteAlertEvaluations({ routeId, userId, limit });
+  return {
+    evaluations,
+    alerts: await alertsStatus(),
+  };
+}
+
+async function evaluateSavedRouteAlert(input = {}) {
+  const route = normaliseBackendSavedRoute(input.route || input);
+  const devices = input.devices || (await listPushDevices({ userId: route.userId, status: "active", limit: 20 }));
+  const evaluation = buildSavedRouteAlertEvaluation({
+    route,
+    devices,
+    candidate: input.candidate || input.recommendation || {},
+    notificationPermission: input.notificationPermission,
+    regionCapabilities: input.regionCapabilities,
+    now: input.now,
+    pushDeliveryEnabled: false,
+  });
+  await appendRouteAlertEvaluation(evaluation);
+  return {
+    evaluation,
+    pushDeliveryEnabled: false,
+    deliveryStatus: evaluation.status === "send_alert" ? "not_sent_push_provider_disabled" : "not_applicable",
+    alerts: await alertsStatus(),
+  };
+}
+
+function buildSavedRouteAlertEvaluation({
+  route,
+  devices = [],
+  candidate = {},
+  notificationPermission = "granted",
+  regionCapabilities = [],
+  now,
+  pushDeliveryEnabled = false,
+} = {}) {
+  const evaluatedAt = validIsoDate(now) || new Date().toISOString();
+  const capabilities = Array.isArray(regionCapabilities) && regionCapabilities.length
+    ? regionCapabilities
+    : capabilitiesForPoints([route.from, route.to]);
+  const activeDevices = Array.isArray(devices) ? devices.filter((device) => device.status !== "inactive" && device.expoPushToken) : [];
+
+  let status = "send_alert";
+  let reason = "saving_above_threshold";
+  if (!route.alertEnabled) [status, reason] = ["alert_disabled", "route_alert_disabled"];
+  else if (route.pausedUntil && new Date(route.pausedUntil).getTime() > new Date(evaluatedAt).getTime()) [status, reason] = ["quiet_today", "route_paused"];
+  else if (route.lastAlertSentAt && hoursBetween(route.lastAlertSentAt, evaluatedAt) < ALERT_DUPLICATE_COOLDOWN_HOURS) [status, reason] = ["quiet_today", "duplicate_cooldown"];
+  else if (notificationPermission !== "granted") [status, reason] = ["permission_missing", "notification_permission_missing"];
+  else if (!activeDevices.length) [status, reason] = ["missing_push_token", "no_active_push_device"];
+  else if (capabilities.some((item) => item.capability === "unsupported")) [status, reason] = ["region_unsupported", "route_region_unsupported"];
+  else if (capabilities.some((item) => item.capability === "pending_access")) [status, reason] = ["provider_access_pending", "route_provider_access_pending"];
+  else if (candidate.openNow === false) [status, reason] = ["station_closed", "candidate_station_closed"];
+  else if (!Number.isFinite(optionalNumber(candidate.freshnessMinutes)) || optionalNumber(candidate.freshnessMinutes) > ALERT_FRESHNESS_MAX_MINUTES) [status, reason] = ["stale_price", "candidate_price_stale"];
+  else if (!Number.isFinite(optionalNumber(candidate.estimatedSavingDollars)) || optionalNumber(candidate.estimatedSavingDollars) < route.minSavingDollars) [status, reason] = ["saving_below_threshold", "saving_below_route_threshold"];
+  else if (Number.isFinite(optionalNumber(candidate.detourMinutes)) && optionalNumber(candidate.detourMinutes) > route.maxDetourMinutes) [status, reason] = ["detour_above_threshold", "detour_above_route_threshold"];
+
+  return {
+    id: `rae_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    routeId: route.id,
+    userId: route.userId,
+    status,
+    reason,
+    stationCode: cleanString(candidate.stationCode),
+    stationName: cleanString(candidate.stationName),
+    estimatedSavingDollars: optionalNumber(candidate.estimatedSavingDollars),
+    detourMinutes: optionalNumber(candidate.detourMinutes),
+    freshnessMinutes: optionalNumber(candidate.freshnessMinutes),
+    messageTitle: status === "send_alert" ? "Fuel worth checking before your drive" : undefined,
+    messageBody: status === "send_alert"
+      ? `${route.fuel} is worth checking${candidate.stationName ? ` near ${candidate.stationName}` : ""} before your ${route.alertTimeLocal} drive.`
+      : undefined,
+    evaluatedAt,
+    pushDeliveryEnabled,
+    pushTicketId: undefined,
+    pushReceiptStatus: undefined,
+  };
+}
+
+function normalisePushDevice(input) {
+  const userId = requiredText(input.userId, "userId");
+  const deviceId = requiredText(input.deviceId || input.id, "deviceId");
+  const expoPushToken = requiredText(input.expoPushToken || input.pushToken, "expoPushToken");
+  const platform = cleanString(input.platform || "unknown").slice(0, 30) || "unknown";
+  const now = new Date().toISOString();
+  return {
+    id: `pd_${stableId(`${userId}:${deviceId}`)}`,
+    userId,
+    deviceId,
+    platform,
+    expoPushToken,
+    appVersion: cleanString(input.appVersion).slice(0, 40),
+    status: ["active", "inactive"].includes(input.status) ? input.status : "active",
+    lastSeenAt: validIsoDate(input.lastSeenAt) || now,
+    invalidatedAt: validIsoDate(input.invalidatedAt) || undefined,
+  };
+}
+
+function normaliseBackendSavedRoute(input) {
+  const userId = requiredText(input.userId, "userId");
+  const id = cleanString(input.id) || `sr_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const now = new Date().toISOString();
+  const route = {
+    id: id.slice(0, 80),
+    userId,
+    name: requiredText(input.name, "name").slice(0, 120),
+    from: normaliseRoutePoint(input.from, "from"),
+    to: normaliseRoutePoint(input.to, "to"),
+    fuel: String(input.fuel || "").trim().toUpperCase(),
+    alertEnabled: Boolean(input.alertEnabled),
+    alertTimeLocal: normaliseAlertTime(input.alertTimeLocal || input.alertTime),
+    timezone: cleanString(input.timezone || "Australia/Sydney").slice(0, 80),
+    minSavingDollars: boundedNumber(input.minSavingDollars, 1, 100, 5),
+    maxDetourMinutes: boundedNumber(input.maxDetourMinutes, 0, 60, 8),
+    pausedUntil: validIsoDate(input.pausedUntil) || undefined,
+    lastAlertSentAt: validIsoDate(input.lastAlertSentAt) || undefined,
+    createdAt: validIsoDate(input.createdAt) || now,
+    updatedAt: now,
+  };
+  if (!["E10", "U91", "P95", "P98", "DL", "PDL", "LPG", "E85"].includes(route.fuel)) {
+    throw new Error("fuel is not supported for saved-route alerts");
+  }
+  return route;
+}
+
+function normaliseRoutePoint(value, field) {
+  const point = value || {};
+  const lat = Number(point.lat);
+  const lon = Number(point.lon);
+  if (!Number.isFinite(lat) || lat < -44 || lat > -9) throw new Error(`${field}.lat must be an Australian latitude`);
+  if (!Number.isFinite(lon) || lon < 112 || lon > 154.5) throw new Error(`${field}.lon must be an Australian longitude`);
+  return {
+    lat,
+    lon,
+    label: cleanString(point.label || "Saved location").slice(0, 160),
+  };
+}
+
+function normaliseAlertTime(value) {
+  const text = cleanString(value);
+  return /^([01]\d|2[0-3]):[0-5]\d$/.test(text) ? text : "07:30";
+}
+
+function requiredText(value, field) {
+  const text = cleanString(value);
+  if (!text) throw new Error(`${field} is required`);
+  return text;
+}
+
+function cleanString(value) {
+  return String(value || "").trim();
+}
+
+function boundedNumber(value, min, max, fallback) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(min, Math.min(max, parsed));
+}
+
+function validIsoDate(value) {
+  if (!value) return "";
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? "" : parsed.toISOString();
+}
+
+function hoursBetween(start, end) {
+  const startMs = new Date(start).getTime();
+  const endMs = new Date(end).getTime();
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) return Infinity;
+  return Math.abs(endMs - startMs) / 36e5;
+}
+
+function stableId(value) {
+  let hash = 0;
+  const text = String(value || "");
+  for (let index = 0; index < text.length; index += 1) {
+    hash = (hash * 31 + text.charCodeAt(index)) >>> 0;
+  }
+  return hash.toString(36);
 }
 
 async function predictionStatus() {
@@ -2570,6 +2858,8 @@ function normaliseDirection(value) {
 }
 
 module.exports = {
+  alertsWriteAuthorised,
+  alertsWriteSecurity,
   alertsStatus,
   boolParam,
   buildRoute,
@@ -2577,6 +2867,7 @@ module.exports = {
   capabilitiesForPoints,
   capabilitySummary,
   distanceKm,
+  evaluateSavedRouteAlert,
   fuelProviderCapabilityMatrix,
   geocode,
   geocodeProviderStatus,
@@ -2593,6 +2884,9 @@ module.exports = {
   normaliseWaFuelWatchPayloads,
   numberParam,
   listPredictionBacktests,
+  listBackendAlertEvaluations,
+  listBackendPushDevices,
+  listBackendSavedRoutes,
   pointInAct,
   pointFromQuery,
   pointInNt,
@@ -2603,12 +2897,15 @@ module.exports = {
   predictionStatus,
   predictionWriteAuthorised,
   predictionWriteSecurity,
+  registerPushDevice,
   recordPredictionBacktest,
   routeContextStations,
   routeFromPayload,
   routeProviderStatus,
+  saveBackendSavedRoute,
   scoreRoute,
   sendJson,
+  setAlertStorageForTests,
   setPredictionStorageForTests,
   setParam,
   stationPayload,

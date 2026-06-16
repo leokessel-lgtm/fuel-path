@@ -71,10 +71,12 @@
 - [ ] Confirm NT MyFuel data/API access path and implement adapter after approved schema is available.
 - [ ] Add saved commutes and notification permission flow.
 - [x] Design backend push scheduler for price-triggered saved-route alerts.
-- [ ] Implement backend push scheduler for price-triggered saved-route alerts after native notification validation.
+- [x] Add backend saved-route alert storage and evaluator foundation with push delivery disabled.
+- [ ] Implement scheduled Expo push delivery for price-triggered saved-route alerts after native notification validation.
 - [x] Add prediction back-testing API contract with metric summary and accuracy-claim gates.
 - [x] Add durable prediction storage adapter for Neon/Postgres with safe memory fallback.
-- [ ] Provision production Neon/Postgres and set `DATABASE_URL` plus `PREDICTION_BACKTEST_WRITE_TOKEN`.
+- [x] Provision production Neon/Postgres and set `DATABASE_URL` plus `PREDICTION_BACKTEST_WRITE_TOKEN`.
+- [x] Set `ALERTS_WRITE_TOKEN` in production before backend alert writes are enabled.
 - [x] Add backend no-cycle-signal states for unsupported fuels, regions and sparse histories.
 - [ ] Add break-it test evidence to every new backlog item before marking it done.
 - [ ] Prepare Apple/Android store readiness plan, including privacy disclosures and API usage constraints.

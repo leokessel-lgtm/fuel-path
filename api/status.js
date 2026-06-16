@@ -42,7 +42,7 @@ module.exports = async function handler(req, res) {
     },
     geocoding: geocodeProviderStatus(),
     routing: routeProviderStatus(),
-    alerts: alertsStatus(),
+    alerts: await alertsStatus(),
     predictions: await predictionStatus(),
   });
 };

@@ -10,6 +10,7 @@ const {
   capabilitySummary,
   fuelProviderCapabilityMatrix,
   methodAllowed,
+  predictionStatus,
   routeProviderStatus,
   sendJson,
 } = require("./_backend");
@@ -42,5 +43,6 @@ module.exports = function handler(req, res) {
     geocoding: geocodeProviderStatus(),
     routing: routeProviderStatus(),
     alerts: alertsStatus(),
+    predictions: predictionStatus(),
   });
 };

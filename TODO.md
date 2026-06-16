@@ -72,8 +72,9 @@
 - [ ] Add saved commutes and notification permission flow.
 - [x] Design backend push scheduler for price-triggered saved-route alerts.
 - [ ] Implement backend push scheduler for price-triggered saved-route alerts after native notification validation.
-- [ ] Add prediction back-testing storage before any prominent user-facing prediction claim.
-- [ ] Add no-cycle-signal states for unsupported fuels, regions and sparse histories.
+- [x] Add prediction back-testing API contract with metric summary and accuracy-claim gates.
+- [ ] Move prediction back-testing records from ephemeral memory to durable storage before any prominent user-facing prediction claim.
+- [x] Add backend no-cycle-signal states for unsupported fuels, regions and sparse histories.
 - [ ] Add break-it test evidence to every new backlog item before marking it done.
 - [ ] Prepare Apple/Android store readiness plan, including privacy disclosures and API usage constraints.
 

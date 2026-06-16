@@ -11,6 +11,7 @@ const DEFAULT_QLD_FUEL_API_BASE_URL = "https://fppdirectapi-prod.fuelpricesqld.c
 const DEFAULT_WA_FUELWATCH_RSS_URL = "https://www.fuelwatch.wa.gov.au/fuelwatch/fuelWatchRSS";
 const WA_DEFAULT_MAX_REGION_IDS = 18;
 const WA_DEFAULT_FETCH_CONCURRENCY = 6;
+const PREDICTION_BACKTEST_MAX_RECORDS = 500;
 const QLD_REGION_PARAMS = {
   countryId: 21,
   geoRegionLevel: 3,
@@ -183,6 +184,10 @@ const waLiveCache = {
 const tokenCache = {
   accessToken: "",
   loadedAtMs: 0,
+};
+
+const predictionBacktestStore = {
+  records: [],
 };
 
 const DISCOUNT_RULES = [
@@ -2364,6 +2369,179 @@ function alertsStatus() {
   };
 }
 
+function predictionStatus() {
+  const records = predictionBacktestStore.records;
+  return {
+    mode: "measurement_foundation",
+    storage: {
+      mode: "memory_ephemeral",
+      configured: true,
+      durable: false,
+      maxRecords: PREDICTION_BACKTEST_MAX_RECORDS,
+      recordCount: records.length,
+      nextBuildStep: "Move prediction back-test records to durable storage before enabling any user-facing accuracy claim.",
+    },
+    userFacingPredictionEnabled: false,
+    accuracyClaimsAllowed: false,
+    supportedSignalLabels: ["no_cycle_signal", "backtest_required"],
+    summary: predictionBacktestSummary(records),
+  };
+}
+
+function predictionSignal({ region = "", fuel = "", historyDays = 0, observedPriceCount = 0 } = {}) {
+  const safeRegion = String(region || "").trim().toUpperCase();
+  const safeFuel = String(fuel || "").trim().toUpperCase();
+  const history = Number(historyDays || 0);
+  const observed = Number(observedPriceCount || 0);
+  const supportedFuel = ["E10", "U91", "P95", "P98", "DL", "PDL", "LPG", "E85"].includes(safeFuel);
+
+  if (!REGION_ORDER.includes(safeRegion)) {
+    return noCycleSignal({ region: safeRegion || "UNKNOWN", fuel: safeFuel, reason: "unsupported_region" });
+  }
+  if (!supportedFuel) {
+    return noCycleSignal({ region: safeRegion, fuel: safeFuel || "UNKNOWN", reason: "unsupported_fuel" });
+  }
+  if (history < 28 || observed < 56) {
+    return noCycleSignal({ region: safeRegion, fuel: safeFuel, reason: "sparse_history" });
+  }
+
+  return {
+    region: safeRegion,
+    fuel: safeFuel,
+    signal: "backtest_required",
+    confidence: "low",
+    reasons: ["history threshold met, but measured back-test evidence is still required before guidance is enabled"],
+    userFacingCopy: "No cycle guidance yet.",
+    userFacingPredictionEnabled: false,
+    accuracyClaimsAllowed: false,
+  };
+}
+
+function noCycleSignal({ region, fuel, reason }) {
+  const labels = {
+    unsupported_region: "Fuel Path does not have cycle evidence for this region.",
+    unsupported_fuel: "Fuel Path does not have cycle evidence for this fuel.",
+    sparse_history: "Fuel Path needs more price history before showing cycle guidance.",
+  };
+  return {
+    region,
+    fuel,
+    signal: "no_cycle_signal",
+    confidence: "low",
+    reasons: [labels[reason] || "Fuel Path does not have enough evidence for cycle guidance."],
+    userFacingCopy: "No cycle signal.",
+    userFacingPredictionEnabled: false,
+    accuracyClaimsAllowed: false,
+  };
+}
+
+function recordPredictionBacktest(input = {}) {
+  const record = normalisePredictionBacktestRecord(input);
+  predictionBacktestStore.records.push(record);
+  if (predictionBacktestStore.records.length > PREDICTION_BACKTEST_MAX_RECORDS) {
+    predictionBacktestStore.records.splice(0, predictionBacktestStore.records.length - PREDICTION_BACKTEST_MAX_RECORDS);
+  }
+  return {
+    accepted: true,
+    record,
+    summary: predictionBacktestSummary(predictionBacktestStore.records),
+    storage: predictionStatus().storage,
+  };
+}
+
+function normalisePredictionBacktestRecord(input) {
+  const region = String(input.region || "").trim().toUpperCase();
+  const fuel = String(input.fuel || "").trim().toUpperCase();
+  const targetDate = normaliseDateOnly(input.targetDate);
+  if (!REGION_ORDER.includes(region)) throw new Error("region must be NSW, ACT, QLD, WA, VIC, SA, TAS or NT");
+  if (!["E10", "U91", "P95", "P98", "DL", "PDL", "LPG", "E85"].includes(fuel)) {
+    throw new Error("fuel is not supported for prediction back-testing");
+  }
+  if (!targetDate) throw new Error("targetDate must be YYYY-MM-DD");
+
+  const predictedCpl = optionalNumber(input.predictedCpl);
+  const actualCpl = optionalNumber(input.actualCpl);
+  const absoluteErrorCpl = Number.isFinite(predictedCpl) && Number.isFinite(actualCpl) ? round(Math.abs(predictedCpl - actualCpl), 2) : undefined;
+  const predictedDirection = normaliseDirection(input.predictedDirection);
+  const actualDirection = normaliseDirection(input.actualDirection);
+  return {
+    id: `bt_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    region,
+    fuel,
+    targetDate,
+    predictionDate: normaliseDateOnly(input.predictionDate) || new Date().toISOString().slice(0, 10),
+    modelVersion: String(input.modelVersion || "manual-baseline").slice(0, 60),
+    predictedCpl,
+    actualCpl,
+    absoluteErrorCpl,
+    predictedDirection,
+    actualDirection,
+    directionMatched:
+      predictedDirection !== "unknown" && actualDirection !== "unknown" ? predictedDirection === actualDirection : undefined,
+    recordedAt: new Date().toISOString(),
+  };
+}
+
+function predictionBacktestSummary(records = predictionBacktestStore.records) {
+  const completed = records.filter((record) => Number.isFinite(record.absoluteErrorCpl));
+  const mae =
+    completed.length > 0
+      ? round(
+          completed.reduce((total, record) => total + Number(record.absoluteErrorCpl || 0), 0) / completed.length,
+          2,
+        )
+      : undefined;
+  const directionRecords = records.filter((record) => typeof record.directionMatched === "boolean");
+  const directionAccuracy =
+    directionRecords.length > 0
+      ? round(directionRecords.filter((record) => record.directionMatched).length / directionRecords.length, 3)
+      : undefined;
+  const byRegion = {};
+  for (const record of records) byRegion[record.region] = (byRegion[record.region] || 0) + 1;
+  return {
+    sampleSize: records.length,
+    completedSampleSize: completed.length,
+    meanAbsoluteErrorCpl: mae,
+    directionSampleSize: directionRecords.length,
+    directionAccuracy,
+    byRegion,
+    accuracyClaimsAllowed: false,
+  };
+}
+
+function listPredictionBacktests({ region = "", fuel = "", limit = 50 } = {}) {
+  const safeRegion = String(region || "").trim().toUpperCase();
+  const safeFuel = String(fuel || "").trim().toUpperCase();
+  const safeLimit = Math.max(1, Math.min(100, Number(limit || 50)));
+  const records = predictionBacktestStore.records
+    .filter((record) => (!safeRegion || record.region === safeRegion) && (!safeFuel || record.fuel === safeFuel))
+    .slice(-safeLimit)
+    .reverse();
+  return {
+    records,
+    summary: predictionBacktestSummary(records),
+    storage: predictionStatus().storage,
+  };
+}
+
+function normaliseDateOnly(value) {
+  const text = String(value || "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return "";
+  const parsed = new Date(`${text}T00:00:00Z`);
+  return Number.isNaN(parsed.getTime()) ? "" : text;
+}
+
+function optionalNumber(value) {
+  if (value === undefined || value === null || value === "") return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function normaliseDirection(value) {
+  const direction = String(value || "unknown").trim().toLowerCase();
+  return ["up", "down", "flat", "unknown"].includes(direction) ? direction : "unknown";
+}
+
 module.exports = {
   alertsStatus,
   boolParam,
@@ -2387,12 +2565,16 @@ module.exports = {
   normaliseQldPayload,
   normaliseWaFuelWatchPayloads,
   numberParam,
+  listPredictionBacktests,
   pointInAct,
   pointFromQuery,
   pointInNt,
   pointInSa,
   pointInTas,
   pointInVic,
+  predictionSignal,
+  predictionStatus,
+  recordPredictionBacktest,
   routeContextStations,
   routeFromPayload,
   routeProviderStatus,

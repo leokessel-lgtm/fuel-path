@@ -611,7 +611,7 @@ export function NearbyScreen({
                 contentContainerStyle={styles.listContent}
                 showsVerticalScrollIndicator
               >
-                {sortedStations.slice(0, 18).map((item) => (
+                {sortedStations.map((item) => (
                   <StationRow
                     item={item}
                     key={item.station.stationCode}

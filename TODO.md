@@ -72,7 +72,8 @@
 - [ ] Add saved commutes and notification permission flow.
 - [x] Design backend push scheduler for price-triggered saved-route alerts.
 - [x] Add backend saved-route alert storage and evaluator foundation with push delivery disabled.
-- [ ] Implement scheduled Expo push delivery for price-triggered saved-route alerts after native notification validation.
+- [x] Add scheduled saved-route evaluator, protected cron endpoint, Expo delivery path and push receipt contract behind production env gates.
+- [ ] Connect scheduled evaluator to live route scoring and validated native push-token collection before broad beta.
 - [x] Add prediction back-testing API contract with metric summary and accuracy-claim gates.
 - [x] Add durable prediction storage adapter for Neon/Postgres with safe memory fallback.
 - [x] Provision production Neon/Postgres and set `DATABASE_URL` plus `PREDICTION_BACKTEST_WRITE_TOKEN`.

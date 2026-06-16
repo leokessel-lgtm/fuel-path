@@ -4,6 +4,12 @@
   "buildCommand": "sh scripts/build-vercel-static.sh",
   "outputDirectory": "public",
   "cleanUrls": true,
+  "crons": [
+    {
+      "path": "/api/cron/evaluate-route-alerts",
+      "schedule": "0 21 * * *"
+    }
+  ],
   "headers": [
     {
       "source": "/(.*)",

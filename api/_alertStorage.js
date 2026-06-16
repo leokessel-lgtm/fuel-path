@@ -150,6 +150,71 @@ async function appendRouteAlertEvaluation(record) {
   return record;
 }
 
+async function updateRouteAlertDelivery({ evaluationId, pushTicketId = "", pushReceiptStatus = "" } = {}) {
+  if (testStorage?.updateRouteAlertDelivery) return testStorage.updateRouteAlertDelivery({ evaluationId, pushTicketId, pushReceiptStatus });
+  if (!databaseUrl()) {
+    const record = memoryStore.evaluations.find((item) => item.id === evaluationId);
+    if (record) {
+      if (pushTicketId) record.pushTicketId = pushTicketId;
+      if (pushReceiptStatus) record.pushReceiptStatus = pushReceiptStatus;
+    }
+    return record || null;
+  }
+
+  const sql = await getSql();
+  await ensureTables(sql);
+  const rows = await sql`
+    UPDATE fuel_path_route_alert_evaluations
+    SET
+      push_ticket_id = COALESCE(NULLIF(${pushTicketId}, ''), push_ticket_id),
+      push_receipt_status = COALESCE(NULLIF(${pushReceiptStatus}, ''), push_receipt_status)
+    WHERE id = ${evaluationId}
+    RETURNING *
+  `;
+  return rows[0] ? rowToEvaluation(rows[0]) : null;
+}
+
+async function updateSavedRouteLastAlert(routeId, sentAt) {
+  if (testStorage?.updateSavedRouteLastAlert) return testStorage.updateSavedRouteLastAlert(routeId, sentAt);
+  if (!databaseUrl()) {
+    const record = memoryStore.routes.find((item) => item.id === routeId);
+    if (record) record.lastAlertSentAt = sentAt;
+    return record || null;
+  }
+
+  const sql = await getSql();
+  await ensureTables(sql);
+  const rows = await sql`
+    UPDATE fuel_path_saved_routes
+    SET last_alert_sent_at = ${sentAt}, updated_at = ${sentAt}
+    WHERE id = ${routeId}
+    RETURNING *
+  `;
+  return rows[0] ? rowToRoute(rows[0]) : null;
+}
+
+async function updatePushDeviceStatus({ deviceId, status, invalidatedAt } = {}) {
+  if (testStorage?.updatePushDeviceStatus) return testStorage.updatePushDeviceStatus({ deviceId, status, invalidatedAt });
+  if (!databaseUrl()) {
+    const record = memoryStore.devices.find((item) => item.id === deviceId || item.expoPushToken === deviceId);
+    if (record) {
+      record.status = status;
+      record.invalidatedAt = invalidatedAt;
+    }
+    return record || null;
+  }
+
+  const sql = await getSql();
+  await ensureTables(sql);
+  const rows = await sql`
+    UPDATE fuel_path_push_devices
+    SET status = ${status}, invalidated_at = ${invalidatedAt || null}
+    WHERE id = ${deviceId} OR expo_push_token = ${deviceId}
+    RETURNING *
+  `;
+  return rows[0] ? rowToDevice(rows[0]) : null;
+}
+
 async function listPushDevices({ userId = "", status = "active", limit = 50 } = {}) {
   if (testStorage) return testStorage.listPushDevices({ userId, status, limit });
   if (!databaseUrl()) return filterMemory(memoryStore.devices, { userId, status, limit });
@@ -255,6 +320,26 @@ async function listRouteAlertEvaluations({ routeId = "", userId = "", limit = 50
   }
   return (await sql`
     SELECT * FROM fuel_path_route_alert_evaluations
+    ORDER BY evaluated_at DESC
+    LIMIT ${safeLimit}
+  `).map(rowToEvaluation);
+}
+
+async function listPendingPushTicketEvaluations({ limit = 100 } = {}) {
+  if (testStorage?.listPendingPushTicketEvaluations) return testStorage.listPendingPushTicketEvaluations({ limit });
+  if (!databaseUrl()) {
+    return memoryStore.evaluations
+      .filter((record) => record.pushTicketId && !record.pushReceiptStatus)
+      .slice(-boundedLimit(limit))
+      .reverse();
+  }
+
+  const sql = await getSql();
+  await ensureTables(sql);
+  const safeLimit = boundedLimit(limit);
+  return (await sql`
+    SELECT * FROM fuel_path_route_alert_evaluations
+    WHERE push_ticket_id IS NOT NULL AND push_receipt_status IS NULL
     ORDER BY evaluated_at DESC
     LIMIT ${safeLimit}
   `).map(rowToEvaluation);
@@ -473,9 +558,13 @@ module.exports = {
   appendRouteAlertEvaluation,
   counts,
   listPushDevices,
+  listPendingPushTicketEvaluations,
   listRouteAlertEvaluations,
   listSavedRoutes,
   setAlertStorageForTests,
+  updatePushDeviceStatus,
+  updateRouteAlertDelivery,
+  updateSavedRouteLastAlert,
   upsertPushDevice,
   upsertSavedRoute,
 };

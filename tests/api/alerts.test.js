@@ -2,10 +2,14 @@ const assert = require("node:assert/strict");
 const test = require("node:test");
 
 const alertsHandler = require("../../api/alerts");
+const cronEvaluateHandler = require("../../api/cron/evaluate-route-alerts");
+const internalEvaluateHandler = require("../../api/internal/jobs/evaluate-route-alerts");
+const internalReceiptsHandler = require("../../api/internal/jobs/check-push-receipts");
 const pushRegisterHandler = require("../../api/push/register");
 const savedRoutesHandler = require("../../api/saved-routes");
 const statusHandler = require("../../api/status");
 const { setAlertStorageForTests } = require("../../api/_backend");
+const { setExpoPushClientForTests } = require("../../api/_expoPush");
 
 const route = {
   id: "route-sylvania-cbd",
@@ -148,6 +152,118 @@ test("durable alert storage requires write token and keeps push disabled", async
   }
 });
 
+test("scheduled evaluator requires cron authorisation and records not-evaluated routes safely", async () => {
+  const originalCron = process.env.CRON_SECRET;
+  process.env.CRON_SECRET = "cron-token";
+  const store = memoryDurableStore();
+  setAlertStorageForTests(store);
+
+  try {
+    await store.upsertSavedRoute(route);
+    await store.upsertPushDevice(device);
+
+    const rejected = await callHandler(cronEvaluateHandler, { method: "GET", query: {}, headers: {} });
+    const accepted = await callHandler(cronEvaluateHandler, {
+      method: "GET",
+      query: { ignoreWindow: "1" },
+      headers: { authorization: "Bearer cron-token" },
+    });
+
+    assert.equal(rejected.status, 401);
+    assert.equal(accepted.status, 202);
+    assert.equal(accepted.payload.evaluatedCount, 1);
+    assert.equal(accepted.payload.sentCount, 0);
+    assert.notEqual(accepted.payload.results[0].status, "send_alert");
+    assert.match(accepted.payload.results[0].reason, /provider|route_scoring|unsupported|missing/);
+  } finally {
+    setAlertStorageForTests(null);
+    if (originalCron === undefined) delete process.env.CRON_SECRET;
+    else process.env.CRON_SECRET = originalCron;
+  }
+});
+
+test("Expo push delivery persists tickets only when delivery gate is enabled", async () => {
+  const originalToken = process.env.ALERTS_WRITE_TOKEN;
+  const originalDelivery = process.env.EXPO_PUSH_DELIVERY_ENABLED;
+  process.env.ALERTS_WRITE_TOKEN = "alert-token";
+  process.env.EXPO_PUSH_DELIVERY_ENABLED = "1";
+  const store = memoryDurableStore();
+  setAlertStorageForTests(store);
+  setExpoPushClientForTests({
+    async sendExpoPushMessages(messages) {
+      assert.equal(messages.length, 1);
+      assert.equal(messages[0].to, device.expoPushToken);
+      return [{ status: "ok", id: "ticket-1", to: messages[0].to }];
+    },
+    async fetchExpoPushReceipts(ids) {
+      assert.deepEqual(ids, ["ticket-1"]);
+      return { "ticket-1": { status: "ok" } };
+    },
+  });
+
+  try {
+    await callSavedRoutes("POST", {}, route, { authorization: "Bearer alert-token" });
+    const evaluated = await callAlerts("POST", { action: "evaluate" }, {
+      route,
+      devices: [device],
+      notificationPermission: "granted",
+      regionCapabilities: [{ region: "NSW", capability: "live" }],
+      candidate: freshCandidate(),
+    }, { authorization: "Bearer alert-token" });
+    const receipts = await callHandler(internalReceiptsHandler, {
+      method: "POST",
+      query: {},
+      body: {},
+      headers: { authorization: "Bearer alert-token" },
+    });
+
+    assert.equal(evaluated.status, 202);
+    assert.equal(evaluated.payload.deliveryStatus, "sent_to_expo");
+    assert.equal(evaluated.payload.evaluation.pushDeliveryEnabled, true);
+    assert.equal(evaluated.payload.evaluation.pushTicketId, "ticket-1");
+    assert.equal(store.evaluations[0].pushTicketId, "ticket-1");
+    assert.equal(store.routes[0].lastAlertSentAt, evaluated.payload.evaluation.evaluatedAt);
+    assert.equal(receipts.status, 202);
+    assert.equal(receipts.payload.checkedCount, 1);
+    assert.equal(receipts.payload.updatedCount, 1);
+    assert.equal(store.evaluations[0].pushReceiptStatus, "ok");
+  } finally {
+    setAlertStorageForTests(null);
+    setExpoPushClientForTests(null);
+    if (originalToken === undefined) delete process.env.ALERTS_WRITE_TOKEN;
+    else process.env.ALERTS_WRITE_TOKEN = originalToken;
+    if (originalDelivery === undefined) delete process.env.EXPO_PUSH_DELIVERY_ENABLED;
+    else process.env.EXPO_PUSH_DELIVERY_ENABLED = originalDelivery;
+  }
+});
+
+test("internal evaluator accepts write token without exposing public cron access", async () => {
+  const originalToken = process.env.ALERTS_WRITE_TOKEN;
+  process.env.ALERTS_WRITE_TOKEN = "alert-token";
+  const store = memoryDurableStore();
+  setAlertStorageForTests(store);
+
+  try {
+    await store.upsertSavedRoute(route);
+    const rejected = await callHandler(internalEvaluateHandler, { method: "POST", query: {}, body: {}, headers: {} });
+    const accepted = await callHandler(internalEvaluateHandler, {
+      method: "POST",
+      query: { ignoreWindow: "1" },
+      body: {},
+      headers: { authorization: "Bearer alert-token" },
+    });
+
+    assert.equal(rejected.status, 401);
+    assert.equal(accepted.status, 202);
+    assert.equal(accepted.payload.evaluatedCount, 1);
+    assert.equal(accepted.payload.results[0].status, "permission_missing");
+  } finally {
+    setAlertStorageForTests(null);
+    if (originalToken === undefined) delete process.env.ALERTS_WRITE_TOKEN;
+    else process.env.ALERTS_WRITE_TOKEN = originalToken;
+  }
+});
+
 function freshCandidate(overrides = {}) {
   return {
     stationCode: "station-1",
@@ -164,7 +280,10 @@ function memoryDurableStore() {
   const devices = [];
   const routes = [];
   const evaluations = [];
-  return {
+  const store = {
+    devices,
+    routes,
+    evaluations,
     status({ maxRecords }) {
       return {
         mode: "postgres_neon",
@@ -180,11 +299,11 @@ function memoryDurableStore() {
       return { deviceCount: devices.length, routeCount: routes.length, evaluationCount: evaluations.length };
     },
     async upsertPushDevice(record) {
-      devices.push(record);
+      upsert(devices, record);
       return record;
     },
     async upsertSavedRoute(record) {
-      routes.push(record);
+      upsert(routes, record);
       return record;
     },
     async appendRouteAlertEvaluation(record) {
@@ -200,7 +319,38 @@ function memoryDurableStore() {
     async listRouteAlertEvaluations() {
       return evaluations;
     },
+    async listPendingPushTicketEvaluations() {
+      return evaluations.filter((record) => record.pushTicketId && !record.pushReceiptStatus);
+    },
+    async updateRouteAlertDelivery({ evaluationId, pushTicketId = "", pushReceiptStatus = "" }) {
+      const record = evaluations.find((item) => item.id === evaluationId);
+      if (record) {
+        if (pushTicketId) record.pushTicketId = pushTicketId;
+        if (pushReceiptStatus) record.pushReceiptStatus = pushReceiptStatus;
+      }
+      return record || null;
+    },
+    async updateSavedRouteLastAlert(routeId, sentAt) {
+      const record = routes.find((item) => item.id === routeId);
+      if (record) record.lastAlertSentAt = sentAt;
+      return record || null;
+    },
+    async updatePushDeviceStatus({ deviceId, status, invalidatedAt }) {
+      const record = devices.find((item) => item.id === deviceId || item.expoPushToken === deviceId);
+      if (record) {
+        record.status = status;
+        record.invalidatedAt = invalidatedAt;
+      }
+      return record || null;
+    },
   };
+  return store;
+}
+
+function upsert(records, record) {
+  const index = records.findIndex((item) => item.id === record.id);
+  if (index >= 0) records[index] = record;
+  else records.push(record);
 }
 
 function callStatus() {

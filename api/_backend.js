@@ -3,13 +3,18 @@ const {
   alertStorageStatus,
   appendRouteAlertEvaluation,
   counts: alertStorageCounts,
+  listPendingPushTicketEvaluations,
   listPushDevices,
   listRouteAlertEvaluations,
   listSavedRoutes,
   setAlertStorageForTests,
+  updatePushDeviceStatus,
+  updateRouteAlertDelivery,
+  updateSavedRouteLastAlert,
   upsertPushDevice,
   upsertSavedRoute,
 } = require("./_alertStorage");
+const { fetchExpoPushReceipts, sendExpoPushMessages } = require("./_expoPush");
 const {
   appendPredictionBacktestRecord,
   listPredictionBacktestRecords,
@@ -2376,6 +2381,8 @@ function decodePolylineChunk(encoded, startIndex) {
 
 async function alertsStatus() {
   const storage = alertStorageStatus({ maxRecords: ALERT_MAX_RECORDS });
+  const cronConfigured = Boolean(process.env.CRON_SECRET);
+  const pushDeliveryEnabled = alertPushDeliveryEnabled();
   let storageCounts = {};
   let storageError = "";
   try {
@@ -2385,9 +2392,11 @@ async function alertsStatus() {
   }
   return {
     mode: "backend_foundation",
-    schedulerEnabled: false,
+    schedulerEnabled: cronConfigured,
     evaluatorEnabled: true,
-    pushDeliveryEnabled: false,
+    pushDeliveryEnabled,
+    deliveryMode: pushDeliveryEnabled ? "expo_push_service" : "disabled_env_gate",
+    receiptCheckingEnabled: pushDeliveryEnabled,
     storageConfigured: Boolean(storage.configured),
     storage: {
       ...storage,
@@ -2396,8 +2405,8 @@ async function alertsStatus() {
       lastError: storageError,
     },
     writeSecurity: alertsWriteSecurity(),
-    pushProviderConfigured: false,
-    cronConfigured: false,
+    pushProviderConfigured: pushDeliveryEnabled,
+    cronConfigured,
     supportedDecisionStatuses: [
       "send_alert",
       "alert_disabled",
@@ -2413,8 +2422,14 @@ async function alertsStatus() {
       "not_evaluated",
       "failed",
     ],
-    nextBuildStep: "Add scheduled evaluation and Expo push delivery after native device-token validation.",
+    nextBuildStep: pushDeliveryEnabled
+      ? "Connect scheduled evaluation to live route scoring and monitor Expo push receipts."
+      : "Enable EXPO_PUSH_DELIVERY_ENABLED only after native device-token validation passes.",
   };
+}
+
+function alertPushDeliveryEnabled() {
+  return process.env.EXPO_PUSH_DELIVERY_ENABLED === "1";
 }
 
 function alertsWriteSecurity() {
@@ -2439,6 +2454,15 @@ function alertsWriteAuthorised(req = {}) {
   const direct = headers["x-fuel-path-alerts-token"] || headers["X-Fuel-Path-Alerts-Token"] || "";
   const bearer = String(auth).replace(/^Bearer\s+/i, "").trim();
   return bearer === expected || String(direct).trim() === expected;
+}
+
+function cronAuthorised(req = {}) {
+  const expected = process.env.CRON_SECRET;
+  if (!expected) return false;
+  const headers = req.headers || {};
+  const auth = headers.authorization || headers.Authorization || "";
+  const bearer = String(auth).replace(/^Bearer\s+/i, "").trim();
+  return bearer === expected;
 }
 
 async function registerPushDevice(input = {}) {
@@ -2488,6 +2512,7 @@ async function listBackendAlertEvaluations({ routeId = "", userId = "", limit = 
 async function evaluateSavedRouteAlert(input = {}) {
   const route = normaliseBackendSavedRoute(input.route || input);
   const devices = input.devices || (await listPushDevices({ userId: route.userId, status: "active", limit: 20 }));
+  const pushDeliveryEnabled = alertPushDeliveryEnabled();
   const evaluation = buildSavedRouteAlertEvaluation({
     route,
     devices,
@@ -2495,13 +2520,146 @@ async function evaluateSavedRouteAlert(input = {}) {
     notificationPermission: input.notificationPermission,
     regionCapabilities: input.regionCapabilities,
     now: input.now,
-    pushDeliveryEnabled: false,
+    pushDeliveryEnabled,
   });
   await appendRouteAlertEvaluation(evaluation);
+  const delivery = await deliverSavedRouteAlert({ route, devices, evaluation, pushDeliveryEnabled });
   return {
     evaluation,
-    pushDeliveryEnabled: false,
-    deliveryStatus: evaluation.status === "send_alert" ? "not_sent_push_provider_disabled" : "not_applicable",
+    pushDeliveryEnabled,
+    ...delivery,
+    alerts: await alertsStatus(),
+  };
+}
+
+async function deliverSavedRouteAlert({ route, devices = [], evaluation, pushDeliveryEnabled } = {}) {
+  if (evaluation.status !== "send_alert") return { deliveryStatus: "not_applicable" };
+  if (!pushDeliveryEnabled) return { deliveryStatus: "not_sent_push_provider_disabled" };
+
+  const activeDevices = devices.filter((device) => device.status !== "inactive" && isExpoPushToken(device.expoPushToken));
+  if (!activeDevices.length) return { deliveryStatus: "not_sent_no_valid_expo_token" };
+
+  try {
+    const messages = activeDevices.map((device) => ({
+      to: device.expoPushToken,
+      title: evaluation.messageTitle,
+      body: evaluation.messageBody,
+      sound: "default",
+      data: {
+        type: "saved-route-alert",
+        routeId: route.id,
+        evaluationId: evaluation.id,
+        stationCode: evaluation.stationCode,
+        fuel: route.fuel,
+      },
+    }));
+    const tickets = await sendExpoPushMessages(messages);
+    const okTickets = tickets.filter((ticket) => ticket.status === "ok" && ticket.id);
+    for (const ticket of tickets) {
+      if (ticket.status === "error" && ticket.details?.error === "DeviceNotRegistered") {
+        await updatePushDeviceStatus({
+          deviceId: ticket.to,
+          status: "inactive",
+          invalidatedAt: evaluation.evaluatedAt,
+        });
+      }
+    }
+    if (!okTickets.length) {
+      await updateRouteAlertDelivery({
+        evaluationId: evaluation.id,
+        pushReceiptStatus: "ticket_error",
+      });
+      return { deliveryStatus: "expo_ticket_error", pushTickets: tickets };
+    }
+
+    const pushTicketId = okTickets.map((ticket) => ticket.id).join(",");
+    evaluation.pushTicketId = pushTicketId;
+    await updateRouteAlertDelivery({ evaluationId: evaluation.id, pushTicketId });
+    await updateSavedRouteLastAlert(route.id, evaluation.evaluatedAt);
+    return { deliveryStatus: "sent_to_expo", pushTickets: tickets };
+  } catch (error) {
+    await updateRouteAlertDelivery({
+      evaluationId: evaluation.id,
+      pushReceiptStatus: "delivery_error",
+    });
+    return {
+      deliveryStatus: "expo_delivery_failed",
+      deliveryError: error instanceof Error ? error.message : "Expo push delivery failed",
+    };
+  }
+}
+
+async function runScheduledRouteAlertEvaluation({ limit = 50, now, ignoreWindow = false } = {}) {
+  const evaluatedAt = validIsoDate(now) || new Date().toISOString();
+  const routes = await listSavedRoutes({ enabledOnly: true, limit });
+  const results = [];
+
+  for (const route of routes) {
+    if (!ignoreWindow && !routeAlertWindowDue(route, evaluatedAt)) {
+      results.push({ routeId: route.id, status: "skipped", reason: "outside_alert_window" });
+      continue;
+    }
+    const devices = await listPushDevices({ userId: route.userId, status: "active", limit: 20 });
+    const result = await evaluateSavedRouteAlert({
+      route,
+      devices,
+      notificationPermission: devices.length ? "granted" : "unknown",
+      candidate: {},
+      now: evaluatedAt,
+    });
+    results.push({
+      routeId: route.id,
+      evaluationId: result.evaluation.id,
+      status: result.evaluation.status,
+      reason: result.evaluation.reason,
+      deliveryStatus: result.deliveryStatus,
+    });
+  }
+
+  return {
+    accepted: true,
+    mode: "scheduled_saved_route_alert_evaluation",
+    evaluatedAt,
+    routeCount: routes.length,
+    evaluatedCount: results.filter((item) => item.evaluationId).length,
+    skippedCount: results.filter((item) => item.status === "skipped").length,
+    sentCount: results.filter((item) => item.deliveryStatus === "sent_to_expo").length,
+    results,
+    alerts: await alertsStatus(),
+  };
+}
+
+async function checkPushReceipts({ limit = 100 } = {}) {
+  const pending = await listPendingPushTicketEvaluations({ limit });
+  const ids = pending.flatMap((evaluation) => String(evaluation.pushTicketId || "").split(",").map((id) => id.trim()).filter(Boolean));
+  if (!ids.length) {
+    return {
+      accepted: true,
+      checkedCount: 0,
+      updatedCount: 0,
+      receipts: {},
+      alerts: await alertsStatus(),
+    };
+  }
+
+  const receipts = await fetchExpoPushReceipts(ids);
+  let updatedCount = 0;
+  for (const evaluation of pending) {
+    const ticketIds = String(evaluation.pushTicketId || "").split(",").map((id) => id.trim()).filter(Boolean);
+    const statuses = ticketIds.map((id) => receiptStatus(receipts[id])).filter(Boolean);
+    if (!statuses.length) continue;
+    await updateRouteAlertDelivery({
+      evaluationId: evaluation.id,
+      pushReceiptStatus: [...new Set(statuses)].join(","),
+    });
+    updatedCount += 1;
+  }
+
+  return {
+    accepted: true,
+    checkedCount: ids.length,
+    updatedCount,
+    receipts,
     alerts: await alertsStatus(),
   };
 }
@@ -2530,6 +2688,7 @@ function buildSavedRouteAlertEvaluation({
   else if (!activeDevices.length) [status, reason] = ["missing_push_token", "no_active_push_device"];
   else if (capabilities.some((item) => item.capability === "unsupported")) [status, reason] = ["region_unsupported", "route_region_unsupported"];
   else if (capabilities.some((item) => item.capability === "pending_access")) [status, reason] = ["provider_access_pending", "route_provider_access_pending"];
+  else if (!candidate.stationCode) [status, reason] = ["not_evaluated", "route_scoring_not_available"];
   else if (candidate.openNow === false) [status, reason] = ["station_closed", "candidate_station_closed"];
   else if (!Number.isFinite(optionalNumber(candidate.freshnessMinutes)) || optionalNumber(candidate.freshnessMinutes) > ALERT_FRESHNESS_MAX_MINUTES) [status, reason] = ["stale_price", "candidate_price_stale"];
   else if (!Number.isFinite(optionalNumber(candidate.estimatedSavingDollars)) || optionalNumber(candidate.estimatedSavingDollars) < route.minSavingDollars) [status, reason] = ["saving_below_threshold", "saving_below_route_threshold"];
@@ -2555,6 +2714,47 @@ function buildSavedRouteAlertEvaluation({
     pushTicketId: undefined,
     pushReceiptStatus: undefined,
   };
+}
+
+function receiptStatus(receipt) {
+  if (!receipt) return "";
+  if (receipt.status === "ok") return "ok";
+  if (receipt.status === "error") return receipt.details?.error || receipt.message || "error";
+  return String(receipt.status || "");
+}
+
+function isExpoPushToken(value) {
+  return /^(ExponentPushToken|ExpoPushToken)\[[^\]]+\]$/.test(String(value || "").trim());
+}
+
+function routeAlertWindowDue(route, now) {
+  const target = route.alertTimeLocal || "07:30";
+  const local = localTimeParts(now, route.timezone || "Australia/Sydney");
+  if (!local) return true;
+  const [targetHour, targetMinute] = target.split(":").map(Number);
+  const targetMinutes = targetHour * 60 + targetMinute;
+  const localMinutes = local.hour * 60 + local.minute;
+  const diff = Math.abs(localMinutes - targetMinutes);
+  const wrappedDiff = Math.min(diff, 1440 - diff);
+  const windowMinutes = boundedNumber(process.env.ALERT_SCHEDULE_WINDOW_MINUTES, 5, 720, 90);
+  return wrappedDiff <= windowMinutes;
+}
+
+function localTimeParts(value, timezone) {
+  try {
+    const parts = new Intl.DateTimeFormat("en-AU", {
+      timeZone: timezone,
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).formatToParts(new Date(value));
+    const hour = Number(parts.find((part) => part.type === "hour")?.value);
+    const minute = Number(parts.find((part) => part.type === "minute")?.value);
+    if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
+    return { hour: hour === 24 ? 0 : hour, minute };
+  } catch {
+    return null;
+  }
 }
 
 function normalisePushDevice(input) {
@@ -2866,6 +3066,8 @@ module.exports = {
   cacheSeconds,
   capabilitiesForPoints,
   capabilitySummary,
+  checkPushReceipts,
+  cronAuthorised,
   distanceKm,
   evaluateSavedRouteAlert,
   fuelProviderCapabilityMatrix,
@@ -2902,6 +3104,7 @@ module.exports = {
   routeContextStations,
   routeFromPayload,
   routeProviderStatus,
+  runScheduledRouteAlertEvaluation,
   saveBackendSavedRoute,
   scoreRoute,
   sendJson,

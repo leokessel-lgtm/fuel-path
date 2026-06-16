@@ -305,10 +305,10 @@ export function NearbyScreen({
     () => ({
       top: 170,
       right: 18,
-      bottom: sheetExpanded ? 330 : selected ? 285 : 150,
+      bottom: 150,
       left: 18,
     }),
-    [selected, sheetExpanded],
+    [],
   );
 
   const handleSortPress = (nextSortMode: SortMode) => {

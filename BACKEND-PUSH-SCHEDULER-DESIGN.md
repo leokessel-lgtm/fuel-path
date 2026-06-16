@@ -18,6 +18,8 @@ Bad alert:
 
 > Fuel prices changed near you.
 
+National guardrail: only send where the route's region capability, provider terms and freshness support a safe recommendation.
+
 ## Inputs
 
 Per user:
@@ -33,6 +35,7 @@ Per saved route:
 - route id
 - from and to points
 - route geometry or route cache key
+- region and route-crossing capability status
 - fuel type
 - usual alert time
 - alert enabled state
@@ -43,6 +46,7 @@ Per saved route:
 Per evaluation:
 
 - current FuelCheck station prices
+- relevant state or territory provider capability
 - station freshness
 - route-corridor candidates
 - discount-adjusted user price
@@ -108,6 +112,7 @@ Suppress alerts when:
 - detour is above threshold
 - best price is stale beyond the trust cutoff
 - station appears closed
+- route region is unsupported, pending access or not permitted for alerts
 - notification permission or token is missing
 - user has paused the route
 
@@ -138,6 +143,9 @@ Non-send statuses:
 - `detour_above_threshold`
 - `stale_price`
 - `station_closed`
+- `region_unsupported`
+- `provider_access_pending`
+- `provider_terms_blocked`
 - `range_first`
 - `missing_push_token`
 - `permission_missing`

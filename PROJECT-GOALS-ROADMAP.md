@@ -1,10 +1,12 @@
 # Fuel Path Project Goals And Roadmap
 
-Last updated: 15 June 2026, Australia/Sydney
+Last updated: 17 June 2026, Australia/Sydney
 
 ## Main Project Goals
 
-Fuel Path should stay focused on three differentiators.
+Fuel Path should be a whole-of-Australia fuel decision app, not a state-first fuel map. Feature depth can vary by jurisdiction, but every state and territory must have an explicit capability state so users never confuse missing data with a genuine recommendation.
+
+Fuel Path should stay focused on four differentiators.
 
 ### Goal 1: Best Fuel Decision, Not Another Map
 
@@ -55,9 +57,106 @@ This includes:
 
 Performance is a release metric, not a polish task. See `PERFORMANCE-GUARDRAILS.md`.
 
+### Goal 4: Prediction And Cycle Guidance
+
+Fuel Path can show timing guidance only where the evidence supports it.
+
+This includes:
+
+- no-cycle-signal states for unsupported regions, fuels or sparse histories
+- confidence labels that explain why the signal is high, medium or low
+- back-testing before any prominent prediction or accuracy claim
+- route recommendations that still work when cycle guidance is unavailable
+
+Do not market prediction before measured evidence supports it.
+
+## Product Principles
+
+- Lead with the decision, not the map.
+- A stale cheap price is not a bargain.
+- Route value beats raw cheapest price.
+- Confidence must be visible and humble.
+- Prediction must be back-tested before it is trusted.
+- Keep the app lean, fast and ad-free in the core flow.
+
+## National Provider Capability Matrix
+
+The app should represent all Australian states and territories as first-class regions.
+
+| Region | Current capability | Roadmap status |
+| --- | --- | --- |
+| NSW | Live provider validated | Keep live support, confirm commercial/caching/attribution terms |
+| ACT | Covered through API.NSW FuelCheck feed | Keep visible as ACT capability, confirm permitted usage terms |
+| QLD | Live provider adapter validated | Confirm licence/usage constraints before public/commercial launch |
+| WA | First FuelWatch adapter implemented for Perth/metro | Expand beyond metro without excessive provider requests |
+| VIC | Pending Servo Saver API access | Implement adapter after approved schema is available |
+| SA | Pending access path | Confirm API/access process and implement adapter |
+| TAS | Pending provider implementation | Confirm feed access and implement adapter |
+| NT | Pending access path | Confirm MyFuel NT data/API access and implement adapter |
+
+Capability labels in the app and backend should be:
+
+- `live`
+- `limited`
+- `pending_access`
+- `fallback`
+- `unsupported`
+
+## Goal-Level Success Metrics
+
+### Goal 1: Best Fuel Decision, Not Another Map
+
+- 8/8 regions represented in the capability matrix.
+- No region silently returns misleading empty results.
+- Warm route planning response under 3 seconds for common Australian metro and regional routes.
+- No top recommendation from data older than the freshness threshold.
+- No horizontal overflow on supported mobile widths.
+- 95% of valid route searches return either a recommendation or a specific, useful failure reason.
+- Real validation: at least 6 of 8 users say Fuel Path reduces manual comparison effort.
+
+### Goal 2: Your Real Price
+
+- 100% of recommendations preserve pump price beside adjusted price.
+- 0 known cases where an unconfigured discount changes the top recommendation.
+- Discount rule regressions cover brand match, region mismatch, unsupported program, member-only station and no-wallet user.
+- Real validation: at least 5 of 8 users understand the difference between pump price and their price.
+
+### Goal 3: Smart Saved-Route Alerts
+
+- 0 alerts from stale, unsupported or below-threshold data.
+- 100% duplicate suppression for the same route, station and reason within the configured cooldown.
+- At least 60% of beta users rate received alerts as useful.
+- Alert opt-out caused by noise stays under 10% during beta.
+
+### Goal 4: Prediction And Cycle Guidance
+
+- 100% of unsupported regions, fuels and sparse histories avoid forecast-style copy.
+- Back-test coverage exists before prediction appears as a primary decision driver.
+- No user-facing "accurate" or "predicts" claim appears without measured error evidence.
+
 ## Goal 1 Breakdown
 
-Goal 1 is the current priority. The product must first prove that it can make a better fuel decision than a user manually scanning a map.
+Goal 1 is the current priority. The product must first prove that it can make a better fuel decision than a user manually scanning a map, across the whole Australian capability matrix.
+
+### 1.0 National Capability Coverage
+
+**Objective:** Let drivers use Fuel Path across every Australian state and territory with honest capability labels.
+
+**Build scope:**
+
+- Normalised provider contract for every state and territory.
+- Backend status exposes regional capability without leaking provider secrets.
+- UI surfaces capability when data is live, limited, pending access, fallback or unsupported.
+- Region-specific blockers never appear as silent empty results.
+
+**Success metrics:**
+
+- 8/8 regions represented in the capability matrix.
+- Every region has one of the approved capability labels.
+- Provider-routing tests cover supported, limited, pending and unsupported states.
+- Empty states explain no stations, no provider access, stale feed, route failure or geocode failure separately.
+
+**Priority:** P0, immediate.
 
 ### 1.1 Trip Intent Capture
 
@@ -94,7 +193,7 @@ Goal 1 is the current priority. The product must first prove that it can make a 
 **Success metrics:**
 
 - Metro routes return enough candidates to compare meaningfully when data exists.
-- Longer NSW routes do not silently show empty results.
+- Longer metro, regional and interstate routes do not silently show empty results.
 - Results clearly separate "on route" from "nearby context".
 - The app never leaves the user staring at a blank result without a reason.
 
@@ -120,6 +219,7 @@ Goal 1 is the current priority. The product must first prove that it can make a 
 - Every ranked result explains the main reason for its position.
 - Inputs such as fuel type, vehicle and route change the ranking.
 - Regression tests cover "cheapest is not best", "discount changes ranking" and "range risk".
+- UI preserves best value, cheapest, closest and not-worth-detour states without implying they are the same thing.
 
 **Priority:** P0, immediate.
 
@@ -141,6 +241,7 @@ Goal 1 is the current priority. The product must first prove that it can make a 
 - Recommendation copy fits in a compact mobile card.
 - The map remains visible or immediately reachable after planning.
 - Users can explain why the top station won.
+- The top card includes action, station, net saving, detour, source, freshness and confidence cue.
 
 **Priority:** P0, immediate.
 
@@ -187,6 +288,7 @@ Goal 1 is the current priority. The product must first prove that it can make a 
 - Stale or uncertain data is visible before the user navigates.
 - No station is recommended as "best" if it fails a critical eligibility, freshness or availability rule.
 - Trust concerns in validation are mostly about data availability, not confusing wording.
+- Closed, unavailable, restricted, unsupported or unreachable stations are downgraded or blocked before navigation.
 
 **Priority:** P1, next.
 
@@ -252,34 +354,221 @@ The map should maximise useful viewing area, keep the route or nearby search are
 - 4 of 7 understand the top recommendation without explanation.
 - 3 of 4 commuter/high-frequency participants want saved-route alerts.
 - At least one fleet/tradie participant confirms fleet-lite value.
+- At least 6 of 8 users say Fuel Path reduces manual comparison effort before public beta.
 
 **Priority:** P1, next.
+
+## Goal 2 Breakdown
+
+Goal 2 starts after Goal 1 is credible enough that users trust the recommendation surface.
+
+### 2.1 Pump Price And User Price
+
+**Objective:** Show the public pump price and the user's eligible adjusted price without hiding either.
+
+**Build scope:**
+
+- Pump price visible in every station row and recommendation.
+- Confirmed user price shown only when the user has configured an eligible discount or membership.
+- Possible lower price labelled as possible, not guaranteed.
+- Rule source and reason shown for every adjusted price.
+
+**Success metrics:**
+
+- 100% of station rows preserve pump price.
+- 0 known cases where an unconfigured discount changes the top recommendation.
+- Validation users can explain the difference between pump price and user price.
+
+**Priority:** P1, next.
+
+### 2.2 Eligibility And Restricted Prices
+
+**Objective:** Prevent users driving to prices they cannot access.
+
+**Build scope:**
+
+- Member-only warning.
+- Fleet-only warning.
+- Eligibility-unknown warning.
+- Region and brand mismatch checks.
+- Recommendation downgrade or block when eligibility is missing.
+
+**Success metrics:**
+
+- Restricted prices cannot win unless user eligibility is configured.
+- Regression tests cover brand match, region mismatch, unsupported program, member-only station and no-wallet user.
+- Every restricted-price warning is visible before navigation.
+
+**Priority:** P1, next.
+
+### 2.3 Account Preference Hub
+
+**Objective:** Capture vehicle, fuel, tank and discount preferences once so Plan stays fast.
+
+**Build scope:**
+
+- Vehicle profile.
+- Fuel type.
+- Tank size and economy.
+- Discount wallet.
+- Multiple vehicles later only if validation proves need.
+
+**Success metrics:**
+
+- Plan can be used without re-entering profile data.
+- Local saved-profile reads stay under 100 ms.
+- No profile data is sent to the backend unless required for a user-visible calculation or synced alert.
+
+**Priority:** P1, next.
+
+## Goal 3 Breakdown
+
+Goal 3 moves Fuel Path from a trip tool to a habit tool.
+
+### 3.1 Backend Saved-Route Alert Evaluation
+
+**Objective:** Send alerts only when a saved route is worth checking.
+
+**Build scope:**
+
+- Backend-owned route alert evaluation.
+- Region capability check.
+- Source freshness check.
+- Saving and detour thresholds.
+- Suppression and cooldown.
+- Push delivery after native notification validation.
+
+**Success metrics:**
+
+- 0 alerts from stale, unsupported or below-threshold data.
+- Duplicate route/station/reason alerts are suppressed within the configured cooldown.
+- Every non-send status has a clear reason.
+
+**Priority:** P2, later.
+
+### 3.2 Explainable Alert Copy
+
+**Objective:** Make every alert understandable and non-spammy.
+
+**Build scope:**
+
+- Route context.
+- Fuel type.
+- Station area.
+- Reason for alert.
+- Freshness or confidence cue.
+- Regional limitation explanation when alerts are unavailable.
+
+**Success metrics:**
+
+- Alert copy always explains why it was sent.
+- At least 60% of beta users rate received alerts as useful.
+- Alert opt-out caused by noise stays under 10% during beta.
+
+**Priority:** P2, later.
+
+### 3.3 Quiet Controls
+
+**Objective:** Give users control over notification noise.
+
+**Build scope:**
+
+- Pause route alerts.
+- Quiet windows.
+- Quiet days.
+- Missing permission and missing token states.
+
+**Success metrics:**
+
+- Paused routes send nothing.
+- Quiet windows are respected.
+- Missing permission, missing token and unsupported region states are visible in Account.
+
+**Priority:** P2, later.
+
+## Goal 4 Breakdown
+
+Prediction is not a headline feature until it earns trust.
+
+### 4.1 No-Cycle-Signal Mode
+
+**Objective:** Avoid unsupported forecast claims.
+
+**Build scope:**
+
+- Unsupported regions show no-cycle-signal wording.
+- Unsupported fuels show no-cycle-signal wording.
+- Sparse histories show no-cycle-signal wording.
+- Route recommendation still works without cycle guidance.
+
+**Success metrics:**
+
+- 100% unsupported cases avoid forecast-style copy.
+- No unsupported region or fuel uses "predicts", "accurate" or equivalent claim wording.
+
+**Priority:** P2, later.
+
+### 4.2 Prediction Back-Testing Foundation
+
+**Objective:** Measure forecast quality before surfacing prediction as a primary decision driver.
+
+**Build scope:**
+
+- Store prediction runs by region, fuel and date.
+- Store actual outcomes by region, fuel and date.
+- Track mean absolute error and sample size.
+- Gate user-facing accuracy claims behind measured evidence.
+
+**Success metrics:**
+
+- Back-test records exist before prominent prediction UI.
+- No user-facing accuracy claim appears without measured error evidence.
+
+**Priority:** P2, later.
+
+### 4.3 Plain Confidence Labels
+
+**Objective:** Explain confidence without pretending precision.
+
+**Build scope:**
+
+- High, medium and low confidence labels.
+- Reasons such as fresh official data, sparse history, stale feed or irregular pattern.
+- Confidence shown beside timing guidance and trust cues.
+
+**Success metrics:**
+
+- Every confidence label includes a reason.
+- Validation users understand that confidence is not a guarantee.
+
+**Priority:** P2, later.
 
 ## Prioritised Build Roadmap
 
 ### Now: Prove Goal 1
 
-1. Add production-grade address suggestions for suburbs, addresses and points of reference.
-2. Limit long-route ranked results to a useful decision set, with progressive expansion.
-3. Make stale-price severity reduce recommendation confidence more strongly.
-4. Add route-led map camera behaviour with dynamic breathing room and selected-station focus.
+1. Build the national provider capability matrix into backend status and user-facing capability states.
+2. Keep production-grade address suggestions behind the backend provider adapter.
+3. Keep route results to a useful decision set, with progressive expansion for long metro, regional and interstate routes.
+4. Keep stale-price severity and region capability in recommendation confidence.
 5. Keep Plan Trip focused on trip intent, one recommendation and route map.
 6. Keep secondary setup behind Account or detail views.
 
 ### Next: Make The Decision Trustworthy
 
-1. Add clearer availability and eligibility warnings.
-2. Add proper "not worth detour" and stale-data downgrade states.
-3. Expand tests around scoring edge cases.
+1. Add clearer availability, eligibility and region-capability warnings.
+2. Add proper "not worth detour", unsupported-region and stale-data downgrade states.
+3. Expand break-it tests around scoring, provider failures, accessibility and frontend state.
 4. Run real validation sessions.
-5. Confirm API.NSW commercial, caching and public-sharing permissions.
+5. Confirm provider commercial, caching and attribution permissions by jurisdiction.
 
 ### Then: Bring In Goals 2 And 3
 
-1. Add live brand/network discount rules for "your real price".
+1. Expand live brand/network discount rules for "your real price" nationally where rules are known.
 2. Add backend-driven route alert checks that evaluate saved routes before the user's normal travel window.
-3. Add price-cycle guidance only where valid.
-4. Add fleet-lite approved stop mode.
+3. Add price-cycle guidance only where region, fuel type and history support it.
+4. Add prediction back-testing storage before prediction becomes a primary decision driver.
+5. Add fleet-lite approved stop mode.
 
 ### Always: Keep The App Lean
 
@@ -303,8 +592,23 @@ Until Goal 1 validates, every new build item should answer yes to at least one o
 - Does it make the recommendation more accurate?
 - Does it make the recommendation more trustworthy?
 - Does it make the map and ranked result easier to connect?
+- Does it improve whole-of-Australia capability without hiding regional limitations?
+- Does it include success metrics and break-it tests from `NATIONAL-TESTING-REGIME.md`?
 
 If not, park it.
+
+## Done Definition
+
+A roadmap or backlog item is done only when:
+
+- user story and success metrics are documented
+- happy path and break-it tests are added or manually recorded
+- accessibility and performance impact are checked
+- provider and capability limitations are visible to the user
+- stale, restricted or unsupported data cannot silently drive a confident recommendation
+- production smoke passes after deploy, when the change reaches production
+
+Use `NATIONAL-TESTING-REGIME.md` as the release gate for feature, integration and production checks.
 
 ## Build Progress
 

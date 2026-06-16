@@ -1,10 +1,10 @@
 # Fuel Path Product Ideas
 
-Last updated: 14 June 2026, Australia/Sydney
+Last updated: 17 June 2026, Australia/Sydney
 
 ## TLDR
 
-Fuel Path should be a **decision engine for fuel planning**, not another fuel price map.
+Fuel Path should be a **whole-of-Australia decision engine for fuel planning**, not another fuel price map.
 
 The strongest product idea is:
 
@@ -15,23 +15,28 @@ This document captures the product ideas worth preserving from the market resear
 ## Product Principles
 
 - Recommendation first, map second.
+- Lead with the decision, not the dataset.
 - Net saving, not just pump price.
 - Route corridor, not straight-line distance.
+- Route value beats raw cheapest price.
 - Confidence and freshness visible by default.
+- A stale cheap price is not a bargain.
 - Cycle-aware, not fortune-telling.
+- Prediction must be back-tested before it is trusted.
 - App-first for habits and alerts, web companion for demos and fleet/admin.
 - No ads in the core decision flow.
 - Avoid in-app payment until trust and partner value are proven.
 
 ## Main Project Goals
 
-The project is now anchored on three differentiators:
+The project is now anchored on four differentiators:
 
 1. **Best Fuel Decision, Not Another Map:** tell the driver the best fuel action for an actual trip.
 2. **Your Real Price:** show pump price beside the user's eligible adjusted price.
 3. **Smart Saved-Route Alerts:** prompt users around saved routes, timing, tank context and valid price signals.
+4. **Prediction And Cycle Guidance:** show timing guidance only where it is evidence-gated and back-tested.
 
-The active build priority is Goal 1. See [Project goals and roadmap](PROJECT-GOALS-ROADMAP.md).
+The active build priority is Goal 1 as a national capability. See [Project goals and roadmap](PROJECT-GOALS-ROADMAP.md).
 
 ## Adopted Build Direction
 
@@ -65,7 +70,7 @@ The Plan Trip screen should stay compact and action-led:
 
 ### 1. Best Fill For This Drive
 
-**Idea:** User enters destination, fuel type and rough tank level. Fuel Path recommends whether to fill now, on route, later, or skip.
+**Idea:** User enters destination, fuel type and rough tank level. Fuel Path recommends whether to fill now, on route, later, or skip anywhere in Australia where the data capability supports it.
 
 **Target:** Commuters, high-frequency drivers, road-trippers.
 
@@ -76,6 +81,20 @@ The Plan Trip screen should stay compact and action-led:
 **Evidence:** Market research and prototype both support "decision, not dots".
 
 **Risk:** Needs reliable route detour scoring and fresh prices.
+
+### 1A. National Provider Capability Matrix
+
+**Idea:** Treat NSW, ACT, QLD, VIC, SA, WA, TAS and NT as first-class regions with explicit capability labels.
+
+**Target:** All Australian drivers.
+
+**Why it matters:** A national app must not turn provider gaps into misleading blank results.
+
+**MVP timing:** Phase 1.
+
+**Evidence:** The national roadmap now requires 8/8 region representation and capability states.
+
+**Risk:** Capability depth will vary by jurisdiction until API access, licensing and provider schemas are confirmed.
 
 ### 2. Net-Savings Route Ranking
 
@@ -109,7 +128,7 @@ The Plan Trip screen should stay compact and action-led:
 
 **Idea:** For eligible markets, show whether route-corridor unleaded prices are low, falling, rising or uncertain.
 
-**Target:** Sydney commuters first, later Melbourne, Brisbane, Adelaide and Perth.
+**Target:** Supported Australian fuel-cycle markets only.
 
 **Why it matters:** Price cycles can create meaningful savings, but users need guidance not charts.
 
@@ -117,7 +136,7 @@ The Plan Trip screen should stay compact and action-led:
 
 **Evidence:** ACCC confirms cycles in five largest cities and estimated annual savings from timing plus shopping around.
 
-**Risk:** Do not apply to diesel, Canberra/ACT, Hobart, Darwin or most regional locations by default.
+**Risk:** Do not apply to unsupported fuels, regions or sparse histories by default.
 
 ### 5. Saved Commute Alerts
 
@@ -139,7 +158,7 @@ The Plan Trip screen should stay compact and action-led:
 
 **Idea:** Detect early price rises at some stations while cheaper stations remain on the route.
 
-**Target:** Sydney commuters and frequent drivers.
+**Target:** Frequent drivers in supported cycle markets.
 
 **Why it matters:** ACCC says retailers do not all lift prices at once, and users can still find stations that have not yet risen.
 
@@ -221,7 +240,7 @@ The Plan Trip screen should stay compact and action-led:
 
 **Idea:** Explicitly tell users when cycle logic does not apply.
 
-**Target:** ACT users, diesel users, regional users.
+**Target:** Users in unsupported regions, unsupported fuels, sparse-history areas and non-cycle markets.
 
 **Example:** "No petrol-cycle signal for diesel. Here is the cheapest worthwhile stop on your route."
 
@@ -322,7 +341,7 @@ The Plan Trip screen should stay compact and action-led:
 
 ### 19. Data Transparency Page
 
-**Idea:** Public page explaining data sources, update frequency, limitations and how recommendations are calculated.
+**Idea:** Public page explaining data sources, regional capability, update frequency, limitations and how recommendations are calculated.
 
 **Target:** All users, partners, fleet buyers.
 
@@ -406,11 +425,14 @@ The Plan Trip screen should stay compact and action-led:
 
 ### Now
 
+- Build the national provider capability matrix for NSW, ACT, QLD, VIC, SA, WA, TAS and NT.
+- Show region capability status in backend status and user-facing empty/limited states.
 - Run real validation sessions with recruited participants.
-- Confirm permitted app/commercial usage for FuelCheck data.
+- Confirm permitted app/commercial usage, caching and attribution terms for each state/territory provider.
 - Confirm permitted usage, caching and attribution terms for ACT records exposed through the FuelCheck API.
 - Confirm whether the live web demo can be shared publicly after usage rights are confirmed.
 - Keep refining the validation demo from participant feedback.
+- Apply the break-it testing regime in `NATIONAL-TESTING-REGIME.md` before closing new backlog items.
 
 ### Completed In Demo
 
@@ -423,6 +445,7 @@ The Plan Trip screen should stay compact and action-led:
 
 ### Phase 1
 
+- National provider capability matrix.
 - Best Fill For This Drive.
 - Net-Savings Route Ranking.
 - Classic Around-Me Map.
@@ -433,11 +456,13 @@ The Plan Trip screen should stay compact and action-led:
 - Membership-Only Warning.
 - Manual Discount Wallet and discount-aware pricing.
 - Navigation handoff.
+- User story and success metrics attached to every shipped backlog item.
 
 ### Phase 2
 
 - Saved Commute Alerts.
-- Cycle Status Card for Sydney unleaded.
+- Prediction back-testing foundation.
+- Cycle Status Card for supported fuels and regions only.
 - Shop Around Before The Spike.
 - Safe Regional Mode.
 - Stackability rules and voucher/fuel-lock expiry fields.
@@ -450,7 +475,7 @@ The Plan Trip screen should stay compact and action-led:
 - Fleet-Lite Approved Stop Mode.
 - Fleet admin dashboard.
 - Toll plus fuel route economics.
-- National expansion logic by state.
+- Public data transparency page with national capability and source status.
 
 ### Later
 

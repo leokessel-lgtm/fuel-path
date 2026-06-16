@@ -20,7 +20,11 @@
 - [x] Add cost-aware explicit route planning and route-cache status.
 - [x] Add saved-route alert profiles for commute and safe regional examples.
 - [x] Record the three main project goals and Goal 1 build roadmap.
+- [x] Merge whole-of-Australia roadmap, success metrics and break-it testing regime into project docs.
 - [ ] Prove Goal 1: Best Fuel Decision, Not Another Map.
+- [ ] Build national provider capability matrix for NSW, ACT, QLD, VIC, SA, WA, TAS and NT.
+- [ ] Expose regional capability state in backend `/api/status` and user-facing empty/limited states.
+- [ ] Add provider contract tests for capability labels: live, limited, pending_access, fallback and unsupported.
 - [x] Fix empty-result handling for long routes such as Sydney to Canberra.
 - [x] Connect ranked results and map markers both ways.
 - [x] Simplify the recommendation card into one clear action, reason and trust cue.
@@ -44,6 +48,7 @@
 - [x] Apply map-first Plan UI and capture design system direction.
 - [x] Create first Expo / React Native shell for Nearby, Plan and Account using the local Fuel Path backend.
 - [x] Smoke test native web preview against live NSW/ACT FuelCheck responses.
+- [ ] Smoke test native web preview across national capability cases, including live, limited, pending and unsupported regions.
 - [x] Add working interactive map tiles and branded station pins to the Expo web preview.
 - [x] Draw planned trips from real route geometry instead of a straight endpoint line.
 - [x] Make Nearby location editable, defaulting to the Sylvania validation address and supporting independent suburb/address searches.
@@ -61,15 +66,30 @@
 - [x] Add first WA FuelWatch provider adapter for Perth/metro live Nearby and route scoring.
 - [ ] Expand WA FuelWatch provider beyond metro queries without excessive provider requests.
 - [ ] Apply for VIC Servo Saver Public API access and implement adapter after approved schema is available.
+- [ ] Confirm SA fuel data/API access path and implement adapter after approved schema is available.
+- [ ] Confirm TAS fuel data/API access path and implement adapter after approved schema is available.
+- [ ] Confirm NT MyFuel data/API access path and implement adapter after approved schema is available.
 - [ ] Add saved commutes and notification permission flow.
 - [x] Design backend push scheduler for price-triggered saved-route alerts.
 - [ ] Implement backend push scheduler for price-triggered saved-route alerts after native notification validation.
+- [ ] Add prediction back-testing storage before any prominent user-facing prediction claim.
+- [ ] Add no-cycle-signal states for unsupported fuels, regions and sparse histories.
+- [ ] Add break-it test evidence to every new backlog item before marking it done.
 - [ ] Prepare Apple/Android store readiness plan, including privacy disclosures and API usage constraints.
 
 ## External Blockers
 
 - Real validation sessions need recruited participants and scheduled sessions.
+- National provider usage, caching, attribution and public-sharing permissions need confirmation by jurisdiction.
 - FuelCheck app/commercial usage, caching rules and public-sharing permission need API.NSW confirmation.
 - QLD usage constraints still need confirmation against the licence terms before public/commercial launch.
 - VIC Servo Saver live prices need approved API access and schema before implementation.
+- SA fuel data/API access needs confirmation before implementation.
+- TAS fuel data/API access needs confirmation before implementation.
+- NT MyFuel data/API access needs confirmation before implementation.
 - Google Places production autocomplete still needs billing controls, restricted keys, backend adapter and device validation.
+
+## Done Gate
+
+- Every new backlog item needs user story, success metrics and break-it test evidence.
+- Use `NATIONAL-TESTING-REGIME.md` for feature, integration, accessibility, performance and post-deploy checks.

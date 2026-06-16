@@ -295,7 +295,6 @@ export function NearbyScreen({
   const selected = stations.find((item) => item.station.stationCode === selectedCode);
   const selectedMetaLine = selected
     ? [
-        stationOpenLabel(selected.station.openNow),
         selected.station.phone || selected.station.brand,
         `${selected.distanceKm.toFixed(1)} km`,
         formatRelativeUpdatedAt(selected.station.updatedAt),
@@ -542,9 +541,23 @@ export function NearbyScreen({
                         {selected.station.address}
                       </Text>
                     ) : null}
-                    <Text numberOfLines={1} style={styles.muted}>
-                      {selectedMetaLine}
-                    </Text>
+                    <View style={styles.selectedMetaRow}>
+                      <View style={styles.selectedStatus}>
+                        <Text numberOfLines={1} style={styles.muted}>
+                          {stationOpenLabel(selected.station.openNow)}
+                        </Text>
+                        <View
+                          style={[
+                            styles.statusDot,
+                            { backgroundColor: stationOpenDotColor(selected.station.openNow) },
+                          ]}
+                        />
+                      </View>
+                      {selectedMetaLine ? <Text style={styles.metaSeparator}>|</Text> : null}
+                      <Text numberOfLines={1} style={styles.selectedMetaRest}>
+                        {selectedMetaLine}
+                      </Text>
+                    </View>
                   </View>
                   <Pressable
                     accessibilityLabel="Close selected station"
@@ -664,6 +677,12 @@ function stationOpenLabel(openNow?: boolean) {
   if (openNow === false) return "Closed";
   if (openNow === true) return "Open now";
   return "Hours unknown";
+}
+
+function stationOpenDotColor(openNow?: boolean) {
+  if (openNow === false) return colors.red;
+  if (openNow === true) return colors.green;
+  return colors.muted;
 }
 
 const styles = StyleSheet.create({
@@ -965,6 +984,35 @@ const styles = StyleSheet.create({
     fontSize: typeScale.caption,
     fontWeight: "700",
     lineHeight: 17,
+  },
+  selectedMetaRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 6,
+    minWidth: 0,
+  },
+  selectedStatus: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 4,
+  },
+  statusDot: {
+    borderRadius: radii.pill,
+    height: 7,
+    width: 7,
+  },
+  metaSeparator: {
+    color: colors.muted,
+    fontSize: typeScale.caption,
+    fontWeight: "700",
+  },
+  selectedMetaRest: {
+    color: colors.muted,
+    flex: 1,
+    fontSize: typeScale.caption,
+    fontWeight: "700",
+    lineHeight: 17,
+    minWidth: 0,
   },
   closeButton: {
     alignItems: "center",

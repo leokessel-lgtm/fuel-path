@@ -296,7 +296,6 @@ export function NearbyScreen({
   const selectedMetaLine = selected
     ? [
         selected.station.phone || selected.station.brand,
-        `${selected.distanceKm.toFixed(1)} km`,
         formatRelativeUpdatedAt(selected.station.updatedAt),
       ]
         .filter(Boolean)
@@ -572,6 +571,11 @@ export function NearbyScreen({
                     <Text style={styles.priceValue}>
                       {selected.adjustedCpl.toFixed(1)}
                       <Text style={styles.priceUnitInline}> c/L</Text>
+                    </Text>
+                  </View>
+                  <View style={styles.distanceBadge}>
+                    <Text style={styles.distanceBadgeText}>
+                      {selected.distanceKm.toFixed(1)} km
                     </Text>
                   </View>
                   <Pressable
@@ -1030,11 +1034,13 @@ const styles = StyleSheet.create({
   selectedActions: {
     alignItems: "center",
     flexDirection: "row",
-    gap: spacing.md,
+    gap: spacing.sm,
     justifyContent: "space-between",
   },
   selectedPrice: {
-    alignItems: "flex-end",
+    alignItems: "flex-start",
+    flex: 1,
+    minWidth: 0,
   },
   priceValue: {
     color: colors.greenDark,
@@ -1043,6 +1049,21 @@ const styles = StyleSheet.create({
   },
   priceUnitInline: {
     color: colors.muted,
+    fontSize: typeScale.caption,
+    fontWeight: "900",
+  },
+  distanceBadge: {
+    alignItems: "center",
+    backgroundColor: colors.white,
+    borderColor: colors.green,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    minHeight: 32,
+    justifyContent: "center",
+    paddingHorizontal: spacing.md,
+  },
+  distanceBadgeText: {
+    color: colors.greenDark,
     fontSize: typeScale.caption,
     fontWeight: "900",
   },

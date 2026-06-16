@@ -48,7 +48,7 @@
 - [x] Apply map-first Plan UI and capture design system direction.
 - [x] Create first Expo / React Native shell for Nearby, Plan and Account using the local Fuel Path backend.
 - [x] Smoke test native web preview against live NSW/ACT FuelCheck responses.
-- [ ] Smoke test native web preview across national capability cases, including live, limited, pending and unsupported regions.
+- [x] Smoke test native web preview across national capability cases, including live, limited, pending and unsupported regions.
 - [x] Add working interactive map tiles and branded station pins to the Expo web preview.
 - [x] Draw planned trips from real route geometry instead of a straight endpoint line.
 - [x] Make Nearby location editable, defaulting to the Sylvania validation address and supporting independent suburb/address searches.

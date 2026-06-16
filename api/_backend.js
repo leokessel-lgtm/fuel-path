@@ -7,10 +7,129 @@ const DEFAULT_USER_AGENT = "FuelPathHostedBackend/0.1";
 const SAMPLE_NOW = new Date("2026-06-13T08:00:00+10:00");
 const RECOMMENDATION_MAX_PRICE_AGE_HOURS = 48;
 const RECOMMENDED_GEOCODE_PROVIDER = "google_places_autocomplete_new";
+const DEFAULT_QLD_FUEL_API_BASE_URL = "https://fppdirectapi-prod.fuelpricesqld.com.au";
+const DEFAULT_WA_FUELWATCH_RSS_URL = "https://www.fuelwatch.wa.gov.au/fuelwatch/fuelWatchRSS";
+const QLD_REGION_PARAMS = {
+  countryId: 21,
+  geoRegionLevel: 3,
+  geoRegionId: 1,
+};
+const QLD_BOUNDS = {
+  minLat: -29.5,
+  maxLat: -9,
+  minLon: 137,
+  maxLon: 154.2,
+};
+const QLD_FUEL_ID_TO_CODE = new Map([
+  [2, "U91"],
+  [3, "DL"],
+  [5, "P95"],
+  [8, "P98"],
+  [12, "E10"],
+  [14, "PDL"],
+]);
+const QLD_UNAVAILABLE_PRICE = 9999;
+const WA_BOUNDS = {
+  minLat: -36,
+  maxLat: -13,
+  minLon: 112,
+  maxLon: 129.5,
+};
+const VIC_BOUNDS = {
+  minLat: -39.3,
+  maxLat: -33.9,
+  minLon: 140.9,
+  maxLon: 150.2,
+};
+const WA_FUELWATCH_PRODUCTS = [
+  ["U91", 1],
+  ["P95", 2],
+  ["DL", 4],
+  ["LPG", 5],
+  ["P98", 6],
+  ["E85", 10],
+  ["PDL", 11],
+];
+const WA_DEFAULT_METRO_REGION_IDS = [25, 26, 27];
+const WA_FUELWATCH_REGIONS = [
+  { id: 1, name: "Boulder", lat: -30.782, lon: 121.491 },
+  { id: 2, name: "Broome", lat: -17.961, lon: 122.236 },
+  { id: 3, name: "Busselton Townsite", lat: -33.652, lon: 115.345 },
+  { id: 4, name: "Carnarvon", lat: -24.884, lon: 113.657 },
+  { id: 5, name: "Collie", lat: -33.36, lon: 116.156 },
+  { id: 6, name: "Dampier", lat: -20.662, lon: 116.711 },
+  { id: 7, name: "Esperance", lat: -33.86, lon: 121.889 },
+  { id: 8, name: "Kalgoorlie", lat: -30.749, lon: 121.466 },
+  { id: 9, name: "Karratha", lat: -20.736, lon: 116.846 },
+  { id: 10, name: "Kununurra", lat: -15.779, lon: 128.741 },
+  { id: 11, name: "Narrogin", lat: -32.933, lon: 117.178 },
+  { id: 12, name: "Northam", lat: -31.653, lon: 116.671 },
+  { id: 13, name: "Port Hedland", lat: -20.312, lon: 118.61 },
+  { id: 14, name: "South Hedland", lat: -20.407, lon: 118.6 },
+  { id: 15, name: "Albany", lat: -35.027, lon: 117.884 },
+  { id: 16, name: "Bunbury", lat: -33.327, lon: 115.641 },
+  { id: 17, name: "Geraldton", lat: -28.777, lon: 114.614 },
+  { id: 18, name: "Mandurah", lat: -32.536, lon: 115.743 },
+  { id: 19, name: "Capel", lat: -33.558, lon: 115.562 },
+  { id: 20, name: "Dardanup", lat: -33.397, lon: 115.755 },
+  { id: 21, name: "Greenough", lat: -28.956, lon: 114.735 },
+  { id: 22, name: "Harvey", lat: -33.08, lon: 115.893 },
+  { id: 23, name: "Murray", lat: -32.629, lon: 115.874 },
+  { id: 24, name: "Waroona", lat: -32.844, lon: 115.923 },
+  { id: 25, name: "Metro North of River", lat: -31.89, lon: 115.84, metro: true },
+  { id: 26, name: "Metro South of River", lat: -32.08, lon: 115.86, metro: true },
+  { id: 27, name: "Metro East/Hills", lat: -31.98, lon: 116.03, metro: true },
+  { id: 28, name: "Augusta Margaret River", lat: -33.953, lon: 115.073 },
+  { id: 29, name: "Busselton Shire", lat: -33.652, lon: 115.345 },
+  { id: 30, name: "Bridgetown Greenbushes", lat: -33.959, lon: 116.137 },
+  { id: 31, name: "Donnybrook Balingup", lat: -33.572, lon: 115.824 },
+  { id: 32, name: "Manjimup", lat: -34.241, lon: 116.146 },
+  { id: 33, name: "Cataby", lat: -30.744, lon: 115.551 },
+  { id: 34, name: "Coolgardie", lat: -30.954, lon: 121.163 },
+  { id: 35, name: "Cunderdin", lat: -31.652, lon: 117.242 },
+  { id: 36, name: "Dalwallinu", lat: -30.278, lon: 116.66 },
+  { id: 37, name: "Denmark", lat: -34.961, lon: 117.353 },
+  { id: 38, name: "Derby", lat: -17.303, lon: 123.629 },
+  { id: 39, name: "Dongara", lat: -29.252, lon: 114.932 },
+  { id: 40, name: "Exmouth", lat: -21.93, lon: 114.126 },
+  { id: 41, name: "Fitzroy Crossing", lat: -18.197, lon: 125.567 },
+  { id: 42, name: "Jurien", lat: -30.305, lon: 115.039 },
+  { id: 43, name: "Kambalda", lat: -31.206, lon: 121.66 },
+  { id: 44, name: "Kellerberrin", lat: -31.634, lon: 117.72 },
+  { id: 45, name: "Kojonup", lat: -33.833, lon: 117.159 },
+  { id: 46, name: "Meekatharra", lat: -26.593, lon: 118.495 },
+  { id: 47, name: "Moora", lat: -30.64, lon: 116.008 },
+  { id: 48, name: "Mount Barker", lat: -34.63, lon: 117.666 },
+  { id: 49, name: "Newman", lat: -23.357, lon: 119.735 },
+  { id: 50, name: "Norseman", lat: -32.197, lon: 121.779 },
+  { id: 51, name: "Ravensthorpe", lat: -33.582, lon: 120.046 },
+  { id: 53, name: "Tammin", lat: -31.641, lon: 117.484 },
+  { id: 54, name: "Williams", lat: -33.027, lon: 116.88 },
+  { id: 55, name: "Wubin", lat: -30.106, lon: 116.629 },
+  { id: 56, name: "York", lat: -31.888, lon: 116.769 },
+  { id: 57, name: "Regans Ford", lat: -30.98, lon: 115.695 },
+  { id: 58, name: "Meckering", lat: -31.632, lon: 117.008 },
+  { id: 59, name: "Wundowie", lat: -31.76, lon: 116.379 },
+  { id: 60, name: "North Bannister", lat: -32.582, lon: 116.451 },
+  { id: 61, name: "Munglinup", lat: -33.714, lon: 120.865 },
+  { id: 62, name: "Northam Shire", lat: -31.653, lon: 116.671 },
+  { id: 63, name: "Bodallin", lat: -31.37, lon: 118.861 },
+];
 
 const liveCache = {
   stations: null,
   loadedAtMs: 0,
+  lastError: "",
+};
+
+const qldLiveCache = {
+  stations: null,
+  loadedAtMs: 0,
+  lastError: "",
+};
+
+const waLiveCache = {
+  entries: new Map(),
   lastError: "",
 };
 
@@ -98,6 +217,22 @@ function cacheSeconds() {
 
 function hasLiveCredentials() {
   return Boolean(process.env.NSW_FUEL_API_KEY && process.env.NSW_FUEL_API_SECRET);
+}
+
+function hasQldCredentials() {
+  return Boolean(process.env.QLD_FUEL_API_TOKEN);
+}
+
+function hasWaProvider() {
+  return process.env.FUEL_PATH_WA_FUELWATCH_ENABLED !== "0";
+}
+
+function hasVicCredentials() {
+  return Boolean(process.env.VIC_SERVO_SAVER_API_BASE_URL && process.env.VIC_SERVO_SAVER_API_KEY);
+}
+
+function hasAnyLiveCredentials() {
+  return hasLiveCredentials() || hasQldCredentials() || hasWaProvider() || hasVicCredentials();
 }
 
 function googleMapsApiKey() {
@@ -297,6 +432,420 @@ function normaliseNswPayload(payload) {
   return [...stations.values()].filter((station) => Number.isFinite(station.lat) && Number.isFinite(station.lon));
 }
 
+async function qldApiGet(path, params) {
+  const token = process.env.QLD_FUEL_API_TOKEN;
+  if (!token) throw new Error("QLD fuel API token is not configured");
+  const baseUrl = process.env.QLD_FUEL_API_BASE_URL || DEFAULT_QLD_FUEL_API_BASE_URL;
+  const url = new URL(`${baseUrl.replace(/\/$/, "")}/${String(path).replace(/^\//, "")}`);
+  for (const [key, value] of Object.entries(params)) {
+    url.searchParams.set(key, String(value));
+  }
+  return fetchJson(url.toString(), {
+    headers: {
+      Authorization: `FPDAPI SubscriberToken=${token}`,
+      "Content-Type": "application/json",
+    },
+    timeoutMs: 60000,
+  });
+}
+
+async function loadLiveQldStations({ forceRefresh = false } = {}) {
+  const ageMs = Date.now() - qldLiveCache.loadedAtMs;
+  const ttlMs = cacheSeconds() * 1000;
+  if (!forceRefresh && qldLiveCache.stations && ageMs < ttlMs) {
+    return {
+      stations: qldLiveCache.stations,
+      cacheHit: true,
+      cacheAgeSeconds: Math.round(ageMs / 1000),
+      error: "",
+    };
+  }
+
+  const [brands, regions, sites, prices] = await Promise.all([
+    qldApiGet("/Subscriber/GetCountryBrands", { countryId: 21 }),
+    qldApiGet("/Subscriber/GetCountryGeographicRegions", { countryId: 21 }),
+    qldApiGet("/Subscriber/GetFullSiteDetails", QLD_REGION_PARAMS),
+    qldApiGet("/Price/GetSitesPrices", QLD_REGION_PARAMS),
+  ]);
+  const stations = normaliseQldPayload(sites, prices, brands, regions).map(stationWithDiscountRules);
+  qldLiveCache.stations = stations;
+  qldLiveCache.loadedAtMs = Date.now();
+  qldLiveCache.lastError = "";
+  return {
+    stations,
+    cacheHit: false,
+    cacheAgeSeconds: 0,
+    error: "",
+  };
+}
+
+function normaliseQldPayload(sitePayload, pricePayload, brandPayload = {}, regionPayload = {}) {
+  const brands = qldLookupById(brandPayload, "Brands", "BrandId");
+  const regions = qldLookupById(regionPayload, "GeographicRegions", "GeoRegionId");
+  const stations = new Map();
+
+  for (const row of sitePayload?.S || []) {
+    if (!row || typeof row !== "object") continue;
+    const siteId = String(row.S || "");
+    if (!siteId) continue;
+    const suburb = qldRegionName(row, regions);
+    const brandId = String(row.B || "");
+    stations.set(siteId, {
+      stationCode: `QLD-${siteId}`,
+      name: row.N || siteId,
+      brand: brands.get(brandId) || "Unknown",
+      suburb,
+      address: qldAddress(row, suburb),
+      phone: undefined,
+      lat: Number(row.Lat || 0),
+      lon: Number(row.Lng || 0),
+      openNow: qldOpenNow(row),
+      membershipRequired: false,
+      updatedAt: normaliseQldTimestamp(row.M),
+      source: "api_qld_fuelprices",
+      prices: {},
+      discounts: [],
+    });
+  }
+
+  for (const row of pricePayload?.SitePrices || []) {
+    if (!row || typeof row !== "object") continue;
+    const siteId = String(row.SiteId || "");
+    if (!siteId) continue;
+    const fuelCode = QLD_FUEL_ID_TO_CODE.get(Number(row.FuelId || 0));
+    const price = qldPriceCpl(row.Price);
+    if (!fuelCode || price === undefined) continue;
+    const station =
+      stations.get(siteId) ||
+      {
+        stationCode: `QLD-${siteId}`,
+        name: siteId,
+        brand: "Unknown",
+        suburb: "",
+        address: "",
+        phone: undefined,
+        lat: 0,
+        lon: 0,
+        openNow: undefined,
+        membershipRequired: false,
+        updatedAt: undefined,
+        source: "api_qld_fuelprices",
+        prices: {},
+        discounts: [],
+      };
+    station.prices[fuelCode] = price;
+    const updatedAt = normaliseQldTimestamp(row.TransactionDateUtc);
+    if (updatedAt && (!station.updatedAt || updatedAt > String(station.updatedAt))) {
+      station.updatedAt = updatedAt;
+    }
+    stations.set(siteId, station);
+  }
+
+  return [...stations.values()].filter(
+    (station) =>
+      Object.keys(station.prices || {}).length &&
+      Number.isFinite(station.lat) &&
+      Number.isFinite(station.lon) &&
+      (station.lat || station.lon),
+  );
+}
+
+function qldLookupById(payload, listKey, idKey) {
+  const rows = Array.isArray(payload?.[listKey]) ? payload[listKey] : [];
+  const lookup = new Map();
+  for (const row of rows) {
+    if (row && row[idKey] !== undefined && row.Name) lookup.set(String(row[idKey]), String(row.Name));
+  }
+  return lookup;
+}
+
+function qldRegionName(row, regions) {
+  for (const key of ["G1", "G2"]) {
+    const value = row?.[key];
+    if (value !== undefined && regions.has(String(value))) return regions.get(String(value));
+  }
+  return "";
+}
+
+function qldAddress(row, suburb) {
+  return [String(row.A || "").trim(), suburb, `QLD ${String(row.P || "").trim()}`.trim()]
+    .filter(Boolean)
+    .join(", ");
+}
+
+function qldPriceCpl(value) {
+  const price = Number(value);
+  if (!Number.isFinite(price) || price >= QLD_UNAVAILABLE_PRICE) return undefined;
+  return price / 10;
+}
+
+function normaliseQldTimestamp(value) {
+  if (!value) return undefined;
+  const text = String(value).trim().replace(/\s+/g, "");
+  const parsed = new Date(text.endsWith("Z") || /[+-]\d\d:\d\d$/.test(text) ? text : `${text}Z`);
+  if (Number.isNaN(parsed.getTime())) return undefined;
+  return parsed.toISOString();
+}
+
+function qldOpenNow(row) {
+  const prefixByDay = ["SU", "M", "T", "W", "TH", "F", "S"];
+  const prefix = prefixByDay[new Date().getDay()];
+  const openMinutes = qldTimeMinutes(row?.[`${prefix}O`]);
+  const closeMinutes = qldTimeMinutes(row?.[`${prefix}C`]);
+  if (openMinutes === undefined || closeMinutes === undefined) return undefined;
+  const now = new Date();
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  if (closeMinutes <= openMinutes) return nowMinutes >= openMinutes || nowMinutes <= closeMinutes;
+  return openMinutes <= nowMinutes && nowMinutes <= closeMinutes;
+}
+
+function qldTimeMinutes(value) {
+  const digits = String(value || "").replace(/\D/g, "");
+  if (digits.length < 3) return undefined;
+  const padded = digits.padStart(4, "0").slice(-4);
+  let hour = Number(padded.slice(0, 2));
+  const minute = Number(padded.slice(2));
+  if (!Number.isFinite(hour) || !Number.isFinite(minute) || hour > 24 || minute > 59) return undefined;
+  if (hour === 24) hour = 0;
+  return hour * 60 + minute;
+}
+
+async function loadLiveWaStations({ forceRefresh = false, points = [], radiusKm = 0 } = {}) {
+  if (!hasWaProvider()) throw new Error("WA FuelWatch provider is disabled");
+  const regionIds = waRegionIdsForArea(points, radiusKm);
+  const cacheKey = regionIds.join(",");
+  const cached = waLiveCache.entries.get(cacheKey);
+  const ageMs = Date.now() - Number(cached?.loadedAtMs || 0);
+  const ttlMs = cacheSeconds() * 1000;
+  if (!forceRefresh && cached?.stations && ageMs < ttlMs) {
+    return {
+      stations: cached.stations,
+      cacheHit: true,
+      cacheAgeSeconds: Math.round(ageMs / 1000),
+      error: "",
+    };
+  }
+
+  const productPayloads = (
+    await Promise.all(
+      regionIds.flatMap((regionId) =>
+        WA_FUELWATCH_PRODUCTS.map(async ([fuelCode, product]) => ({
+          fuelCode,
+          regionId,
+          xml: await fetchWaFuelWatchRss(product, regionId),
+        })),
+      ),
+    )
+  ).filter((payload) => payload.xml);
+  const stations = normaliseWaFuelWatchPayloads(productPayloads).map(stationWithDiscountRules);
+  waLiveCache.entries.set(cacheKey, {
+    stations,
+    loadedAtMs: Date.now(),
+  });
+  waLiveCache.lastError = "";
+  return {
+    stations,
+    cacheHit: false,
+    cacheAgeSeconds: 0,
+    error: "",
+  };
+}
+
+function waRegionIdsForArea(points = [], radiusKm = 0) {
+  const waPoints = samplePointsForProvider(points.filter(pointInWa), 28);
+  if (!waPoints.length) return WA_DEFAULT_METRO_REGION_IDS;
+
+  const ids = new Set();
+  const perth = { lat: -31.9523, lon: 115.8613 };
+  const searchKm = Math.max(35, Math.min(120, Number(radiusKm || 0) * 2));
+  for (const point of waPoints) {
+    if (distanceKm(point, perth) <= 85) {
+      for (const id of WA_DEFAULT_METRO_REGION_IDS) ids.add(id);
+    }
+    const ranked = WA_FUELWATCH_REGIONS.map((region) => ({
+      region,
+      distance: distanceKm(point, region),
+    })).sort((left, right) => left.distance - right.distance);
+
+    if (ranked[0]) ids.add(ranked[0].region.id);
+    for (const item of ranked) {
+      if (item.distance <= searchKm) ids.add(item.region.id);
+    }
+  }
+
+  return [...ids].sort((left, right) => left - right);
+}
+
+function samplePointsForProvider(points, limit) {
+  if (points.length <= limit) return points;
+  const sampled = [];
+  let previousIndex = -1;
+  for (let index = 0; index < limit; index += 1) {
+    const sourceIndex = Math.round((index / (limit - 1)) * (points.length - 1));
+    if (sourceIndex !== previousIndex) {
+      sampled.push(points[sourceIndex]);
+      previousIndex = sourceIndex;
+    }
+  }
+  return sampled;
+}
+
+async function fetchWaFuelWatchRss(product, regionId) {
+  const baseUrl = process.env.WA_FUELWATCH_RSS_URL || DEFAULT_WA_FUELWATCH_RSS_URL;
+  const url = new URL(baseUrl);
+  url.searchParams.set("Product", String(product));
+  if (regionId) url.searchParams.set("Region", String(regionId));
+  try {
+    return await fetchText(url.toString(), { timeoutMs: 30000 });
+  } catch (error) {
+    if (!regionId) throw error;
+    console.warn?.(
+      `WA FuelWatch region ${regionId} product ${product} unavailable: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+    return "";
+  }
+}
+
+async function fetchText(url, { headers = {}, timeoutMs = 12000 } = {}) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        Accept: "application/rss+xml, application/xml, text/xml, */*",
+        "User-Agent": DEFAULT_USER_AGENT,
+        ...headers,
+      },
+      signal: controller.signal,
+    });
+    const text = await response.text();
+    if (!response.ok) throw new Error(`Provider returned ${response.status}: ${text.slice(0, 120)}`);
+    return text;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function normaliseWaFuelWatchPayloads(productPayloads) {
+  const stations = new Map();
+  for (const { fuelCode, xml } of productPayloads) {
+    for (const item of waFuelWatchItems(xml)) {
+      const lat = Number(item.latitude);
+      const lon = Number(item.longitude);
+      if (!Number.isFinite(lat) || !Number.isFinite(lon) || (!lat && !lon)) continue;
+      const stationCode = waStationCode(item);
+      const existing =
+        stations.get(stationCode) ||
+        {
+          stationCode,
+          name: item["trading-name"] || item.title?.replace(/^[0-9.]+:\s*/, "") || stationCode,
+          brand: item.brand || "Unknown",
+          suburb: titleCase(item.location || ""),
+          address: [item.address, item.location, "WA"].filter(Boolean).join(", "),
+          phone: stationPhone(item),
+          lat,
+          lon,
+          openNow: waOpenNow(item["site-features"]),
+          membershipRequired: waMembershipRequired(item.restrictions),
+          updatedAt: normaliseWaDate(item.date),
+          source: "api_wa_fuelwatch",
+          prices: {},
+          discounts: [],
+        };
+      const price = Number(item.price);
+      if (fuelCode && Number.isFinite(price)) existing.prices[fuelCode] = price;
+      const updatedAt = normaliseWaDate(item.date);
+      if (updatedAt && (!existing.updatedAt || updatedAt > String(existing.updatedAt))) {
+        existing.updatedAt = updatedAt;
+      }
+      stations.set(stationCode, existing);
+    }
+  }
+  return [...stations.values()].filter((station) => Object.keys(station.prices || {}).length);
+}
+
+function waFuelWatchItems(xml) {
+  const cleaned = String(xml || "").replace(/^\uFEFF/, "");
+  const matches = cleaned.matchAll(/<item>([\s\S]*?)<\/item>/gi);
+  return [...matches].map((match) => {
+    const body = match[1];
+    const item = {};
+    for (const tag of [
+      "title",
+      "description",
+      "brand",
+      "date",
+      "price",
+      "trading-name",
+      "location",
+      "address",
+      "phone",
+      "latitude",
+      "longitude",
+      "site-features",
+      "restrictions",
+    ]) {
+      item[tag] = xmlDecode(firstXmlTagValue(body, tag));
+    }
+    return item;
+  });
+}
+
+function firstXmlTagValue(xml, tag) {
+  const pattern = new RegExp(`<${tag}>([\\s\\S]*?)<\\/${tag}>`, "i");
+  const match = pattern.exec(xml);
+  return match ? match[1] : "";
+}
+
+function xmlDecode(value) {
+  return String(value || "")
+    .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .trim();
+}
+
+function waStationCode(item) {
+  const raw = `${item.brand || ""}|${item["trading-name"] || ""}|${item.address || ""}|${item.location || ""}`;
+  const slug = raw
+    .toLowerCase()
+    .replace(/&/g, "and")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 80);
+  return `WA-${slug || `${item.latitude}-${item.longitude}`}`;
+}
+
+function normaliseWaDate(value) {
+  if (!value) return undefined;
+  const text = String(value).trim();
+  const parsed = new Date(`${text}T06:00:00+08:00`);
+  return Number.isNaN(parsed.getTime()) ? undefined : parsed.toISOString();
+}
+
+function waOpenNow(siteFeatures) {
+  const text = String(siteFeatures || "");
+  if (/open\s+24\s+hours/i.test(text)) return true;
+  return undefined;
+}
+
+function waMembershipRequired(restrictions) {
+  return /member|membership|card\s+only/i.test(String(restrictions || ""));
+}
+
+async function loadLiveVicStations() {
+  if (!hasVicCredentials()) {
+    throw new Error("VIC Servo Saver API access is not configured. Apply for API access before enabling live VIC prices.");
+  }
+  throw new Error("VIC Servo Saver API adapter needs the approved API schema before it can be enabled.");
+}
+
 function stationPhone(row) {
   const value =
     row.phone ||
@@ -366,7 +915,101 @@ function loadSampleStations() {
   return sample.sampleStations({ includeFixtureFallback: true }).map(stationWithDiscountRules);
 }
 
-async function loadStationData({ requestedSource = "auto", forceRefresh = false } = {}) {
+function pointInQld(point) {
+  return (
+    Number(point?.lat) >= QLD_BOUNDS.minLat &&
+    Number(point?.lat) <= QLD_BOUNDS.maxLat &&
+    Number(point?.lon) >= QLD_BOUNDS.minLon &&
+    Number(point?.lon) <= QLD_BOUNDS.maxLon
+  );
+}
+
+function pointInWa(point) {
+  return (
+    Number(point?.lat) >= WA_BOUNDS.minLat &&
+    Number(point?.lat) <= WA_BOUNDS.maxLat &&
+    Number(point?.lon) >= WA_BOUNDS.minLon &&
+    Number(point?.lon) <= WA_BOUNDS.maxLon
+  );
+}
+
+function pointInVic(point) {
+  return (
+    Number(point?.lat) >= VIC_BOUNDS.minLat &&
+    Number(point?.lat) <= VIC_BOUNDS.maxLat &&
+    Number(point?.lon) >= VIC_BOUNDS.minLon &&
+    Number(point?.lon) <= VIC_BOUNDS.maxLon
+  );
+}
+
+function qldNswBorderArea(point, radiusKm = 0) {
+  return pointInQld(point) && Number(point.lat) <= -27.75 && Number(point.lon) >= 151 && Number(radiusKm) >= 20;
+}
+
+function liveProviderKeysForArea(points = [], radiusKm = 0) {
+  if (!points.length) {
+    if (hasLiveCredentials()) return ["nsw"];
+    if (hasQldCredentials()) return ["qld"];
+    if (hasWaProvider()) return ["wa"];
+    if (hasVicCredentials()) return ["vic"];
+    return ["nsw"];
+  }
+  const hasQldPoint = points.some(pointInQld);
+  const hasWaPoint = points.some(pointInWa);
+  const hasVicPoint = points.some(pointInVic);
+  const hasNonQldPoint = points.some((point) => !pointInQld(point));
+  if (hasWaPoint) return ["wa"];
+  if (hasVicPoint) return ["vic"];
+  if (hasQldPoint) {
+    const providers = ["qld"];
+    if (hasNonQldPoint || points.some((point) => qldNswBorderArea(point, radiusKm))) providers.push("nsw");
+    return providers;
+  }
+  return ["nsw"];
+}
+
+async function loadLiveStationsForArea({ forceRefresh = false, points = [], radiusKm = 0 } = {}) {
+  const providers = liveProviderKeysForArea(points, radiusKm);
+  const stations = [];
+  const loadedProviders = [];
+  const errors = [];
+  for (const provider of providers) {
+    try {
+      if (provider === "qld") {
+        const live = await loadLiveQldStations({ forceRefresh });
+        stations.push(...live.stations);
+        loadedProviders.push("api_qld");
+      } else if (provider === "wa") {
+        const live = await loadLiveWaStations({ forceRefresh, points, radiusKm });
+        stations.push(...live.stations);
+        loadedProviders.push("api_wa");
+      } else if (provider === "vic") {
+        const live = await loadLiveVicStations({ forceRefresh });
+        stations.push(...live.stations);
+        loadedProviders.push("api_vic");
+      } else if (provider === "nsw") {
+        const live = await loadLiveStations({ forceRefresh });
+        stations.push(...live.stations);
+        loadedProviders.push("api_nsw");
+      }
+    } catch (error) {
+      errors.push(`${provider}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  if (!stations.length) throw new Error(errors.join("; ") || "No live fuel providers are configured");
+  const byCode = new Map();
+  for (const station of stations) byCode.set(String(station.stationCode), station);
+  return {
+    stations: [...byCode.values()],
+    source: loadedProviders.join("+") || "live",
+    provider: loadedProviders.join("+") || "live",
+    cacheHit: false,
+    cacheAgeSeconds: 0,
+    warning: errors.length ? `Some live fuel providers unavailable: ${errors.join("; ")}` : "",
+  };
+}
+
+async function loadStationData({ requestedSource = "auto", forceRefresh = false, points = [], radiusKm = 0 } = {}) {
   const source = resolveSource(requestedSource);
   if (source === "sample") {
     return {
@@ -380,15 +1023,7 @@ async function loadStationData({ requestedSource = "auto", forceRefresh = false 
   }
 
   try {
-    const live = await loadLiveStations({ forceRefresh });
-    return {
-      source: "api_nsw",
-      provider: "api_nsw_fuelcheck",
-      stations: live.stations,
-      cacheHit: live.cacheHit,
-      cacheAgeSeconds: live.cacheAgeSeconds,
-      warning: "",
-    };
+    return await loadLiveStationsForArea({ forceRefresh, points, radiusKm });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     liveCache.lastError = message;
@@ -404,7 +1039,7 @@ async function loadStationData({ requestedSource = "auto", forceRefresh = false 
 }
 
 function resolveSource(source) {
-  const value = source === "auto" || !source ? (hasLiveCredentials() ? "live" : "sample") : source;
+  const value = source === "auto" || !source ? (hasAnyLiveCredentials() ? "live" : "sample") : source;
   if (!["live", "sample"].includes(value)) throw new Error("source must be live, sample or auto");
   return value;
 }
@@ -420,7 +1055,7 @@ function stationPayload(station, { fuel, distanceKm, routeDistance } = {}) {
     phone: station.phone,
     lat: Number(station.lat),
     lon: Number(station.lon),
-    openNow: station.openNow !== false,
+    openNow: typeof station.openNow === "boolean" ? station.openNow : undefined,
     membershipRequired: Boolean(station.membershipRequired),
     updatedAt: station.updatedAt,
     source: station.source,
@@ -586,7 +1221,7 @@ function scoreRoute({ source, route, stations, fuel, tankLitres, tankPercent, ec
 
 function scoreRouteForCorridor({ source, route, stations, fuel, tankLitres, tankPercent, economy, reserveKm, corridorKm, eligibleDiscounts, includeMemberPrices, includeClosed }) {
   const points = route.points || [];
-  const now = source === "api_nsw" ? new Date() : SAMPLE_NOW;
+  const now = source === "sample" || source === "public_demo_snapshot" ? SAMPLE_NOW : new Date();
   const routePositions = new Map();
   const inCorridor = [];
   for (const station of stations) {
@@ -627,7 +1262,10 @@ function scoreRouteForCorridor({ source, route, stations, fuel, tankLitres, tank
     const netSaving = fillLitres * ((baselineCpl - adjustedCpl) / 100) - detourCost;
     const reachable = tankRangeKm >= routeDistanceInfo.distanceAlongRouteKm + routeDistanceInfo.distanceToRouteKm + reserveKm;
     const [freshPenalty, freshWarning] = freshnessPenalty(station.updatedAt, now);
-    if (station.source === "api_nsw_fuelcheck" && priceAgeHours(station.updatedAt, now) > RECOMMENDATION_MAX_PRICE_AGE_HOURS) {
+    if (
+      ["api_nsw_fuelcheck", "api_qld_fuelprices", "api_wa_fuelwatch"].includes(station.source) &&
+      priceAgeHours(station.updatedAt, now) > RECOMMENDATION_MAX_PRICE_AGE_HOURS
+    ) {
       staleExcludedCandidates += 1;
       continue;
     }
@@ -1134,7 +1772,11 @@ module.exports = {
   distanceKm,
   geocode,
   geocodeProviderStatus,
+  hasAnyLiveCredentials,
   hasLiveCredentials,
+  hasQldCredentials,
+  hasVicCredentials,
+  hasWaProvider,
   loadStationData,
   methodAllowed,
   numberParam,

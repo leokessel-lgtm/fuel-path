@@ -27,6 +27,8 @@ module.exports = async function handler(req, res) {
   const data = await loadStationData({
     requestedSource: stringParam(req.query.source, "auto"),
     forceRefresh: boolParam(req.query.forceRefresh),
+    points: [centre],
+    radiusKm,
   });
   const stations = data.stations
     .map((station) => ({

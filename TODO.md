@@ -57,7 +57,10 @@
 - [x] Make Plan Trip address lookup session-token aware for future production autocomplete billing.
 - [x] Add backend `/api/geocode` provider adapter for Google, Mapbox, HERE, Geoapify and Nominatim fallback.
 - [ ] Implement Google Places Autocomplete (New) backend adapter after billing/API-key controls are approved.
-- [ ] Add QLD provider adapter after fuel ID and region mapping are confirmed.
+- [x] Add QLD provider adapter after fuel ID and region mapping are confirmed.
+- [x] Add first WA FuelWatch provider adapter for Perth/metro live Nearby and route scoring.
+- [ ] Expand WA FuelWatch provider beyond metro queries without excessive provider requests.
+- [ ] Apply for VIC Servo Saver Public API access and implement adapter after approved schema is available.
 - [ ] Add saved commutes and notification permission flow.
 - [x] Design backend push scheduler for price-triggered saved-route alerts.
 - [ ] Implement backend push scheduler for price-triggered saved-route alerts after native notification validation.
@@ -67,5 +70,6 @@
 
 - Real validation sessions need recruited participants and scheduled sessions.
 - FuelCheck app/commercial usage, caching rules and public-sharing permission need API.NSW confirmation.
-- QLD fuel ID mapping, region coverage and usage constraints need confirmation against the API manual or Postman collection.
+- QLD usage constraints still need confirmation against the licence terms before public/commercial launch.
+- VIC Servo Saver live prices need approved API access and schema before implementation.
 - Google Places production autocomplete still needs billing controls, restricted keys, backend adapter and device validation.

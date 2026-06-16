@@ -14,6 +14,7 @@ import base64
 import json
 import math
 import os
+import re
 import sys
 import urllib.error
 import urllib.parse
@@ -36,6 +37,15 @@ DEFAULT_USER_AGENT = (
 )
 SYDNEY_TZ = ZoneInfo("Australia/Sydney")
 RECOMMENDATION_MAX_PRICE_AGE_HOURS = 48.0
+QLD_FUEL_ID_TO_CODE = {
+    2: "U91",
+    3: "DL",
+    5: "P95",
+    8: "P98",
+    12: "E10",
+    14: "PDL",
+}
+QLD_UNAVAILABLE_PRICE = 9999
 
 
 @dataclass(frozen=True)
@@ -244,7 +254,7 @@ def score_candidates(
     available_for_baseline = [
         float(station["prices"][fuel])
         for station in in_corridor
-        if station.get("openNow", True)
+        if station.get("openNow") is not False
         and (include_member_prices or not station.get("membershipRequired", False))
     ]
     route_baseline_cpl = baseline_cpl or median(available_for_baseline)
@@ -257,7 +267,7 @@ def score_candidates(
     for station in in_corridor:
         station_code = str(station.get("stationCode"))
         distance_to_route, distance_along = station_positions[station_code]
-        open_now = bool(station.get("openNow", True))
+        open_now = station.get("openNow") is not False
         membership_required = bool(station.get("membershipRequired", False))
         eligible = include_member_prices or not membership_required
         if not include_closed and not open_now:
@@ -282,7 +292,7 @@ def score_candidates(
         reachable = range_km >= reach_needed_km
         fresh_penalty, fresh_warning = freshness_penalty(station.get("updatedAt"), now)
         if (
-            station.get("source") == "api_nsw_fuelcheck"
+            station.get("source") in {"api_nsw_fuelcheck", "api_qld_fuelprices", "api_wa_fuelwatch"}
             and price_age_hours(station.get("updatedAt"), now)
             > RECOMMENDATION_MAX_PRICE_AGE_HOURS
         ):
@@ -652,6 +662,189 @@ def normalise_nsw_payload(payload: dict[str, Any]) -> list[dict[str, Any]]:
         ):
             station["updatedAt"] = updated_at
     return list(stations.values())
+
+
+def normalise_qld_payload(
+    site_payload: dict[str, Any],
+    price_payload: dict[str, Any],
+    brand_payload: dict[str, Any] | None = None,
+    region_payload: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
+    """Normalise Fuel Prices QLD Direct API payloads into Fuel Path stations."""
+
+    brands = qld_lookup_by_id(brand_payload, "Brands", "BrandId")
+    regions = qld_lookup_by_id(region_payload, "GeographicRegions", "GeoRegionId")
+    stations: dict[str, dict[str, Any]] = {}
+
+    for row in site_payload.get("S") or []:
+        if not isinstance(row, dict):
+            continue
+        station_code = str(row.get("S") or "")
+        if not station_code:
+            continue
+        suburb = qld_region_name(row, regions)
+        address = qld_address(row, suburb)
+        brand_id = str(row.get("B") or "")
+        stations[station_code] = {
+            "stationCode": f"QLD-{station_code}",
+            "name": row.get("N") or station_code,
+            "brand": brands.get(brand_id) or "Unknown",
+            "suburb": suburb,
+            "address": address,
+            "phone": None,
+            "lat": float(row.get("Lat") or 0),
+            "lon": float(row.get("Lng") or 0),
+            "openNow": qld_open_now(row),
+            "membershipRequired": False,
+            "updatedAt": normalise_qld_timestamp(row.get("M")),
+            "source": "api_qld_fuelprices",
+            "prices": {},
+            "discounts": [],
+        }
+
+    for row in price_payload.get("SitePrices") or []:
+        if not isinstance(row, dict):
+            continue
+        site_id = str(row.get("SiteId") or "")
+        if not site_id:
+            continue
+        fuel_code = QLD_FUEL_ID_TO_CODE.get(int(row.get("FuelId") or 0))
+        price = qld_price_cpl(row.get("Price"))
+        if not fuel_code or price is None:
+            continue
+        station = stations.get(site_id)
+        if not station:
+            station = {
+                "stationCode": f"QLD-{site_id}",
+                "name": site_id,
+                "brand": "Unknown",
+                "suburb": "",
+                "address": "",
+                "phone": None,
+                "lat": 0.0,
+                "lon": 0.0,
+                "openNow": None,
+                "membershipRequired": False,
+                "updatedAt": None,
+                "source": "api_qld_fuelprices",
+                "prices": {},
+                "discounts": [],
+            }
+            stations[site_id] = station
+        station["prices"][fuel_code] = price
+        updated_at = normalise_qld_timestamp(row.get("TransactionDateUtc"))
+        if updated_at and (
+            not station.get("updatedAt") or updated_at > str(station.get("updatedAt"))
+        ):
+            station["updatedAt"] = updated_at
+
+    return [
+        station
+        for station in stations.values()
+        if station.get("prices")
+        and math.isfinite(float(station.get("lat") or 0))
+        and math.isfinite(float(station.get("lon") or 0))
+        and (float(station.get("lat") or 0) or float(station.get("lon") or 0))
+    ]
+
+
+def qld_lookup_by_id(
+    payload: dict[str, Any] | None,
+    list_key: str,
+    id_key: str,
+) -> dict[str, str]:
+    rows = payload.get(list_key) if isinstance(payload, dict) else None
+    if not isinstance(rows, list):
+        return {}
+    return {
+        str(row.get(id_key)): str(row.get("Name"))
+        for row in rows
+        if isinstance(row, dict) and row.get(id_key) is not None and row.get("Name")
+    }
+
+
+def qld_region_name(row: dict[str, Any], regions: dict[str, str]) -> str:
+    for key in ("G1", "G2"):
+        value = row.get(key)
+        if value is not None and str(value) in regions:
+            return regions[str(value)]
+    return ""
+
+
+def qld_address(row: dict[str, Any], suburb: str) -> str:
+    parts = [str(row.get("A") or "").strip()]
+    if suburb:
+        parts.append(suburb)
+    postcode = str(row.get("P") or "").strip()
+    parts.append(f"QLD {postcode}".strip())
+    return ", ".join(part for part in parts if part)
+
+
+def qld_price_cpl(value: Any) -> float | None:
+    try:
+        price = float(value)
+    except (TypeError, ValueError):
+        return None
+    if price >= QLD_UNAVAILABLE_PRICE:
+        return None
+    return price / 10
+
+
+def normalise_qld_timestamp(value: Any) -> str | None:
+    if value is None or value == "":
+        return None
+    text = str(value).strip().replace(" ", "")
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc).isoformat()
+
+
+def qld_open_now(row: dict[str, Any]) -> bool | None:
+    weekday = datetime.now(SYDNEY_TZ).strftime("%a").upper()
+    prefix_by_day = {
+        "MON": "M",
+        "TUE": "T",
+        "WED": "W",
+        "THU": "TH",
+        "FRI": "F",
+        "SAT": "S",
+        "SUN": "SU",
+    }
+    prefix = prefix_by_day.get(weekday)
+    if not prefix:
+        return None
+    open_text = str(row.get(f"{prefix}O") or "").strip()
+    close_text = str(row.get(f"{prefix}C") or "").strip()
+    if not open_text or not close_text:
+        return None
+    open_minutes = qld_time_minutes(open_text)
+    close_minutes = qld_time_minutes(close_text)
+    if open_minutes is None or close_minutes is None:
+        return None
+    now_minutes = datetime.now(SYDNEY_TZ).hour * 60 + datetime.now(SYDNEY_TZ).minute
+    if close_minutes <= open_minutes:
+        return now_minutes >= open_minutes or now_minutes <= close_minutes
+    return open_minutes <= now_minutes <= close_minutes
+
+
+def qld_time_minutes(value: str) -> int | None:
+    digits = re.sub(r"\D", "", value)
+    if len(digits) < 3:
+        return None
+    digits = digits.zfill(4)[-4:]
+    hour = int(digits[:2])
+    minute = int(digits[2:])
+    if hour > 24 or minute > 59:
+        return None
+    if hour == 24:
+        hour = 0
+    return hour * 60 + minute
 
 
 def station_phone(row: dict[str, Any]) -> str | None:

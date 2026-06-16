@@ -2,7 +2,11 @@ const {
   alertsStatus,
   cacheSeconds,
   geocodeProviderStatus,
+  hasAnyLiveCredentials,
   hasLiveCredentials,
+  hasQldCredentials,
+  hasVicCredentials,
+  hasWaProvider,
   methodAllowed,
   routeProviderStatus,
   sendJson,
@@ -12,8 +16,16 @@ module.exports = function handler(req, res) {
   if (!methodAllowed(req, res)) return;
   sendJson(res, 200, {
     api: "fuel-path-hosted-backend-v1",
-    credentialsConfigured: hasLiveCredentials(),
-    defaultSource: hasLiveCredentials() ? "live" : "sample",
+    credentialsConfigured: hasAnyLiveCredentials(),
+    defaultSource: hasAnyLiveCredentials() ? "live" : "sample",
+    fuelProviders: {
+      apiNswConfigured: hasLiveCredentials(),
+      apiQldConfigured: hasQldCredentials(),
+      apiWaConfigured: hasWaProvider(),
+      apiVicConfigured: hasVicCredentials(),
+      vicStatus: hasVicCredentials() ? "configured_pending_adapter_schema" : "needs_servo_saver_api_access",
+      selection: "region-aware",
+    },
     cacheSeconds: cacheSeconds(),
     maps: {
       provider: "osm",

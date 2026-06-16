@@ -4,7 +4,13 @@ import unittest
 from copy import deepcopy
 from datetime import datetime, timezone
 
-from score_route import load_json, normalise_nsw_payload, score_candidates, score_candidates_adaptive
+from score_route import (
+    load_json,
+    normalise_nsw_payload,
+    normalise_qld_payload,
+    score_candidates,
+    score_candidates_adaptive,
+)
 from pathlib import Path
 
 
@@ -151,6 +157,70 @@ class ScoreRouteTests(unittest.TestCase):
         self.assertEqual(station["suburb"], "Umina Beach")
         self.assertEqual(station["prices"]["U91"], 181.9)
         self.assertTrue(station["updatedAt"].startswith("2026-06-12"))
+
+    def test_normalises_qld_site_price_and_reference_collections(self):
+        site_payload = {
+            "S": [
+                {
+                    "S": 61477713,
+                    "A": "123 Test Road",
+                    "N": "Caltex Brisbane Test",
+                    "B": 2,
+                    "P": "4000",
+                    "G1": 101,
+                    "G2": 202,
+                    "Lat": -27.4705,
+                    "Lng": 153.026,
+                    "M": "2026-06-16T00:10:00",
+                }
+            ]
+        }
+        price_payload = {
+            "SitePrices": [
+                {
+                    "SiteId": 61477713,
+                    "FuelId": 2,
+                    "Price": 1679,
+                    "TransactionDateUtc": "2026-06-16T00:15:00",
+                },
+                {
+                    "SiteId": 61477713,
+                    "FuelId": 12,
+                    "Price": 1665,
+                    "TransactionDateUtc": "2026-06-16T00:16:00",
+                },
+                {
+                    "SiteId": 61477713,
+                    "FuelId": 8,
+                    "Price": 9999,
+                    "TransactionDateUtc": "2026-06-16T00:17:00",
+                },
+            ]
+        }
+        brand_payload = {"Brands": [{"BrandId": 2, "Name": "Caltex"}]}
+        region_payload = {
+            "GeographicRegions": [
+                {"GeoRegionId": 101, "Name": "Brisbane City"},
+                {"GeoRegionId": 202, "Name": "Brisbane"},
+            ]
+        }
+
+        [station] = normalise_qld_payload(
+            site_payload,
+            price_payload,
+            brand_payload,
+            region_payload,
+        )
+
+        self.assertEqual(station["stationCode"], "QLD-61477713")
+        self.assertEqual(station["brand"], "Caltex")
+        self.assertEqual(station["suburb"], "Brisbane City")
+        self.assertEqual(station["address"], "123 Test Road, Brisbane City, QLD 4000")
+        self.assertAlmostEqual(station["prices"]["U91"], 167.9)
+        self.assertAlmostEqual(station["prices"]["E10"], 166.5)
+        self.assertNotIn("P98", station["prices"])
+        self.assertEqual(station["source"], "api_qld_fuelprices")
+        self.assertTrue(station["updatedAt"].startswith("2026-06-16"))
 
     def test_adaptive_corridor_expands_sparse_long_routes(self):
         route = {

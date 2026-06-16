@@ -26,10 +26,10 @@ python3 prototype/scripts/validate_api_qld.py --env prototype/.env
 Latest local validation result:
 
 - Site detail endpoint: OK.
-- Site detail rows: 64.
+- Site detail rows: 1803.
 - Price endpoint: OK.
-- Price rows: 233.
-- Region tested: `countryId=21`, `geoRegionLevel=2`, `geoRegionId=16`.
+- Price rows: 6980.
+- Region tested: `countryId=21`, `geoRegionLevel=3`, `geoRegionId=1`.
 
 Validated endpoints:
 
@@ -66,18 +66,28 @@ Useful observed price fields:
 - `TransactionDateUtc`
 - `CollectionMethod`
 
-Assumption to confirm against the API manual or Postman collection:
+Confirmed against the API manual:
 
-- `Price` appears to be stored in tenths of cents per litre, for example `1695.0` means `169.5 c/L`.
+- `geoRegionLevel=3` and `geoRegionId=1` returns Queensland.
+- `Price` is stored in tenths of cents per litre, for example `1679` means `167.9 c/L`.
+- `9999` means the product is currently unavailable at that site.
+
+Confirmed against the live reference table:
+
+- Fuel ID `2`: `U91`.
+- Fuel ID `3`: `DL`.
+- Fuel ID `5`: `P95`.
+- Fuel ID `8`: `P98`.
+- Fuel ID `12`: `E10`.
+- Fuel ID `14`: `PDL`.
 
 ## Integration Notes
 
-Recommended next step is a small QLD provider adapter behind the existing backend station lookup path.
+The QLD provider adapter is now implemented behind the existing backend station lookup path.
 
 Keep it narrow:
 
-- Add QLD as a source provider, not a new product flow.
-- Confirm QLD fuel ID mapping before joining prices into Fuel Path fuel codes.
-- Confirm region IDs needed for production coverage.
-- Confirm brand/operator mapping before relying on icon matching.
+- QLD is a source provider, not a new product flow.
+- Backend source selection is region-aware: NSW/ACT uses API.NSW, QLD uses Fuel Prices QLD, and QLD border searches can merge nearby NSW stations.
+- Brand and region reference tables are used for station normalisation.
 - Keep smart saved-route alerts as a later backend scheduling concern.

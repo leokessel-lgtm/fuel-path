@@ -528,6 +528,14 @@ export function PlanScreen({
               </View>
             </Pressable>
           ) : null}
+          {!loading && !error && !best ? (
+            <View style={styles.emptyRouteState}>
+              <Text style={styles.decisionTitle}>No fuel stops found</Text>
+              <Text style={styles.muted}>
+                Route found, but no eligible stations match this fuel, freshness and open-station settings.
+              </Text>
+            </View>
+          ) : null}
 
           <View style={styles.sheetHeaderRow}>
             <Text style={styles.selectedTitle}>Suggested fuel stops</Text>
@@ -973,6 +981,12 @@ const styles = StyleSheet.create({
     fontSize: typeScale.caption,
     fontWeight: "800",
     marginTop: 2,
+  },
+  emptyRouteState: {
+    backgroundColor: colors.panel,
+    borderRadius: radii.md,
+    gap: spacing.xs,
+    padding: spacing.md,
   },
   recommendationPrice: {
     alignItems: "flex-end",

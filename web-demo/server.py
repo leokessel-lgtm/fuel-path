@@ -13,6 +13,7 @@ import os
 import re
 import sys
 import time
+import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -32,6 +33,7 @@ from score_route import Point  # noqa: E402
 from score_route import haversine_km  # noqa: E402
 from score_route import load_json  # noqa: E402
 from score_route import load_live_nsw_prices  # noqa: E402
+from score_route import normalise_qld_payload  # noqa: E402
 from score_route import nearest_route_position  # noqa: E402
 from score_route import route_points  # noqa: E402
 from score_route import score_candidates_adaptive  # noqa: E402
@@ -42,6 +44,105 @@ DEFAULT_CACHE_SECONDS = 300
 HTTP_TIMEOUT_SECONDS = 12
 USER_AGENT = "FuelPathDemo/0.1 local validation"
 RECOMMENDED_GEOCODE_PROVIDER = "google_places_autocomplete_new"
+DEFAULT_QLD_FUEL_API_BASE_URL = "https://fppdirectapi-prod.fuelpricesqld.com.au"
+DEFAULT_WA_FUELWATCH_RSS_URL = "https://www.fuelwatch.wa.gov.au/fuelwatch/fuelWatchRSS"
+QLD_REGION_PARAMS = {
+    "countryId": 21,
+    "geoRegionLevel": 3,
+    "geoRegionId": 1,
+}
+QLD_BOUNDS = {
+    "min_lat": -29.5,
+    "max_lat": -9.0,
+    "min_lon": 137.0,
+    "max_lon": 154.2,
+}
+WA_BOUNDS = {
+    "min_lat": -36.0,
+    "max_lat": -13.0,
+    "min_lon": 112.0,
+    "max_lon": 129.5,
+}
+VIC_BOUNDS = {
+    "min_lat": -39.3,
+    "max_lat": -33.9,
+    "min_lon": 140.9,
+    "max_lon": 150.2,
+}
+WA_FUELWATCH_PRODUCTS = {
+    "U91": 1,
+    "P95": 2,
+    "DL": 4,
+    "LPG": 5,
+    "P98": 6,
+    "E85": 10,
+    "PDL": 11,
+}
+WA_DEFAULT_METRO_REGION_IDS = [25, 26, 27]
+WA_FUELWATCH_REGIONS = [
+    {"id": 1, "name": "Boulder", "lat": -30.782, "lon": 121.491},
+    {"id": 2, "name": "Broome", "lat": -17.961, "lon": 122.236},
+    {"id": 3, "name": "Busselton Townsite", "lat": -33.652, "lon": 115.345},
+    {"id": 4, "name": "Carnarvon", "lat": -24.884, "lon": 113.657},
+    {"id": 5, "name": "Collie", "lat": -33.36, "lon": 116.156},
+    {"id": 6, "name": "Dampier", "lat": -20.662, "lon": 116.711},
+    {"id": 7, "name": "Esperance", "lat": -33.86, "lon": 121.889},
+    {"id": 8, "name": "Kalgoorlie", "lat": -30.749, "lon": 121.466},
+    {"id": 9, "name": "Karratha", "lat": -20.736, "lon": 116.846},
+    {"id": 10, "name": "Kununurra", "lat": -15.779, "lon": 128.741},
+    {"id": 11, "name": "Narrogin", "lat": -32.933, "lon": 117.178},
+    {"id": 12, "name": "Northam", "lat": -31.653, "lon": 116.671},
+    {"id": 13, "name": "Port Hedland", "lat": -20.312, "lon": 118.61},
+    {"id": 14, "name": "South Hedland", "lat": -20.407, "lon": 118.6},
+    {"id": 15, "name": "Albany", "lat": -35.027, "lon": 117.884},
+    {"id": 16, "name": "Bunbury", "lat": -33.327, "lon": 115.641},
+    {"id": 17, "name": "Geraldton", "lat": -28.777, "lon": 114.614},
+    {"id": 18, "name": "Mandurah", "lat": -32.536, "lon": 115.743},
+    {"id": 19, "name": "Capel", "lat": -33.558, "lon": 115.562},
+    {"id": 20, "name": "Dardanup", "lat": -33.397, "lon": 115.755},
+    {"id": 21, "name": "Greenough", "lat": -28.956, "lon": 114.735},
+    {"id": 22, "name": "Harvey", "lat": -33.08, "lon": 115.893},
+    {"id": 23, "name": "Murray", "lat": -32.629, "lon": 115.874},
+    {"id": 24, "name": "Waroona", "lat": -32.844, "lon": 115.923},
+    {"id": 25, "name": "Metro North of River", "lat": -31.89, "lon": 115.84},
+    {"id": 26, "name": "Metro South of River", "lat": -32.08, "lon": 115.86},
+    {"id": 27, "name": "Metro East/Hills", "lat": -31.98, "lon": 116.03},
+    {"id": 28, "name": "Augusta Margaret River", "lat": -33.953, "lon": 115.073},
+    {"id": 29, "name": "Busselton Shire", "lat": -33.652, "lon": 115.345},
+    {"id": 30, "name": "Bridgetown Greenbushes", "lat": -33.959, "lon": 116.137},
+    {"id": 31, "name": "Donnybrook Balingup", "lat": -33.572, "lon": 115.824},
+    {"id": 32, "name": "Manjimup", "lat": -34.241, "lon": 116.146},
+    {"id": 33, "name": "Cataby", "lat": -30.744, "lon": 115.551},
+    {"id": 34, "name": "Coolgardie", "lat": -30.954, "lon": 121.163},
+    {"id": 35, "name": "Cunderdin", "lat": -31.652, "lon": 117.242},
+    {"id": 36, "name": "Dalwallinu", "lat": -30.278, "lon": 116.66},
+    {"id": 37, "name": "Denmark", "lat": -34.961, "lon": 117.353},
+    {"id": 38, "name": "Derby", "lat": -17.303, "lon": 123.629},
+    {"id": 39, "name": "Dongara", "lat": -29.252, "lon": 114.932},
+    {"id": 40, "name": "Exmouth", "lat": -21.93, "lon": 114.126},
+    {"id": 41, "name": "Fitzroy Crossing", "lat": -18.197, "lon": 125.567},
+    {"id": 42, "name": "Jurien", "lat": -30.305, "lon": 115.039},
+    {"id": 43, "name": "Kambalda", "lat": -31.206, "lon": 121.66},
+    {"id": 44, "name": "Kellerberrin", "lat": -31.634, "lon": 117.72},
+    {"id": 45, "name": "Kojonup", "lat": -33.833, "lon": 117.159},
+    {"id": 46, "name": "Meekatharra", "lat": -26.593, "lon": 118.495},
+    {"id": 47, "name": "Moora", "lat": -30.64, "lon": 116.008},
+    {"id": 48, "name": "Mount Barker", "lat": -34.63, "lon": 117.666},
+    {"id": 49, "name": "Newman", "lat": -23.357, "lon": 119.735},
+    {"id": 50, "name": "Norseman", "lat": -32.197, "lon": 121.779},
+    {"id": 51, "name": "Ravensthorpe", "lat": -33.582, "lon": 120.046},
+    {"id": 53, "name": "Tammin", "lat": -31.641, "lon": 117.484},
+    {"id": 54, "name": "Williams", "lat": -33.027, "lon": 116.88},
+    {"id": 55, "name": "Wubin", "lat": -30.106, "lon": 116.629},
+    {"id": 56, "name": "York", "lat": -31.888, "lon": 116.769},
+    {"id": 57, "name": "Regans Ford", "lat": -30.98, "lon": 115.695},
+    {"id": 58, "name": "Meckering", "lat": -31.632, "lon": 117.008},
+    {"id": 59, "name": "Wundowie", "lat": -31.76, "lon": 116.379},
+    {"id": 60, "name": "North Bannister", "lat": -32.582, "lon": 116.451},
+    {"id": 61, "name": "Munglinup", "lat": -33.714, "lon": 120.865},
+    {"id": 62, "name": "Northam Shire", "lat": -31.653, "lon": 116.671},
+    {"id": 63, "name": "Bodallin", "lat": -31.37, "lon": 118.861},
+]
 GEOCODE_PROVIDER_ALIASES = {
     "auto": "auto",
     "google": "google",
@@ -102,6 +203,13 @@ LIVE_CACHE: dict[str, Any] = {
     "stations": None,
     "loaded_at": 0.0,
 }
+QLD_LIVE_CACHE: dict[str, Any] = {
+    "stations": None,
+    "loaded_at": 0.0,
+}
+WA_LIVE_CACHE: dict[str, Any] = {
+    "entries": {},
+}
 
 
 def load_env_file(path: Path) -> None:
@@ -120,6 +228,22 @@ def load_env_file(path: Path) -> None:
 
 def has_live_credentials() -> bool:
     return bool(os.getenv("NSW_FUEL_API_KEY") and os.getenv("NSW_FUEL_API_SECRET"))
+
+
+def has_qld_credentials() -> bool:
+    return bool(os.getenv("QLD_FUEL_API_TOKEN"))
+
+
+def has_wa_provider() -> bool:
+    return os.getenv("FUEL_PATH_WA_FUELWATCH_ENABLED") != "0"
+
+
+def has_vic_credentials() -> bool:
+    return bool(os.getenv("VIC_SERVO_SAVER_API_BASE_URL") and os.getenv("VIC_SERVO_SAVER_API_KEY"))
+
+
+def has_any_live_credentials() -> bool:
+    return has_live_credentials() or has_qld_credentials() or has_wa_provider() or has_vic_credentials()
 
 
 def google_maps_api_key() -> str:
@@ -223,6 +347,322 @@ def load_live_stations(*, force_refresh: bool = False) -> list[dict[str, Any]]:
     LIVE_CACHE["stations"] = stations
     LIVE_CACHE["loaded_at"] = now
     return stations
+
+
+def qld_api_get(path: str, params: dict[str, int]) -> dict[str, Any]:
+    token = os.getenv("QLD_FUEL_API_TOKEN", "").strip()
+    if not token:
+        raise RuntimeError("QLD fuel API token is not configured.")
+    base_url = (
+        os.getenv("QLD_FUEL_API_BASE_URL", DEFAULT_QLD_FUEL_API_BASE_URL).strip()
+        or DEFAULT_QLD_FUEL_API_BASE_URL
+    )
+    url = f"{base_url.rstrip('/')}/{path.lstrip('/')}?{urlencode(params)}"
+    request = Request(
+        url,
+        headers={
+            "Authorization": f"FPDAPI SubscriberToken={token}",
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            "User-Agent": USER_AGENT,
+        },
+    )
+    with urlopen(request, timeout=HTTP_TIMEOUT_SECONDS) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+
+def load_live_qld_stations(*, force_refresh: bool = False) -> list[dict[str, Any]]:
+    ttl = int(os.getenv("FUEL_PATH_LIVE_CACHE_SECONDS", str(DEFAULT_CACHE_SECONDS)))
+    now = time.time()
+    cached = QLD_LIVE_CACHE.get("stations")
+    if (
+        not force_refresh
+        and cached is not None
+        and now - float(QLD_LIVE_CACHE.get("loaded_at", 0.0)) < ttl
+    ):
+        return cached
+
+    brands = qld_api_get("/Subscriber/GetCountryBrands", {"countryId": 21})
+    regions = qld_api_get("/Subscriber/GetCountryGeographicRegions", {"countryId": 21})
+    sites = qld_api_get("/Subscriber/GetFullSiteDetails", QLD_REGION_PARAMS)
+    prices = qld_api_get("/Price/GetSitesPrices", QLD_REGION_PARAMS)
+    stations = normalise_qld_payload(sites, prices, brands, regions)
+    QLD_LIVE_CACHE["stations"] = stations
+    QLD_LIVE_CACHE["loaded_at"] = now
+    return stations
+
+
+def load_live_wa_stations(
+    *,
+    force_refresh: bool = False,
+    points: list[Point] | None = None,
+    radius_km: float = 0.0,
+) -> list[dict[str, Any]]:
+    if not has_wa_provider():
+        raise RuntimeError("WA FuelWatch provider is disabled.")
+
+    region_ids = wa_region_ids_for_area(points or [], radius_km=radius_km)
+    cache_key = ",".join(str(region_id) for region_id in region_ids)
+    ttl = int(os.getenv("FUEL_PATH_LIVE_CACHE_SECONDS", str(DEFAULT_CACHE_SECONDS)))
+    now = time.time()
+    entries = WA_LIVE_CACHE.setdefault("entries", {})
+    cached = entries.get(cache_key)
+    if (
+        not force_refresh
+        and cached is not None
+        and now - float(cached.get("loaded_at", 0.0)) < ttl
+    ):
+        return cached["stations"]
+
+    payloads = [
+        (fuel_code, fetch_wa_fuelwatch_rss(product_id, region_id))
+        for region_id in region_ids
+        for fuel_code, product_id in WA_FUELWATCH_PRODUCTS.items()
+    ]
+    stations = normalise_wa_fuelwatch_payloads(payloads)
+    entries[cache_key] = {"stations": stations, "loaded_at": now}
+    return stations
+
+
+def wa_region_ids_for_area(points: list[Point], *, radius_km: float = 0.0) -> list[int]:
+    wa_points = sample_points_for_provider([point for point in points if point_in_wa(point)], 28)
+    if not wa_points:
+        return list(WA_DEFAULT_METRO_REGION_IDS)
+
+    region_ids: set[int] = set()
+    perth = Point(lat=-31.9523, lon=115.8613)
+    search_km = max(35.0, min(120.0, float(radius_km or 0.0) * 2.0))
+    for point in wa_points:
+        if haversine_km(point, perth) <= 85.0:
+            region_ids.update(WA_DEFAULT_METRO_REGION_IDS)
+
+        ranked = sorted(
+            (
+                (haversine_km(point, Point(lat=region["lat"], lon=region["lon"])), int(region["id"]))
+                for region in WA_FUELWATCH_REGIONS
+            ),
+            key=lambda item: item[0],
+        )
+        if ranked:
+            region_ids.add(ranked[0][1])
+        for distance_km, region_id in ranked:
+            if distance_km <= search_km:
+                region_ids.add(region_id)
+
+    return sorted(region_ids)
+
+
+def sample_points_for_provider(points: list[Point], limit: int) -> list[Point]:
+    if len(points) <= limit:
+        return points
+    sampled: list[Point] = []
+    previous_index = -1
+    for index in range(limit):
+        source_index = round((index / (limit - 1)) * (len(points) - 1))
+        if source_index != previous_index:
+            sampled.append(points[source_index])
+            previous_index = source_index
+    return sampled
+
+
+def fetch_wa_fuelwatch_rss(product_id: int, region_id: int) -> bytes:
+    base_url = os.getenv("WA_FUELWATCH_RSS_URL", DEFAULT_WA_FUELWATCH_RSS_URL)
+    url = f"{base_url}?{urlencode({'Product': product_id, 'Region': region_id})}"
+    request = Request(
+        url,
+        headers={
+            "Accept": "application/rss+xml, application/xml, text/xml, */*",
+            "User-Agent": USER_AGENT,
+        },
+    )
+    with urlopen(request, timeout=30) as response:
+        return response.read().lstrip(b"\xef\xbb\xbf")
+
+
+def normalise_wa_fuelwatch_payloads(payloads: list[tuple[str, bytes]]) -> list[dict[str, Any]]:
+    stations: dict[str, dict[str, Any]] = {}
+    for fuel_code, payload in payloads:
+        root = ET.fromstring(payload)
+        for item in root.findall("./channel/item"):
+            row = {child.tag: (child.text or "").strip() for child in item}
+            try:
+                lat = float(row.get("latitude") or 0)
+                lon = float(row.get("longitude") or 0)
+                price = float(row.get("price") or "nan")
+            except ValueError:
+                continue
+            if not lat or not lon or price != price:
+                continue
+            station_code = wa_station_code(row)
+            station = stations.setdefault(
+                station_code,
+                {
+                    "stationCode": station_code,
+                    "name": row.get("trading-name") or re.sub(r"^[0-9.]+:\s*", "", row.get("title") or ""),
+                    "brand": row.get("brand") or "Unknown",
+                    "suburb": title_case(row.get("location") or ""),
+                    "address": ", ".join(
+                        item
+                        for item in [row.get("address"), row.get("location"), "WA"]
+                        if item
+                    ),
+                    "phone": row.get("phone") or None,
+                    "lat": lat,
+                    "lon": lon,
+                    "openNow": wa_open_now(row.get("site-features")),
+                    "membershipRequired": wa_membership_required(row.get("restrictions")),
+                    "updatedAt": normalise_wa_date(row.get("date")),
+                    "source": "api_wa_fuelwatch",
+                    "prices": {},
+                    "discounts": [],
+                },
+            )
+            station["prices"][fuel_code] = price
+            updated_at = normalise_wa_date(row.get("date"))
+            if updated_at and (not station.get("updatedAt") or updated_at > str(station["updatedAt"])):
+                station["updatedAt"] = updated_at
+
+    return [station for station in stations.values() if station.get("prices")]
+
+
+def wa_station_code(row: dict[str, str]) -> str:
+    raw = "|".join(
+        [
+            row.get("brand", ""),
+            row.get("trading-name", ""),
+            row.get("address", ""),
+            row.get("location", ""),
+        ]
+    )
+    slug = re.sub(r"[^a-z0-9]+", "-", raw.lower().replace("&", "and")).strip("-")[:80]
+    fallback = f"{row.get('latitude')}-{row.get('longitude')}"
+    return f"WA-{slug or fallback}"
+
+
+def normalise_wa_date(value: str | None) -> str | None:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(f"{value}T06:00:00+08:00").astimezone(timezone.utc).isoformat()
+    except ValueError:
+        return None
+
+
+def wa_open_now(site_features: str | None) -> bool | None:
+    if site_features and re.search(r"open\s+24\s+hours", site_features, re.IGNORECASE):
+        return True
+    return None
+
+
+def wa_membership_required(restrictions: str | None) -> bool:
+    return bool(re.search(r"member|membership|card\s+only", restrictions or "", re.IGNORECASE))
+
+
+def title_case(value: str) -> str:
+    return str(value or "").lower().title()
+
+
+def load_live_vic_stations(*, force_refresh: bool = False) -> list[dict[str, Any]]:
+    _ = force_refresh
+    if not has_vic_credentials():
+        raise RuntimeError(
+            "VIC Servo Saver API access is not configured. Apply for API access before enabling live VIC prices."
+        )
+    raise RuntimeError("VIC Servo Saver API adapter needs the approved API schema before it can be enabled.")
+
+
+def point_in_qld(point: Point) -> bool:
+    return (
+        QLD_BOUNDS["min_lat"] <= point.lat <= QLD_BOUNDS["max_lat"]
+        and QLD_BOUNDS["min_lon"] <= point.lon <= QLD_BOUNDS["max_lon"]
+    )
+
+
+def point_in_wa(point: Point) -> bool:
+    return (
+        WA_BOUNDS["min_lat"] <= point.lat <= WA_BOUNDS["max_lat"]
+        and WA_BOUNDS["min_lon"] <= point.lon <= WA_BOUNDS["max_lon"]
+    )
+
+
+def point_in_vic(point: Point) -> bool:
+    return (
+        VIC_BOUNDS["min_lat"] <= point.lat <= VIC_BOUNDS["max_lat"]
+        and VIC_BOUNDS["min_lon"] <= point.lon <= VIC_BOUNDS["max_lon"]
+    )
+
+
+def qld_nsw_border_area(point: Point, radius_km: float = 0.0) -> bool:
+    return point_in_qld(point) and point.lat <= -27.75 and point.lon >= 151.0 and radius_km >= 20
+
+
+def live_provider_keys_for_area(points: list[Point], *, radius_km: float = 0.0) -> list[str]:
+    if not points:
+        if has_live_credentials():
+            return ["nsw"]
+        if has_qld_credentials():
+            return ["qld"]
+        if has_wa_provider():
+            return ["wa"]
+        if has_vic_credentials():
+            return ["vic"]
+        return ["nsw"]
+    if any(point_in_wa(point) for point in points):
+        return ["wa"]
+    if any(point_in_vic(point) for point in points):
+        return ["vic"]
+    has_qld_point = any(point_in_qld(point) for point in points)
+    has_non_qld_point = any(not point_in_qld(point) for point in points)
+    if has_qld_point:
+        providers = ["qld"]
+        if has_non_qld_point or any(qld_nsw_border_area(point, radius_km) for point in points):
+            providers.append("nsw")
+        return providers
+    return ["nsw"]
+
+
+def load_live_stations_for_area(
+    *,
+    force_refresh: bool = False,
+    points: list[Point] | None = None,
+    radius_km: float = 0.0,
+) -> tuple[list[dict[str, Any]], str]:
+    providers = live_provider_keys_for_area(points or [], radius_km=radius_km)
+    stations: list[dict[str, Any]] = []
+    loaded_providers: list[str] = []
+    errors: list[str] = []
+    for provider in providers:
+        try:
+            if provider == "qld":
+                stations.extend(load_live_qld_stations(force_refresh=force_refresh))
+                loaded_providers.append("api_qld")
+            elif provider == "wa":
+                stations.extend(
+                    load_live_wa_stations(
+                        force_refresh=force_refresh,
+                        points=points or [],
+                        radius_km=radius_km,
+                    )
+                )
+                loaded_providers.append("api_wa")
+            elif provider == "vic":
+                stations.extend(load_live_vic_stations(force_refresh=force_refresh))
+                loaded_providers.append("api_vic")
+            elif provider == "nsw":
+                stations.extend(load_live_stations(force_refresh=force_refresh))
+                loaded_providers.append("api_nsw")
+        except Exception as exc:
+            errors.append(f"{provider}: {exc}")
+
+    if not stations:
+        raise RuntimeError("; ".join(errors) or "No live fuel providers are configured.")
+
+    by_code: dict[str, dict[str, Any]] = {}
+    for station in stations:
+        by_code[str(station.get("stationCode"))] = station
+
+    provider_source = "+".join(loaded_providers) if loaded_providers else "live"
+    return list(by_code.values()), provider_source
 
 
 def station_brand_text(station: dict[str, Any]) -> str:
@@ -739,19 +1179,29 @@ def station_payload(
 def source_from_params(params: dict[str, list[str]]) -> str:
     source = get_param(params, "source", "auto")
     if source == "auto":
-        source = "live" if has_live_credentials() else "sample"
+        source = "live" if has_any_live_credentials() else "sample"
     if source not in {"live", "sample"}:
         raise ValueError("source must be live, sample or auto")
     return source
 
 
-def load_stations_for_source(source: str, *, force_refresh: bool = False) -> list[dict[str, Any]]:
-    stations = (
-        load_live_stations(force_refresh=force_refresh)
-        if source == "live"
-        else load_sample_stations()
-    )
-    return [station_with_discount_rules(station) for station in stations]
+def load_stations_for_source(
+    source: str,
+    *,
+    force_refresh: bool = False,
+    points: list[Point] | None = None,
+    radius_km: float = 0.0,
+) -> tuple[list[dict[str, Any]], str]:
+    if source == "live":
+        stations, provider_source = load_live_stations_for_area(
+            force_refresh=force_refresh,
+            points=points,
+            radius_km=radius_km,
+        )
+    else:
+        stations = load_sample_stations()
+        provider_source = "sample"
+    return [station_with_discount_rules(station) for station in stations], provider_source
 
 
 def score_response_for_route(
@@ -785,9 +1235,9 @@ def score_response_for_route(
         include_member_prices=include_member_prices,
         include_closed=include_closed,
         baseline_cpl=None,
-        now=None if source == "live" else SAMPLE_NOW,
+        now=None if source != "sample" else SAMPLE_NOW,
     )
-    context["source"] = "api_nsw" if source == "live" else "sample"
+    context["source"] = source
     context["routeProvider"] = route.get("provider") or route.get("routeType") or "sample"
     context["routeCacheHit"] = bool(route.get("cacheHit"))
     context["generatedAt"] = datetime.now(timezone.utc).isoformat()
@@ -863,12 +1313,17 @@ def build_score_response(params: dict[str, list[str]]) -> dict[str, Any]:
 
     brand_filter = bool_param(params, "brandFilter")
     brands = set_param(params, "brands")
-    stations = load_stations_for_source(source, force_refresh=force_refresh)
+    route = route_by_id[route_id]
+    stations, provider_source = load_stations_for_source(
+        source,
+        force_refresh=force_refresh,
+        points=route_points(route),
+    )
     if brand_filter:
         stations = [station for station in stations if str(station.get("brand") or "Unknown") in brands]
     return score_response_for_route(
-        source=source,
-        route=route_by_id[route_id],
+        source=provider_source,
+        route=route,
         stations=stations,
         fuel=get_param(params, "fuel", "U91").upper(),
         tank_litres=float_param(params, "tankLitres", 55),
@@ -891,12 +1346,16 @@ def build_score_response_from_json(payload: dict[str, Any]) -> dict[str, Any]:
 
     force_refresh = bool(payload.get("forceRefresh"))
     route = route_from_payload(payload.get("route") or {})
-    stations = load_stations_for_source(source, force_refresh=force_refresh)
+    stations, provider_source = load_stations_for_source(
+        source,
+        force_refresh=force_refresh,
+        points=route_points(route),
+    )
     brands = {str(item) for item in payload.get("brands") or [] if str(item)}
     if bool(payload.get("brandFilter")):
         stations = [station for station in stations if str(station.get("brand") or "Unknown") in brands]
     return score_response_for_route(
-        source=source,
+        source=provider_source,
         route=route,
         stations=stations,
         fuel=str(payload.get("fuel") or "U91").upper(),
@@ -957,8 +1416,14 @@ def build_stations_response(params: dict[str, list[str]]) -> dict[str, Any]:
     brand_filter = bool_param(params, "brandFilter")
     brands = set_param(params, "brands")
 
+    loaded_stations, provider_source = load_stations_for_source(
+        source,
+        force_refresh=force_refresh,
+        points=[centre],
+        radius_km=radius_km,
+    )
     stations = []
-    for station in load_stations_for_source(source, force_refresh=force_refresh):
+    for station in loaded_stations:
         prices = station.get("prices") or {}
         if fuel not in prices:
             continue
@@ -980,7 +1445,7 @@ def build_stations_response(params: dict[str, list[str]]) -> dict[str, Any]:
     selected = stations[:limit]
     return {
         "context": {
-            "source": "api_nsw" if source == "live" else "sample",
+            "source": provider_source,
             "fuel": fuel,
             "radiusKm": radius_km,
             "centre": {"lat": centre.lat, "lon": centre.lon, "label": centre.label},
@@ -1025,8 +1490,20 @@ class FuelPathHandler(SimpleHTTPRequestHandler):
             self.send_json(
                 {
                     "api": "fuel-path-local",
-                    "credentialsConfigured": has_live_credentials(),
-                    "defaultSource": "live" if has_live_credentials() else "sample",
+                    "credentialsConfigured": has_any_live_credentials(),
+                    "defaultSource": "live" if has_any_live_credentials() else "sample",
+                    "fuelProviders": {
+                        "apiNswConfigured": has_live_credentials(),
+                        "apiQldConfigured": has_qld_credentials(),
+                        "apiWaConfigured": has_wa_provider(),
+                        "apiVicConfigured": has_vic_credentials(),
+                        "vicStatus": (
+                            "configured_pending_adapter_schema"
+                            if has_vic_credentials()
+                            else "needs_servo_saver_api_access"
+                        ),
+                        "selection": "region-aware",
+                    },
                     "maps": {
                         "provider": "google" if google_maps_key else "osm",
                         "googleMapsConfigured": bool(google_maps_key),

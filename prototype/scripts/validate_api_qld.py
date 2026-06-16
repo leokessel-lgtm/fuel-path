@@ -14,8 +14,8 @@ from urllib.request import Request, urlopen
 
 DEFAULT_BASE_URL = "https://fppdirectapi-prod.fuelpricesqld.com.au"
 DEFAULT_COUNTRY_ID = 21
-DEFAULT_GEO_REGION_LEVEL = 2
-DEFAULT_GEO_REGION_ID = 16
+DEFAULT_GEO_REGION_LEVEL = 3
+DEFAULT_GEO_REGION_ID = 1
 HTTP_TIMEOUT_SECONDS = 20
 
 

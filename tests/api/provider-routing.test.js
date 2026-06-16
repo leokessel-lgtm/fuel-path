@@ -34,12 +34,12 @@ test("national capability matrix covers every Australian state and territory", (
       assert.equal(capabilities.find((item) => item.region === "NSW")?.capability, "live");
       assert.equal(capabilities.find((item) => item.region === "ACT")?.capability, "live");
       assert.equal(capabilities.find((item) => item.region === "QLD")?.capability, "live");
-      assert.equal(capabilities.find((item) => item.region === "WA")?.capability, "limited");
+      assert.equal(capabilities.find((item) => item.region === "WA")?.capability, "live");
       assert.equal(capabilities.find((item) => item.region === "VIC")?.capability, "pending_access");
       assert.equal(capabilities.find((item) => item.region === "SA")?.capability, "pending_access");
       assert.equal(capabilities.find((item) => item.region === "TAS")?.capability, "pending_access");
       assert.equal(capabilities.find((item) => item.region === "NT")?.capability, "pending_access");
-      assert.deepEqual(capabilitySummary(capabilities), { live: 3, limited: 1, pending_access: 4 });
+      assert.deepEqual(capabilitySummary(capabilities), { live: 4, pending_access: 4 });
     },
   );
 });

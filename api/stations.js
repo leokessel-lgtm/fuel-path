@@ -17,7 +17,7 @@ module.exports = async function handler(req, res) {
       lon: coordinateParam(req.query.lon, "lon", -180, 180),
       label: stringParam(req.query.label, "Map centre"),
     };
-    const fuel = stringParam(req.query.fuel, "U91");
+    const fuel = stringParam(req.query.fuel, "U91").toUpperCase();
     const radiusKm = boundedNumberParam(req.query.radiusKm, "radiusKm", 8, { min: 0.5, max: 100 });
     const limit = Math.round(boundedNumberParam(req.query.limit, "limit", 120, { min: 1, max: 120 }));
     const includeClosed = boolParam(req.query.includeClosed);
@@ -29,6 +29,7 @@ module.exports = async function handler(req, res) {
       forceRefresh: boolParam(req.query.forceRefresh),
       points: [centre],
       radiusKm,
+      fuels: [fuel],
     });
     const stations = data.stations
       .map((station) => ({

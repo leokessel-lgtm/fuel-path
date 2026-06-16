@@ -9,6 +9,8 @@ const RECOMMENDATION_MAX_PRICE_AGE_HOURS = 48;
 const RECOMMENDED_GEOCODE_PROVIDER = "google_places_autocomplete_new";
 const DEFAULT_QLD_FUEL_API_BASE_URL = "https://fppdirectapi-prod.fuelpricesqld.com.au";
 const DEFAULT_WA_FUELWATCH_RSS_URL = "https://www.fuelwatch.wa.gov.au/fuelwatch/fuelWatchRSS";
+const WA_DEFAULT_MAX_REGION_IDS = 18;
+const WA_DEFAULT_FETCH_CONCURRENCY = 6;
 const QLD_REGION_PARAMS = {
   countryId: 21,
   geoRegionLevel: 3,
@@ -93,6 +95,7 @@ const WA_FUELWATCH_PRODUCTS = [
   ["E85", 10],
   ["PDL", 11],
 ];
+const WA_FUELWATCH_PRODUCT_BY_CODE = new Map(WA_FUELWATCH_PRODUCTS);
 const WA_DEFAULT_METRO_REGION_IDS = [25, 26, 27];
 const WA_FUELWATCH_REGIONS = [
   { id: 1, name: "Boulder", lat: -30.782, lon: 121.491 },
@@ -173,6 +176,7 @@ const qldLiveCache = {
 
 const waLiveCache = {
   entries: new Map(),
+  payloads: new Map(),
   lastError: "",
 };
 
@@ -258,6 +262,20 @@ function cacheSeconds() {
   return Math.max(60, Number(process.env.FUEL_PATH_LIVE_CACHE_SECONDS || DEFAULT_CACHE_SECONDS));
 }
 
+function boundedIntegerEnv(name, fallback, { min = 1, max = 100 } = {}) {
+  const parsed = Number(process.env[name]);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(min, Math.min(max, Math.round(parsed)));
+}
+
+function waMaxRegionIds() {
+  return boundedIntegerEnv("FUEL_PATH_WA_MAX_REGION_IDS", WA_DEFAULT_MAX_REGION_IDS, { min: 3, max: 40 });
+}
+
+function waFetchConcurrency() {
+  return boundedIntegerEnv("FUEL_PATH_WA_FETCH_CONCURRENCY", WA_DEFAULT_FETCH_CONCURRENCY, { min: 1, max: 12 });
+}
+
 function hasLiveCredentials() {
   return Boolean(process.env.NSW_FUEL_API_KEY && process.env.NSW_FUEL_API_SECRET);
 }
@@ -311,10 +329,10 @@ function fuelProviderCapabilityMatrix() {
       region: "WA",
       name: "Western Australia",
       provider: "api_wa_fuelwatch",
-      capability: hasWaProvider() ? "limited" : "unsupported",
+      capability: hasWaProvider() ? "live" : "unsupported",
       configured: hasWaProvider(),
-      coverage: "WA FuelWatch RSS with current metro-first query support.",
-      blocker: hasWaProvider() ? "Regional WA expansion still needs request-volume guardrails." : "WA FuelWatch provider is disabled.",
+      coverage: "WA FuelWatch live prices statewide using request-budgeted RSS. Tomorrow locked prices are checked after 2:30pm AWST.",
+      blocker: hasWaProvider() ? "" : "WA FuelWatch provider is disabled.",
     }),
     capabilityEntry({
       region: "VIC",
@@ -791,10 +809,25 @@ function qldTimeMinutes(value) {
   return hour * 60 + minute;
 }
 
-async function loadLiveWaStations({ forceRefresh = false, points = [], radiusKm = 0 } = {}) {
+async function loadLiveWaStations({ forceRefresh = false, points = [], radiusKm = 0, fuels = [], now = new Date() } = {}) {
   if (!hasWaProvider()) throw new Error("WA FuelWatch provider is disabled");
-  const regionIds = waRegionIdsForArea(points, radiusKm);
-  const cacheKey = regionIds.join(",");
+  const plan = waFuelWatchRequestPlan({ points, radiusKm, fuels, now });
+  if (!plan.products.length) {
+    return {
+      stations: [],
+      cacheHit: true,
+      cacheAgeSeconds: 0,
+      error: "",
+      warning: `WA FuelWatch does not publish ${plan.requestedFuelCodes.join("/") || "the requested fuel"} in the current Fuel Path product map.`,
+      metadata: plan,
+    };
+  }
+
+  const cacheKey = [
+    plan.regionIds.join(","),
+    plan.products.map((item) => item.fuelCode).join(","),
+    plan.days.join(","),
+  ].join("|");
   const cached = waLiveCache.entries.get(cacheKey);
   const ageMs = Date.now() - Number(cached?.loadedAtMs || 0);
   const ttlMs = cacheSeconds() * 1000;
@@ -804,57 +837,167 @@ async function loadLiveWaStations({ forceRefresh = false, points = [], radiusKm 
       cacheHit: true,
       cacheAgeSeconds: Math.round(ageMs / 1000),
       error: "",
+      warning: cached.warning || "",
+      metadata: cached.metadata || plan,
     };
   }
 
-  const productPayloads = (
-    await Promise.all(
-      regionIds.flatMap((regionId) =>
-        WA_FUELWATCH_PRODUCTS.map(async ([fuelCode, product]) => ({
-          fuelCode,
-          regionId,
-          xml: await fetchWaFuelWatchRss(product, regionId),
-        })),
-      ),
-    )
-  ).filter((payload) => payload.xml);
+  const requests = plan.regionIds.flatMap((regionId) =>
+    plan.products.flatMap(({ fuelCode, product }) =>
+      plan.days.map((day) => ({
+        day,
+        fuelCode,
+        product,
+        regionId,
+      })),
+    ),
+  );
+  const productPayloads = (await mapWithConcurrency(requests, waFetchConcurrency(), (request) => fetchWaFuelWatchPayload(request, { forceRefresh }))).filter(
+    (payload) => payload.xml,
+  );
   const stations = normaliseWaFuelWatchPayloads(productPayloads).map(stationWithDiscountRules);
+  const cacheHits = productPayloads.filter((payload) => payload.cacheHit).length;
+  const warning = waFuelWatchPlanWarning(plan);
   waLiveCache.entries.set(cacheKey, {
     stations,
+    warning,
+    metadata: plan,
     loadedAtMs: Date.now(),
   });
   waLiveCache.lastError = "";
   return {
     stations,
-    cacheHit: false,
+    cacheHit: Boolean(productPayloads.length) && cacheHits === productPayloads.length,
     cacheAgeSeconds: 0,
     error: "",
+    warning,
+    metadata: plan,
   };
 }
 
 function waRegionIdsForArea(points = [], radiusKm = 0) {
-  const waPoints = samplePointsForProvider(points.filter(pointInWa), 28);
-  if (!waPoints.length) return WA_DEFAULT_METRO_REGION_IDS;
+  return waRegionPlanForArea(points, radiusKm).regionIds;
+}
 
-  const ids = new Set();
+function waFuelWatchRequestPlan({ points = [], radiusKm = 0, fuels = [], now = new Date() } = {}) {
+  const regionPlan = waRegionPlanForArea(points, radiusKm);
+  const products = waFuelWatchProductsForRequest(fuels);
+  const days = ["today"];
+  if (waTomorrowPriceAvailable(now) && process.env.FUEL_PATH_WA_FETCH_TOMORROW !== "0") days.push("tomorrow");
+  return {
+    ...regionPlan,
+    days,
+    products,
+    requestedFuelCodes: requestedFuelCodes(fuels),
+    requestCount: regionPlan.regionIds.length * products.length * days.length,
+    fetchConcurrency: waFetchConcurrency(),
+  };
+}
+
+function waRegionPlanForArea(points = [], radiusKm = 0) {
+  const waPoints = samplePointsForProvider(points.filter(pointInWa), 32);
+  const maxRegionIds = waMaxRegionIds();
+  if (!waPoints.length) {
+    return {
+      regionIds: [...WA_DEFAULT_METRO_REGION_IDS],
+      capped: false,
+      maxRegionIds,
+      sampledPointCount: 0,
+      matchedRegionCount: WA_DEFAULT_METRO_REGION_IDS.length,
+      defaultedToMetro: true,
+    };
+  }
+
+  const byId = new Map();
   const perth = { lat: -31.9523, lon: 115.8613 };
-  const searchKm = Math.max(35, Math.min(120, Number(radiusKm || 0) * 2));
-  for (const point of waPoints) {
+  const searchKm = Math.max(35, Math.min(160, Number(radiusKm || 0) * 2));
+  for (let pointIndex = 0; pointIndex < waPoints.length; pointIndex += 1) {
+    const point = waPoints[pointIndex];
     if (distanceKm(point, perth) <= 85) {
-      for (const id of WA_DEFAULT_METRO_REGION_IDS) ids.add(id);
+      for (const id of WA_DEFAULT_METRO_REGION_IDS) addWaRegionCandidate(byId, id, 0, pointIndex);
     }
     const ranked = WA_FUELWATCH_REGIONS.map((region) => ({
       region,
       distance: distanceKm(point, region),
     })).sort((left, right) => left.distance - right.distance);
 
-    if (ranked[0]) ids.add(ranked[0].region.id);
+    if (ranked[0]) addWaRegionCandidate(byId, ranked[0].region.id, ranked[0].distance, pointIndex);
     for (const item of ranked) {
-      if (item.distance <= searchKm) ids.add(item.region.id);
+      if (item.distance <= searchKm) addWaRegionCandidate(byId, item.region.id, item.distance, pointIndex);
     }
   }
 
-  return [...ids].sort((left, right) => left - right);
+  const rankedRegionIds = [...byId.values()]
+    .sort((left, right) => left.score - right.score || left.id - right.id)
+    .map((item) => item.id);
+  const regionIds = rankedRegionIds.slice(0, maxRegionIds).sort((left, right) => left - right);
+  return {
+    regionIds,
+    capped: rankedRegionIds.length > maxRegionIds,
+    maxRegionIds,
+    sampledPointCount: waPoints.length,
+    matchedRegionCount: rankedRegionIds.length,
+    defaultedToMetro: false,
+  };
+}
+
+function addWaRegionCandidate(byId, id, distance, pointIndex) {
+  const existing = byId.get(id);
+  const score = Number(distance) + pointIndex * 0.02;
+  if (!existing || score < existing.score) {
+    byId.set(id, { id, score });
+  }
+}
+
+function waFuelWatchProductsForRequest(fuels = []) {
+  const codes = requestedFuelCodes(fuels);
+  const usableCodes = codes.length ? codes : WA_FUELWATCH_PRODUCTS.map(([fuelCode]) => fuelCode);
+  const products = [];
+  const seen = new Set();
+  for (const fuelCode of usableCodes) {
+    const product = WA_FUELWATCH_PRODUCT_BY_CODE.get(fuelCode);
+    if (product === undefined || seen.has(fuelCode)) continue;
+    seen.add(fuelCode);
+    products.push({ fuelCode, product });
+  }
+  return products;
+}
+
+function requestedFuelCodes(fuels = []) {
+  return [...new Set((Array.isArray(fuels) ? fuels : [fuels]).map((fuel) => String(fuel || "").trim().toUpperCase()).filter(Boolean))];
+}
+
+function waTomorrowPriceAvailable(now = new Date()) {
+  const date = now instanceof Date ? now : new Date(now);
+  if (Number.isNaN(date.getTime())) return false;
+  const awstMinutes = date.getUTCHours() * 60 + date.getUTCMinutes() + 8 * 60;
+  const minutesToday = ((awstMinutes % 1440) + 1440) % 1440;
+  return minutesToday >= 14 * 60 + 30;
+}
+
+function waFuelWatchPlanWarning(plan) {
+  const warnings = [];
+  if (plan.capped) {
+    warnings.push(`WA FuelWatch request budget selected ${plan.regionIds.length} of ${plan.matchedRegionCount} matched regions.`);
+  }
+  if (!plan.days.includes("tomorrow")) {
+    warnings.push("WA tomorrow locked prices are checked after 2:30pm AWST.");
+  }
+  return warnings.join(" ");
+}
+
+async function mapWithConcurrency(items, limit, mapper) {
+  const results = new Array(items.length);
+  let cursor = 0;
+  const workers = Array.from({ length: Math.min(Math.max(1, limit), items.length) }, async () => {
+    while (cursor < items.length) {
+      const index = cursor;
+      cursor += 1;
+      results[index] = await mapper(items[index], index);
+    }
+  });
+  await Promise.all(workers);
+  return results;
 }
 
 function samplePointsForProvider(points, limit) {
@@ -871,11 +1014,42 @@ function samplePointsForProvider(points, limit) {
   return sampled;
 }
 
-async function fetchWaFuelWatchRss(product, regionId) {
+async function fetchWaFuelWatchPayload({ product, regionId, fuelCode, day = "today" }, { forceRefresh = false } = {}) {
+  const cacheKey = `${regionId || "all"}:${product}:${day}`;
+  const cached = waLiveCache.payloads.get(cacheKey);
+  const ageMs = Date.now() - Number(cached?.loadedAtMs || 0);
+  if (!forceRefresh && cached?.xml && ageMs < cacheSeconds() * 1000) {
+    return {
+      day,
+      fuelCode,
+      product,
+      regionId,
+      xml: cached.xml,
+      cacheHit: true,
+    };
+  }
+
+  const xml = await fetchWaFuelWatchRss(product, regionId, day);
+  waLiveCache.payloads.set(cacheKey, {
+    xml,
+    loadedAtMs: Date.now(),
+  });
+  return {
+    day,
+    fuelCode,
+    product,
+    regionId,
+    xml,
+    cacheHit: false,
+  };
+}
+
+async function fetchWaFuelWatchRss(product, regionId, day = "today") {
   const baseUrl = process.env.WA_FUELWATCH_RSS_URL || DEFAULT_WA_FUELWATCH_RSS_URL;
   const url = new URL(baseUrl);
   url.searchParams.set("Product", String(product));
   if (regionId) url.searchParams.set("Region", String(regionId));
+  url.searchParams.set("Day", day === "tomorrow" ? "tomorrow" : "today");
   try {
     return await fetchText(url.toString(), { timeoutMs: 30000 });
   } catch (error) {
@@ -912,12 +1086,13 @@ async function fetchText(url, { headers = {}, timeoutMs = 12000 } = {}) {
 
 function normaliseWaFuelWatchPayloads(productPayloads) {
   const stations = new Map();
-  for (const { fuelCode, xml } of productPayloads) {
+  for (const { fuelCode, xml, day = "today" } of productPayloads) {
     for (const item of waFuelWatchItems(xml)) {
       const lat = Number(item.latitude);
       const lon = Number(item.longitude);
       if (!Number.isFinite(lat) || !Number.isFinite(lon) || (!lat && !lon)) continue;
       const stationCode = waStationCode(item);
+      const updatedAt = normaliseWaDate(item.date);
       const existing =
         stations.get(stationCode) ||
         {
@@ -931,15 +1106,26 @@ function normaliseWaFuelWatchPayloads(productPayloads) {
           lon,
           openNow: waOpenNow(item["site-features"]),
           membershipRequired: waMembershipRequired(item.restrictions),
-          updatedAt: normaliseWaDate(item.date),
+          updatedAt: day === "today" ? updatedAt : undefined,
           source: "api_wa_fuelwatch",
           prices: {},
+          futurePrices: {},
           discounts: [],
         };
       const price = Number(item.price);
-      if (fuelCode && Number.isFinite(price)) existing.prices[fuelCode] = price;
-      const updatedAt = normaliseWaDate(item.date);
-      if (updatedAt && (!existing.updatedAt || updatedAt > String(existing.updatedAt))) {
+      if (fuelCode && Number.isFinite(price) && day === "today") existing.prices[fuelCode] = price;
+      if (fuelCode && Number.isFinite(price) && day === "tomorrow") {
+        existing.futurePrices.tomorrow = existing.futurePrices.tomorrow || {
+          effectiveFrom: updatedAt,
+          prices: {},
+          label: "WA locked tomorrow price",
+        };
+        existing.futurePrices.tomorrow.prices[fuelCode] = price;
+        if (updatedAt && (!existing.futurePrices.tomorrow.effectiveFrom || updatedAt > existing.futurePrices.tomorrow.effectiveFrom)) {
+          existing.futurePrices.tomorrow.effectiveFrom = updatedAt;
+        }
+      }
+      if (day === "today" && updatedAt && (!existing.updatedAt || updatedAt > String(existing.updatedAt))) {
         existing.updatedAt = updatedAt;
       }
       stations.set(stationCode, existing);
@@ -1316,7 +1502,7 @@ function capabilityWarning(capabilities = []) {
   return "";
 }
 
-async function loadLiveStationsForArea({ forceRefresh = false, points = [], radiusKm = 0, providers: requestedProviders } = {}) {
+async function loadLiveStationsForArea({ forceRefresh = false, points = [], radiusKm = 0, providers: requestedProviders, fuels = [] } = {}) {
   const providers = requestedProviders || liveProviderKeysForArea(points, radiusKm);
   const regionCapabilities = capabilitiesForPoints(points);
   if (!providers.length) {
@@ -1334,6 +1520,7 @@ async function loadLiveStationsForArea({ forceRefresh = false, points = [], radi
   const stations = [];
   const loadedProviders = [];
   const errors = [];
+  const warnings = [];
   for (const provider of providers) {
     try {
       if (provider === "qld") {
@@ -1341,9 +1528,10 @@ async function loadLiveStationsForArea({ forceRefresh = false, points = [], radi
         stations.push(...live.stations);
         loadedProviders.push("api_qld");
       } else if (provider === "wa") {
-        const live = await loadLiveWaStations({ forceRefresh, points, radiusKm });
+        const live = await loadLiveWaStations({ forceRefresh, points, radiusKm, fuels });
         stations.push(...live.stations);
         loadedProviders.push("api_wa");
+        if (live.warning) warnings.push(live.warning);
       } else if (provider === "vic") {
         const live = await loadLiveVicStations({ forceRefresh });
         stations.push(...live.stations);
@@ -1357,7 +1545,7 @@ async function loadLiveStationsForArea({ forceRefresh = false, points = [], radi
       errors.push(`${provider}: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
-  if (!stations.length) throw new Error(errors.join("; ") || "No live fuel providers are configured");
+  if (!stations.length && !loadedProviders.length) throw new Error(errors.join("; ") || "No live fuel providers are configured");
   const byCode = new Map();
   for (const station of stations) byCode.set(String(station.stationCode), station);
   return {
@@ -1368,11 +1556,11 @@ async function loadLiveStationsForArea({ forceRefresh = false, points = [], radi
     regionCapabilities,
     cacheHit: false,
     cacheAgeSeconds: 0,
-    warning: errors.length ? `Some live fuel providers unavailable: ${errors.join("; ")}` : "",
+    warning: [...warnings, ...(errors.length ? [`Some live fuel providers unavailable: ${errors.join("; ")}`] : [])].join(" "),
   };
 }
 
-async function loadStationData({ requestedSource = "auto", forceRefresh = false, points = [], radiusKm = 0 } = {}) {
+async function loadStationData({ requestedSource = "auto", forceRefresh = false, points = [], radiusKm = 0, fuels = [] } = {}) {
   const source = resolveSource(requestedSource);
   if (source === "sample") {
     const regionCapabilities = capabilitiesForPoints(points);
@@ -1408,6 +1596,7 @@ async function loadStationData({ requestedSource = "auto", forceRefresh = false,
       forceRefresh,
       points,
       radiusKm,
+      fuels,
       providers: requestedProvider ? [requestedProvider] : undefined,
     });
   } catch (error) {
@@ -1462,6 +1651,7 @@ function stationPayload(station, { fuel, distanceKm, routeDistance } = {}) {
     updatedAt: station.updatedAt,
     source: station.source,
     prices,
+    futurePrices: station.futurePrices || undefined,
     discounts: station.discounts || [],
   };
   if (fuel && prices[fuel] !== undefined) payload.pumpCpl = round(Number(prices[fuel]), 1);
@@ -2191,9 +2381,11 @@ module.exports = {
   hasVicCredentials,
   hasWaProvider,
   loadStationData,
+  loadLiveWaStations,
   liveProviderKeysForArea,
   methodAllowed,
   normaliseQldPayload,
+  normaliseWaFuelWatchPayloads,
   numberParam,
   pointInAct,
   pointFromQuery,
@@ -2209,4 +2401,7 @@ module.exports = {
   setParam,
   stationPayload,
   stringParam,
+  waFuelWatchRequestPlan,
+  waRegionPlanForArea,
+  waTomorrowPriceAvailable,
 };

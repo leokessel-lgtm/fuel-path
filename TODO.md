@@ -64,7 +64,7 @@
 - [ ] Implement Google Places Autocomplete (New) backend adapter after billing/API-key controls are approved.
 - [x] Add QLD provider adapter after fuel ID and region mapping are confirmed.
 - [x] Add first WA FuelWatch provider adapter for Perth/metro live Nearby and route scoring.
-- [ ] Expand WA FuelWatch provider beyond metro queries without excessive provider requests.
+- [x] Expand WA FuelWatch provider to full live statewide v2 with request-budgeted region planning, per-region/product/day caching and tomorrow-price checks.
 - [ ] Apply for VIC Servo Saver Public API access and implement adapter after approved schema is available.
 - [ ] Confirm SA fuel data/API access path and implement adapter after approved schema is available.
 - [ ] Confirm TAS fuel data/API access path and implement adapter after approved schema is available.

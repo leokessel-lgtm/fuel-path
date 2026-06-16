@@ -18,12 +18,13 @@ module.exports = async function handler(req, res) {
     const query = req.query || {};
     const source = req.method === "POST" ? body.source || "auto" : stringParam(query.source, "auto");
     const route = req.method === "POST" ? routeFromPayload(body.route || {}) : routeFromPayloadFromQuery(query);
+    const fuel = String(req.method === "POST" ? body.fuel || "U91" : stringParam(query.fuel, "U91")).toUpperCase();
     const data = await loadStationData({
       requestedSource: source,
       forceRefresh: req.method === "POST" ? Boolean(body.forceRefresh) : boolParam(query.forceRefresh),
       points: route.points || [],
+      fuels: [fuel],
     });
-    const fuel = String(req.method === "POST" ? body.fuel || "U91" : stringParam(query.fuel, "U91")).toUpperCase();
     const includeMemberPrices = req.method === "POST" ? Boolean(body.includeMemberPrices) : boolParam(query.includeMemberPrices);
     const includeClosed = req.method === "POST" ? Boolean(body.includeClosed) : boolParam(query.includeClosed);
     const eligibleDiscounts =

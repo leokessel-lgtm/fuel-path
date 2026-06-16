@@ -1,8 +1,8 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 
-const { liveProviderKeysForArea, loadStationData, pointInAct, pointInVic } = require("./_backend");
-const stationsHandler = require("./stations");
+const { liveProviderKeysForArea, loadStationData, pointInAct, pointInVic } = require("../../api/_backend");
+const stationsHandler = require("../../api/stations");
 
 test("ACT coordinates are treated as NSW provider coverage", () => {
   const canberra = { lat: -35.2809, lon: 149.13 };

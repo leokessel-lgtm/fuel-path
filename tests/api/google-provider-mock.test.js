@@ -1,7 +1,7 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 
-const { buildRoute, geocode, geocodeProviderStatus, routeProviderStatus } = require("./_backend");
+const { buildRoute, geocode, geocodeProviderStatus, routeProviderStatus } = require("../../api/_backend");
 
 const GOOGLE_ENV_KEYS = [
   "FUEL_PATH_GOOGLE_MAPS_API_KEY",

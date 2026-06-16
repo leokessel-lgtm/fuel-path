@@ -4,7 +4,7 @@ const path = require("node:path");
 const test = require("node:test");
 
 test("Vercel production config includes baseline browser security headers", () => {
-  const config = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "vercel.json"), "utf8"));
+  const config = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "..", "vercel.json"), "utf8"));
   const globalHeaderRule = config.headers.find((rule) => rule.source === "/(.*)");
   assert.ok(globalHeaderRule, "global header rule is required");
 

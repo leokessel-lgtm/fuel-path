@@ -1,7 +1,7 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 
-const { normaliseQldPayload } = require("./_backend");
+const { normaliseQldPayload } = require("../../api/_backend");
 
 const brandPayload = {
   Brands: [
@@ -101,4 +101,3 @@ test("QLD normalisation keeps genuine level-one locality regions", () => {
   assert.equal(station.prices.U91, 171.9);
 }
 );
-

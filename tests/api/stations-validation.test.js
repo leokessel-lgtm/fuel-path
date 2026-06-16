@@ -1,7 +1,7 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 
-const stationsHandler = require("./stations");
+const stationsHandler = require("../../api/stations");
 
 test("stations rejects missing and invalid coordinates", async () => {
   const cases = [

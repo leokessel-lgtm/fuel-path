@@ -3,6 +3,7 @@ const test = require("node:test");
 
 const predictionsHandler = require("../../api/predictions");
 const statusHandler = require("../../api/status");
+const { setPredictionStorageForTests } = require("../../api/_backend");
 
 test("prediction status exposes measurement foundation without enabling claims", async () => {
   const response = await callStatus();
@@ -12,6 +13,8 @@ test("prediction status exposes measurement foundation without enabling claims",
   assert.equal(response.payload.predictions.userFacingPredictionEnabled, false);
   assert.equal(response.payload.predictions.accuracyClaimsAllowed, false);
   assert.equal(response.payload.predictions.storage.durable, false);
+  assert.equal(response.payload.predictions.storage.health, "ok");
+  assert.equal(response.payload.predictions.writeSecurity.tokenRequired, false);
 });
 
 test("prediction signal returns no-cycle-signal for unsupported and sparse cases", async () => {
@@ -96,6 +99,92 @@ test("prediction back-test records produce measurement summary", async () => {
   assert.equal(list.payload.summary.accuracyClaimsAllowed, false);
 });
 
+test("prediction storage can run against a durable adapter contract", async () => {
+  const original = process.env.PREDICTION_BACKTEST_WRITE_TOKEN;
+  process.env.PREDICTION_BACKTEST_WRITE_TOKEN = "durable-token";
+  const records = [];
+  setPredictionStorageForTests({
+    status({ maxRecords }) {
+      return {
+        mode: "postgres_neon",
+        configured: true,
+        durable: true,
+        maxRecords,
+        recordCount: records.length,
+        table: "fuel_path_prediction_backtests",
+      };
+    },
+    async append(record) {
+      records.push(record);
+      return record;
+    },
+    async list({ region = "", fuel = "", limit = 50 } = {}) {
+      return records
+        .filter((record) => (!region || record.region === region) && (!fuel || record.fuel === fuel))
+        .slice(-limit)
+        .reverse();
+    },
+  });
+
+  try {
+    const created = await postPredictions({
+      region: "QLD",
+      fuel: "P95",
+      predictionDate: "2026-06-17",
+      targetDate: "2026-06-18",
+      modelVersion: "durable-contract-test",
+      predictedCpl: 181,
+      actualCpl: 179,
+    }, { authorization: "Bearer durable-token" });
+    const listed = await callPredictions({ mode: "backtests", region: "QLD", fuel: "P95" });
+    const status = await callStatus();
+
+    assert.equal(created.status, 202);
+    assert.equal(created.payload.storage.mode, "postgres_neon");
+    assert.equal(created.payload.storage.durable, true);
+    assert.equal(listed.payload.records.length, 1);
+    assert.equal(listed.payload.summary.meanAbsoluteErrorCpl, 2);
+    assert.equal(status.payload.predictions.storage.mode, "postgres_neon");
+    assert.equal(status.payload.predictions.storage.durable, true);
+    assert.equal(status.payload.predictions.writeSecurity.tokenRequired, true);
+    assert.equal(status.payload.predictions.writeSecurity.writeEnabled, true);
+    assert.equal(status.payload.predictions.accuracyClaimsAllowed, false);
+  } finally {
+    setPredictionStorageForTests(null);
+    if (original === undefined) delete process.env.PREDICTION_BACKTEST_WRITE_TOKEN;
+    else process.env.PREDICTION_BACKTEST_WRITE_TOKEN = original;
+  }
+});
+
+test("prediction back-test writes require a configured token", async () => {
+  const original = process.env.PREDICTION_BACKTEST_WRITE_TOKEN;
+  process.env.PREDICTION_BACKTEST_WRITE_TOKEN = "secret-token";
+
+  try {
+    const rejected = await postPredictions({
+      region: "WA",
+      fuel: "U91",
+      targetDate: "2026-06-18",
+    });
+    const accepted = await postPredictions(
+      {
+        region: "WA",
+        fuel: "U91",
+        targetDate: "2026-06-19",
+      },
+      { authorization: "Bearer secret-token" },
+    );
+
+    assert.equal(rejected.status, 401);
+    assert.match(rejected.payload.error, /valid token/);
+    assert.equal(rejected.payload.predictions.writeSecurity.tokenRequired, true);
+    assert.equal(accepted.status, 202);
+  } finally {
+    if (original === undefined) delete process.env.PREDICTION_BACKTEST_WRITE_TOKEN;
+    else process.env.PREDICTION_BACKTEST_WRITE_TOKEN = original;
+  }
+});
+
 test("prediction back-test rejects unsupported payloads", async () => {
   const response = await postPredictions({
     region: "WA",
@@ -112,8 +201,8 @@ function callPredictions(query) {
   return callHandler(predictionsHandler, { method: "GET", query });
 }
 
-function postPredictions(body) {
-  return callHandler(predictionsHandler, { method: "POST", query: {}, body });
+function postPredictions(body, headers = {}) {
+  return callHandler(predictionsHandler, { method: "POST", query: {}, body, headers });
 }
 
 function callStatus() {
@@ -121,7 +210,7 @@ function callStatus() {
 }
 
 function callHandler(handler, req) {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const res = {
       statusCode: 200,
       status(code) {
@@ -133,6 +222,6 @@ function callHandler(handler, req) {
       },
     };
 
-    handler(req, res);
+    Promise.resolve(handler(req, res)).catch(reject);
   });
 }

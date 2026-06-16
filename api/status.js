@@ -15,7 +15,7 @@ const {
   sendJson,
 } = require("./_backend");
 
-module.exports = function handler(req, res) {
+module.exports = async function handler(req, res) {
   if (!methodAllowed(req, res)) return;
   const providerCapabilities = fuelProviderCapabilityMatrix();
   sendJson(res, 200, {
@@ -43,6 +43,6 @@ module.exports = function handler(req, res) {
     geocoding: geocodeProviderStatus(),
     routing: routeProviderStatus(),
     alerts: alertsStatus(),
-    predictions: predictionStatus(),
+    predictions: await predictionStatus(),
   });
 };

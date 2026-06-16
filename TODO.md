@@ -73,7 +73,8 @@
 - [x] Design backend push scheduler for price-triggered saved-route alerts.
 - [ ] Implement backend push scheduler for price-triggered saved-route alerts after native notification validation.
 - [x] Add prediction back-testing API contract with metric summary and accuracy-claim gates.
-- [ ] Move prediction back-testing records from ephemeral memory to durable storage before any prominent user-facing prediction claim.
+- [x] Add durable prediction storage adapter for Neon/Postgres with safe memory fallback.
+- [ ] Provision production Neon/Postgres and set `DATABASE_URL` plus `PREDICTION_BACKTEST_WRITE_TOKEN`.
 - [x] Add backend no-cycle-signal states for unsupported fuels, regions and sparse histories.
 - [ ] Add break-it test evidence to every new backlog item before marking it done.
 - [ ] Prepare Apple/Android store readiness plan, including privacy disclosures and API usage constraints.

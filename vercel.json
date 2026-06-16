@@ -1,6 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "installCommand": "cd mobile-app && npm ci --cache .npm-cache",
+  "installCommand": "npm ci --cache .npm-cache && cd mobile-app && npm ci --cache ../.npm-cache",
   "buildCommand": "sh scripts/build-vercel-static.sh",
   "outputDirectory": "public",
   "cleanUrls": true,

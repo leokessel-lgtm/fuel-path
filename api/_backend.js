@@ -1,4 +1,10 @@
 const sample = require("./_sample");
+const {
+  appendPredictionBacktestRecord,
+  listPredictionBacktestRecords,
+  predictionStorageStatus,
+  setPredictionStorageForTests,
+} = require("./_predictionStorage");
 
 const DEFAULT_CACHE_SECONDS = 300;
 const DEFAULT_TOKEN_URL = "https://api.onegov.nsw.gov.au/oauth/client_credential/accesstoken";
@@ -184,10 +190,6 @@ const waLiveCache = {
 const tokenCache = {
   accessToken: "",
   loadedAtMs: 0,
-};
-
-const predictionBacktestStore = {
-  records: [],
 };
 
 const DISCOUNT_RULES = [
@@ -2369,18 +2371,24 @@ function alertsStatus() {
   };
 }
 
-function predictionStatus() {
-  const records = predictionBacktestStore.records;
+async function predictionStatus() {
+  const storage = predictionStorageStatus({ maxRecords: PREDICTION_BACKTEST_MAX_RECORDS });
+  let records = [];
+  let storageError = "";
+  try {
+    records = await listPredictionBacktestRecords({ limit: PREDICTION_BACKTEST_MAX_RECORDS });
+  } catch (error) {
+    storageError = error instanceof Error ? error.message : "Prediction storage is unavailable";
+  }
   return {
     mode: "measurement_foundation",
     storage: {
-      mode: "memory_ephemeral",
-      configured: true,
-      durable: false,
-      maxRecords: PREDICTION_BACKTEST_MAX_RECORDS,
-      recordCount: records.length,
-      nextBuildStep: "Move prediction back-test records to durable storage before enabling any user-facing accuracy claim.",
+      ...storage,
+      recordCount: storageError ? storage.recordCount : records.length,
+      health: storageError ? "error" : "ok",
+      lastError: storageError,
     },
+    writeSecurity: predictionWriteSecurity(),
     userFacingPredictionEnabled: false,
     accuracyClaimsAllowed: false,
     supportedSignalLabels: ["no_cycle_signal", "backtest_required"],
@@ -2435,17 +2443,15 @@ function noCycleSignal({ region, fuel, reason }) {
   };
 }
 
-function recordPredictionBacktest(input = {}) {
+async function recordPredictionBacktest(input = {}) {
   const record = normalisePredictionBacktestRecord(input);
-  predictionBacktestStore.records.push(record);
-  if (predictionBacktestStore.records.length > PREDICTION_BACKTEST_MAX_RECORDS) {
-    predictionBacktestStore.records.splice(0, predictionBacktestStore.records.length - PREDICTION_BACKTEST_MAX_RECORDS);
-  }
+  await appendPredictionBacktestRecord(record, { maxRecords: PREDICTION_BACKTEST_MAX_RECORDS });
+  const records = await listPredictionBacktestRecords({ limit: PREDICTION_BACKTEST_MAX_RECORDS });
   return {
     accepted: true,
     record,
-    summary: predictionBacktestSummary(predictionBacktestStore.records),
-    storage: predictionStatus().storage,
+    summary: predictionBacktestSummary(records),
+    storage: (await predictionStatus()).storage,
   };
 }
 
@@ -2482,7 +2488,7 @@ function normalisePredictionBacktestRecord(input) {
   };
 }
 
-function predictionBacktestSummary(records = predictionBacktestStore.records) {
+function predictionBacktestSummary(records = []) {
   const completed = records.filter((record) => Number.isFinite(record.absoluteErrorCpl));
   const mae =
     completed.length > 0
@@ -2509,19 +2515,40 @@ function predictionBacktestSummary(records = predictionBacktestStore.records) {
   };
 }
 
-function listPredictionBacktests({ region = "", fuel = "", limit = 50 } = {}) {
+async function listPredictionBacktests({ region = "", fuel = "", limit = 50 } = {}) {
   const safeRegion = String(region || "").trim().toUpperCase();
   const safeFuel = String(fuel || "").trim().toUpperCase();
   const safeLimit = Math.max(1, Math.min(100, Number(limit || 50)));
-  const records = predictionBacktestStore.records
-    .filter((record) => (!safeRegion || record.region === safeRegion) && (!safeFuel || record.fuel === safeFuel))
-    .slice(-safeLimit)
-    .reverse();
+  const records = await listPredictionBacktestRecords({ region: safeRegion, fuel: safeFuel, limit: safeLimit });
   return {
     records,
     summary: predictionBacktestSummary(records),
-    storage: predictionStatus().storage,
+    storage: (await predictionStatus()).storage,
   };
+}
+
+function predictionWriteSecurity() {
+  const tokenConfigured = Boolean(process.env.PREDICTION_BACKTEST_WRITE_TOKEN);
+  const storage = predictionStorageStatus({ maxRecords: PREDICTION_BACKTEST_MAX_RECORDS });
+  const tokenRequired = tokenConfigured || Boolean(storage.durable);
+  return {
+    tokenConfigured,
+    tokenRequired,
+    writeEnabled: !tokenRequired || tokenConfigured,
+    acceptedHeaders: ["Authorization: Bearer <token>", "X-Fuel-Path-Prediction-Token"],
+  };
+}
+
+function predictionWriteAuthorised(req = {}) {
+  const security = predictionWriteSecurity();
+  if (!security.tokenRequired) return true;
+  if (!security.tokenConfigured) return false;
+  const expected = process.env.PREDICTION_BACKTEST_WRITE_TOKEN;
+  const headers = req.headers || {};
+  const auth = headers.authorization || headers.Authorization || "";
+  const direct = headers["x-fuel-path-prediction-token"] || headers["X-Fuel-Path-Prediction-Token"] || "";
+  const bearer = String(auth).replace(/^Bearer\s+/i, "").trim();
+  return bearer === expected || String(direct).trim() === expected;
 }
 
 function normaliseDateOnly(value) {
@@ -2574,12 +2601,15 @@ module.exports = {
   pointInVic,
   predictionSignal,
   predictionStatus,
+  predictionWriteAuthorised,
+  predictionWriteSecurity,
   recordPredictionBacktest,
   routeContextStations,
   routeFromPayload,
   routeProviderStatus,
   scoreRoute,
   sendJson,
+  setPredictionStorageForTests,
   setParam,
   stationPayload,
   stringParam,

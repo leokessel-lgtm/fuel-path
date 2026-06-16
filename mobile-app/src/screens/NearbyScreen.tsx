@@ -583,7 +583,7 @@ export function NearbyScreen({
                     onPress={() => handleNavigateToStation(selected)}
                     style={styles.navigateButton}
                   >
-                    <Text style={styles.navigateButtonText}>Navigate</Text>
+                    <Text style={styles.navigateButtonIcon}>↗</Text>
                   </Pressable>
                 </View>
               </View>
@@ -1071,14 +1071,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: colors.green,
     borderRadius: radii.pill,
-    minHeight: 38,
+    height: 38,
     justifyContent: "center",
-    paddingHorizontal: spacing.lg,
+    width: 38,
   },
-  navigateButtonText: {
+  navigateButtonIcon: {
     color: colors.white,
-    fontSize: typeScale.caption,
+    fontSize: 20,
     fontWeight: "900",
+    lineHeight: 22,
   },
   list: {
     flex: 1,

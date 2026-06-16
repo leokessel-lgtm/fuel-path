@@ -2,6 +2,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { colors, radii, spacing, typeScale } from "../theme";
 import { StationViewModel } from "../types";
+import { tomorrowPriceView } from "../utils/pricing";
 import { BrandBadge } from "./BrandBadge";
 
 export function StationRow({
@@ -13,6 +14,7 @@ export function StationRow({
   selected: boolean;
   onPress: () => void;
 }) {
+  const tomorrow = tomorrowPriceView(item);
   return (
     <Pressable onPress={onPress} style={[styles.row, selected && styles.selected]}>
       <BrandBadge station={item.station} size={34} />
@@ -32,6 +34,18 @@ export function StationRow({
       <View style={styles.price}>
         <Text style={styles.priceValue}>{item.adjustedCpl.toFixed(1)}</Text>
         <Text style={styles.priceUnit}>c/L</Text>
+        {tomorrow ? (
+          <Text
+            numberOfLines={1}
+            style={[
+              styles.tomorrowPrice,
+              tomorrow.direction === "down" && styles.tomorrowPriceDown,
+              tomorrow.direction === "up" && styles.tomorrowPriceUp,
+            ]}
+          >
+            {tomorrow.shortLabel}
+          </Text>
+        ) : null}
       </View>
     </Pressable>
   );
@@ -75,6 +89,7 @@ const styles = StyleSheet.create({
   },
   price: {
     alignItems: "flex-end",
+    minWidth: 74,
   },
   priceValue: {
     color: colors.greenDark,
@@ -85,5 +100,18 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontSize: 10,
     fontWeight: "900",
+  },
+  tomorrowPrice: {
+    color: colors.muted,
+    fontSize: 10,
+    fontWeight: "900",
+    marginTop: 2,
+    maxWidth: 92,
+  },
+  tomorrowPriceDown: {
+    color: colors.greenDark,
+  },
+  tomorrowPriceUp: {
+    color: colors.amber,
   },
 });

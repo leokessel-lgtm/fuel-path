@@ -24,7 +24,7 @@ import {
   ScoreResponse,
   StationViewModel,
 } from "../types";
-import { formatUpdatedAt, stationPriceView } from "../utils/pricing";
+import { formatUpdatedAt, stationPriceView, tomorrowPriceView } from "../utils/pricing";
 
 type PlanScreenProps = {
   preferences: AppPreferences;
@@ -288,6 +288,8 @@ export function PlanScreen({
   );
   const best = candidates[0];
   const selected = mapStations.find((item) => item.station.stationCode === selectedCode) || best;
+  const bestTomorrow = best ? tomorrowPriceView(best) : null;
+  const selectedTomorrow = selected ? tomorrowPriceView(selected) : null;
   const routeNotice = result ? routeContextNotice(result.context) : "";
   const currentRouteSaved = Boolean(
     routeEndpoints &&
@@ -488,6 +490,21 @@ export function PlanScreen({
                 <Text style={styles.factLabel}>Detour</Text>
                 <Text style={styles.factValue}>{(selected.detourMinutes || 0).toFixed(1)} min</Text>
               </View>
+              {selectedTomorrow ? (
+                <View style={styles.factPill}>
+                  <Text style={styles.factLabel}>Tomorrow</Text>
+                  <Text
+                    numberOfLines={1}
+                    style={[
+                      styles.factValue,
+                      selectedTomorrow.direction === "down" && styles.tomorrowPriceDown,
+                      selectedTomorrow.direction === "up" && styles.tomorrowPriceUp,
+                    ]}
+                  >
+                    {selectedTomorrow.cpl.toFixed(1)} c/L
+                  </Text>
+                </View>
+              ) : null}
             </View>
             <Text style={styles.muted}>
               Updated {formatUpdatedAt(selected.station.updatedAt)}
@@ -532,6 +549,18 @@ export function PlanScreen({
                 <View style={styles.recommendationPrice}>
                   <Text style={styles.priceValue}>{best.adjustedCpl.toFixed(1)}</Text>
                   <Text style={styles.priceUnit}>c/L</Text>
+                  {bestTomorrow ? (
+                    <Text
+                      numberOfLines={1}
+                      style={[
+                        styles.recommendationTomorrowPrice,
+                        bestTomorrow.direction === "down" && styles.tomorrowPriceDown,
+                        bestTomorrow.direction === "up" && styles.tomorrowPriceUp,
+                      ]}
+                    >
+                      {bestTomorrow.shortLabel}
+                    </Text>
+                  ) : null}
                 </View>
               </Pressable>
             </>
@@ -638,6 +667,7 @@ function routeCandidateToStation(candidate: ScoreCandidate, index: number): Stat
     discountCpl: Number(candidate.discountCpl || 0),
     discountLabel: candidate.discountLabel || candidate.discountLabels?.join(", "),
     distanceKm: Number(candidate.distanceToRouteKm || candidate.distanceKm || 0),
+    fuel: candidate.fuel,
     netSaving: Number(candidate.netSaving || 0),
     detourMinutes: Number(candidate.detourMinutes || 0),
     rank: index + 1,
@@ -1030,6 +1060,7 @@ const styles = StyleSheet.create({
   },
   recommendationPrice: {
     alignItems: "flex-end",
+    minWidth: 78,
   },
   sheetHeaderRow: {
     alignItems: "center",
@@ -1118,5 +1149,18 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontSize: 10,
     fontWeight: "900",
+  },
+  recommendationTomorrowPrice: {
+    color: colors.muted,
+    fontSize: 10,
+    fontWeight: "900",
+    marginTop: 2,
+    maxWidth: 96,
+  },
+  tomorrowPriceDown: {
+    color: colors.greenDark,
+  },
+  tomorrowPriceUp: {
+    color: colors.amber,
   },
 });

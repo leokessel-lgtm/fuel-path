@@ -29,6 +29,40 @@ export function stationPriceView(
     discountCpl,
     discountLabel,
     distanceKm: Number(station.distanceKm || 0),
+    fuel,
+  };
+}
+
+export type TomorrowPriceView = {
+  fuel: string;
+  cpl: number;
+  deltaCpl: number;
+  direction: "up" | "down" | "flat";
+  effectiveFrom?: string;
+  shortLabel: string;
+  detailLabel: string;
+};
+
+export function tomorrowPriceView(item: StationViewModel): TomorrowPriceView | null {
+  const fuel = item.fuel || inferFuelForPumpPrice(item.station, item.pumpCpl);
+  if (!fuel) return null;
+  const cpl = Number(item.station.futurePrices?.tomorrow?.prices?.[fuel]);
+  if (!Number.isFinite(cpl)) return null;
+  const deltaCpl = cpl - Number(item.pumpCpl);
+  const roundedDelta = Math.round(deltaCpl * 10) / 10;
+  const direction = Math.abs(roundedDelta) < 0.05 ? "flat" : roundedDelta > 0 ? "up" : "down";
+  const deltaLabel =
+    direction === "flat"
+      ? "same"
+      : `${roundedDelta > 0 ? "+" : ""}${roundedDelta.toFixed(1)} c/L`;
+  return {
+    fuel,
+    cpl,
+    deltaCpl: roundedDelta,
+    direction,
+    effectiveFrom: item.station.futurePrices?.tomorrow?.effectiveFrom,
+    shortLabel: `Tomorrow ${cpl.toFixed(1)}`,
+    detailLabel: `Tomorrow locked ${cpl.toFixed(1)} c/L (${deltaLabel})`,
   };
 }
 
@@ -49,6 +83,13 @@ export function sortStations(
 
 function stationValueScore(station: StationViewModel) {
   return station.adjustedCpl + station.distanceKm * VALUE_DISTANCE_PENALTY_CPL_PER_KM;
+}
+
+function inferFuelForPumpPrice(station: Station, pumpCpl?: number) {
+  const target = Number(pumpCpl);
+  if (!Number.isFinite(target)) return "";
+  const match = Object.entries(station.prices || {}).find(([, value]) => Math.abs(Number(value) - target) < 0.05);
+  return match?.[0] || "";
 }
 
 export function formatUpdatedAt(value?: string) {

@@ -18,7 +18,7 @@ import { StationRow } from "../components/StationRow";
 import { getCurrentMapPoint, getGrantedCurrentMapPoint } from "../services/currentLocation";
 import { colors, radii, shadow, spacing, typeScale } from "../theme";
 import { AppPreferences, FuelCode, MapPoint, StationViewModel } from "../types";
-import { formatRelativeUpdatedAt, sortStations, stationPriceView } from "../utils/pricing";
+import { formatRelativeUpdatedAt, sortStations, stationPriceView, tomorrowPriceView } from "../utils/pricing";
 
 const defaultNearbyCentre: MapPoint = {
   lat: -34.0114122,
@@ -301,6 +301,7 @@ export function NearbyScreen({
     [listSourceStations, sortMode],
   );
   const selected = stations.find((item) => item.station.stationCode === selectedCode);
+  const selectedTomorrow = selected ? tomorrowPriceView(selected) : null;
   const selectedMetaLine = selected
     ? [
         selected.station.phone || selected.station.brand,
@@ -592,6 +593,18 @@ export function NearbyScreen({
                       {selected.adjustedCpl.toFixed(1)}
                       <Text style={styles.priceUnitInline}> c/L</Text>
                     </Text>
+                    {selectedTomorrow ? (
+                      <Text
+                        numberOfLines={1}
+                        style={[
+                          styles.selectedTomorrowPrice,
+                          selectedTomorrow.direction === "down" && styles.tomorrowPriceDown,
+                          selectedTomorrow.direction === "up" && styles.tomorrowPriceUp,
+                        ]}
+                      >
+                        {selectedTomorrow.detailLabel}
+                      </Text>
+                    ) : null}
                   </View>
                   <View style={styles.distanceBadge}>
                     <Text style={styles.distanceBadgeText}>
@@ -1107,6 +1120,18 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontSize: typeScale.caption,
     fontWeight: "900",
+  },
+  selectedTomorrowPrice: {
+    color: colors.muted,
+    fontSize: typeScale.caption,
+    fontWeight: "900",
+    marginTop: 2,
+  },
+  tomorrowPriceDown: {
+    color: colors.greenDark,
+  },
+  tomorrowPriceUp: {
+    color: colors.amber,
   },
   distanceBadge: {
     alignItems: "center",

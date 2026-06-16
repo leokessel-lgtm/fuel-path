@@ -53,6 +53,12 @@ export type StationDiscount = {
   inferred?: boolean;
 };
 
+export type FuturePriceWindow = {
+  effectiveFrom?: string;
+  prices: Record<string, number>;
+  label?: string;
+};
+
 export type Station = {
   stationCode: string;
   name: string;
@@ -67,6 +73,9 @@ export type Station = {
   updatedAt?: string;
   source?: string;
   prices: Record<string, number>;
+  futurePrices?: {
+    tomorrow?: FuturePriceWindow;
+  };
   discounts?: StationDiscount[];
   pumpCpl?: number;
   distanceKm?: number;
@@ -79,6 +88,7 @@ export type StationViewModel = {
   discountCpl: number;
   discountLabel?: string;
   distanceKm: number;
+  fuel?: string;
   score?: number;
   netSaving?: number;
   detourMinutes?: number;

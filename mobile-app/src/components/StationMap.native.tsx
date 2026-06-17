@@ -13,6 +13,10 @@ import { MapPoint, StationViewModel } from "../types";
 import { BrandBadge } from "./BrandBadge";
 
 const maxStationMarkers = 240;
+const maxPriceMarkers = 34;
+const maxDotMarkers = 90;
+const markerGridSize = 92;
+const compactMarkerGridSize = 36;
 
 type CameraInsets = {
   top?: number;
@@ -56,6 +60,7 @@ export function StationMap({
   const [mapReady, setMapReady] = useState(false);
   const [mapMovedByUser, setMapMovedByUser] = useState(false);
   const [cameraResetVersion, setCameraResetVersion] = useState(0);
+  const [currentRegion, setCurrentRegion] = useState<Region>(() => regionForPoint(centre));
 
   const visibleRoutePoints = useMemo(
     () => (routePoints.length >= 2 ? sampleRoutePoints(routePoints, 180) : []),
@@ -80,6 +85,10 @@ export function StationMap({
     ];
   }, [centre, routeEndpoints, stations, visibleRoutePoints]);
   const initialRegion = useMemo(() => regionForPoint(centre), [centre]);
+  const markerGroups = useMemo(
+    () => visibleMarkerGroups(stations.slice(0, maxStationMarkers), currentRegion, selectedStationCode),
+    [currentRegion, selectedStationCode, stations],
+  );
 
   useEffect(() => {
     if (!mapReady || !mapRef.current || !cameraCoordinates.length) return;
@@ -138,6 +147,7 @@ export function StationMap({
   }, [mapReady, selectedStationCode, stations]);
 
   const handleRegionChangeComplete = (region: Region) => {
+    setCurrentRegion(region);
     if (!programmaticMoveRef.current && userGestureStartedRef.current) {
       userMovedMapRef.current = true;
       setMapMovedByUser(true);
@@ -227,7 +237,21 @@ export function StationMap({
           </Marker>
         ) : null}
 
-        {stations.slice(0, maxStationMarkers).map((item) => {
+        {markerGroups.dotMarkers.map((item) => (
+          <Marker
+            coordinate={{ latitude: item.station.lat, longitude: item.station.lon }}
+            description={`${item.adjustedCpl.toFixed(1)} c/L`}
+            key={`dot-${item.station.stationCode}`}
+            onPress={() => handleMarkerPress(item.station.stationCode)}
+            title={item.station.name}
+            tracksViewChanges={false}
+            zIndex={100}
+          >
+            <View style={styles.compactPin} />
+          </Marker>
+        ))}
+
+        {markerGroups.priceMarkers.map((item) => {
           const selected = item.station.stationCode === selectedStationCode;
           return (
             <Marker
@@ -240,10 +264,10 @@ export function StationMap({
               }}
               title={item.station.name}
               tracksViewChanges={false}
-              zIndex={selected ? 500 : 0}
+              zIndex={selected ? 700 : 500}
             >
               <View style={[styles.pin, selected && styles.pinSelected]}>
-                <BrandBadge station={item.station} size={28} />
+                <BrandBadge station={item.station} size={24} />
                 <Text style={styles.pinPrice}>{item.adjustedCpl.toFixed(1)}</Text>
               </View>
             </Marker>
@@ -294,6 +318,88 @@ function stationCodesInRegion(stations: StationViewModel[], region: Region) {
         item.station.lon <= maxLon,
     )
     .map((item) => item.station.stationCode);
+}
+
+function visibleMarkerGroups(
+  stations: StationViewModel[],
+  region: Region,
+  selectedStationCode?: string,
+) {
+  const protectedCodes = protectedStationCodes(stations, selectedStationCode);
+  const priceCells = new Set<string>();
+  const compactCells = new Set<string>();
+  const priceMarkers: StationViewModel[] = [];
+  const dotMarkers: StationViewModel[] = [];
+
+  const ranked = [...stations].sort((left, right) => {
+    const leftProtected = protectedCodes.has(left.station.stationCode) ? 0 : 1;
+    const rightProtected = protectedCodes.has(right.station.stationCode) ? 0 : 1;
+    return (
+      leftProtected - rightProtected ||
+      markerPriorityScore(left) - markerPriorityScore(right)
+    );
+  });
+
+  for (const item of ranked) {
+    const code = item.station.stationCode;
+    const priceCell = markerCell(item, region, markerGridSize);
+    const compactCell = markerCell(item, region, compactMarkerGridSize);
+    const protectedMarker = protectedCodes.has(code);
+
+    if (
+      protectedMarker ||
+      (priceMarkers.length < maxPriceMarkers && !priceCells.has(priceCell))
+    ) {
+      priceMarkers.push(item);
+      priceCells.add(priceCell);
+      compactCells.add(compactCell);
+      continue;
+    }
+
+    if (dotMarkers.length < maxDotMarkers && !compactCells.has(compactCell)) {
+      dotMarkers.push(item);
+      compactCells.add(compactCell);
+    }
+  }
+
+  return { priceMarkers, dotMarkers };
+}
+
+function protectedStationCodes(stations: StationViewModel[], selectedStationCode?: string) {
+  const codes = new Set<string>();
+  if (selectedStationCode) codes.add(selectedStationCode);
+  const cheapest = minBy(stations, (item) => item.adjustedCpl);
+  const closest = minBy(stations, (item) => item.distanceKm);
+  const bestValue = minBy(stations, markerPriorityScore);
+  for (const item of [cheapest, closest, bestValue]) {
+    if (item) codes.add(item.station.stationCode);
+  }
+  return codes;
+}
+
+function minBy<T>(items: T[], score: (item: T) => number) {
+  let best: T | undefined;
+  let bestScore = Number.POSITIVE_INFINITY;
+  for (const item of items) {
+    const nextScore = score(item);
+    if (nextScore < bestScore) {
+      best = item;
+      bestScore = nextScore;
+    }
+  }
+  return best;
+}
+
+function markerPriorityScore(item: StationViewModel) {
+  return item.adjustedCpl + item.distanceKm * 0.85;
+}
+
+function markerCell(item: StationViewModel, region: Region, gridSize: number) {
+  const safeLatDelta = Math.max(region.latitudeDelta, 0.005);
+  const safeLonDelta = Math.max(region.longitudeDelta, 0.005);
+  const x = ((item.station.lon - (region.longitude - safeLonDelta / 2)) / safeLonDelta) * 1000;
+  const y = ((item.station.lat - (region.latitude - safeLatDelta / 2)) / safeLatDelta) * 1000;
+  return `${Math.round(x / gridSize)}:${Math.round(y / gridSize)}`;
 }
 
 function sampleRoutePoints(points: MapPoint[], maxPoints: number) {
@@ -431,7 +537,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     flexDirection: "row",
     gap: spacing.xs,
-    minWidth: 86,
+    minWidth: 76,
     padding: 4,
     paddingRight: spacing.sm,
   },
@@ -443,6 +549,15 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontSize: 13,
     fontWeight: "900",
+  },
+  compactPin: {
+    ...shadow.soft,
+    backgroundColor: colors.white,
+    borderColor: colors.green,
+    borderRadius: radii.pill,
+    borderWidth: 3,
+    height: 18,
+    width: 18,
   },
   recenterButton: {
     ...shadow.soft,

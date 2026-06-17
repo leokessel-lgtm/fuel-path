@@ -423,6 +423,7 @@ export function NearbyScreen({
                 onFocus={() => setLocationSearchActive(true)}
                 onSubmitEditing={applyLocationSearch}
                 placeholder="Search address, suburb or place"
+                placeholderTextColor={colors.muted}
                 returnKeyType="search"
                 style={styles.locationInput}
               />

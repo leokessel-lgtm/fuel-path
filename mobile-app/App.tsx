@@ -322,7 +322,7 @@ export default function App() {
         <View style={styles.header}>
           <View>
             <Text style={styles.brand}>Fuel Path</Text>
-            <Text style={styles.subhead}>Native app shell</Text>
+            <Text style={styles.subhead}>Live fuel decisions</Text>
           </View>
           <Pressable
             accessibilityLabel={hasVehicle ? "View vehicle profile" : "Add vehicle profile"}

@@ -2,6 +2,7 @@
   "expo": {
     "name": "Fuel Path",
     "slug": "fuel-path",
+    "owner": "leokessel",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -40,7 +41,10 @@
       ]
     ],
     "extra": {
-      "apiBaseUrlHint": "Set EXPO_PUBLIC_FUEL_PATH_API_BASE_URL for device testing."
+      "apiBaseUrlHint": "Set EXPO_PUBLIC_FUEL_PATH_API_BASE_URL for device testing.",
+      "eas": {
+        "projectId": "240831fe-3325-4f8e-bbf5-2f4d82842f9f"
+      }
     }
   }
 }

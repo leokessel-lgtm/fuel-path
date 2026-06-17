@@ -152,6 +152,38 @@ test("durable alert storage requires write token and keeps push disabled", async
   }
 });
 
+test("durable alert storage can use a separate preview client validation token", async () => {
+  const originalAdminToken = process.env.ALERTS_WRITE_TOKEN;
+  const originalClientEnabled = process.env.ALERTS_CLIENT_WRITE_ENABLED;
+  const originalClientToken = process.env.ALERTS_CLIENT_WRITE_TOKEN;
+  delete process.env.ALERTS_WRITE_TOKEN;
+  process.env.ALERTS_CLIENT_WRITE_ENABLED = "1";
+  process.env.ALERTS_CLIENT_WRITE_TOKEN = "preview-client-token";
+  const store = memoryDurableStore();
+  setAlertStorageForTests(store);
+
+  try {
+    const rejected = await callSavedRoutes("POST", {}, route, { authorization: "Bearer wrong-token" });
+    const accepted = await callSavedRoutes("POST", {}, route, { authorization: "Bearer preview-client-token" });
+    const status = await callStatus();
+
+    assert.equal(rejected.status, 401);
+    assert.equal(accepted.status, 202);
+    assert.equal(status.payload.alerts.writeSecurity.adminTokenConfigured, false);
+    assert.equal(status.payload.alerts.writeSecurity.clientTokenEnabled, true);
+    assert.equal(status.payload.alerts.writeSecurity.clientTokenConfigured, true);
+    assert.equal(status.payload.alerts.writeSecurity.writeEnabled, true);
+  } finally {
+    setAlertStorageForTests(null);
+    if (originalAdminToken === undefined) delete process.env.ALERTS_WRITE_TOKEN;
+    else process.env.ALERTS_WRITE_TOKEN = originalAdminToken;
+    if (originalClientEnabled === undefined) delete process.env.ALERTS_CLIENT_WRITE_ENABLED;
+    else process.env.ALERTS_CLIENT_WRITE_ENABLED = originalClientEnabled;
+    if (originalClientToken === undefined) delete process.env.ALERTS_CLIENT_WRITE_TOKEN;
+    else process.env.ALERTS_CLIENT_WRITE_TOKEN = originalClientToken;
+  }
+});
+
 test("scheduled evaluator requires cron authorisation and records not-evaluated routes safely", async () => {
   const originalCron = process.env.CRON_SECRET;
   process.env.CRON_SECRET = "cron-token";

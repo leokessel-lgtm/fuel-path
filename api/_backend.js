@@ -2947,11 +2947,17 @@ function alertPushDeliveryEnabled() {
 }
 
 function alertsWriteSecurity() {
-  const tokenConfigured = Boolean(process.env.ALERTS_WRITE_TOKEN);
+  const adminTokenConfigured = Boolean(process.env.ALERTS_WRITE_TOKEN);
+  const clientTokenEnabled = process.env.ALERTS_CLIENT_WRITE_ENABLED === "1";
+  const clientTokenConfigured = clientTokenEnabled && Boolean(process.env.ALERTS_CLIENT_WRITE_TOKEN);
+  const tokenConfigured = adminTokenConfigured || clientTokenConfigured;
   const storage = alertStorageStatus({ maxRecords: ALERT_MAX_RECORDS });
   const tokenRequired = tokenConfigured || Boolean(storage.durable);
   return {
     tokenConfigured,
+    adminTokenConfigured,
+    clientTokenEnabled,
+    clientTokenConfigured,
     tokenRequired,
     writeEnabled: !tokenRequired || tokenConfigured,
     acceptedHeaders: ["Authorization: Bearer <token>", "X-Fuel-Path-Alerts-Token"],
@@ -2961,13 +2967,18 @@ function alertsWriteSecurity() {
 function alertsWriteAuthorised(req = {}) {
   const security = alertsWriteSecurity();
   if (!security.tokenRequired) return true;
-  if (!security.tokenConfigured) return false;
-  const expected = process.env.ALERTS_WRITE_TOKEN;
+  if (!security.writeEnabled) return false;
   const headers = req.headers || {};
   const auth = headers.authorization || headers.Authorization || "";
   const direct = headers["x-fuel-path-alerts-token"] || headers["X-Fuel-Path-Alerts-Token"] || "";
   const bearer = String(auth).replace(/^Bearer\s+/i, "").trim();
-  return bearer === expected || String(direct).trim() === expected;
+  const supplied = bearer || String(direct).trim();
+  if (process.env.ALERTS_WRITE_TOKEN && supplied === process.env.ALERTS_WRITE_TOKEN) return true;
+  return (
+    security.clientTokenConfigured &&
+    Boolean(process.env.ALERTS_CLIENT_WRITE_TOKEN) &&
+    supplied === process.env.ALERTS_CLIENT_WRITE_TOKEN
+  );
 }
 
 function cronAuthorised(req = {}) {

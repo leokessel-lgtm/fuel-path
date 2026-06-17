@@ -4,14 +4,18 @@ Fuel Path is app-first, so iOS and Android builds need separate validation from 
 
 ## Current Status
 
-Last local preflight: 2026-06-15.
+Last local preflight: 2026-06-17.
 
 - TypeScript: passed.
 - Expo Doctor: passed, 21 of 21 checks.
 - Expo dependency check: passed.
-- EAS CLI: available as `eas-cli/20.1.0` when run with the repo-local npm cache.
-- EAS account state: not logged in on this machine, so cloud build creation and build history checks are blocked.
+- EAS CLI: available as `eas-cli/20.2.0` when run with the repo-local npm cache.
+- EAS account state: logged in as `leokessel`.
+- EAS project: `@leokessel/fuel-path`, project id `240831fe-3325-4f8e-bbf5-2f4d82842f9f`.
+- EAS preview env: production API URL and preview alerts validation token configured.
+- Vercel production env: `ALERTS_CLIENT_WRITE_ENABLED` and `ALERTS_CLIENT_WRITE_TOKEN` configured for preview validation without reusing `ALERTS_WRITE_TOKEN`.
 - Device validation: pending.
+- Push-token readiness: native config now injects `extra.eas.projectId` when `EXPO_PUBLIC_EAS_PROJECT_ID`, `EAS_PROJECT_ID` or the static EAS project id is set; strict validation is blocked until the Android Maps key is present.
 
 ## Required Environment
 
@@ -20,6 +24,15 @@ Set the backend URL for physical device builds because phones cannot reach the M
 ```sh
 export EXPO_PUBLIC_FUEL_PATH_API_BASE_URL=http://YOUR-MAC-LAN-IP:4174
 ```
+
+For backend push-token registration, set the EAS project id and preview-only alerts validation token before building:
+
+```sh
+export EXPO_PUBLIC_EAS_PROJECT_ID=YOUR_EAS_PROJECT_ID
+export EXPO_PUBLIC_FUEL_PATH_ALERTS_VALIDATION_TOKEN=YOUR_PREVIEW_VALIDATION_TOKEN
+```
+
+The EAS project id is written into the native public config as `extra.eas.projectId`, which Expo push-token creation needs at runtime. Do not put the production `ALERTS_WRITE_TOKEN` into an `EXPO_PUBLIC_` variable; public mobile values are bundled into the app. Use a separate backend `ALERTS_CLIENT_WRITE_TOKEN` with `ALERTS_CLIENT_WRITE_ENABLED=1` for preview validation, then rotate or disable it before public release.
 
 For Android builds using Google Maps, set a restricted Maps SDK for Android key before building:
 
@@ -40,6 +53,7 @@ From `mobile-app/`:
 ```sh
 npm run typecheck
 npm run perf:deps
+npm run native:preflight
 npm_config_cache=.npm-cache npx expo-doctor
 npm_config_cache=.npm-cache npx expo install --check
 npm_config_cache=.npm-cache npx expo config --type public
@@ -48,9 +62,11 @@ npm_config_cache=.npm-cache npx expo config --type public
 Expected:
 
 - no TypeScript errors
+- `npm run native:preflight` passes in strict mode before device validation
 - no Expo Doctor issues
 - dependencies match Expo SDK 56
 - public config shows `androidGoogleMapsApiKeyConfigured: true` when the Android Maps key is set
+- public config shows `easProjectIdConfigured: true` and `extra.eas.projectId` when the EAS project id is set
 
 ## Preview Builds
 
@@ -84,6 +100,10 @@ Run these checks on both iOS and Android:
 - Account shows saved commute after app restart.
 - Notification permission flow is honest for the platform.
 - Daily local route reminder can be scheduled for a saved commute.
+- Expo push token is created only on a native build with notification permission and `extra.eas.projectId`.
+- Backend saved-route sync registers the push token and returns `Price-triggered backend alert synced.`
+- Turning the saved-route alert off disables the backend route and cancels the local reminder.
+- Android 13+ shows the notification permission prompt after the `route-alerts` channel is created.
 
 ## First Baselines
 

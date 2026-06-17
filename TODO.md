@@ -81,6 +81,10 @@
 - [x] Add backend saved-route alert storage and evaluator foundation with push delivery disabled.
 - [x] Add scheduled saved-route evaluator, protected cron endpoint, Expo delivery path and push receipt contract behind production env gates.
 - [x] Connect scheduled evaluator to live route scoring and gated native push-token registration path.
+- [x] Add strict native preflight for EAS project id, alerts sync token, physical-device API URL and Android Maps key.
+- [x] Create and link EAS project `@leokessel/fuel-path`.
+- [x] Configure EAS preview API URL and separate preview alert validation token.
+- [x] Separate mobile preview alert validation token from the protected backend alerts write token.
 - [ ] Run native device validation with EAS project id and alerts sync token before enabling Expo push delivery.
 - [x] Add prediction back-testing API contract with metric summary and accuracy-claim gates.
 - [x] Add durable prediction storage adapter for Neon/Postgres with safe memory fallback.

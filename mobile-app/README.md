@@ -54,13 +54,20 @@ For Android preview builds with Google Maps, set a restricted Maps SDK for Andro
 export FUEL_PATH_ANDROID_GOOGLE_MAPS_API_KEY=YOUR_RESTRICTED_ANDROID_MAPS_KEY
 ```
 
+Before creating an EAS preview build, run the strict native validation gate:
+
+```sh
+npm run native:preflight
+```
+
+That gate checks the EAS project id, preview alerts validation token, device-reachable API URL and Android Maps key needed for route-alert push-token validation.
+
 See `NATIVE-VALIDATION.md` for the native build checklist, EAS commands and first build-size baseline table.
 
 ## Next Native Steps
 
 - Validate iOS and Android preview builds using `NATIVE-VALIDATION.md`.
 - Implement the Google Places Autocomplete backend adapter behind `/api/geocode`.
-- Validate local saved-route notifications on real iOS and Android builds.
-- Implement backend push scheduling for price-triggered saved-route alerts after native notification validation.
+- Validate local saved-route notifications and Expo push-token registration on real iOS and Android builds.
 - Capture first EAS preview build size baselines for the performance guardrails.
 - Confirm FuelCheck commercial/public app usage rules before public release.

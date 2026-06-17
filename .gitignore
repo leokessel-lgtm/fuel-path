@@ -23,6 +23,9 @@ android/
 # Build and tool caches
 .metro-health-check*
 *.tsbuildinfo
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
 .DS_Store
 
 # Credentials and signing material

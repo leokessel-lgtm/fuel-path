@@ -170,10 +170,23 @@ def price_age_hours(updated_at: str | None, now: datetime) -> float:
     return max(0.0, (now - parsed.astimezone(now.tzinfo)).total_seconds() / 3600)
 
 
-def freshness_penalty(updated_at: str | None, now: datetime) -> tuple[float, str | None]:
+def is_official_live_price_source(source: str | None) -> bool:
+    return str(source or "") in {
+        "api_nsw_fuelcheck",
+        "api_qld_fuelprices",
+        "api_wa_fuelwatch",
+        "api_vic_servo_saver",
+    }
+
+
+def freshness_penalty(
+    updated_at: str | None, now: datetime, source: str | None = None
+) -> tuple[float, str | None]:
     hours = price_age_hours(updated_at, now)
     if not math.isfinite(hours):
         return 1.5, "price timestamp missing or invalid"
+    if is_official_live_price_source(source):
+        return 0.0, None
     if hours <= 1:
         return 0.0, None
     if hours <= 6:
@@ -290,9 +303,11 @@ def score_candidates(
         net_saving = saving_before_detour - detour_cost
         reach_needed_km = distance_along + distance_to_route + reserve_km
         reachable = range_km >= reach_needed_km
-        fresh_penalty, fresh_warning = freshness_penalty(station.get("updatedAt"), now)
+        fresh_penalty, fresh_warning = freshness_penalty(
+            station.get("updatedAt"), now, station.get("source")
+        )
         if (
-            station.get("source") in {"api_nsw_fuelcheck", "api_qld_fuelprices", "api_wa_fuelwatch"}
+            not is_official_live_price_source(station.get("source"))
             and price_age_hours(station.get("updatedAt"), now)
             > RECOMMENDATION_MAX_PRICE_AGE_HOURS
         ):

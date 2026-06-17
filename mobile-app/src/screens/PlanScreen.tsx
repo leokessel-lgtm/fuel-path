@@ -23,13 +23,20 @@ import {
   ScoreCandidate,
   ScoreResponse,
   StationViewModel,
+  RouteTimingAdvice,
 } from "../types";
-import { formatUpdatedAt, stationPriceView, tomorrowPriceView } from "../utils/pricing";
+import { stationTimestampLine } from "../utils/decisionEvidence";
+import { stationPriceView, tomorrowPriceView } from "../utils/pricing";
 
 type PlanScreenProps = {
   preferences: AppPreferences;
   onFuelChange: (fuel: FuelCode) => void;
+  onAddRecentLocation?: (point: MapPoint) => void;
+  onClearRecentLocations?: () => void;
+  onRemoveRecentLocation?: (point: MapPoint) => void;
+  onSaveNamedPlace?: (kind: "home" | "work", point: MapPoint) => void;
   onSaveCommute: (commute: Pick<SavedCommute, "from" | "fuel" | "name" | "to">) => void;
+  recentLocations?: MapPoint[];
   savedCommutes: SavedCommute[];
 };
 
@@ -290,6 +297,9 @@ export function PlanScreen({
   const selected = mapStations.find((item) => item.station.stationCode === selectedCode) || best;
   const bestTomorrow = best ? tomorrowPriceView(best) : null;
   const selectedTomorrow = selected ? tomorrowPriceView(selected) : null;
+  const recommendationCopy = best
+    ? routeRecommendationCopy(best, result?.context.timingAdvice)
+    : null;
   const routeNotice = result ? routeContextNotice(result.context) : "";
   const currentRouteSaved = Boolean(
     routeEndpoints &&
@@ -506,9 +516,7 @@ export function PlanScreen({
                 </View>
               ) : null}
             </View>
-            <Text style={styles.muted}>
-              Updated {formatUpdatedAt(selected.station.updatedAt)}
-            </Text>
+            <Text style={styles.muted}>{stationTimestampLine(selected.station)}</Text>
           </View>
         ) : (
           <>
@@ -540,10 +548,10 @@ export function PlanScreen({
                 <View style={styles.recommendationCopy}>
                   <Text style={styles.eyebrow}>Recommendation</Text>
                   <Text numberOfLines={1} style={styles.compactDecisionTitle}>
-                    {decisionTitle(best)}
+                    {recommendationCopy?.title}
                   </Text>
                   <Text numberOfLines={1} style={styles.compactReason}>
-                    {best.station.name} saves about {formatMoney(best.netSaving || 0)}
+                    {recommendationCopy?.reason}
                   </Text>
                 </View>
                 <View style={styles.recommendationPrice}>
@@ -700,10 +708,50 @@ function uniqueStations(stations: StationViewModel[]) {
   });
 }
 
-function decisionTitle(best: StationViewModel) {
-  if ((best.netSaving || 0) >= 4) return "Fill on route";
-  if ((best.netSaving || 0) >= 1) return "Fill if it suits";
-  return "Skip the detour";
+function routeRecommendationCopy(
+  best: StationViewModel,
+  timingAdvice?: RouteTimingAdvice,
+) {
+  if (timingAdvice?.visible && usefulTimingAdvice(timingAdvice)) {
+    return {
+      title: timingAdvice.label || timingAdviceLabel(timingAdvice.action),
+      reason: timingAdvice.reason || routeValueReason(best),
+    };
+  }
+
+  const saving = Number(best.netSaving || 0);
+  if (saving >= 1) {
+    return {
+      title: "Best value stop",
+      reason: routeValueReason(best),
+    };
+  }
+  return {
+    title: "Not worth detour",
+    reason: `Best value is ${best.station.name}, but the detour is unlikely to save money.`,
+  };
+}
+
+function usefulTimingAdvice(timingAdvice: RouteTimingAdvice) {
+  return ["fill_today_on_route", "fill_today_with_detour", "wait_if_can"].includes(
+    timingAdvice.action,
+  );
+}
+
+function timingAdviceLabel(action: RouteTimingAdvice["action"]) {
+  if (action === "fill_today_on_route") return "Fill today on this route";
+  if (action === "fill_today_with_detour") return "Fill today, but check the detour";
+  if (action === "wait_if_can") return "Wait if you can";
+  return "";
+}
+
+function routeValueReason(best: StationViewModel) {
+  const saving = Number(best.netSaving || 0);
+  const detourMinutes = Number(best.detourMinutes || 0);
+  if (detourMinutes > 0.05) {
+    return `${best.station.name} saves about ${formatMoney(saving)} after ${detourMinutes.toFixed(1)} min detour.`;
+  }
+  return `${best.station.name} saves about ${formatMoney(saving)} on this route.`;
 }
 
 function formatMoney(value: number) {

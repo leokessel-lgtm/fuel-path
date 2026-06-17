@@ -109,7 +109,7 @@ Capability labels in the app and backend should be:
 - 8/8 regions represented in the capability matrix.
 - No region silently returns misleading empty results.
 - Warm route planning response under 3 seconds for common Australian metro and regional routes.
-- No top recommendation from data older than the freshness threshold.
+- No top recommendation from fallback, sample, demo or unknown-source data older than the freshness threshold; official live provider timestamps are treated as price effective/unchanged-since dates.
 - No horizontal overflow on supported mobile widths.
 - 95% of valid route searches return either a recommendation or a specific, useful failure reason.
 - Real validation: at least 6 of 8 users say Fuel Path reduces manual comparison effort.
@@ -275,8 +275,8 @@ Goal 1 is the current priority. The product must first prove that it can make a 
 
 - Source label.
 - Price timestamp and age.
-- Freshness rule: live prices older than 48 hours can appear as map/context data, but cannot win the route recommendation.
-- Quiet timestamp detail instead of stale-price headline copy.
+- Freshness rule: official live provider timestamps mean price effective/unchanged-since; fallback, sample, demo or unknown-source prices older than the threshold can appear as context but cannot win the route recommendation.
+- Quiet timestamp detail instead of stale-price headline copy for official live providers.
 - Open-now or unknown-hours state.
 - Member-only or eligibility warning.
 - No-cycle-signal wording where cycle logic does not apply.
@@ -286,7 +286,7 @@ Goal 1 is the current priority. The product must first prove that it can make a 
 
 - Every recommendation shows source and freshness.
 - Stale or uncertain data is visible before the user navigates.
-- No station is recommended as "best" if it fails a critical eligibility, freshness or availability rule.
+- No station is recommended as "best" if it fails a critical eligibility, untrusted-source freshness or availability rule.
 - Trust concerns in validation are mostly about data availability, not confusing wording.
 - Closed, unavailable, restricted, unsupported or unreachable stations are downgraded or blocked before navigation.
 
@@ -550,7 +550,7 @@ Prediction is not a headline feature until it earns trust.
 1. Build the national provider capability matrix into backend status and user-facing capability states.
 2. Keep production-grade address suggestions behind the backend provider adapter.
 3. Keep route results to a useful decision set, with progressive expansion for long metro, regional and interstate routes.
-4. Keep stale-price severity and region capability in recommendation confidence.
+4. Keep stale-price severity for untrusted sources and region capability in recommendation confidence.
 5. Keep Plan Trip focused on trip intent, one recommendation and route map.
 6. Keep secondary setup behind Account or detail views.
 
@@ -597,15 +597,27 @@ Until Goal 1 validates, every new build item should answer yes to at least one o
 
 If not, park it.
 
+Every implementation must also carry a product decision rule. The rule must be implemented in backend or product logic, and the frontend must either expose the result clearly or explain why the rule blocks, downgrades or withholds a recommendation.
+
+For each new item, document:
+
+- the user-visible promise
+- the backend or product rule that enforces it
+- the UX surface where the rule is shown
+- the unhappy path when the rule cannot be satisfied
+- the test evidence that proves the rule cannot be bypassed
+
 ## Done Definition
 
 A roadmap or backlog item is done only when:
 
 - user story and success metrics are documented
+- backend or product decision rule is documented and implemented
+- UX shows the rule outcome, limitation or blocked state where it affects the user
 - happy path and break-it tests are added or manually recorded
 - accessibility and performance impact are checked
 - provider and capability limitations are visible to the user
-- stale, restricted or unsupported data cannot silently drive a confident recommendation
+- stale untrusted-source, restricted or unsupported data cannot silently drive a confident recommendation
 - production smoke passes after deploy, when the change reaches production
 
 Use `NATIONAL-TESTING-REGIME.md` as the release gate for feature, integration and production checks.

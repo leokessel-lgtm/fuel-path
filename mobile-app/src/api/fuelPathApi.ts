@@ -14,8 +14,10 @@ type GeocodeResponse = {
   providerMode?: string;
   recommendedProductionProvider?: string;
   sessionToken?: string;
-  location: MapPoint;
+  location?: MapPoint | null;
   suggestions: MapPoint[];
+  lookupStatus?: "ok" | "local_fallback" | "degraded" | "no_match";
+  warning?: string;
 };
 
 type RouteResponse = {
@@ -104,11 +106,34 @@ export async function geocodeAddress(label: string, sessionToken?: string) {
   return suggestions[0];
 }
 
+const locationSearchCache = new Map<string, { expiresAt: number; suggestions: MapPoint[] }>();
+const LOCATION_SEARCH_CACHE_MS = 5 * 60 * 1000;
+
 export async function searchLocations(label: string, limit = 5, sessionToken?: string) {
+  const cacheKey = `${limit}:${label.trim().toLowerCase().replace(/\s+/g, " ")}`;
+  const cached = locationSearchCache.get(cacheKey);
+  if (cached && Date.now() < cached.expiresAt) return cached.suggestions;
+  if (cached) locationSearchCache.delete(cacheKey);
+
   const payload = await fetchJson<GeocodeResponse>(
     `/api/geocode?${query({ q: label, limit, sessionToken })}`,
   );
-  return payload.suggestions?.length ? payload.suggestions : [payload.location];
+  const suggestions = payload.suggestions?.length
+    ? payload.suggestions
+    : payload.location
+      ? [payload.location]
+      : [];
+  if (!suggestions.length) {
+    throw new Error(
+      payload.warning ||
+        "Address lookup is limited right now. Try a fuller address, suburb or postcode.",
+    );
+  }
+  locationSearchCache.set(cacheKey, {
+    expiresAt: Date.now() + LOCATION_SEARCH_CACHE_MS,
+    suggestions,
+  });
+  return suggestions;
 }
 
 export async function getRoute(from: MapPoint, to: MapPoint) {

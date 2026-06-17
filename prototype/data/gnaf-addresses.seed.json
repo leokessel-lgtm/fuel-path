@@ -1,0 +1,37 @@
+[
+  {
+    "id": "seed-au-nsw-sylvania-corea-87a",
+    "label": "87A Corea Street, Sylvania NSW 2224",
+    "lat": -34.0153146,
+    "lon": 151.0997397,
+    "state": "NSW",
+    "postcode": "2224",
+    "accuracy": "street_interpolated_seed",
+    "aliases": [
+      "87a corea street",
+      "87a corea st",
+      "87a corea street sylvania",
+      "87a corea st sylvania",
+      "87a corea street sylvania nsw",
+      "87a corea st sylvania nsw 2224"
+    ]
+  },
+  {
+    "id": "seed-au-nsw-sylvania-easton-66b",
+    "label": "66B Easton Avenue, Sylvania NSW 2224",
+    "lat": -34.0114122,
+    "lon": 151.0993847,
+    "state": "NSW",
+    "postcode": "2224",
+    "accuracy": "address_seed",
+    "aliases": [
+      "66b eas",
+      "66b east",
+      "66b easton",
+      "66b easton avenue",
+      "66b easton ave",
+      "66b easton avenue sylvania",
+      "66b easton ave sylvania nsw 2224"
+    ]
+  }
+]

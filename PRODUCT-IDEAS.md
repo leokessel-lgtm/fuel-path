@@ -224,11 +224,11 @@ The Plan Trip screen should stay compact and action-led:
 
 **Risk:** Requires data source attribution and careful wording.
 
-**Adopted rule:** Live FuelCheck prices older than 48 hours stay visible on map and nearby context, but cannot become the top route recommendation. The timestamp belongs in station detail and source context, not as scary headline copy.
+**Adopted rule:** Official live provider timestamps mean the price effective/unchanged-since time, not API response age. Fallback, sample, demo or unknown-source prices older than the freshness threshold stay visible as context but cannot become the top route recommendation. The timestamp belongs in station detail and source context, not as scary headline copy.
 
 ### 10. Open Now And Availability Warnings
 
-**Idea:** Do not recommend closed stations, stale live prices or unavailable fuel types without warning.
+**Idea:** Do not recommend closed stations, stale untrusted-source prices or unavailable fuel types without warning.
 
 **Target:** High-frequency drivers, road-trippers, regional users.
 
@@ -432,6 +432,7 @@ The Plan Trip screen should stay compact and action-led:
 - Confirm permitted usage, caching and attribution terms for ACT records exposed through the FuelCheck API.
 - Confirm whether the live web demo can be shared publicly after usage rights are confirmed.
 - Keep refining the validation demo from participant feedback.
+- Require every implementation to include a backend or product decision rule and a UX surface that shows the rule outcome, limitation or blocked state.
 - Apply the break-it testing regime in `NATIONAL-TESTING-REGIME.md` before closing new backlog items.
 
 ### Completed In Demo

@@ -41,8 +41,8 @@
 - [ ] Confirm whether the live web demo can be shared publicly after usage rights are confirmed.
 - [x] Add internal validation address typeahead suggestions for suburbs, addresses and POIs.
 - [x] Limit long-route ranked results to a decision-sized set with progressive expansion.
-- [x] Make stale-price severity reduce recommendation confidence more strongly.
-- [x] Exclude live FuelCheck prices older than 48 hours from route recommendations while keeping them visible as map context.
+- [x] Make stale-price severity reduce recommendation confidence more strongly for fallback, sample and unknown-source data.
+- [x] Treat official live provider timestamps as price effective/unchanged-since dates, not stale API-response age.
 - [x] Add live brand/network discount rules on top of FuelCheck station data.
 - [x] Add visible saved-route alert card in Plan.
 - [x] Apply map-first Plan UI and capture design system direction.
@@ -61,7 +61,14 @@
 - [x] Choose Google Places Autocomplete (New) as the preferred production address/POI provider behind the Fuel Path backend.
 - [x] Make Plan Trip address lookup session-token aware for future production autocomplete billing.
 - [x] Add backend `/api/geocode` provider adapter for Google, Mapbox, HERE, Geoapify and Nominatim fallback.
-- [ ] Implement Google Places Autocomplete (New) backend adapter after billing/API-key controls are approved.
+- [x] Add AU address-index-first lookup path so exact G-NAF-style addresses resolve before external providers.
+- [x] Redesign Plan Trip route editor around modern mapping-app patterns: explicit From/To rows, clear controls, swap route, current-location row, rich suggestion rows, recents, saved routes and Home/Work shortcuts.
+- [x] Expand Home/Work address management with direct typed edit and refine-on-map support.
+- [x] Persist recent locations across app restarts with privacy-safe limits and remove controls.
+- [x] Add route-editor accessibility pass for focus order, touch target sizing, dynamic text and screen-reader labels.
+- [x] Add route-editor break-it test matrix covering current location denied, clear/retype, swap, weak lookup, exact address, POI, saved route, Home/Work and recents.
+- [x] Add restrained route timing cue and wire it into the Plan recommendation card: show Fill today states, support future Wait if you can, hide neutral/no-cycle.
+- [x] Implement Google Places Autocomplete (New) backend adapter contract behind billing/API-key gates.
 - [x] Add QLD provider adapter after fuel ID and region mapping are confirmed.
 - [x] Add first WA FuelWatch provider adapter for Perth/metro live Nearby and route scoring.
 - [x] Expand WA FuelWatch provider to full live statewide v2 with request-budgeted region planning, per-region/product/day caching and tomorrow-price checks.
@@ -81,7 +88,7 @@
 - [x] Set `ALERTS_WRITE_TOKEN` in production before backend alert writes are enabled.
 - [x] Add backend no-cycle-signal states for unsupported fuels, regions and sparse histories.
 - [ ] Add break-it test evidence to every new backlog item before marking it done.
-- [ ] Prepare Apple/Android store readiness plan, including privacy disclosures and API usage constraints.
+- [x] Prepare Apple/Android store readiness plan, including privacy disclosures and API usage constraints.
 
 ## External Blockers
 
@@ -93,9 +100,10 @@
 - SA fuel data/API access needs confirmation before implementation.
 - TAS fuel data/API access needs confirmation before implementation.
 - NT MyFuel data/API access needs confirmation before implementation.
-- Google Places production autocomplete still needs billing controls, restricted keys, backend adapter and device validation.
+- Google Places production autocomplete still needs billing controls, restricted keys and device validation before live enablement.
 
 ## Done Gate
 
 - Every new backlog item needs user story, success metrics and break-it test evidence.
+- Every implementation needs a backend or product decision rule, plus a UX surface that shows the rule outcome, limitation or blocked state.
 - Use `NATIONAL-TESTING-REGIME.md` for feature, integration, accessibility, performance and post-deploy checks.

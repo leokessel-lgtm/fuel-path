@@ -7,6 +7,8 @@ export type AppPreferences = {
   vehicleRego: string;
   fuel: FuelCode;
   selectedDiscounts: string[];
+  homeLocation?: MapPoint;
+  workLocation?: MapPoint;
 };
 
 export type CommuteAlertStatus =
@@ -101,6 +103,10 @@ export type MapPoint = {
   lat: number;
   lon: number;
   label: string;
+  provider?: string;
+  matchType?: string;
+  confidence?: string;
+  type?: string;
 };
 
 export type RegionCapabilityStatus =
@@ -119,6 +125,18 @@ export type RegionCapability = {
   liveData: boolean;
   coverage: string;
   blocker?: string;
+};
+
+export type RouteTimingAdvice = {
+  action:
+    | "fill_today_on_route"
+    | "fill_today_with_detour"
+    | "wait_if_can"
+    | "neutral"
+    | "no_cycle_signal";
+  visible: boolean;
+  label: string;
+  reason?: string;
 };
 
 export type NearbyResponse = {
@@ -161,6 +179,7 @@ export type ScoreResponse = {
     eligibleCandidates: number;
     staleExcludedCandidates?: number;
     freshnessCutoffHours?: number;
+    timingAdvice?: RouteTimingAdvice;
   };
   recommendations: ScoreCandidate[];
   contextStations: Station[];

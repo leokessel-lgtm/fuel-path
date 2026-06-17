@@ -25,10 +25,21 @@ import {
   loadSavedCommutes,
   persistSavedCommutes,
 } from "./src/services/savedCommutesStore";
+import {
+  defaultPreferences,
+  loadPreferences,
+  persistPreferences,
+} from "./src/services/preferencesStore";
+import {
+  loadRecentLocations,
+  normaliseRecentLocations,
+  persistRecentLocations,
+} from "./src/services/recentLocationsStore";
 import { colors, radii, shadow, spacing, typeScale } from "./src/theme";
 import {
   AppPreferences,
   FuelCode,
+  MapPoint,
   NotificationPermissionState,
   SavedCommute,
 } from "./src/types";
@@ -43,12 +54,10 @@ const tabs: Array<{ key: TabKey; label: string; hint: string }> = [
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabKey>("nearby");
-  const [preferences, setPreferences] = useState<AppPreferences>({
-    vehicleName: "Toyota Corolla",
-    vehicleRego: "FP123",
-    fuel: "U91",
-    selectedDiscounts: ["fleet_card"],
-  });
+  const [preferences, setPreferences] = useState<AppPreferences>(defaultPreferences);
+  const [preferencesLoaded, setPreferencesLoaded] = useState(false);
+  const [recentLocations, setRecentLocations] = useState<MapPoint[]>([]);
+  const [recentLocationsLoaded, setRecentLocationsLoaded] = useState(false);
   const [savedCommutes, setSavedCommutes] = useState<SavedCommute[]>([]);
   const [savedCommutesLoaded, setSavedCommutesLoaded] = useState(false);
   const [alertSyncingCommuteId, setAlertSyncingCommuteId] = useState<string | null>(null);
@@ -79,6 +88,37 @@ export default function App() {
       }
       return { ...current, selectedDiscounts: Array.from(selected) };
     });
+  };
+
+  const saveNamedPlace = (kind: "home" | "work", point: MapPoint) => {
+    setPreferences((current) => ({
+      ...current,
+      [kind === "home" ? "homeLocation" : "workLocation"]: point,
+    }));
+  };
+
+  const clearNamedPlace = (kind: "home" | "work") => {
+    setPreferences((current) => ({
+      ...current,
+      [kind === "home" ? "homeLocation" : "workLocation"]: undefined,
+    }));
+  };
+
+  const addRecentLocation = (point: MapPoint) => {
+    setRecentLocations((current) => normaliseRecentLocations([point, ...current]));
+  };
+
+  const removeRecentLocation = (point: MapPoint) => {
+    setRecentLocations((current) =>
+      current.filter(
+        (item) =>
+          !closeCoordinate(item.lat, point.lat) || !closeCoordinate(item.lon, point.lon),
+      ),
+    );
+  };
+
+  const clearRecentLocations = () => {
+    setRecentLocations([]);
   };
 
   const saveCommute = ({
@@ -220,6 +260,11 @@ export default function App() {
 
   useEffect(() => {
     let active = true;
+    loadPreferences().then((storedPreferences) => {
+      if (!active) return;
+      setPreferences(storedPreferences);
+      setPreferencesLoaded(true);
+    });
     configureRouteNotificationHandler().catch(() => {});
     getRouteNotificationPermission().then((result) => {
       if (!active) return;
@@ -230,6 +275,11 @@ export default function App() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!preferencesLoaded) return;
+    persistPreferences(preferences).catch(() => {});
+  }, [preferences, preferencesLoaded]);
 
   useEffect(() => {
     let active = true;
@@ -247,6 +297,23 @@ export default function App() {
     if (!savedCommutesLoaded) return;
     persistSavedCommutes(savedCommutes).catch(() => {});
   }, [savedCommutes, savedCommutesLoaded]);
+
+  useEffect(() => {
+    let active = true;
+    loadRecentLocations().then((locations) => {
+      if (!active) return;
+      setRecentLocations(locations);
+      setRecentLocationsLoaded(true);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!recentLocationsLoaded) return;
+    persistRecentLocations(recentLocations).catch(() => {});
+  }, [recentLocations, recentLocationsLoaded]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -281,7 +348,12 @@ export default function App() {
             <PlanScreen
               preferences={preferences}
               onFuelChange={updateFuel}
+              onAddRecentLocation={addRecentLocation}
+              onClearRecentLocations={clearRecentLocations}
+              onRemoveRecentLocation={removeRecentLocation}
+              onSaveNamedPlace={saveNamedPlace}
               onSaveCommute={saveCommute}
+              recentLocations={recentLocations}
               savedCommutes={savedCommutes}
             />
           ) : null}
@@ -296,6 +368,8 @@ export default function App() {
               alertSyncingCommuteId={alertSyncingCommuteId}
               onFuelChange={updateFuel}
               onRequestNotifications={requestNotifications}
+              onClearNamedPlace={clearNamedPlace}
+              onSaveNamedPlace={saveNamedPlace}
               onToggleDiscount={toggleDiscount}
               onToggleCommuteAlert={toggleCommuteAlert}
               savedCommutes={savedCommutes}

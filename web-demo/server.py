@@ -11,6 +11,7 @@ import argparse
 import json
 import os
 import re
+import sqlite3
 import sys
 import time
 import xml.etree.ElementTree as ET
@@ -25,6 +26,7 @@ from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS_DIR = ROOT / "prototype" / "scripts"
+GNAF_SEED_PATH = ROOT / "prototype" / "data" / "gnaf-addresses.seed.json"
 sys.path.insert(0, str(SCRIPTS_DIR))
 
 from score_route import DATA_DIR  # noqa: E402
@@ -41,6 +43,9 @@ from score_route import score_candidates_adaptive  # noqa: E402
 
 SAMPLE_NOW = datetime.fromisoformat("2026-06-13T08:00:00+10:00")
 DEFAULT_CACHE_SECONDS = 300
+GEOCODE_CACHE_SECONDS = 60 * 60 * 6
+GEOCODE_DEGRADED_CACHE_SECONDS = 60
+NOMINATIM_RATE_LIMIT_BACKOFF_SECONDS = 60
 HTTP_TIMEOUT_SECONDS = 12
 USER_AGENT = "FuelPathDemo/0.1 local validation"
 RECOMMENDED_GEOCODE_PROVIDER = "google_places_autocomplete_new"
@@ -57,6 +62,12 @@ QLD_BOUNDS = {
     "min_lon": 137.0,
     "max_lon": 154.2,
 }
+NSW_BOUNDS = {
+    "min_lat": -37.7,
+    "max_lat": -28.0,
+    "min_lon": 140.9,
+    "max_lon": 154.2,
+}
 WA_BOUNDS = {
     "min_lat": -36.0,
     "max_lat": -13.0,
@@ -69,6 +80,23 @@ VIC_BOUNDS = {
     "min_lon": 140.9,
     "max_lon": 150.2,
 }
+ACT_BOUNDS = {
+    "min_lat": -35.95,
+    "max_lat": -35.1,
+    "min_lon": 148.7,
+    "max_lon": 149.45,
+}
+NSW_VIC_BORDER_POINTS = [
+    {"lon": 141.0, "lat": -34.0},
+    {"lon": 142.2, "lat": -34.18},
+    {"lon": 143.6, "lat": -35.35},
+    {"lon": 144.75, "lat": -36.12},
+    {"lon": 146.0, "lat": -35.998},
+    {"lon": 146.45, "lat": -36.03},
+    {"lon": 146.9, "lat": -36.08},
+    {"lon": 148.25, "lat": -36.65},
+    {"lon": 149.98, "lat": -37.5},
+]
 WA_FUELWATCH_PRODUCTS = {
     "U91": 1,
     "P95": 2,
@@ -156,10 +184,252 @@ GEOCODE_PROVIDER_ALIASES = {
 GEOCODE_QUERY_CORRECTIONS = {
     "artamon": "artarmon",
 }
+LOCAL_GEOCODE_HINTS = [
+    {
+        "label": "66B Easton Avenue, Sylvania NSW 2224",
+        "lat": -34.0114122,
+        "lon": 151.0993847,
+        "kind": "address",
+        "aliases": ["66b eas", "66b east", "easton", "easton ave", "easton avenue sylvania"],
+    },
+    {
+        "label": "Sydney Opera House, Bennelong Point NSW 2000",
+        "lat": -33.8567844,
+        "lon": 151.2152967,
+        "kind": "poi",
+        "aliases": ["opera", "opera house", "sydney opera"],
+    },
+    {
+        "label": "Sydney CBD, Sydney NSW",
+        "lat": -33.8747234,
+        "lon": 151.2053644,
+        "kind": "suburb",
+        "aliases": ["sydney cbd", "cbd sydney", "city sydney"],
+    },
+    {
+        "label": "Sydney Harbour Bridge, Sydney NSW",
+        "lat": -33.8523063,
+        "lon": 151.2107871,
+        "kind": "poi",
+        "aliases": ["harbour bridge", "sydney harbour bridge"],
+    },
+    {
+        "label": "Bondi Beach, Bondi NSW 2026",
+        "lat": -33.8914755,
+        "lon": 151.2766845,
+        "kind": "poi",
+        "aliases": ["bondi", "bondi beach"],
+    },
+    {
+        "label": "Sydney Airport, Mascot NSW 2020",
+        "lat": -33.9399228,
+        "lon": 151.1752764,
+        "kind": "airport",
+        "aliases": ["sydney airport", "kingsford smith airport", "mascot airport"],
+    },
+    {
+        "label": "Westfield Parramatta, Parramatta NSW 2150",
+        "lat": -33.817986,
+        "lon": 151.001057,
+        "kind": "poi",
+        "aliases": ["westfield parramatta", "parramatta westfield"],
+    },
+    {
+        "label": "Canberra ACT",
+        "lat": -35.2975906,
+        "lon": 149.1012676,
+        "kind": "city",
+        "aliases": ["canberra", "canberra act"],
+    },
+    {
+        "label": "Canberra Centre, Canberra ACT 2601",
+        "lat": -35.279341,
+        "lon": 149.133663,
+        "kind": "poi",
+        "aliases": ["canberra centre"],
+    },
+    {
+        "label": "Melbourne CBD, Melbourne VIC",
+        "lat": -37.8136276,
+        "lon": 144.9630576,
+        "kind": "city",
+        "aliases": ["melbourne", "melbourne cbd", "city melbourne"],
+    },
+    {
+        "label": "Melbourne Central, Melbourne VIC 3000",
+        "lat": -37.810064,
+        "lon": 144.962792,
+        "kind": "poi",
+        "aliases": ["melbourne central"],
+    },
+    {
+        "label": "Flinders Street Station, Melbourne VIC 3000",
+        "lat": -37.818305,
+        "lon": 144.966964,
+        "kind": "poi",
+        "aliases": ["flinders street station", "flinders st station"],
+    },
+    {
+        "label": "Queen Victoria Market, Melbourne VIC 3000",
+        "lat": -37.807579,
+        "lon": 144.956785,
+        "kind": "poi",
+        "aliases": ["queen victoria market", "qvm"],
+    },
+    {
+        "label": "Melbourne Cricket Ground, East Melbourne VIC 3002",
+        "lat": -37.819967,
+        "lon": 144.983449,
+        "kind": "poi",
+        "aliases": ["mcg", "melbourne cricket ground"],
+    },
+    {
+        "label": "Melbourne Airport, Tullamarine VIC 3045",
+        "lat": -37.669012,
+        "lon": 144.841027,
+        "kind": "airport",
+        "aliases": ["melbourne airport", "tullamarine airport"],
+    },
+    {
+        "label": "Brisbane CBD, Brisbane QLD",
+        "lat": -27.4697707,
+        "lon": 153.0251235,
+        "kind": "city",
+        "aliases": ["brisbane", "brisbane cbd", "city brisbane"],
+    },
+    {
+        "label": "South Bank, Brisbane QLD 4101",
+        "lat": -27.481079,
+        "lon": 153.023379,
+        "kind": "poi",
+        "aliases": ["south bank brisbane", "southbank brisbane"],
+    },
+    {
+        "label": "Queen Street Mall, Brisbane QLD 4000",
+        "lat": -27.470849,
+        "lon": 153.024475,
+        "kind": "poi",
+        "aliases": ["queen street mall", "queen street mall brisbane"],
+    },
+    {
+        "label": "Brisbane Airport, Brisbane Airport QLD 4008",
+        "lat": -27.384199,
+        "lon": 153.1175,
+        "kind": "airport",
+        "aliases": ["brisbane airport"],
+    },
+    {
+        "label": "Perth CBD, Perth WA",
+        "lat": -31.9523123,
+        "lon": 115.861309,
+        "kind": "city",
+        "aliases": ["perth", "perth cbd", "city perth"],
+    },
+    {
+        "label": "Elizabeth Quay, Perth WA 6000",
+        "lat": -31.958647,
+        "lon": 115.857494,
+        "kind": "poi",
+        "aliases": ["elizabeth quay", "elizabeth quay perth"],
+    },
+    {
+        "label": "Perth Airport, Perth Airport WA 6105",
+        "lat": -31.940299,
+        "lon": 115.966904,
+        "kind": "airport",
+        "aliases": ["perth airport"],
+    },
+    {
+        "label": "Adelaide CBD, Adelaide SA",
+        "lat": -34.9284989,
+        "lon": 138.6007456,
+        "kind": "city",
+        "aliases": ["adelaide", "adelaide cbd", "city adelaide"],
+    },
+    {
+        "label": "Rundle Mall, Adelaide SA 5000",
+        "lat": -34.922776,
+        "lon": 138.602686,
+        "kind": "poi",
+        "aliases": ["rundle mall", "rundle mall adelaide"],
+    },
+    {
+        "label": "Adelaide Airport, Adelaide Airport SA 5950",
+        "lat": -34.945,
+        "lon": 138.530556,
+        "kind": "airport",
+        "aliases": ["adelaide airport"],
+    },
+    {
+        "label": "Hobart CBD, Hobart TAS",
+        "lat": -42.8821377,
+        "lon": 147.3271949,
+        "kind": "city",
+        "aliases": ["hobart", "hobart cbd", "city hobart"],
+    },
+    {
+        "label": "Salamanca Market, Hobart TAS 7000",
+        "lat": -42.886438,
+        "lon": 147.33174,
+        "kind": "poi",
+        "aliases": ["salamanca market", "salamanca hobart"],
+    },
+    {
+        "label": "Hobart Airport, Cambridge TAS 7170",
+        "lat": -42.836111,
+        "lon": 147.510278,
+        "kind": "airport",
+        "aliases": ["hobart airport"],
+    },
+    {
+        "label": "Darwin CBD, Darwin NT",
+        "lat": -12.46344,
+        "lon": 130.845642,
+        "kind": "city",
+        "aliases": ["darwin", "darwin cbd", "city darwin"],
+    },
+    {
+        "label": "Darwin Waterfront, Darwin NT 0800",
+        "lat": -12.466762,
+        "lon": 130.846361,
+        "kind": "poi",
+        "aliases": ["darwin waterfront", "waterfront darwin"],
+    },
+    {
+        "label": "Darwin Airport, Eaton NT 0820",
+        "lat": -12.414722,
+        "lon": 130.876667,
+        "kind": "airport",
+        "aliases": ["darwin airport"],
+    },
+]
+GEOCODE_CACHE: dict[str, dict[str, Any]] = {}
+NOMINATIM_BLOCKED_UNTIL = 0.0
+GNAF_SEED_RECORDS: list[dict[str, Any]] | None = None
 STREET_QUERY_PATTERN = re.compile(
     r"^(.+\b(?:street|st|road|rd|avenue|ave|drive|dr|parade|pde|place|pl|lane|ln|way|crescent|cres)\b)\b.*$",
     re.IGNORECASE,
 )
+PARTIAL_STREET_QUERY_PATTERN = re.compile(r"^(\d+[a-z]?\s+[a-z][a-z\s'-]{2,})$", re.IGNORECASE)
+STREET_TYPE_EXPANSIONS = ["street", "road", "avenue", "drive", "parade", "place", "lane", "way"]
+STATION_QUERY_TERMS = [
+    "7 eleven",
+    "ampol",
+    "bp",
+    "caltex",
+    "coles express",
+    "eg",
+    "fuel",
+    "metro",
+    "mobil",
+    "petrol",
+    "reddy",
+    "service station",
+    "servo",
+    "shell",
+    "united",
+    "woolworths",
+]
 DISCOUNT_RULES = [
     {
         "id": "everyday_rewards",
@@ -276,6 +546,7 @@ def geocode_provider_status() -> dict[str, Any]:
         "requestedProvider": requested,
         "supportedProviders": ["google", "mapbox", "here", "geoapify", "nominatim"],
         "fallbackProvider": "nominatim",
+        "addressIndex": address_index_status(),
         "backendProxyRequired": True,
         "sessionTokenRequired": True,
         "googlePlacesConfigured": bool(google_places_api_key()),
@@ -586,10 +857,57 @@ def point_in_wa(point: Point) -> bool:
 
 
 def point_in_vic(point: Point) -> bool:
-    return (
+    if point_in_act(point):
+        return False
+    if not (
         VIC_BOUNDS["min_lat"] <= point.lat <= VIC_BOUNDS["max_lat"]
         and VIC_BOUNDS["min_lon"] <= point.lon <= VIC_BOUNDS["max_lon"]
+    ):
+        return False
+    border_lat = nsw_vic_border_lat_at_lon(point.lon)
+    if border_lat is not None:
+        return point.lat < border_lat
+    first = NSW_VIC_BORDER_POINTS[0]
+    last = NSW_VIC_BORDER_POINTS[-1]
+    if point.lon > last["lon"]:
+        return point.lat <= last["lat"]
+    if point.lon < first["lon"]:
+        return point.lat < first["lat"]
+    return True
+
+
+def point_in_act(point: Point) -> bool:
+    return (
+        ACT_BOUNDS["min_lat"] <= point.lat <= ACT_BOUNDS["max_lat"]
+        and ACT_BOUNDS["min_lon"] <= point.lon <= ACT_BOUNDS["max_lon"]
     )
+
+
+def point_in_nsw_or_act(point: Point) -> bool:
+    if point_in_act(point):
+        return True
+    if not (
+        NSW_BOUNDS["min_lat"] <= point.lat <= NSW_BOUNDS["max_lat"]
+        and NSW_BOUNDS["min_lon"] <= point.lon <= NSW_BOUNDS["max_lon"]
+    ):
+        return False
+    return not point_in_qld(point) and not point_in_wa(point) and not point_in_vic(point)
+
+
+def nsw_vic_border_lat_at_lon(lon: float) -> float | None:
+    first = NSW_VIC_BORDER_POINTS[0]
+    last = NSW_VIC_BORDER_POINTS[-1]
+    if lon < first["lon"] or lon > last["lon"]:
+        return None
+    for index in range(1, len(NSW_VIC_BORDER_POINTS)):
+        left = NSW_VIC_BORDER_POINTS[index - 1]
+        right = NSW_VIC_BORDER_POINTS[index]
+        if lon < left["lon"] or lon > right["lon"]:
+            continue
+        span = right["lon"] - left["lon"]
+        ratio = (lon - left["lon"]) / span if span else 0
+        return left["lat"] + (right["lat"] - left["lat"]) * ratio
+    return None
 
 
 def qld_nsw_border_area(point: Point, radius_km: float = 0.0) -> bool:
@@ -610,7 +928,10 @@ def live_provider_keys_for_area(points: list[Point], *, radius_km: float = 0.0) 
     if any(point_in_wa(point) for point in points):
         return ["wa"]
     if any(point_in_vic(point) for point in points):
-        return ["vic"]
+        providers = ["vic"]
+        if any(point_in_nsw_or_act(point) for point in points):
+            providers.append("nsw")
+        return providers
     has_qld_point = any(point_in_qld(point) for point in points)
     has_non_qld_point = any(not point_in_qld(point) for point in points)
     if has_qld_point:
@@ -618,7 +939,9 @@ def live_provider_keys_for_area(points: list[Point], *, radius_km: float = 0.0) 
         if has_non_qld_point or any(qld_nsw_border_area(point, radius_km) for point in points):
             providers.append("nsw")
         return providers
-    return ["nsw"]
+    if any(point_in_nsw_or_act(point) for point in points):
+        return ["nsw"]
+    return []
 
 
 def load_live_stations_for_area(
@@ -785,7 +1108,12 @@ def select_geocode_provider(value: str, *, allow_fallback: bool = False) -> str:
 
 
 def nominatim_geocode(query: str, limit: int) -> list[dict[str, Any]]:
+    global NOMINATIM_BLOCKED_UNTIL
+    if time.time() < NOMINATIM_BLOCKED_UNTIL:
+        raise ValueError("Validation geocoder is cooling down after rate limiting")
     last_error = f"No location found for {query}"
+    suggestions: list[dict[str, Any]] = []
+    seen: set[str] = set()
     for candidate_query in geocode_query_variants(query):
         search_params = urlencode(
             {
@@ -796,10 +1124,25 @@ def nominatim_geocode(query: str, limit: int) -> list[dict[str, Any]]:
                 "addressdetails": "1",
             }
         )
-        payload = fetch_json(f"https://nominatim.openstreetmap.org/search?{search_params}")
+        try:
+            payload = fetch_json(f"https://nominatim.openstreetmap.org/search?{search_params}")
+        except Exception as exc:
+            if is_rate_limit_error(exc):
+                NOMINATIM_BLOCKED_UNTIL = time.time() + NOMINATIM_RATE_LIMIT_BACKOFF_SECONDS
+            raise
         if isinstance(payload, list) and payload:
-            return [nominatim_item_payload(item, candidate_query) for item in payload]
-    raise ValueError(last_error)
+            for item in payload:
+                suggestion = nominatim_item_payload(item, candidate_query)
+                key = geocode_suggestion_key(suggestion)
+                if key in seen:
+                    continue
+                suggestions.append(suggestion)
+                seen.add(key)
+                if len(suggestions) >= limit:
+                    return suggestions
+    if not suggestions:
+        raise ValueError(last_error)
+    return suggestions
 
 
 def geocode_query_variants(query: str) -> list[str]:
@@ -819,6 +1162,12 @@ def geocode_query_variants(query: str) -> list[str]:
         street_only = match.group(1).strip()
         variants.extend([street_only, f"{street_only} Sydney", f"{street_only} NSW"])
 
+    if PARTIAL_STREET_QUERY_PATTERN.match(cleaned) and not STREET_QUERY_PATTERN.match(cleaned):
+        for street_type in STREET_TYPE_EXPANSIONS:
+            variants.extend([f"{cleaned} {street_type} NSW", f"{cleaned} {street_type} Sydney NSW"])
+
+    variants.extend([f"{cleaned} NSW", f"{cleaned} Australia"])
+
     unique = []
     seen = set()
     for value in variants:
@@ -826,7 +1175,263 @@ def geocode_query_variants(query: str) -> list[str]:
         if value and key not in seen:
             unique.append(value)
             seen.add(key)
-    return unique
+    return unique[:8]
+
+
+def local_station_geocode(query: str, limit: int) -> list[dict[str, Any]]:
+    needle = normalise_search_text(query)
+    if len(needle) < 3:
+        return []
+    try:
+        stations, _source = load_live_stations_for_area(points=[], radius_km=0)
+    except Exception:
+        return []
+
+    scored: list[tuple[int, int, dict[str, Any]]] = []
+    for station in stations:
+        haystack = normalise_search_text(
+            " ".join(
+                str(value)
+                for value in [
+                    station.get("name"),
+                    station.get("brand"),
+                    station.get("suburb"),
+                    station.get("address"),
+                ]
+                if value
+            )
+        )
+        if needle not in haystack:
+            continue
+        name = str(station.get("name") or station.get("brand") or "Fuel station")
+        suburb = f", {station.get('suburb')}" if station.get("suburb") else ""
+        address = f" - {station.get('address')}" if station.get("address") else ""
+        item = geocode_item_payload(
+            label=f"{name}{suburb}{address}",
+            lat=float(station["lat"]),
+            lon=float(station["lon"]),
+            kind="fuel_station",
+            provider="fuel_path",
+            provider_id=str(station.get("stationCode") or ""),
+        )
+        scored.append((0 if haystack.startswith(needle) else haystack.find(needle), len(item["label"]), item))
+    scored.sort(key=lambda row: (row[0], row[1]))
+    return [row[2] for row in scored[:limit]]
+
+
+def local_address_geocode(query: str, limit: int) -> list[dict[str, Any]]:
+    needle = normalise_address_text(query)
+    if len(needle) < 4:
+        return []
+    sqlite_results = search_gnaf_sqlite(needle, limit)
+    if sqlite_results:
+        return sqlite_results
+    scored: list[tuple[int, int, dict[str, Any], str]] = []
+    for record in load_gnaf_seed_records():
+        result = score_address_record(record, needle)
+        if not result:
+            continue
+        score, match_type = result
+        item = geocode_item_payload(
+            label=str(record["label"]),
+            lat=float(record["lat"]),
+            lon=float(record["lon"]),
+            kind="address",
+            provider="fuel_path_gnaf",
+            provider_id=str(record.get("id") or record["label"]),
+        )
+        item["confidence"] = "high" if match_type == "exact_address" else "medium"
+        item["matchType"] = match_type
+        item["score"] = score
+        item["source"] = "gnaf_address_index"
+        item["accuracy"] = str(record.get("accuracy") or "address_index")
+        item["state"] = str(record.get("state") or "")
+        item["postcode"] = str(record.get("postcode") or "")
+        scored.append((score, -len(str(record["label"])), item, match_type))
+    scored.sort(key=lambda row: (row[0], row[1]), reverse=True)
+    return [row[2] for row in scored[:limit]]
+
+
+def search_gnaf_sqlite(needle: str, limit: int) -> list[dict[str, Any]]:
+    sqlite_path = os.getenv("FUEL_PATH_GNAF_SQLITE_PATH", "").strip()
+    if not sqlite_path or not Path(sqlite_path).exists():
+        return []
+    try:
+        with sqlite3.connect(sqlite_path) as connection:
+            connection.row_factory = sqlite3.Row
+            terms = [re.sub(r"[^a-z0-9_-]+", " ", term).strip() for term in needle.split()[:8]]
+            fts_query = " ".join(f"{term}*" for term in terms if term)
+            if fts_query:
+                try:
+                    rows = connection.execute(
+                        """
+                        SELECT id, label, lat, lon, state, postcode, accuracy, search_text
+                        FROM address_fts
+                        WHERE address_fts MATCH ?
+                        ORDER BY rank
+                        LIMIT ?
+                        """,
+                        (fts_query, limit),
+                    ).fetchall()
+                    if rows:
+                        return [sqlite_address_row_to_suggestion(row, needle) for row in rows]
+                except sqlite3.Error:
+                    pass
+            rows = connection.execute(
+                """
+                SELECT id, label, lat, lon, state, postcode, accuracy, search_text
+                FROM addresses
+                WHERE search_text LIKE ?
+                ORDER BY LENGTH(label)
+                LIMIT ?
+                """,
+                (f"%{needle}%", limit),
+            ).fetchall()
+            return [sqlite_address_row_to_suggestion(row, needle) for row in rows]
+    except sqlite3.Error:
+        return []
+
+
+def sqlite_address_row_to_suggestion(row: sqlite3.Row, needle: str) -> dict[str, Any]:
+    text = normalise_address_text(str(row["search_text"] or row["label"]))
+    if text == needle:
+        match_type = "exact_address"
+    elif text.startswith(needle):
+        match_type = "address_prefix"
+    else:
+        match_type = "address_contains"
+    item = geocode_item_payload(
+        label=str(row["label"]),
+        lat=float(row["lat"]),
+        lon=float(row["lon"]),
+        kind="address",
+        provider="fuel_path_gnaf",
+        provider_id=str(row["id"]),
+    )
+    item["confidence"] = "high" if match_type == "exact_address" else "medium"
+    item["matchType"] = match_type
+    item["source"] = "gnaf_address_index"
+    item["accuracy"] = str(row["accuracy"] or "address_index")
+    item["state"] = str(row["state"] or "")
+    item["postcode"] = str(row["postcode"] or "")
+    return item
+
+
+def score_address_record(record: dict[str, Any], needle: str) -> tuple[int, str] | None:
+    texts = [normalise_address_text(str(record.get("label") or ""))]
+    texts.extend(normalise_address_text(str(alias)) for alias in record.get("aliases") or [])
+    best_score = 0
+    match_type = ""
+    for text in texts:
+        if needle == text:
+            best_score = max(best_score, 1000)
+            match_type = "exact_address"
+        elif text.startswith(needle):
+            best_score = max(best_score, 900)
+            match_type = match_type or "address_prefix"
+        elif needle in text:
+            best_score = max(best_score, 760)
+            match_type = match_type or "address_contains"
+        elif len(text) >= 8 and text in needle:
+            best_score = max(best_score, 680)
+            match_type = match_type or "address_alias"
+    return (best_score, match_type) if best_score else None
+
+
+def has_exact_address_suggestion(suggestions: list[dict[str, Any]]) -> bool:
+    return any(
+        item.get("provider") == "fuel_path_gnaf" and item.get("matchType") == "exact_address"
+        for item in suggestions
+    )
+
+
+def load_gnaf_seed_records() -> list[dict[str, Any]]:
+    global GNAF_SEED_RECORDS
+    if GNAF_SEED_RECORDS is not None:
+        return GNAF_SEED_RECORDS
+    try:
+        payload = json.loads(GNAF_SEED_PATH.read_text())
+        GNAF_SEED_RECORDS = payload if isinstance(payload, list) else []
+    except Exception:
+        GNAF_SEED_RECORDS = []
+    return GNAF_SEED_RECORDS
+
+
+def address_index_status() -> dict[str, Any]:
+    sqlite_path = os.getenv("FUEL_PATH_GNAF_SQLITE_PATH", "").strip()
+    sqlite_configured = bool(sqlite_path and Path(sqlite_path).exists())
+    seed_records = len(load_gnaf_seed_records())
+    return {
+        "configured": sqlite_configured or seed_records > 0,
+        "mode": "sqlite" if sqlite_configured else ("seed" if seed_records else "disabled"),
+        "sqliteConfigured": sqlite_configured,
+        "seedRecords": seed_records,
+        "source": sqlite_path if sqlite_configured else str(GNAF_SEED_PATH),
+        "provider": "fuel_path_gnaf",
+    }
+
+
+def local_hint_geocode(query: str, limit: int) -> list[dict[str, Any]]:
+    needle = normalise_search_text(query)
+    if len(needle) < 3:
+        return []
+    scored: list[tuple[int, int, dict[str, Any]]] = []
+    for hint in LOCAL_GEOCODE_HINTS:
+        texts = [normalise_search_text(str(hint["label"]))]
+        texts.extend(normalise_search_text(str(alias)) for alias in hint.get("aliases", []))
+        if not any(local_hint_matches(needle, value, str(hint.get("kind") or "")) for value in texts):
+            continue
+        indexes = [value.find(needle) for value in texts if value.find(needle) >= 0]
+        score = min(indexes) if indexes else 999
+        item = geocode_item_payload(
+            label=str(hint["label"]),
+            lat=float(hint["lat"]),
+            lon=float(hint["lon"]),
+            kind=str(hint.get("kind") or "place"),
+            provider="fuel_path_hint",
+            provider_id=normalise_search_text(str(hint["label"])),
+        )
+        scored.append((score, len(item["label"]), item))
+    scored.sort(key=lambda row: (row[0], row[1]))
+    return [row[2] for row in scored[:limit]]
+
+
+def local_hint_matches(needle: str, value: str, kind: str) -> bool:
+    if not value:
+        return False
+    if needle == value or needle in value:
+        return True
+    if kind == "city":
+        return False
+    return len(value) >= 6 and value in needle
+
+
+def normalise_search_text(value: str) -> str:
+    return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9]+", " ", str(value).lower())).strip()
+
+
+def normalise_address_text(value: str) -> str:
+    expanded = str(value).lower()
+    replacements = {
+        r"\bst\b": "street",
+        r"\brd\b": "road",
+        r"\bave\b": "avenue",
+        r"\bdr\b": "drive",
+        r"\bpde\b": "parade",
+        r"\bpl\b": "place",
+        r"\bln\b": "lane",
+    }
+    for pattern, replacement in replacements.items():
+        expanded = re.sub(pattern, replacement, expanded)
+    return normalise_search_text(expanded)
+
+
+def geocode_suggestion_key(item: dict[str, Any]) -> str:
+    return (
+        f"{round(float(item.get('lat', 0)) * 100000)}:"
+        f"{round(float(item.get('lon', 0)) * 100000)}:"
+        f"{normalise_search_text(str(item.get('label', '')))[:48]}"
+    )
 
 
 def google_place_details(
@@ -1050,23 +1655,119 @@ def build_geocode_response(params: dict[str, list[str]]) -> dict[str, Any]:
         os.getenv("FUEL_PATH_GEOCODE_PROVIDER", "nominatim"),
     )
     provider = select_geocode_provider(requested_provider)
-    suggestions = provider_geocode(
-        provider=provider,
-        query=query,
-        limit=limit,
-        session_token=session_token,
+    cache_key = geocode_cache_key(provider, query, limit)
+    cached = read_geocode_cache(cache_key)
+    if cached:
+        return {**cached, "cache": "hit", "sessionToken": session_token}
+    local_suggestions = merge_geocode_suggestions(
+        [
+            *local_address_geocode(query, limit),
+            *local_hint_geocode(query, limit),
+            *(
+                local_station_geocode(query, limit)
+                if provider == "nominatim" and looks_like_station_query(query)
+                else []
+            ),
+        ],
+        limit,
     )
-    item = suggestions[0]
-    return {
+    provider_warning = ""
+    provider_suggestions = []
+    if not has_exact_address_suggestion(local_suggestions):
+        try:
+            provider_suggestions = provider_geocode(
+                provider=provider,
+                query=query,
+                limit=limit,
+                session_token=session_token,
+            )
+        except Exception as exc:
+            provider_suggestions = []
+            provider_warning = geocode_provider_warning(exc, provider)
+    suggestions = merge_geocode_suggestions([*local_suggestions, *provider_suggestions], limit)
+    if suggestions:
+        lookup_status = "local_fallback" if provider_warning else "ok"
+    else:
+        lookup_status = "degraded" if provider_warning else "no_match"
+    payload = {
         "provider": provider,
         "providerMode": "validation" if provider == "nominatim" else "production_candidate",
         "recommendedProductionProvider": RECOMMENDED_GEOCODE_PROVIDER,
         "requestedProvider": requested_provider,
         "sessionToken": session_token,
         "query": query,
-        "location": item,
+        "location": suggestions[0] if suggestions else None,
         "suggestions": suggestions,
+        "lookupStatus": lookup_status,
     }
+    if provider_warning:
+        payload["warning"] = provider_warning
+    write_geocode_cache(cache_key, payload, lookup_status in {"ok", "local_fallback"})
+    return payload
+
+
+def geocode_cache_key(provider: str, query: str, limit: int) -> str:
+    return f"{provider}:{limit}:{normalise_search_text(query)}"
+
+
+def read_geocode_cache(key: str) -> dict[str, Any] | None:
+    entry = GEOCODE_CACHE.get(key)
+    if not entry:
+        return None
+    if time.time() > float(entry["expires_at"]):
+        GEOCODE_CACHE.pop(key, None)
+        return None
+    return dict(entry["payload"])
+
+
+def write_geocode_cache(key: str, payload: dict[str, Any], durable: bool) -> None:
+    ttl = GEOCODE_CACHE_SECONDS if durable else GEOCODE_DEGRADED_CACHE_SECONDS
+    GEOCODE_CACHE[key] = {"expires_at": time.time() + ttl, "payload": dict(payload)}
+
+
+def is_rate_limit_error(error: Exception) -> bool:
+    return "429" in str(error)
+
+
+def geocode_provider_warning(error: Exception, provider: str) -> str:
+    message = str(error)
+    if is_rate_limit_error(error) or re.search(
+        r"cooling down|rate limit", message, flags=re.IGNORECASE
+    ):
+        return (
+            f"{provider} lookup is temporarily rate-limited. Try a fuller address, suburb "
+            "or postcode, or enable a production autocomplete provider."
+        )
+    if re.search(r"abort|timeout|timed out", message, flags=re.IGNORECASE):
+        return f"{provider} lookup timed out. Try a fuller address, suburb or postcode."
+    if re.search(r"No location found", message, flags=re.IGNORECASE):
+        return "No strong location match found. Try a fuller address, suburb or postcode."
+    return f"{provider} lookup is temporarily unavailable. Try a fuller address, suburb or postcode."
+
+
+def looks_like_station_query(query: str) -> bool:
+    needle = normalise_search_text(query)
+    if len(needle) < 3:
+        return False
+    for term in STATION_QUERY_TERMS:
+        normalised_term = normalise_search_text(term)
+        if needle == normalised_term or normalised_term in needle:
+            return True
+    return False
+
+
+def merge_geocode_suggestions(items: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
+    merged: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for item in items:
+        key = geocode_suggestion_key(item)
+        if key in seen:
+            continue
+        merged.append(item)
+        seen.add(key)
+        if len(merged) >= limit:
+            break
+    return merged
 
 
 def build_route_response(params: dict[str, list[str]]) -> dict[str, Any]:
@@ -1244,6 +1945,7 @@ def score_response_for_route(
     context["cacheSeconds"] = int(
         os.getenv("FUEL_PATH_LIVE_CACHE_SECONDS", str(DEFAULT_CACHE_SECONDS))
     )
+    context["timingAdvice"] = route_timing_advice(candidates[0] if candidates else None)
     context_stations = route_context_station_payloads(
         route=route,
         stations=stations,
@@ -1258,6 +1960,45 @@ def score_response_for_route(
         "recommendations": [candidate_payload(candidate) for candidate in candidates[:20]],
         "contextStations": context_stations,
     }
+
+
+def route_timing_advice(candidate: Candidate | None) -> dict[str, Any]:
+    if candidate is None:
+        return {
+            "action": "no_cycle_signal",
+            "visible": False,
+            "label": "",
+            "reason": "",
+        }
+
+    saving = float(candidate.net_saving_dollars or 0)
+    detour_minutes = float(candidate.detour_minutes or 0)
+    station_name = str(candidate.station.get("name") or "This stop")
+    if saving >= 4 and detour_minutes <= 3:
+        return {
+            "action": "fill_today_on_route",
+            "visible": True,
+            "label": "Fill today on this route",
+            "reason": f"{station_name} is good value with only {detour_minutes:.1f} min detour.",
+        }
+    if saving >= 1:
+        return {
+            "action": "fill_today_with_detour",
+            "visible": True,
+            "label": "Fill today, but check the detour",
+            "reason": f"{station_name} saves about {format_money(saving)} after {detour_minutes:.1f} min detour.",
+        }
+    return {
+        "action": "no_cycle_signal",
+        "visible": False,
+        "label": "",
+        "reason": "",
+    }
+
+
+def format_money(value: float) -> str:
+    sign = "-" if value < 0 else ""
+    return f"{sign}${abs(value):.2f}"
 
 
 def route_context_station_payloads(

@@ -18,7 +18,12 @@ import { StationRow } from "../components/StationRow";
 import { getCurrentMapPoint, getGrantedCurrentMapPoint } from "../services/currentLocation";
 import { colors, radii, shadow, spacing, typeScale } from "../theme";
 import { AppPreferences, FuelCode, MapPoint, StationViewModel } from "../types";
-import { formatRelativeUpdatedAt, sortStations, stationPriceView, tomorrowPriceView } from "../utils/pricing";
+import {
+  predictionDisciplineCue,
+  stationAttentionCue,
+  stationTimestampLine,
+} from "../utils/decisionEvidence";
+import { sortStations, stationPriceView, tomorrowPriceView } from "../utils/pricing";
 
 const defaultNearbyCentre: MapPoint = {
   lat: -34.0114122,
@@ -158,6 +163,7 @@ export function NearbyScreen({
 
     let active = true;
     setSuggestionsLoading(true);
+    setLocationError("");
     const timer = setTimeout(() => {
       searchLocations(query, 5, addressSessionTokenRef.current)
         .then((suggestions) => {
@@ -171,7 +177,7 @@ export function NearbyScreen({
         .finally(() => {
           if (active) setSuggestionsLoading(false);
         });
-    }, 300);
+    }, 650);
 
     return () => {
       active = false;
@@ -302,10 +308,12 @@ export function NearbyScreen({
   );
   const selected = stations.find((item) => item.station.stationCode === selectedCode);
   const selectedTomorrow = selected ? tomorrowPriceView(selected) : null;
+  const selectedAttentionCue = selected ? stationAttentionCue(selected) : null;
+  const selectedPredictionCue = selected ? predictionDisciplineCue(selected) : "";
   const selectedMetaLine = selected
     ? [
         selected.station.phone || selected.station.brand,
-        formatRelativeUpdatedAt(selected.station.updatedAt),
+        stationTimestampLine(selected.station),
       ]
         .filter(Boolean)
         .join(" | ")
@@ -578,6 +586,20 @@ export function NearbyScreen({
                         {selectedMetaLine}
                       </Text>
                     </View>
+                    {selectedAttentionCue || selectedPredictionCue ? (
+                      <View style={styles.evidenceRow}>
+                        {selectedAttentionCue ? (
+                          <Text numberOfLines={1} style={styles.evidenceChip}>
+                            {selectedAttentionCue.label}
+                          </Text>
+                        ) : null}
+                        {selectedPredictionCue ? (
+                          <Text numberOfLines={1} style={styles.evidenceChip}>
+                            {selectedPredictionCue}
+                          </Text>
+                        ) : null}
+                      </View>
+                    ) : null}
                   </View>
                   <Pressable
                     accessibilityLabel="Close selected station"
@@ -589,6 +611,9 @@ export function NearbyScreen({
                 </View>
                 <View style={styles.selectedActions}>
                   <View style={styles.selectedPrice}>
+                    <Text style={styles.selectedPriceBasis}>
+                      {selected.discountCpl > 0 ? `Pump ${selected.pumpCpl.toFixed(1)}` : "Pump price"}
+                    </Text>
                     <Text style={styles.priceValue}>
                       {selected.adjustedCpl.toFixed(1)}
                       <Text style={styles.priceUnitInline}> c/L</Text>
@@ -1087,6 +1112,25 @@ const styles = StyleSheet.create({
     lineHeight: 17,
     minWidth: 0,
   },
+  evidenceRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.xs,
+    marginTop: spacing.xs,
+  },
+  evidenceChip: {
+    backgroundColor: colors.white,
+    borderColor: colors.line,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    color: colors.ink,
+    fontSize: 9,
+    fontWeight: "900",
+    maxWidth: 150,
+    overflow: "hidden",
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+  },
   closeButton: {
     alignItems: "center",
     backgroundColor: colors.white,
@@ -1110,6 +1154,11 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     flex: 1,
     minWidth: 0,
+  },
+  selectedPriceBasis: {
+    color: colors.muted,
+    fontSize: 10,
+    fontWeight: "900",
   },
   priceValue: {
     color: colors.greenDark,

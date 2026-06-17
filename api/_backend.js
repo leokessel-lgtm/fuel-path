@@ -21,8 +21,12 @@ const {
   predictionStorageStatus,
   setPredictionStorageForTests,
 } = require("./_predictionStorage");
+const { addressIndexStatus, searchAddressIndex } = require("./_addressIndex");
 
 const DEFAULT_CACHE_SECONDS = 300;
+const GEOCODE_CACHE_SECONDS = 60 * 60 * 6;
+const GEOCODE_DEGRADED_CACHE_SECONDS = 60;
+const NOMINATIM_RATE_LIMIT_BACKOFF_MS = 60 * 1000;
 const DEFAULT_TOKEN_URL = "https://api.onegov.nsw.gov.au/oauth/client_credential/accesstoken";
 const DEFAULT_PRICES_URL = "https://api.onegov.nsw.gov.au/FuelPriceCheck/v1/fuel/prices";
 const DEFAULT_USER_AGENT = "FuelPathHostedBackend/0.1";
@@ -1785,9 +1789,19 @@ function priceAgeHours(updatedAt, now = new Date()) {
   return (now.getTime() - parsed.getTime()) / 3600000;
 }
 
-function freshnessPenalty(updatedAt, now) {
+function isOfficialLivePriceSource(source) {
+  return new Set([
+    "api_nsw_fuelcheck",
+    "api_qld_fuelprices",
+    "api_wa_fuelwatch",
+    "api_vic_servo_saver",
+  ]).has(String(source || ""));
+}
+
+function freshnessPenalty(updatedAt, now, source) {
   const hours = priceAgeHours(updatedAt, now);
   if (!Number.isFinite(hours)) return [1.5, "price timestamp missing or invalid"];
+  if (isOfficialLivePriceSource(source)) return [0, ""];
   if (hours <= 6) return [0, ""];
   if (hours <= 24) return [0.5, `price is ${hours.toFixed(1)} hours old`];
   if (hours <= 48) return [1, `price is ${hours.toFixed(1)} hours old`];
@@ -1881,9 +1895,9 @@ function scoreRouteForCorridor({ source, route, stations, fuel, tankLitres, tank
     const detourCost = detourFuelLitres * (adjustedCpl / 100);
     const netSaving = fillLitres * ((baselineCpl - adjustedCpl) / 100) - detourCost;
     const reachable = tankRangeKm >= routeDistanceInfo.distanceAlongRouteKm + routeDistanceInfo.distanceToRouteKm + reserveKm;
-    const [freshPenalty, freshWarning] = freshnessPenalty(station.updatedAt, now);
+    const [freshPenalty, freshWarning] = freshnessPenalty(station.updatedAt, now, station.source);
     if (
-      ["api_nsw_fuelcheck", "api_qld_fuelprices", "api_wa_fuelwatch"].includes(station.source) &&
+      !isOfficialLivePriceSource(station.source) &&
       priceAgeHours(station.updatedAt, now) > RECOMMENDATION_MAX_PRICE_AGE_HOURS
     ) {
       staleExcludedCandidates += 1;
@@ -1939,8 +1953,50 @@ function scoreRouteForCorridor({ source, route, stations, fuel, tankLitres, tank
       eligibleCandidates: candidates.length,
       freshnessCutoffHours: RECOMMENDATION_MAX_PRICE_AGE_HOURS,
       staleExcludedCandidates,
+      timingAdvice: routeTimingAdvice(candidates[0]),
     },
   };
+}
+
+function routeTimingAdvice(candidate) {
+  if (!candidate) {
+    return {
+      action: "no_cycle_signal",
+      visible: false,
+      label: "",
+      reason: "",
+    };
+  }
+
+  const saving = Number(candidate.netSaving || 0);
+  const detourMinutes = Number(candidate.detourMinutes || 0);
+  if (saving >= 4 && detourMinutes <= 3) {
+    return {
+      action: "fill_today_on_route",
+      visible: true,
+      label: "Fill today on this route",
+      reason: `${candidate.station?.name || "This stop"} is good value with only ${detourMinutes.toFixed(1)} min detour.`,
+    };
+  }
+  if (saving >= 1) {
+    return {
+      action: "fill_today_with_detour",
+      visible: true,
+      label: "Fill today, but check the detour",
+      reason: `${candidate.station?.name || "This stop"} saves about ${formatMoney(saving)} after ${detourMinutes.toFixed(1)} min detour.`,
+    };
+  }
+  return {
+    action: "no_cycle_signal",
+    visible: false,
+    label: "",
+    reason: "",
+  };
+}
+
+function formatMoney(value) {
+  const sign = value < 0 ? "-" : "";
+  return `${sign}$${Math.abs(Number(value) || 0).toFixed(2)}`;
 }
 
 function routeContextStations({ route, stations, fuel, excludedCodes, corridorKm, includeMemberPrices, includeClosed, limit = 40 }) {
@@ -2029,6 +2085,7 @@ function geocodeProviderStatus() {
     requestedProvider,
     supportedProviders: ["google", "mapbox", "here", "geoapify", "nominatim"],
     fallbackProvider: "nominatim",
+    addressIndex: addressIndexStatus(),
     backendProxyRequired: true,
     sessionTokenRequired: activeProvider === "google",
     googlePlacesConfigured,
@@ -2042,7 +2099,250 @@ const GEOCODE_QUERY_CORRECTIONS = {
   artamon: "artarmon",
 };
 
+const LOCAL_GEOCODE_HINTS = [
+  {
+    label: "66B Easton Avenue, Sylvania NSW 2224",
+    lat: -34.0114122,
+    lon: 151.0993847,
+    kind: "address",
+    aliases: ["66b eas", "66b east", "easton", "easton ave", "easton avenue sylvania"],
+  },
+  {
+    label: "Sydney Opera House, Bennelong Point NSW 2000",
+    lat: -33.8567844,
+    lon: 151.2152967,
+    kind: "poi",
+    aliases: ["opera", "opera house", "sydney opera"],
+  },
+  {
+    label: "Sydney CBD, Sydney NSW",
+    lat: -33.8747234,
+    lon: 151.2053644,
+    kind: "suburb",
+    aliases: ["sydney cbd", "cbd sydney", "city sydney"],
+  },
+  {
+    label: "Sydney Harbour Bridge, Sydney NSW",
+    lat: -33.8523063,
+    lon: 151.2107871,
+    kind: "poi",
+    aliases: ["harbour bridge", "sydney harbour bridge"],
+  },
+  {
+    label: "Bondi Beach, Bondi NSW 2026",
+    lat: -33.8914755,
+    lon: 151.2766845,
+    kind: "poi",
+    aliases: ["bondi", "bondi beach"],
+  },
+  {
+    label: "Sydney Airport, Mascot NSW 2020",
+    lat: -33.9399228,
+    lon: 151.1752764,
+    kind: "airport",
+    aliases: ["sydney airport", "kingsford smith airport", "mascot airport"],
+  },
+  {
+    label: "Westfield Parramatta, Parramatta NSW 2150",
+    lat: -33.817986,
+    lon: 151.001057,
+    kind: "poi",
+    aliases: ["westfield parramatta", "parramatta westfield"],
+  },
+  {
+    label: "Canberra ACT",
+    lat: -35.2975906,
+    lon: 149.1012676,
+    kind: "city",
+    aliases: ["canberra", "canberra act"],
+  },
+  {
+    label: "Canberra Centre, Canberra ACT 2601",
+    lat: -35.279341,
+    lon: 149.133663,
+    kind: "poi",
+    aliases: ["canberra centre"],
+  },
+  {
+    label: "Melbourne CBD, Melbourne VIC",
+    lat: -37.8136276,
+    lon: 144.9630576,
+    kind: "city",
+    aliases: ["melbourne", "melbourne cbd", "city melbourne"],
+  },
+  {
+    label: "Melbourne Central, Melbourne VIC 3000",
+    lat: -37.810064,
+    lon: 144.962792,
+    kind: "poi",
+    aliases: ["melbourne central"],
+  },
+  {
+    label: "Flinders Street Station, Melbourne VIC 3000",
+    lat: -37.818305,
+    lon: 144.966964,
+    kind: "poi",
+    aliases: ["flinders street station", "flinders st station"],
+  },
+  {
+    label: "Queen Victoria Market, Melbourne VIC 3000",
+    lat: -37.807579,
+    lon: 144.956785,
+    kind: "poi",
+    aliases: ["queen victoria market", "qvm"],
+  },
+  {
+    label: "Melbourne Cricket Ground, East Melbourne VIC 3002",
+    lat: -37.819967,
+    lon: 144.983449,
+    kind: "poi",
+    aliases: ["mcg", "melbourne cricket ground"],
+  },
+  {
+    label: "Melbourne Airport, Tullamarine VIC 3045",
+    lat: -37.669012,
+    lon: 144.841027,
+    kind: "airport",
+    aliases: ["melbourne airport", "tullamarine airport"],
+  },
+  {
+    label: "Brisbane CBD, Brisbane QLD",
+    lat: -27.4697707,
+    lon: 153.0251235,
+    kind: "city",
+    aliases: ["brisbane", "brisbane cbd", "city brisbane"],
+  },
+  {
+    label: "South Bank, Brisbane QLD 4101",
+    lat: -27.481079,
+    lon: 153.023379,
+    kind: "poi",
+    aliases: ["south bank brisbane", "southbank brisbane"],
+  },
+  {
+    label: "Queen Street Mall, Brisbane QLD 4000",
+    lat: -27.470849,
+    lon: 153.024475,
+    kind: "poi",
+    aliases: ["queen street mall", "queen street mall brisbane"],
+  },
+  {
+    label: "Brisbane Airport, Brisbane Airport QLD 4008",
+    lat: -27.384199,
+    lon: 153.1175,
+    kind: "airport",
+    aliases: ["brisbane airport"],
+  },
+  {
+    label: "Perth CBD, Perth WA",
+    lat: -31.9523123,
+    lon: 115.861309,
+    kind: "city",
+    aliases: ["perth", "perth cbd", "city perth"],
+  },
+  {
+    label: "Elizabeth Quay, Perth WA 6000",
+    lat: -31.958647,
+    lon: 115.857494,
+    kind: "poi",
+    aliases: ["elizabeth quay", "elizabeth quay perth"],
+  },
+  {
+    label: "Perth Airport, Perth Airport WA 6105",
+    lat: -31.940299,
+    lon: 115.966904,
+    kind: "airport",
+    aliases: ["perth airport"],
+  },
+  {
+    label: "Adelaide CBD, Adelaide SA",
+    lat: -34.9284989,
+    lon: 138.6007456,
+    kind: "city",
+    aliases: ["adelaide", "adelaide cbd", "city adelaide"],
+  },
+  {
+    label: "Rundle Mall, Adelaide SA 5000",
+    lat: -34.922776,
+    lon: 138.602686,
+    kind: "poi",
+    aliases: ["rundle mall", "rundle mall adelaide"],
+  },
+  {
+    label: "Adelaide Airport, Adelaide Airport SA 5950",
+    lat: -34.945,
+    lon: 138.530556,
+    kind: "airport",
+    aliases: ["adelaide airport"],
+  },
+  {
+    label: "Hobart CBD, Hobart TAS",
+    lat: -42.8821377,
+    lon: 147.3271949,
+    kind: "city",
+    aliases: ["hobart", "hobart cbd", "city hobart"],
+  },
+  {
+    label: "Salamanca Market, Hobart TAS 7000",
+    lat: -42.886438,
+    lon: 147.33174,
+    kind: "poi",
+    aliases: ["salamanca market", "salamanca hobart"],
+  },
+  {
+    label: "Hobart Airport, Cambridge TAS 7170",
+    lat: -42.836111,
+    lon: 147.510278,
+    kind: "airport",
+    aliases: ["hobart airport"],
+  },
+  {
+    label: "Darwin CBD, Darwin NT",
+    lat: -12.46344,
+    lon: 130.845642,
+    kind: "city",
+    aliases: ["darwin", "darwin cbd", "city darwin"],
+  },
+  {
+    label: "Darwin Waterfront, Darwin NT 0800",
+    lat: -12.466762,
+    lon: 130.846361,
+    kind: "poi",
+    aliases: ["darwin waterfront", "waterfront darwin"],
+  },
+  {
+    label: "Darwin Airport, Eaton NT 0820",
+    lat: -12.414722,
+    lon: 130.876667,
+    kind: "airport",
+    aliases: ["darwin airport"],
+  },
+];
+
+const geocodeCache = new Map();
+let nominatimBlockedUntilMs = 0;
+
 const STREET_QUERY_PATTERN = /^(.+\b(?:street|st|road|rd|avenue|ave|drive|dr|parade|pde|place|pl|lane|ln|way|crescent|cres)\b)\b.*$/i;
+const PARTIAL_STREET_QUERY_PATTERN = /^(\d+[a-z]?\s+[a-z][a-z\s'-]{2,})$/i;
+const STREET_TYPE_EXPANSIONS = ["street", "road", "avenue", "drive", "parade", "place", "lane", "way"];
+const STATION_QUERY_TERMS = [
+  "7 eleven",
+  "ampol",
+  "bp",
+  "caltex",
+  "coles express",
+  "eg",
+  "fuel",
+  "metro",
+  "mobil",
+  "petrol",
+  "reddy",
+  "service station",
+  "servo",
+  "shell",
+  "united",
+  "woolworths",
+];
 
 function geocodeQueryVariants(query) {
   const cleaned = String(query || "").trim().replace(/\s+/g, " ").replace(/\.+$/, "");
@@ -2059,7 +2359,13 @@ function geocodeQueryVariants(query) {
       variants.push(streetOnly, `${streetOnly} Sydney`, `${streetOnly} NSW`);
     }
   }
-  return [...new Set(variants.filter(Boolean).map((value) => value.trim()))];
+  if (PARTIAL_STREET_QUERY_PATTERN.test(cleaned) && !STREET_QUERY_PATTERN.test(cleaned)) {
+    for (const type of STREET_TYPE_EXPANSIONS) {
+      variants.push(`${cleaned} ${type} NSW`, `${cleaned} ${type} Sydney NSW`);
+    }
+  }
+  variants.push(`${cleaned} NSW`, `${cleaned} Australia`);
+  return [...new Set(variants.filter(Boolean).map((value) => value.trim()))].slice(0, 8);
 }
 
 function geocodeItemPayload({ label, lat, lon, provider, kind = "place", providerId = "" }) {
@@ -2074,6 +2380,11 @@ function geocodeItemPayload({ label, lat, lon, provider, kind = "place", provide
 }
 
 async function nominatimGeocode(query, limit) {
+  if (Date.now() < nominatimBlockedUntilMs) {
+    throw new Error("Validation geocoder is cooling down after rate limiting");
+  }
+  const suggestions = [];
+  const seen = new Set();
   for (const candidateQuery of geocodeQueryVariants(query)) {
     const url = new URL("https://nominatim.openstreetmap.org/search");
     url.searchParams.set("q", candidateQuery);
@@ -2081,21 +2392,115 @@ async function nominatimGeocode(query, limit) {
     url.searchParams.set("limit", String(limit));
     url.searchParams.set("countrycodes", "au");
     url.searchParams.set("addressdetails", "1");
-    const payload = await fetchJson(url.toString(), { timeoutMs: 12000 });
+    let payload;
+    try {
+      payload = await fetchJson(url.toString(), { timeoutMs: 12000 });
+    } catch (error) {
+      if (isRateLimitError(error)) {
+        nominatimBlockedUntilMs = Date.now() + NOMINATIM_RATE_LIMIT_BACKOFF_MS;
+      }
+      throw error;
+    }
     if (Array.isArray(payload) && payload.length) {
-      return payload.map((item) =>
-        geocodeItemPayload({
+      for (const item of payload) {
+        const suggestion = geocodeItemPayload({
           label: String(item.display_name || item.name || candidateQuery),
           lat: item.lat,
           lon: item.lon,
           kind: String(item.type || item.class || "place"),
           provider: "nominatim",
           providerId: `${item.osm_type || ""}:${item.osm_id || ""}`,
-        }),
-      );
+        });
+        const key = geocodeSuggestionKey(suggestion);
+        if (!seen.has(key)) {
+          suggestions.push(suggestion);
+          seen.add(key);
+        }
+        if (suggestions.length >= limit) return suggestions;
+      }
     }
   }
-  throw new Error(`No location found for ${query}`);
+  if (!suggestions.length) throw new Error(`No location found for ${query}`);
+  return suggestions;
+}
+
+async function localStationGeocode(query, limit) {
+  const needle = normaliseSearchText(query);
+  if (needle.length < 3) return [];
+  try {
+    const data = await loadStationData({ requestedSource: "auto", points: [], radiusKm: 0 });
+    const scored = [];
+    for (const station of data.stations || []) {
+      const haystack = normaliseSearchText(
+        [station.name, station.brand, station.suburb, station.address].filter(Boolean).join(" "),
+      );
+      if (!haystack.includes(needle)) continue;
+      const name = String(station.name || station.brand || "Fuel station");
+      const suburb = station.suburb ? `, ${station.suburb}` : "";
+      const address = station.address ? ` - ${station.address}` : "";
+      scored.push({
+        score: haystack.startsWith(needle) ? 0 : haystack.indexOf(needle),
+        item: geocodeItemPayload({
+          label: `${name}${suburb}${address}`,
+          lat: station.lat,
+          lon: station.lon,
+          kind: "fuel_station",
+          provider: "fuel_path",
+          providerId: String(station.stationCode || ""),
+        }),
+      });
+    }
+    return scored
+      .sort((left, right) => left.score - right.score || left.item.label.length - right.item.label.length)
+      .slice(0, limit)
+      .map((row) => row.item);
+  } catch {
+    return [];
+  }
+}
+
+function localHintGeocode(query, limit) {
+  const needle = normaliseSearchText(query);
+  if (needle.length < 3) return [];
+  return LOCAL_GEOCODE_HINTS.map((hint) => {
+    const texts = [hint.label, ...(hint.aliases || [])].map(normaliseSearchText);
+    const matched = texts.some((value) => localHintMatches(needle, value, hint.kind));
+    if (!matched) return null;
+    const bestIndex = Math.min(...texts.map((value) => {
+      const index = value.indexOf(needle);
+      return index >= 0 ? index : 999;
+    }));
+    return {
+      score: bestIndex,
+      item: geocodeItemPayload({
+        label: hint.label,
+        lat: hint.lat,
+        lon: hint.lon,
+        kind: hint.kind,
+        provider: "fuel_path_hint",
+        providerId: normaliseSearchText(hint.label),
+      }),
+    };
+  })
+    .filter(Boolean)
+    .sort((left, right) => left.score - right.score || left.item.label.length - right.item.label.length)
+    .slice(0, limit)
+    .map((row) => row.item);
+}
+
+function localHintMatches(needle, value, kind) {
+  if (!value) return false;
+  if (needle === value || value.includes(needle)) return true;
+  if (kind === "city") return false;
+  return value.length >= 6 && needle.includes(value);
+}
+
+function normaliseSearchText(value) {
+  return String(value || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function geocodeSuggestionKey(item) {
+  return `${Math.round(Number(item.lat) * 100000)}:${Math.round(Number(item.lon) * 100000)}:${normaliseSearchText(item.label).slice(0, 48)}`;
 }
 
 async function googlePlaceDetails(placeId, sessionToken) {
@@ -2231,26 +2636,133 @@ async function geoapifyGeocode(query, limit) {
 
 async function geocode({ query, limit, sessionToken, provider }) {
   const selectedProvider = selectGeocodeProvider(provider || process.env.FUEL_PATH_GEOCODE_PROVIDER || "auto");
-  const suggestions =
-    selectedProvider === "google"
-      ? await googleGeocode(query, limit, sessionToken)
-      : selectedProvider === "mapbox"
-        ? await mapboxGeocode(query, limit)
-        : selectedProvider === "here"
-          ? await hereGeocode(query, limit)
-          : selectedProvider === "geoapify"
-            ? await geoapifyGeocode(query, limit)
-            : await nominatimGeocode(query, limit);
-  return {
+  const cacheKey = geocodeCacheKey({ provider: selectedProvider, query, limit });
+  const cached = readGeocodeCache(cacheKey);
+  if (cached) {
+    return {
+      ...cached,
+      cache: "hit",
+      sessionToken,
+    };
+  }
+  const addressSuggestions = searchAddressIndex(query, limit);
+  const localSuggestions = mergeGeocodeSuggestions(
+    [
+      ...addressSuggestions,
+      ...localHintGeocode(query, limit),
+      ...(selectedProvider === "nominatim" && looksLikeStationQuery(query)
+        ? await localStationGeocode(query, limit)
+        : []),
+    ],
+    limit,
+  );
+  let providerSuggestions = [];
+  let providerWarning = "";
+  if (!hasExactAddressSuggestion(addressSuggestions)) {
+    try {
+      providerSuggestions =
+        selectedProvider === "google"
+          ? await googleGeocode(query, limit, sessionToken)
+          : selectedProvider === "mapbox"
+            ? await mapboxGeocode(query, limit)
+            : selectedProvider === "here"
+              ? await hereGeocode(query, limit)
+              : selectedProvider === "geoapify"
+                ? await geoapifyGeocode(query, limit)
+                : await nominatimGeocode(query, limit);
+    } catch (error) {
+      providerWarning = geocodeProviderWarning(error, selectedProvider);
+    }
+  }
+  const suggestions = mergeGeocodeSuggestions([...localSuggestions, ...providerSuggestions], limit);
+  const lookupStatus = suggestions.length
+    ? providerWarning
+      ? "local_fallback"
+      : "ok"
+    : providerWarning
+      ? "degraded"
+      : "no_match";
+  const payload = {
     provider: selectedProvider,
     providerMode: selectedProvider === "nominatim" ? "validation" : "production_candidate",
     recommendedProductionProvider: RECOMMENDED_GEOCODE_PROVIDER,
     requestedProvider: provider || process.env.FUEL_PATH_GEOCODE_PROVIDER || "auto",
     sessionToken,
     query,
-    location: suggestions[0],
+    location: suggestions[0] || null,
     suggestions,
+    lookupStatus,
+    ...(providerWarning ? { warning: providerWarning } : {}),
   };
+  writeGeocodeCache(cacheKey, payload, lookupStatus === "ok" || lookupStatus === "local_fallback");
+  return payload;
+}
+
+function geocodeCacheKey({ provider, query, limit }) {
+  return `${provider}:${limit}:${normaliseSearchText(query)}`;
+}
+
+function hasExactAddressSuggestion(suggestions) {
+  return suggestions.some(
+    (item) => item.provider === "fuel_path_gnaf" && item.matchType === "exact_address",
+  );
+}
+
+function readGeocodeCache(key) {
+  const entry = geocodeCache.get(key);
+  if (!entry) return null;
+  if (Date.now() > entry.expiresAt) {
+    geocodeCache.delete(key);
+    return null;
+  }
+  return entry.payload;
+}
+
+function writeGeocodeCache(key, payload, durable) {
+  geocodeCache.set(key, {
+    expiresAt: Date.now() + (durable ? GEOCODE_CACHE_SECONDS : GEOCODE_DEGRADED_CACHE_SECONDS) * 1000,
+    payload,
+  });
+}
+
+function isRateLimitError(error) {
+  return String(error?.message || error).includes("429");
+}
+
+function geocodeProviderWarning(error, provider) {
+  const message = String(error?.message || error || "");
+  if (isRateLimitError(error) || /cooling down|rate limit/i.test(message)) {
+    return `${provider} lookup is temporarily rate-limited. Try a fuller address, suburb or postcode, or enable a production autocomplete provider.`;
+  }
+  if (/abort|timeout/i.test(message)) {
+    return `${provider} lookup timed out. Try a fuller address, suburb or postcode.`;
+  }
+  if (/No location found/i.test(message)) {
+    return `No strong location match found. Try a fuller address, suburb or postcode.`;
+  }
+  return `${provider} lookup is temporarily unavailable. Try a fuller address, suburb or postcode.`;
+}
+
+function looksLikeStationQuery(query) {
+  const needle = normaliseSearchText(query);
+  if (needle.length < 3) return false;
+  return STATION_QUERY_TERMS.some((term) => {
+    const normalisedTerm = normaliseSearchText(term);
+    return needle === normalisedTerm || needle.includes(normalisedTerm);
+  });
+}
+
+function mergeGeocodeSuggestions(items, limit) {
+  const merged = [];
+  const seen = new Set();
+  for (const item of items) {
+    const key = geocodeSuggestionKey(item);
+    if (seen.has(key)) continue;
+    merged.push(item);
+    seen.add(key);
+    if (merged.length >= limit) break;
+  }
+  return merged;
 }
 
 function activeRouteProvider() {

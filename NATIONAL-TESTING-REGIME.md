@@ -13,11 +13,25 @@ This regime applies to every roadmap item before it can be marked done.
 A backlog item is done only when:
 
 - user story and success metrics are documented
+- backend or product decision rule is documented and implemented
+- UX shows the rule outcome, limitation or blocked state where it affects the user
 - happy path and break-it tests are added or manually recorded
 - accessibility and performance impact are checked
 - provider and capability limitations are visible to the user
 - stale, restricted or unsupported data cannot silently drive a confident recommendation
 - production smoke passes after deploy, when the change reaches production
+
+## Implementation Rule
+
+Every implementation must carry a product decision rule. The rule belongs in backend or product logic, not only in copy or layout. The frontend must then make the rule legible through the recommendation, station row, capability state, alert status, empty state or account setting that the user sees.
+
+Each item must identify:
+
+- user-visible promise
+- backend or product rule
+- UX surface
+- blocked, downgraded or unavailable state
+- break-it test proving the rule cannot be bypassed
 
 ## Required Test Gates During Implementation
 

@@ -69,11 +69,12 @@
 - [ ] Confirm SA fuel data/API access path and implement adapter after approved schema is available.
 - [ ] Confirm TAS fuel data/API access path and implement adapter after approved schema is available.
 - [ ] Confirm NT MyFuel data/API access path and implement adapter after approved schema is available.
-- [ ] Add saved commutes and notification permission flow.
+- [x] Add saved commutes, notification permission flow and backend alert sync path for validation builds.
 - [x] Design backend push scheduler for price-triggered saved-route alerts.
 - [x] Add backend saved-route alert storage and evaluator foundation with push delivery disabled.
 - [x] Add scheduled saved-route evaluator, protected cron endpoint, Expo delivery path and push receipt contract behind production env gates.
-- [ ] Connect scheduled evaluator to live route scoring and validated native push-token collection before broad beta.
+- [x] Connect scheduled evaluator to live route scoring and gated native push-token registration path.
+- [ ] Run native device validation with EAS project id and alerts sync token before enabling Expo push delivery.
 - [x] Add prediction back-testing API contract with metric summary and accuracy-claim gates.
 - [x] Add durable prediction storage adapter for Neon/Postgres with safe memory fallback.
 - [x] Provision production Neon/Postgres and set `DATABASE_URL` plus `PREDICTION_BACKTEST_WRITE_TOKEN`.

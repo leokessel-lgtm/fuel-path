@@ -1,5 +1,7 @@
 import { Platform } from "react-native";
+import Constants from "expo-constants";
 
+import { configuredEasProjectId } from "./backendAlerts";
 import { CommuteAlertStatus, NotificationPermissionState, SavedCommute } from "../types";
 
 type PermissionResult = {
@@ -12,6 +14,12 @@ type ScheduleResult = {
   nextAlertAt?: string;
   notificationId?: string;
   status: CommuteAlertStatus;
+};
+
+type PushTokenResult = {
+  message: string;
+  token?: string;
+  status: "ready" | "unavailable" | "failed";
 };
 
 const ROUTE_ALERT_CHANNEL_ID = "route-alerts";
@@ -120,6 +128,48 @@ export async function scheduleSavedCommuteAlert(commute: SavedCommute): Promise<
   }
 }
 
+export async function getExpoRoutePushToken(): Promise<PushTokenResult> {
+  if (Platform.OS === "web") {
+    return {
+      status: "unavailable",
+      message: "Push alerts need an iOS or Android build.",
+    };
+  }
+
+  try {
+    const Notifications = await import("expo-notifications");
+    await ensureRouteAlertChannel(Notifications);
+
+    const permission = await Notifications.getPermissionsAsync();
+    if (permission.status !== "granted") {
+      return {
+        status: "unavailable",
+        message: "Enable notifications before backend alerts can run.",
+      };
+    }
+
+    const projectId = expoProjectId();
+    if (!projectId) {
+      return {
+        status: "unavailable",
+        message: "Backend push alerts need an EAS project id in the native build.",
+      };
+    }
+
+    const token = await Notifications.getExpoPushTokenAsync({ projectId });
+    return {
+      status: "ready",
+      token: token.data,
+      message: "Push token ready.",
+    };
+  } catch {
+    return {
+      status: "failed",
+      message: "Could not get this device push token.",
+    };
+  }
+}
+
 export async function cancelSavedCommuteAlert(commute: SavedCommute): Promise<ScheduleResult> {
   if (Platform.OS !== "web" && commute.scheduledNotificationId) {
     try {
@@ -170,6 +220,15 @@ function permissionResultForStatus(status: string): PermissionResult {
     state: "undetermined",
     message: "Enable alerts when you want Fuel Path to check saved routes for you.",
   };
+}
+
+function expoProjectId() {
+  return (
+    configuredEasProjectId() ||
+    Constants.expoConfig?.extra?.eas?.projectId ||
+    Constants.easConfig?.projectId ||
+    ""
+  );
 }
 
 function parseAlertTime(value: string) {

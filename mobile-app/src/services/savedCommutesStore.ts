@@ -38,6 +38,7 @@ function normaliseSavedCommute(commute: SavedCommute): SavedCommute {
     alertTime: normaliseAlertTime(commute.alertTime),
     alertStatus: commute.alertStatus || (commute.alertEnabled ? "scheduled" : "off"),
     alertStatusMessage: commute.alertStatusMessage,
+    backendSyncedAt: commute.backendSyncedAt,
     createdAt: commute.createdAt || now,
     nextAlertAt: commute.nextAlertAt,
     scheduledNotificationId: commute.scheduledNotificationId,

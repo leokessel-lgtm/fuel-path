@@ -12,6 +12,7 @@ export type AppPreferences = {
 export type CommuteAlertStatus =
   | "off"
   | "scheduled"
+  | "backend_synced"
   | "needs_permission"
   | "unavailable"
   | "failed";
@@ -26,6 +27,7 @@ export type SavedCommute = {
   alertTime: string;
   alertStatus?: CommuteAlertStatus;
   alertStatusMessage?: string;
+  backendSyncedAt?: string;
   createdAt: string;
   nextAlertAt?: string;
   scheduledNotificationId?: string;

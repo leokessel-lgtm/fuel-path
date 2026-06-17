@@ -8,7 +8,7 @@ const internalReceiptsHandler = require("../../api/internal/jobs/check-push-rece
 const pushRegisterHandler = require("../../api/push/register");
 const savedRoutesHandler = require("../../api/saved-routes");
 const statusHandler = require("../../api/status");
-const { setAlertStorageForTests } = require("../../api/_backend");
+const { setAlertRouteScorerForTests, setAlertStorageForTests } = require("../../api/_backend");
 const { setExpoPushClientForTests } = require("../../api/_expoPush");
 
 const route = {
@@ -176,6 +176,93 @@ test("scheduled evaluator requires cron authorisation and records not-evaluated 
     assert.notEqual(accepted.payload.results[0].status, "send_alert");
     assert.match(accepted.payload.results[0].reason, /provider|route_scoring|unsupported|missing/);
   } finally {
+    setAlertStorageForTests(null);
+    if (originalCron === undefined) delete process.env.CRON_SECRET;
+    else process.env.CRON_SECRET = originalCron;
+  }
+});
+
+test("scheduled evaluator scores saved routes before deciding whether to alert", async () => {
+  const originalCron = process.env.CRON_SECRET;
+  process.env.CRON_SECRET = "cron-token";
+  const store = memoryDurableStore();
+  setAlertStorageForTests(store);
+  setAlertRouteScorerForTests(async () => ({
+    status: "scored",
+    regionCapabilities: [{ region: "NSW", capability: "live" }],
+    candidate: freshCandidate({ estimatedSavingDollars: 9, detourMinutes: 3, freshnessMinutes: 20 }),
+  }));
+
+  try {
+    await store.upsertSavedRoute(route);
+    await store.upsertPushDevice(device);
+
+    const accepted = await callHandler(cronEvaluateHandler, {
+      method: "GET",
+      query: { ignoreWindow: "1" },
+      headers: { authorization: "Bearer cron-token" },
+    });
+
+    assert.equal(accepted.status, 202);
+    assert.equal(accepted.payload.evaluatedCount, 1);
+    assert.equal(accepted.payload.results[0].status, "send_alert");
+    assert.equal(accepted.payload.results[0].scoringStatus, "scored");
+    assert.equal(accepted.payload.results[0].deliveryStatus, "not_sent_push_provider_disabled");
+    assert.equal(store.evaluations[0].stationCode, "station-1");
+  } finally {
+    setAlertRouteScorerForTests(null);
+    setAlertStorageForTests(null);
+    if (originalCron === undefined) delete process.env.CRON_SECRET;
+    else process.env.CRON_SECRET = originalCron;
+  }
+});
+
+test("scheduled evaluator suppresses stale and duplicate route alerts", async () => {
+  const originalCron = process.env.CRON_SECRET;
+  process.env.CRON_SECRET = "cron-token";
+  const store = memoryDurableStore();
+  setAlertStorageForTests(store);
+
+  try {
+    await store.upsertPushDevice(device);
+    await store.upsertSavedRoute({
+      ...route,
+      id: "stale-route",
+      lastAlertSentAt: undefined,
+    });
+    setAlertRouteScorerForTests(async () => ({
+      status: "scored",
+      regionCapabilities: [{ region: "NSW", capability: "live" }],
+      candidate: freshCandidate({ freshnessMinutes: 240 }),
+    }));
+    const stale = await callHandler(cronEvaluateHandler, {
+      method: "GET",
+      query: { ignoreWindow: "1" },
+      headers: { authorization: "Bearer cron-token" },
+    });
+
+    await store.upsertSavedRoute({
+      ...route,
+      id: "duplicate-route",
+      lastAlertSentAt: "2026-06-17T07:00:00.000Z",
+    });
+    setAlertRouteScorerForTests(async () => ({
+      status: "scored",
+      regionCapabilities: [{ region: "NSW", capability: "live" }],
+      candidate: freshCandidate({ freshnessMinutes: 15 }),
+    }));
+    const duplicate = await callHandler(cronEvaluateHandler, {
+      method: "GET",
+      query: { ignoreWindow: "1", now: "2026-06-17T08:00:00.000Z" },
+      headers: { authorization: "Bearer cron-token" },
+    });
+
+    assert.equal(stale.status, 202);
+    assert.equal(stale.payload.results[0].status, "stale_price");
+    assert.equal(duplicate.status, 202);
+    assert.equal(duplicate.payload.results.some((item) => item.routeId === "duplicate-route" && item.status === "quiet_today"), true);
+  } finally {
+    setAlertRouteScorerForTests(null);
     setAlertStorageForTests(null);
     if (originalCron === undefined) delete process.env.CRON_SECRET;
     else process.env.CRON_SECRET = originalCron;

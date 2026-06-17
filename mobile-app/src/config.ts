@@ -30,3 +30,9 @@ function configuredApiBaseUrl() {
 
 export const API_BASE_URL =
   configuredApiBaseUrl();
+
+export const ALERTS_SYNC_TOKEN =
+  process?.env?.EXPO_PUBLIC_FUEL_PATH_ALERTS_TOKEN || "";
+
+export const EAS_PROJECT_ID =
+  process?.env?.EXPO_PUBLIC_EAS_PROJECT_ID || "";

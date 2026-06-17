@@ -15,10 +15,12 @@ import { PlanScreen } from "./src/screens/PlanScreen";
 import {
   cancelSavedCommuteAlert,
   configureRouteNotificationHandler,
+  getExpoRoutePushToken,
   getRouteNotificationPermission,
   requestRouteNotificationPermission,
   scheduleSavedCommuteAlert,
 } from "./src/services/routeNotifications";
+import { syncSavedRouteAlert } from "./src/services/backendAlerts";
 import {
   loadSavedCommutes,
   persistSavedCommutes,
@@ -117,6 +119,11 @@ export default function App() {
     try {
       if (targetCommute.alertEnabled) {
         const result = await cancelSavedCommuteAlert(targetCommute);
+        const backendSync = await syncSavedRouteAlert({
+          commute: targetCommute,
+          enabled: false,
+          preferences,
+        });
         setSavedCommutes((current) =>
           current.map((commute) =>
             commute.id === commuteId
@@ -124,7 +131,8 @@ export default function App() {
                   ...commute,
                   alertEnabled: false,
                   alertStatus: result.status,
-                  alertStatusMessage: result.message,
+                  alertStatusMessage: alertStatusMessage(result.message, backendSync.message),
+                  backendSyncedAt: backendSync.syncedAt,
                   nextAlertAt: undefined,
                   scheduledNotificationId: undefined,
                   updatedAt: new Date().toISOString(),
@@ -161,14 +169,37 @@ export default function App() {
       }
 
       const result = await scheduleSavedCommuteAlert(targetCommute);
+      const tokenResult = await getExpoRoutePushToken();
+      const backendSync =
+        tokenResult.status === "ready"
+          ? await syncSavedRouteAlert({
+              commute: targetCommute,
+              enabled: true,
+              expoPushToken: tokenResult.token,
+              preferences,
+            })
+          : {
+              status: tokenResult.status,
+              message: tokenResult.message,
+              syncedAt: undefined,
+            };
+      const backendSynced = backendSync.status === "synced";
       setSavedCommutes((current) =>
         current.map((commute) =>
           commute.id === commuteId
             ? {
                 ...commute,
-                alertEnabled: result.status === "scheduled",
-                alertStatus: result.status,
-                alertStatusMessage: result.message,
+                alertEnabled: result.status === "scheduled" || backendSynced,
+                alertStatus: backendSynced ? "backend_synced" : result.status,
+                alertStatusMessage: alertStatusMessage(
+                  backendSynced
+                    ? "Price-triggered backend alert synced."
+                    : result.message,
+                  backendSynced && result.status === "scheduled"
+                    ? "Local daily reminder also scheduled."
+                    : backendSync.message,
+                ),
+                backendSyncedAt: backendSync.syncedAt,
                 nextAlertAt: result.nextAlertAt,
                 scheduledNotificationId: result.notificationId,
                 updatedAt: new Date().toISOString(),
@@ -320,6 +351,10 @@ function makeCommuteId(from: SavedCommute["from"], to: SavedCommute["to"], fuel:
     to.lat.toFixed(4),
     to.lon.toFixed(4),
   ].join(":");
+}
+
+function alertStatusMessage(primary: string, secondary?: string) {
+  return [primary, secondary].filter(Boolean).join(" ");
 }
 
 const styles = StyleSheet.create({

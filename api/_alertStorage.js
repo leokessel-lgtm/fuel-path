@@ -475,6 +475,7 @@ function rowToDevice(row) {
 }
 
 function rowToRoute(row) {
+  const raw = rawObject(row.raw);
   return {
     id: row.id,
     userId: row.user_id,
@@ -487,11 +488,27 @@ function rowToRoute(row) {
     timezone: row.timezone,
     minSavingDollars: Number(row.min_saving_dollars),
     maxDetourMinutes: Number(row.max_detour_minutes),
+    eligibleDiscounts: Array.isArray(raw.eligibleDiscounts) ? raw.eligibleDiscounts : [],
+    tankLitres: optionalNumber(raw.tankLitres),
+    tankPercent: optionalNumber(raw.tankPercent),
+    economy: optionalNumber(raw.economy),
+    reserveKm: optionalNumber(raw.reserveKm),
     pausedUntil: row.paused_until ? isoDateTime(row.paused_until) : undefined,
     lastAlertSentAt: row.last_alert_sent_at ? isoDateTime(row.last_alert_sent_at) : undefined,
     createdAt: isoDateTime(row.created_at),
     updatedAt: isoDateTime(row.updated_at),
   };
+}
+
+function rawObject(value) {
+  if (!value) return {};
+  if (typeof value === "object") return value;
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
 }
 
 function rowToEvaluation(row) {

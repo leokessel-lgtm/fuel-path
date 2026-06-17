@@ -194,6 +194,8 @@ const liveCache = {
   lastError: "",
 };
 
+let alertRouteScorerForTests;
+
 const qldLiveCache = {
   stations: null,
   loadedAtMs: 0,
@@ -2600,11 +2602,13 @@ async function runScheduledRouteAlertEvaluation({ limit = 50, now, ignoreWindow 
       continue;
     }
     const devices = await listPushDevices({ userId: route.userId, status: "active", limit: 20 });
+    const scoredAlert = await scoreSavedRouteForAlert(route, evaluatedAt);
     const result = await evaluateSavedRouteAlert({
       route,
       devices,
       notificationPermission: devices.length ? "granted" : "unknown",
-      candidate: {},
+      candidate: scoredAlert.candidate,
+      regionCapabilities: scoredAlert.regionCapabilities,
       now: evaluatedAt,
     });
     results.push({
@@ -2613,6 +2617,7 @@ async function runScheduledRouteAlertEvaluation({ limit = 50, now, ignoreWindow 
       status: result.evaluation.status,
       reason: result.evaluation.reason,
       deliveryStatus: result.deliveryStatus,
+      scoringStatus: scoredAlert.status,
     });
   }
 
@@ -2626,6 +2631,68 @@ async function runScheduledRouteAlertEvaluation({ limit = 50, now, ignoreWindow 
     sentCount: results.filter((item) => item.deliveryStatus === "sent_to_expo").length,
     results,
     alerts: await alertsStatus(),
+  };
+}
+
+async function scoreSavedRouteForAlert(route, evaluatedAt) {
+  if (alertRouteScorerForTests) return alertRouteScorerForTests(route, evaluatedAt);
+
+  const fallbackCapabilities = capabilitiesForPoints([route.from, route.to]);
+  try {
+    const plannedRoute = await buildRoute({ from: route.from, to: route.to });
+    const routeForScore = {
+      id: route.id,
+      name: route.name,
+      provider: plannedRoute.provider,
+      defaultCorridorKm: 2.5,
+      defaultDetourSpeedKmh: 80,
+      points: plannedRoute.points || [route.from, route.to],
+    };
+    const data = await loadStationData({
+      requestedSource: "live",
+      points: routeForScore.points,
+      fuels: [route.fuel],
+    });
+    const scored = scoreRoute({
+      source: data.source,
+      route: routeForScore,
+      stations: data.stations,
+      fuel: route.fuel,
+      tankLitres: route.tankLitres || 55,
+      tankPercent: route.tankPercent || 45,
+      economy: route.economy || 8.2,
+      reserveKm: route.reserveKm || 35,
+      corridorKm: 2.5,
+      eligibleDiscounts: new Set(route.eligibleDiscounts || []),
+      includeMemberPrices: false,
+      includeClosed: false,
+    });
+    const recommendation = scored.candidates[0];
+    return {
+      status: recommendation ? "scored" : "no_candidate",
+      candidate: recommendation ? alertCandidateFromScore(recommendation, evaluatedAt) : {},
+      context: scored.context,
+      regionCapabilities: data.regionCapabilities || fallbackCapabilities,
+    };
+  } catch (error) {
+    return {
+      status: "failed",
+      candidate: {},
+      error: error instanceof Error ? error.message : "Route alert scoring failed",
+      regionCapabilities: fallbackCapabilities,
+    };
+  }
+}
+
+function alertCandidateFromScore(recommendation, evaluatedAt) {
+  const station = recommendation.station || {};
+  return {
+    stationCode: station.stationCode,
+    stationName: station.name,
+    estimatedSavingDollars: recommendation.netSaving,
+    detourMinutes: recommendation.detourMinutes,
+    freshnessMinutes: minutesSince(station.updatedAt, evaluatedAt),
+    openNow: recommendation.openNow !== false && station.openNow !== false,
   };
 }
 
@@ -2792,6 +2859,13 @@ function normaliseBackendSavedRoute(input) {
     timezone: cleanString(input.timezone || "Australia/Sydney").slice(0, 80),
     minSavingDollars: boundedNumber(input.minSavingDollars, 1, 100, 5),
     maxDetourMinutes: boundedNumber(input.maxDetourMinutes, 0, 60, 8),
+    eligibleDiscounts: Array.isArray(input.eligibleDiscounts)
+      ? input.eligibleDiscounts.map(cleanString).filter(Boolean).slice(0, 20)
+      : [],
+    tankLitres: boundedNumber(input.tankLitres, 20, 180, 55),
+    tankPercent: boundedNumber(input.tankPercent, 1, 100, 45),
+    economy: boundedNumber(input.economy, 2, 30, 8.2),
+    reserveKm: boundedNumber(input.reserveKm, 0, 250, 35),
     pausedUntil: validIsoDate(input.pausedUntil) || undefined,
     lastAlertSentAt: validIsoDate(input.lastAlertSentAt) || undefined,
     createdAt: validIsoDate(input.createdAt) || now,
@@ -2848,6 +2922,13 @@ function hoursBetween(start, end) {
   const endMs = new Date(end).getTime();
   if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) return Infinity;
   return Math.abs(endMs - startMs) / 36e5;
+}
+
+function minutesSince(start, end) {
+  const startMs = new Date(start).getTime();
+  const endMs = new Date(end).getTime();
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) return undefined;
+  return Math.max(0, Math.round((endMs - startMs) / 60000));
 }
 
 function stableId(value) {
@@ -2929,6 +3010,10 @@ function noCycleSignal({ region, fuel, reason }) {
     userFacingPredictionEnabled: false,
     accuracyClaimsAllowed: false,
   };
+}
+
+function setAlertRouteScorerForTests(scorer) {
+  alertRouteScorerForTests = typeof scorer === "function" ? scorer : null;
 }
 
 async function recordPredictionBacktest(input = {}) {
@@ -3108,6 +3193,7 @@ module.exports = {
   saveBackendSavedRoute,
   scoreRoute,
   sendJson,
+  setAlertRouteScorerForTests,
   setAlertStorageForTests,
   setPredictionStorageForTests,
   setParam,

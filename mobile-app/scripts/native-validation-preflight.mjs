@@ -5,6 +5,7 @@ const args = new Set(process.argv.slice(2));
 const strict = args.has("--strict");
 const appJson = readJson("app.json").expo;
 const packageJson = readJson("package.json");
+const appConfigSource = readFileSync(resolve("src/config.ts"), "utf8");
 const env = process.env;
 
 const checks = [];
@@ -58,6 +59,16 @@ check("Android Google Maps key configured", Boolean(env.FUEL_PATH_ANDROID_GOOGLE
   detail: "Set FUEL_PATH_ANDROID_GOOGLE_MAPS_API_KEY for Android native map validation.",
 });
 
+check("Expo public env access is native-bundle safe", bundleSafePublicEnvAccess(), {
+  fail: true,
+  detail: "Use direct process.env.EXPO_PUBLIC_* access in src/config.ts so Expo can inline values into native bundles.",
+});
+
+check("Installed native fallback uses HTTPS API", installedNativeFallbackIsHttps(), {
+  fail: true,
+  detail: "Release/preview native builds must not fall back to emulator or localhost HTTP API URLs.",
+});
+
 const failures = checks.filter((item) => item.status === "fail");
 const warnings = checks.filter((item) => item.status === "warn");
 
@@ -104,6 +115,24 @@ function validDeviceApiBaseUrl() {
   } catch {
     return false;
   }
+}
+
+function bundleSafePublicEnvAccess() {
+  return (
+    appConfigSource.includes("process.env.EXPO_PUBLIC_FUEL_PATH_API_BASE_URL") &&
+    appConfigSource.includes("process.env.EXPO_PUBLIC_FUEL_PATH_ALERTS_VALIDATION_TOKEN") &&
+    appConfigSource.includes("process.env.EXPO_PUBLIC_EAS_PROJECT_ID") &&
+    !appConfigSource.includes("process?.env") &&
+    !appConfigSource.includes("process.env?.")
+  );
+}
+
+function installedNativeFallbackIsHttps() {
+  return (
+    appConfigSource.includes('const PRODUCTION_API_BASE_URL = "https://fuel-path.vercel.app";') &&
+    !appConfigSource.includes('if (Platform.OS === "android") {') &&
+    appConfigSource.includes("if (__DEV__ && Platform.OS === \"android\")")
+  );
 }
 
 function notificationsPlugin() {

@@ -13,6 +13,7 @@
     },
     "android": {
       "package": "com.fuelpath.app",
+      "versionCode": 2,
       "adaptiveIcon": {
         "backgroundColor": "#E8F0EC",
         "foregroundImage": "./assets/android-icon-foreground.png",

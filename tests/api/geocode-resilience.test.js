@@ -109,6 +109,60 @@ test("configured production provider outranks street-level fallback for precise 
   );
 });
 
+test("regional gazetteer blocks same-state wrong-town street fallback", async () => {
+  await withGeocodeEnv({ FUEL_PATH_GEOCODE_PROVIDER: "nominatim" }, async () => {
+    const mockFetch = installFetchMock(() =>
+      jsonResponse({ error: { message: "Too many requests" } }, 429),
+    );
+
+    const result = await geocode({
+      query: "1 Church Street Mudgee NSW",
+      limit: 5,
+      sessionToken: "regional-mudgee-session",
+    });
+
+    assert.equal(result.lookupStatus, "local_fallback");
+    assert.equal(result.location.label, "Church Street, Mudgee NSW 2850");
+    assert.equal(result.location.provider, "fuel_path_regional_gazetteer");
+    assert.equal(result.location.matchType, "regional_street_locality");
+    assert.equal(
+      result.suggestions.some((item) => item.label === "Church Street, Parramatta NSW 2150"),
+      false,
+    );
+
+    mockFetch.restore();
+  });
+});
+
+test("regional gazetteer resolves hard rural broad searches and POIs without provider help", async () => {
+  await withGeocodeEnv({ FUEL_PATH_GEOCODE_PROVIDER: "nominatim" }, async () => {
+    const mockFetch = installFetchMock(() =>
+      jsonResponse({ error: { message: "Too many requests" } }, 429),
+    );
+
+    const town = await geocode({
+      query: "Kalgoorlie WA",
+      limit: 5,
+      sessionToken: "regional-town-session",
+    });
+    const poi = await geocode({
+      query: "Taronga Western Plains Zoo Dubbo",
+      limit: 5,
+      sessionToken: "regional-poi-session",
+    });
+
+    assert.equal(town.lookupStatus, "local_fallback");
+    assert.equal(town.location.label, "Kalgoorlie WA 6430");
+    assert.equal(town.location.provider, "fuel_path_regional_gazetteer");
+
+    assert.equal(poi.lookupStatus, "local_fallback");
+    assert.equal(poi.location.label, "Taronga Western Plains Zoo Dubbo");
+    assert.equal(poi.location.provider, "fuel_path_regional_gazetteer");
+
+    mockFetch.restore();
+  });
+});
+
 test("geocode cache avoids repeated provider calls for the same query", async () => {
   await withGeocodeEnv(
     {

@@ -23,6 +23,7 @@ const {
 } = require("./_predictionStorage");
 const { addressIndexStatus, searchAddressIndex } = require("./_addressIndex");
 const { additionalLocalGeocodeHints, additionalLocalGeocodeHintStatus } = require("./_geocodeHints");
+const { regionalGeocodeHintStatus, regionalLocalGeocode } = require("./_regionalGeocodeHints");
 
 const DEFAULT_CACHE_SECONDS = 300;
 const GEOCODE_CACHE_SECONDS = 60 * 60 * 6;
@@ -2269,6 +2270,7 @@ function geocodeProviderStatus() {
     localHints: {
       builtInRecords: LOCAL_GEOCODE_HINTS.length,
       ...additionalLocalGeocodeHintStatus(),
+      ...regionalGeocodeHintStatus(),
       provider: "fuel_path_hint",
     },
     backendProxyRequired: true,
@@ -2664,8 +2666,10 @@ function localHintGeocode(query, limit) {
   const needle = normaliseSearchText(query);
   if (needle.length < 3) return [];
   const queryStateCode = detectStateCode(query);
+  const queryLocality = detectQueryLocality(query);
   return ALL_LOCAL_GEOCODE_HINTS.map((hint) => {
     if (queryStateCode && hintStateCode(hint) && hintStateCode(hint) !== queryStateCode) return null;
+    if (queryLocality && hintLocality(hint) && !localityMatches(queryLocality, hintLocality(hint))) return null;
     const texts = [hint.label, ...(hint.aliases || [])].map(normaliseSearchText);
     const match = localHintMatch(needle, texts, hint.kind);
     if (!match) return null;
@@ -2698,6 +2702,35 @@ function detectStateCode(value) {
 
 function hintStateCode(hint) {
   return detectStateCode(hint?.label || "");
+}
+
+function hintLocality(hint) {
+  return extractLabelLocality(hint?.label || "");
+}
+
+function detectQueryLocality(query) {
+  const text = String(query || "").trim().replace(/\s+/g, " ");
+  const streetMatch = /\b(?:street|st|road|rd|avenue|ave|drive|dr|parade|pde|place|pl|terrace|highway|mall|court|close|vista|circuit|way|lane|ln)\b\s+(.+?)(?:\s+\b(NSW|ACT|QLD|WA|SA)\b|\s*$)/i.exec(text);
+  if (streetMatch?.[1]) return normaliseSearchText(streetMatch[1]);
+  const stateMatch = /^(.+?)\s+\b(NSW|ACT|QLD|WA|SA)\b$/i.exec(text);
+  if (stateMatch?.[1]) return normaliseSearchText(stateMatch[1]);
+  return "";
+}
+
+function extractLabelLocality(label) {
+  const text = String(label || "").trim();
+  const commaParts = text.split(",").map((part) => part.trim()).filter(Boolean);
+  if (commaParts.length >= 2) {
+    const withState = commaParts.find((part) => /\b(NSW|ACT|QLD|WA|SA)\b/i.test(part));
+    if (withState) return normaliseSearchText(withState.replace(/\b(NSW|ACT|QLD|WA|SA)\b.*$/i, ""));
+  }
+  const stateMatch = /,\s*([^,]+?)\s+\b(NSW|ACT|QLD|WA|SA)\b/i.exec(text) || /\b([A-Za-z][A-Za-z\s'.-]+?)\s+\b(NSW|ACT|QLD|WA|SA)\b/i.exec(text);
+  return stateMatch?.[1] ? normaliseSearchText(stateMatch[1]) : "";
+}
+
+function localityMatches(left, right) {
+  if (!left || !right) return true;
+  return left === right || left.includes(right) || right.includes(left);
 }
 
 function localHintBestIndex(needle, value) {
@@ -2898,6 +2931,7 @@ async function geocode({ query, limit, sessionToken, provider }) {
   const localSuggestions = mergeGeocodeSuggestions(
     [
       ...addressSuggestions,
+      ...regionalLocalGeocode(query, limit),
       ...localHintGeocode(query, limit),
       ...(selectedProvider === "nominatim" && looksLikeStationQuery(query)
         ? await localStationGeocode(query, limit)

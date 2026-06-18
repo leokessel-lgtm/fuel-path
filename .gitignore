@@ -26,6 +26,7 @@ android/
 *.sqlite
 *.sqlite-shm
 *.sqlite-wal
+tmp/
 .DS_Store
 
 # Credentials and signing material

@@ -1,0 +1,6 @@
+tmp/
+.git/
+.git-backups/
+.npm-cache/
+node_modules/
+**/node_modules/

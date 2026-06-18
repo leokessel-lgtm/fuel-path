@@ -1,5 +1,9 @@
 {
   "private": true,
+  "scripts": {
+    "test:geocode-matrix": "node scripts/geocode-matrix.mjs",
+    "test:geocode-matrix:local": "FUEL_PATH_MATRIX_MODE=module FUEL_PATH_MATRIX_PROVIDER_FAILURE=rate_limit node scripts/geocode-matrix.mjs"
+  },
   "engines": {
     "node": "22.x"
   },

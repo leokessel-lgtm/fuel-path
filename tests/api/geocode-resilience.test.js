@@ -34,18 +34,79 @@ test("local geocode hints survive provider rate limiting", async () => {
     );
 
     const result = await geocode({
-      query: "Melbourne Central",
+      query: "100 Queen Street Brisbane QLD",
       limit: 5,
       sessionToken: "local-fallback-session",
     });
 
     assert.equal(result.lookupStatus, "local_fallback");
-    assert.equal(result.location.label, "Melbourne Central, Melbourne VIC 3000");
+    assert.equal(result.location.label, "Queen Street, Brisbane QLD 4000");
     assert.equal(result.suggestions[0].provider, "fuel_path_hint");
     assert.match(result.warning, /rate-limited|cooling down/i);
 
     mockFetch.restore();
   });
+});
+
+test("strong local place hints do not call validation provider", async () => {
+  await withGeocodeEnv({ FUEL_PATH_GEOCODE_PROVIDER: "nominatim" }, async () => {
+    const mockFetch = installFetchMock(() =>
+      jsonResponse({ error: { message: "Unexpected provider call" } }, 500),
+    );
+
+    const result = await geocode({
+      query: "Canberra Centre",
+      limit: 5,
+      sessionToken: "strong-local-session",
+    });
+
+    assert.equal(result.lookupStatus, "ok");
+    assert.equal(result.location.label, "Canberra Centre, Canberra ACT 2601");
+    assert.equal(result.location.provider, "fuel_path_hint");
+    assert.equal(mockFetch.calls.length, 0);
+
+    mockFetch.restore();
+  });
+});
+
+test("configured production provider outranks street-level fallback for precise addresses", async () => {
+  await withGeocodeEnv(
+    {
+      FUEL_PATH_GEOCODE_PROVIDER: "geoapify",
+      FUEL_PATH_GEOAPIFY_API_KEY: "test-geoapify-key",
+    },
+    async () => {
+      const mockFetch = installFetchMock(() =>
+        jsonResponse({
+          features: [
+            {
+              properties: {
+                formatted: "100 Queen Street, Brisbane QLD 4000, Australia",
+                lat: -27.4708,
+                lon: 153.0245,
+                result_type: "building",
+                place_id: "geoapify-queen-street-100",
+              },
+            },
+          ],
+        }),
+      );
+
+      const result = await geocode({
+        query: "100 Queen Street Brisbane QLD",
+        limit: 5,
+        sessionToken: "provider-first-session",
+      });
+
+      assert.equal(result.lookupStatus, "ok");
+      assert.equal(result.location.label, "100 Queen Street, Brisbane QLD 4000, Australia");
+      assert.equal(result.location.provider, "geoapify");
+      assert.equal(result.suggestions[1].label, "Queen Street, Brisbane QLD 4000");
+      assert.equal(mockFetch.calls.length, 1);
+
+      mockFetch.restore();
+    },
+  );
 });
 
 test("geocode cache avoids repeated provider calls for the same query", async () => {

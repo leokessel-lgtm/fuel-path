@@ -22,6 +22,7 @@ const {
   setPredictionStorageForTests,
 } = require("./_predictionStorage");
 const { addressIndexStatus, searchAddressIndex } = require("./_addressIndex");
+const { additionalLocalGeocodeHints, additionalLocalGeocodeHintStatus } = require("./_geocodeHints");
 
 const DEFAULT_CACHE_SECONDS = 300;
 const GEOCODE_CACHE_SECONDS = 60 * 60 * 6;
@@ -2265,6 +2266,11 @@ function geocodeProviderStatus() {
     supportedProviders: ["google", "mapbox", "here", "geoapify", "nominatim"],
     fallbackProvider: "nominatim",
     addressIndex: addressIndexStatus(),
+    localHints: {
+      builtInRecords: LOCAL_GEOCODE_HINTS.length,
+      ...additionalLocalGeocodeHintStatus(),
+      provider: "fuel_path_hint",
+    },
     backendProxyRequired: true,
     sessionTokenRequired: activeProvider === "google",
     googlePlacesConfigured,
@@ -2498,6 +2504,8 @@ const LOCAL_GEOCODE_HINTS = [
   },
 ];
 
+const ALL_LOCAL_GEOCODE_HINTS = [...LOCAL_GEOCODE_HINTS, ...additionalLocalGeocodeHints()];
+const LIVE_GEOCODE_REGION_CODES = ["NSW", "ACT", "QLD", "WA", "SA"];
 const geocodeCache = new Map();
 let nominatimBlockedUntilMs = 0;
 
@@ -2526,6 +2534,11 @@ const STATION_QUERY_TERMS = [
 function geocodeQueryVariants(query) {
   const cleaned = String(query || "").trim().replace(/\s+/g, " ").replace(/\.+$/, "");
   const variants = [cleaned];
+  const upperCleaned = cleaned.toUpperCase();
+  const detectedStateCodes = LIVE_GEOCODE_REGION_CODES.filter((code) =>
+    new RegExp(`\\b${code}\\b`, "i").test(upperCleaned),
+  );
+  const targetStateCodes = detectedStateCodes.length ? detectedStateCodes : LIVE_GEOCODE_REGION_CODES;
   let corrected = cleaned;
   for (const [typo, replacement] of Object.entries(GEOCODE_QUERY_CORRECTIONS)) {
     corrected = corrected.replace(new RegExp(`\\b${typo}\\b`, "gi"), replacement);
@@ -2535,19 +2548,27 @@ function geocodeQueryVariants(query) {
     const match = STREET_QUERY_PATTERN.exec(value);
     if (match) {
       const streetOnly = match[1].trim();
-      variants.push(streetOnly, `${streetOnly} Sydney`, `${streetOnly} NSW`);
+      variants.push(streetOnly);
+      for (const code of targetStateCodes) {
+        variants.push(`${streetOnly} ${code}`);
+      }
     }
   }
   if (PARTIAL_STREET_QUERY_PATTERN.test(cleaned) && !STREET_QUERY_PATTERN.test(cleaned)) {
     for (const type of STREET_TYPE_EXPANSIONS) {
-      variants.push(`${cleaned} ${type} NSW`, `${cleaned} ${type} Sydney NSW`);
+      for (const code of targetStateCodes) {
+        variants.push(`${cleaned} ${type} ${code}`);
+      }
     }
   }
-  variants.push(`${cleaned} NSW`, `${cleaned} Australia`);
-  return [...new Set(variants.filter(Boolean).map((value) => value.trim()))].slice(0, 8);
+  for (const code of targetStateCodes) {
+    variants.push(`${cleaned} ${code}`);
+  }
+  variants.push(`${cleaned} Australia`);
+  return [...new Set(variants.filter(Boolean).map((value) => value.trim()))].slice(0, 16);
 }
 
-function geocodeItemPayload({ label, lat, lon, provider, kind = "place", providerId = "" }) {
+function geocodeItemPayload({ label, lat, lon, provider, kind = "place", providerId = "", ...extra }) {
   return {
     label,
     lat: Number(lat),
@@ -2555,6 +2576,7 @@ function geocodeItemPayload({ label, lat, lon, provider, kind = "place", provide
     type: kind,
     provider,
     ...(providerId ? { providerId } : {}),
+    ...extra,
   };
 }
 
@@ -2641,16 +2663,15 @@ async function localStationGeocode(query, limit) {
 function localHintGeocode(query, limit) {
   const needle = normaliseSearchText(query);
   if (needle.length < 3) return [];
-  return LOCAL_GEOCODE_HINTS.map((hint) => {
+  const queryStateCode = detectStateCode(query);
+  return ALL_LOCAL_GEOCODE_HINTS.map((hint) => {
+    if (queryStateCode && hintStateCode(hint) && hintStateCode(hint) !== queryStateCode) return null;
     const texts = [hint.label, ...(hint.aliases || [])].map(normaliseSearchText);
-    const matched = texts.some((value) => localHintMatches(needle, value, hint.kind));
-    if (!matched) return null;
-    const bestIndex = Math.min(...texts.map((value) => {
-      const index = value.indexOf(needle);
-      return index >= 0 ? index : 999;
-    }));
+    const match = localHintMatch(needle, texts, hint.kind);
+    if (!match) return null;
+    const bestIndex = Math.min(...texts.map((value) => localHintBestIndex(needle, value)));
     return {
-      score: bestIndex,
+      score: match.score + bestIndex,
       item: geocodeItemPayload({
         label: hint.label,
         lat: hint.lat,
@@ -2658,6 +2679,9 @@ function localHintGeocode(query, limit) {
         kind: hint.kind,
         provider: "fuel_path_hint",
         providerId: normaliseSearchText(hint.label),
+        confidence: match.confidence,
+        matchType: match.matchType,
+        source: "local_geocode_hints",
       }),
     };
   })
@@ -2667,11 +2691,57 @@ function localHintGeocode(query, limit) {
     .map((row) => row.item);
 }
 
-function localHintMatches(needle, value, kind) {
-  if (!value) return false;
-  if (needle === value || value.includes(needle)) return true;
-  if (kind === "city") return false;
-  return value.length >= 6 && needle.includes(value);
+function detectStateCode(value) {
+  const text = String(value || "").toUpperCase();
+  return REGION_ORDER.find((code) => new RegExp(`\\b${code}\\b`).test(text)) || "";
+}
+
+function hintStateCode(hint) {
+  return detectStateCode(hint?.label || "");
+}
+
+function localHintBestIndex(needle, value) {
+  const directIndex = value.indexOf(needle);
+  if (directIndex >= 0) return directIndex;
+  const reverseIndex = needle.indexOf(value);
+  return reverseIndex >= 0 ? reverseIndex : 999;
+}
+
+function localHintMatch(needle, texts, kind) {
+  let best = null;
+  for (const value of texts) {
+    const candidate = localHintTextMatch(needle, value, kind);
+    if (!candidate) continue;
+    if (!best || candidate.score < best.score) best = candidate;
+  }
+  return best;
+}
+
+function localHintTextMatch(needle, value, kind) {
+  if (!value) return null;
+  if (needle === value) {
+    return { matchType: "exact_hint", confidence: "medium", score: 0 };
+  }
+  if (value.startsWith(needle)) {
+    return { matchType: "hint_prefix", confidence: "medium", score: 10 };
+  }
+  if (value.includes(needle)) {
+    return { matchType: "hint_contains", confidence: "medium", score: 20 };
+  }
+  if (kind === "city") return null;
+  if (value.length >= 6 && needle.includes(value)) {
+    return { matchType: "fallback_area", confidence: "low", score: 40 - Math.min(value.length, 40) / 10 };
+  }
+  return null;
+}
+
+function hasStrongLocalSuggestion(suggestions) {
+  return suggestions.some(
+    (item) =>
+      item.provider === "fuel_path_hint" &&
+      ["exact_hint", "hint_prefix"].includes(item.matchType) &&
+      !["street", "address"].includes(item.type),
+  );
 }
 
 function normaliseSearchText(value) {
@@ -2837,7 +2907,7 @@ async function geocode({ query, limit, sessionToken, provider }) {
   );
   let providerSuggestions = [];
   let providerWarning = "";
-  if (!hasExactAddressSuggestion(addressSuggestions)) {
+  if (!hasExactAddressSuggestion(addressSuggestions) && !hasStrongLocalSuggestion(localSuggestions)) {
     try {
       providerSuggestions =
         selectedProvider === "google"
@@ -2853,7 +2923,10 @@ async function geocode({ query, limit, sessionToken, provider }) {
       providerWarning = geocodeProviderWarning(error, selectedProvider);
     }
   }
-  const suggestions = mergeGeocodeSuggestions([...localSuggestions, ...providerSuggestions], limit);
+  const suggestions =
+    selectedProvider === "nominatim"
+      ? mergeGeocodeSuggestions([...addressSuggestions, ...localSuggestions, ...providerSuggestions], limit)
+      : mergeGeocodeSuggestions([...addressSuggestions, ...providerSuggestions, ...localSuggestions], limit);
   const lookupStatus = suggestions.length
     ? providerWarning
       ? "local_fallback"

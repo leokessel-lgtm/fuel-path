@@ -52,6 +52,13 @@ QLD_FUEL_API_BASE_URL
 QLD_FUEL_API_TOKEN
 ```
 
+South Australia production access:
+
+```text
+SA_FUEL_API_BASE_URL
+SA_FUEL_API_TOKEN
+```
+
 Geocoding:
 
 ```text

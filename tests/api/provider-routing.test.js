@@ -19,6 +19,7 @@ test("national capability matrix covers every Australian state and territory", (
       NSW_FUEL_API_KEY: "test-key",
       NSW_FUEL_API_SECRET: "test-secret",
       QLD_FUEL_API_TOKEN: "test-token",
+      SA_FUEL_API_TOKEN: "test-sa-token",
       FUEL_PATH_WA_FUELWATCH_ENABLED: "1",
       VIC_SERVO_SAVER_API_BASE_URL: "",
       VIC_SERVO_SAVER_API_KEY: "",
@@ -36,10 +37,10 @@ test("national capability matrix covers every Australian state and territory", (
       assert.equal(capabilities.find((item) => item.region === "QLD")?.capability, "live");
       assert.equal(capabilities.find((item) => item.region === "WA")?.capability, "live");
       assert.equal(capabilities.find((item) => item.region === "VIC")?.capability, "pending_access");
-      assert.equal(capabilities.find((item) => item.region === "SA")?.capability, "pending_access");
+      assert.equal(capabilities.find((item) => item.region === "SA")?.capability, "live");
       assert.equal(capabilities.find((item) => item.region === "TAS")?.capability, "pending_access");
       assert.equal(capabilities.find((item) => item.region === "NT")?.capability, "pending_access");
-      assert.deepEqual(capabilitySummary(capabilities), { live: 4, pending_access: 4 });
+      assert.deepEqual(capabilitySummary(capabilities), { live: 5, pending_access: 3 });
     },
   );
 });
@@ -131,6 +132,20 @@ test("unsupported geographies do not fall through to NSW", () => {
   }
 });
 
+test("SA routes to live provider only when token is configured", () => {
+  const adelaide = { lat: -34.9285, lon: 138.6007 };
+
+  withEnv({ SA_FUEL_API_TOKEN: "" }, () => {
+    assert.deepEqual(liveProviderKeysForArea([adelaide], 8), []);
+    assert.equal(capabilitiesForPoints([adelaide])[0]?.capability, "pending_access");
+  });
+
+  withEnv({ SA_FUEL_API_TOKEN: "test-sa-token" }, () => {
+    assert.deepEqual(liveProviderKeysForArea([adelaide], 8), ["sa"]);
+    assert.equal(capabilitiesForPoints([adelaide])[0]?.capability, "live");
+  });
+});
+
 test("unsupported station loads return explicit empty unsupported context", async () => {
   const data = await loadStationData({
     requestedSource: "auto",
@@ -193,6 +208,7 @@ test("forced provider outside coverage returns explicit JSON instead of throwing
   const forcedOutsideCoverage = [
     { source: "qld", lat: -33.86, lon: 151.2, expectedProvider: "qld" },
     { source: "wa", lat: -33.86, lon: 151.2, expectedProvider: "wa" },
+    { source: "sa", lat: -33.86, lon: 151.2, expectedProvider: "sa" },
     { source: "nsw", lat: -27.4698, lon: 153.0251, expectedProvider: "nsw" },
   ];
 

@@ -73,7 +73,7 @@
 - [x] Add first WA FuelWatch provider adapter for Perth/metro live Nearby and route scoring.
 - [x] Expand WA FuelWatch provider to full live statewide v2 with request-budgeted region planning, per-region/product/day caching and tomorrow-price checks.
 - [ ] Apply for VIC Servo Saver Public API access and implement adapter after approved schema is available.
-- [ ] Confirm SA fuel data/API access path and implement adapter after approved schema is available.
+- [x] Add SA Fuel Pricing Information Scheme Direct API adapter behind server-side token configuration.
 - [ ] Confirm TAS fuel data/API access path and implement adapter after approved schema is available.
 - [ ] Confirm NT MyFuel data/API access path and implement adapter after approved schema is available.
 - [x] Add saved commutes, notification permission flow and backend alert sync path for validation builds.
@@ -101,7 +101,7 @@
 - FuelCheck app/commercial usage, caching rules and public-sharing permission need API.NSW confirmation.
 - QLD usage constraints still need confirmation against the licence terms before public/commercial launch.
 - VIC Servo Saver live prices need approved API access and schema before implementation.
-- SA fuel data/API access needs confirmation before implementation.
+- SA Fuel Pricing Information Scheme access is granted; production token must be configured server-side before live SA prices appear.
 - TAS fuel data/API access needs confirmation before implementation.
 - NT MyFuel data/API access needs confirmation before implementation.
 - Google Places production autocomplete still needs billing controls, restricted keys and device validation before live enablement.

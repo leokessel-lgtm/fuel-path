@@ -34,6 +34,7 @@ const SAMPLE_NOW = new Date("2026-06-13T08:00:00+10:00");
 const RECOMMENDATION_MAX_PRICE_AGE_HOURS = 48;
 const RECOMMENDED_GEOCODE_PROVIDER = "google_places_autocomplete_new";
 const DEFAULT_QLD_FUEL_API_BASE_URL = "https://fppdirectapi-prod.fuelpricesqld.com.au";
+const DEFAULT_SA_FUEL_API_BASE_URL = "https://fppdirectapi-prod.safuelpricinginformation.com.au";
 const DEFAULT_WA_FUELWATCH_RSS_URL = "https://www.fuelwatch.wa.gov.au/fuelwatch/fuelWatchRSS";
 const WA_DEFAULT_MAX_REGION_IDS = 18;
 const WA_DEFAULT_FETCH_CONCURRENCY = 6;
@@ -45,6 +46,11 @@ const QLD_REGION_PARAMS = {
   countryId: 21,
   geoRegionLevel: 3,
   geoRegionId: 1,
+};
+const SA_REGION_PARAMS = {
+  countryId: 21,
+  geoRegionLevel: 3,
+  geoRegionId: 4,
 };
 const QLD_BOUNDS = {
   minLat: -29.1,
@@ -60,7 +66,9 @@ const QLD_FUEL_ID_TO_CODE = new Map([
   [12, "E10"],
   [14, "PDL"],
 ]);
+const SA_FUEL_ID_TO_CODE = QLD_FUEL_ID_TO_CODE;
 const QLD_UNAVAILABLE_PRICE = 9999;
+const SA_UNAVAILABLE_PRICE = 9999;
 const WA_BOUNDS = {
   minLat: -36,
   maxLat: -13,
@@ -206,6 +214,12 @@ const qldLiveCache = {
   lastError: "",
 };
 
+const saLiveCache = {
+  stations: null,
+  loadedAtMs: 0,
+  lastError: "",
+};
+
 const waLiveCache = {
   entries: new Map(),
   payloads: new Map(),
@@ -316,6 +330,10 @@ function hasQldCredentials() {
   return Boolean(process.env.QLD_FUEL_API_TOKEN);
 }
 
+function hasSaCredentials() {
+  return Boolean(process.env.SA_FUEL_API_TOKEN);
+}
+
 function hasWaProvider() {
   return process.env.FUEL_PATH_WA_FUELWATCH_ENABLED !== "0";
 }
@@ -325,7 +343,7 @@ function hasVicCredentials() {
 }
 
 function hasAnyLiveCredentials() {
-  return hasLiveCredentials() || hasQldCredentials() || hasWaProvider() || hasVicCredentials();
+  return hasLiveCredentials() || hasQldCredentials() || hasSaCredentials() || hasWaProvider() || hasVicCredentials();
 }
 
 function fuelProviderCapabilityMatrix() {
@@ -381,10 +399,10 @@ function fuelProviderCapabilityMatrix() {
       region: "SA",
       name: "South Australia",
       provider: "api_sa_fuel_price_reporting",
-      capability: "pending_access",
-      configured: false,
-      coverage: "SA fuel price reporting access planned.",
-      blocker: "SA fuel data/API access path needs confirmation.",
+      capability: hasSaCredentials() ? "live" : "pending_access",
+      configured: hasSaCredentials(),
+      coverage: "SA Fuel Pricing Information Scheme Direct API live prices.",
+      blocker: hasSaCredentials() ? "" : "SA Fuel Pricing Information Scheme API token is not configured.",
     }),
     capabilityEntry({
       region: "TAS",
@@ -777,6 +795,160 @@ function qldAddress(row, suburb) {
   const postcode = String(row.P || "").trim();
   if (/\b(?:QLD|Queensland)\s+\d{4}\b/i.test(address)) return address;
   return [address, suburb, `QLD ${postcode}`.trim()].filter(Boolean).join(", ");
+}
+
+async function saApiGet(path, params) {
+  const token = process.env.SA_FUEL_API_TOKEN;
+  if (!token) throw new Error("SA fuel API token is not configured");
+  const baseUrl = process.env.SA_FUEL_API_BASE_URL || DEFAULT_SA_FUEL_API_BASE_URL;
+  const url = new URL(`${baseUrl.replace(/\/$/, "")}/${String(path).replace(/^\//, "")}`);
+  for (const [key, value] of Object.entries(params)) {
+    url.searchParams.set(key, String(value));
+  }
+  return fetchJson(url.toString(), {
+    headers: {
+      Authorization: `FPDAPI SubscriberToken=${token}`,
+      "Content-Type": "application/json",
+    },
+    timeoutMs: 60000,
+  });
+}
+
+async function loadLiveSaStations({ forceRefresh = false } = {}) {
+  const ageMs = Date.now() - saLiveCache.loadedAtMs;
+  const ttlMs = Math.max(cacheSeconds(), 60) * 1000;
+  if (!forceRefresh && saLiveCache.stations && ageMs < ttlMs) {
+    return {
+      stations: saLiveCache.stations,
+      cacheHit: true,
+      cacheAgeSeconds: Math.round(ageMs / 1000),
+      error: "",
+    };
+  }
+
+  const [brands, regions, sites, prices] = await Promise.all([
+    saApiGet("/Subscriber/GetCountryBrands", { countryId: 21 }),
+    saApiGet("/Subscriber/GetCountryGeographicRegions", { countryId: 21 }),
+    saApiGet("/Subscriber/GetFullSiteDetails", SA_REGION_PARAMS),
+    saApiGet("/Price/GetSitesPrices", SA_REGION_PARAMS),
+  ]);
+  const stations = normaliseSaPayload(sites, prices, brands, regions).map(stationWithDiscountRules);
+  saLiveCache.stations = stations;
+  saLiveCache.loadedAtMs = Date.now();
+  saLiveCache.lastError = "";
+  return {
+    stations,
+    cacheHit: false,
+    cacheAgeSeconds: 0,
+    error: "",
+  };
+}
+
+function normaliseSaPayload(sitePayload, pricePayload, brandPayload = {}, regionPayload = {}) {
+  const brands = qldLookupById(brandPayload, "Brands", "BrandId");
+  const regions = qldRegionLookupById(regionPayload);
+  const stations = new Map();
+
+  for (const row of sitePayload?.S || []) {
+    if (!row || typeof row !== "object") continue;
+    const siteId = String(row.S || "");
+    if (!siteId) continue;
+    const suburb = saRegionName(row, regions);
+    const brandId = String(row.B || "");
+    stations.set(siteId, {
+      stationCode: `SA-${siteId}`,
+      name: row.N || siteId,
+      brand: brands.get(brandId) || "Unknown",
+      suburb,
+      address: saAddress(row, suburb),
+      phone: stationPhone(row),
+      lat: Number(row.Lat || 0),
+      lon: Number(row.Lng || 0),
+      openNow: qldOpenNow(row),
+      membershipRequired: false,
+      updatedAt: normaliseQldTimestamp(row.M),
+      source: "api_sa_fuel_price_reporting",
+      prices: {},
+      discounts: [],
+    });
+  }
+
+  for (const row of pricePayload?.SitePrices || []) {
+    if (!row || typeof row !== "object") continue;
+    const siteId = String(row.SiteId || "");
+    if (!siteId) continue;
+    const fuelCode = SA_FUEL_ID_TO_CODE.get(Number(row.FuelId || 0));
+    const price = saPriceCpl(row.Price);
+    if (!fuelCode || price === undefined) continue;
+    const station =
+      stations.get(siteId) ||
+      {
+        stationCode: `SA-${siteId}`,
+        name: siteId,
+        brand: "Unknown",
+        suburb: "",
+        address: "",
+        phone: undefined,
+        lat: 0,
+        lon: 0,
+        openNow: undefined,
+        membershipRequired: false,
+        updatedAt: undefined,
+        source: "api_sa_fuel_price_reporting",
+        prices: {},
+        discounts: [],
+      };
+    station.prices[fuelCode] = price;
+    const updatedAt = normaliseQldTimestamp(row.TransactionDateUtc);
+    if (updatedAt && (!station.updatedAt || updatedAt > String(station.updatedAt))) {
+      station.updatedAt = updatedAt;
+    }
+    stations.set(siteId, station);
+  }
+
+  return [...stations.values()].filter(
+    (station) =>
+      Object.keys(station.prices || {}).length &&
+      Number.isFinite(station.lat) &&
+      Number.isFinite(station.lon) &&
+      (station.lat || station.lon),
+  );
+}
+
+function saPriceCpl(value) {
+  const price = Number(value);
+  if (!Number.isFinite(price) || price === SA_UNAVAILABLE_PRICE) return undefined;
+  return Math.round(price) / 10;
+}
+
+function saRegionName(row, regions) {
+  for (const key of ["G1", "G2", "G3", "G4", "G5"]) {
+    const value = row?.[key];
+    const region = regions.get(String(value));
+    if (region && Number(region.GeoRegionLevel) === 1 && !/^south australia$/i.test(String(region.Name))) {
+      return String(region.Name);
+    }
+  }
+  return saSuburbFromAddress(row?.A, row?.P) || qldSuburbFromName(row?.N);
+}
+
+function saAddress(row, suburb) {
+  const address = String(row.A || "").replace(/\s+/g, " ").replace(/,\s*Australia$/i, "").trim();
+  const postcode = String(row.P || "").trim();
+  if (/\b(?:SA|South Australia)\s+\d{4}\b/i.test(address)) return address;
+  return [address, suburb, `SA ${postcode}`.trim()].filter(Boolean).join(", ");
+}
+
+function saSuburbFromAddress(address, postcode) {
+  const text = String(address || "").replace(/\s+/g, " ").trim();
+  const postcodeText = String(postcode || "").trim();
+  const match = /\b([^,]+?)\s+SA\s+\d{4}\b/i.exec(text);
+  if (match?.[1]) return titleCase(match[1].trim());
+  if (postcodeText) {
+    const beforePostcode = new RegExp(`([^,]+?)\\s+${postcodeText}\\b`, "i").exec(text);
+    if (beforePostcode?.[1]) return titleCase(beforePostcode[1].replace(/\bSA$/i, "").trim());
+  }
+  return qldSuburbFromAddress(text, postcodeText);
 }
 
 function qldSuburbFromAddress(address, postcode) {
@@ -1455,8 +1627,10 @@ function liveProviderKeysForArea(points = [], radiusKm = 0) {
   const hasQldPoint = points.some(pointInQld);
   const hasWaPoint = points.some(pointInWa);
   const hasVicPoint = points.some(pointInVic);
+  const hasSaPoint = points.some(pointInSa);
   const hasNswPoint = points.some(pointInNswOrAct);
   if (hasWaPoint) return ["wa"];
+  if (hasSaPoint) return hasSaCredentials() ? ["sa"] : [];
   if (hasVicPoint) {
     const providers = ["vic"];
     if (hasNswPoint) providers.push("nsw");
@@ -1568,6 +1742,10 @@ async function loadLiveStationsForArea({ forceRefresh = false, points = [], radi
         const live = await loadLiveVicStations({ forceRefresh });
         stations.push(...live.stations);
         loadedProviders.push("api_vic");
+      } else if (provider === "sa") {
+        const live = await loadLiveSaStations({ forceRefresh });
+        stations.push(...live.stations);
+        loadedProviders.push("api_sa");
       } else if (provider === "nsw") {
         const live = await loadLiveStations({ forceRefresh });
         stations.push(...live.stations);
@@ -1649,14 +1827,14 @@ async function loadStationData({ requestedSource = "auto", forceRefresh = false,
 
 function resolveSource(source) {
   const value = source === "auto" || !source ? (hasAnyLiveCredentials() ? "live" : "sample") : source;
-  if (!["live", "sample", "nsw", "qld", "wa", "vic"].includes(value)) {
-    throw new Error("source must be live, sample, nsw, qld, wa, vic or auto");
+  if (!["live", "sample", "nsw", "qld", "wa", "vic", "sa"].includes(value)) {
+    throw new Error("source must be live, sample, nsw, qld, wa, vic, sa or auto");
   }
   return value;
 }
 
 function providerFromSource(source) {
-  return ["nsw", "qld", "wa", "vic"].includes(source) ? source : "";
+  return ["nsw", "qld", "wa", "vic", "sa"].includes(source) ? source : "";
 }
 
 function pointInProviderCoverage(provider, point) {
@@ -1664,6 +1842,7 @@ function pointInProviderCoverage(provider, point) {
   if (provider === "qld") return pointInQld(point);
   if (provider === "wa") return pointInWa(point);
   if (provider === "vic") return pointInVic(point);
+  if (provider === "sa") return pointInSa(point);
   return false;
 }
 
@@ -3684,13 +3863,16 @@ module.exports = {
   hasAnyLiveCredentials,
   hasLiveCredentials,
   hasQldCredentials,
+  hasSaCredentials,
   hasVicCredentials,
   hasWaProvider,
   loadStationData,
+  loadLiveSaStations,
   loadLiveWaStations,
   liveProviderKeysForArea,
   methodAllowed,
   normaliseQldPayload,
+  normaliseSaPayload,
   normaliseWaFuelWatchPayloads,
   numberParam,
   listPredictionBacktests,

@@ -8,10 +8,14 @@
     <meta name="apple-mobile-web-app-title" content="Fuel Path" />
     <title>Fuel Path Demo</title>
     <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23075642'/%3E%3Ctext x='32' y='39' text-anchor='middle' font-family='Arial,sans-serif' font-size='20' font-weight='700' fill='white'%3EFP%3C/text%3E%3C/svg%3E"
+    />
+    <link
       rel="stylesheet"
       href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
     />
-    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./styles.css?v=20260621-stability-pins" />
   </head>
   <body>
     <main id="controls" class="app-shell">
@@ -21,7 +25,7 @@
             <span class="brand-mark" aria-hidden="true">FP</span>
             <div>
               <h1>Fuel Path</h1>
-              <p>Native app prototype.</p>
+              <p>Internal validation demo. <a href="./privacy.html">Privacy policy</a></p>
             </div>
           </div>
 
@@ -37,6 +41,14 @@
             </button>
           </nav>
         </div>
+        <section class="validation-boundary" aria-label="Validation readiness status">
+          <strong>Controlled demo only</strong>
+          <span>
+            Public beta remains blocked until provider terms, iOS validation,
+            store/privacy evidence and support readiness are proven. Android
+            physical performance evidence is captured for the current preview.
+          </span>
+        </section>
       </header>
 
       <section class="workspace" aria-live="polite">
@@ -334,9 +346,9 @@
               <section class="account-card" aria-labelledby="notificationsTitle">
                 <h3 id="notificationsTitle">Notifications</h3>
                 <div class="notification-list">
-                  <label><input type="checkbox" checked /> Route price drops</label>
-                  <label><input type="checkbox" checked /> Saved commute cycle alerts</label>
-                  <label><input type="checkbox" /> Discount eligibility reminders</label>
+                  <label><input type="checkbox" checked disabled /> Saved-route alert preview, no push sent</label>
+                  <label><input type="checkbox" disabled /> Cycle alerts parked until measured evidence exists</label>
+                  <label><input type="checkbox" disabled /> Discount reminders parked for later</label>
                 </div>
               </section>
 
@@ -366,6 +378,6 @@
     </main>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="./app.js?v=20260614-nearby-logo-pins"></script>
+    <script src="./app.js?v=20260621-stability-pins"></script>
   </body>
 </html>

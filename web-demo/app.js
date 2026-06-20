@@ -677,6 +677,22 @@ function googlePriceMarkerContent({ tone, label, rank = null, station, nearby = 
   return content;
 }
 
+function makeMapMarkerDecorative(marker, dataset = {}) {
+  marker.on("add", () => {
+    const markerElement = marker.getElement();
+    if (!markerElement) return;
+    Object.entries(dataset).forEach(([key, value]) => {
+      markerElement.dataset[key] = value;
+    });
+    if (markerElement.title) {
+      markerElement.dataset.markerTitle = markerElement.title;
+      markerElement.removeAttribute("title");
+    }
+    markerElement.tabIndex = -1;
+    markerElement.setAttribute("aria-hidden", "true");
+  });
+}
+
 function createGooglePriceMarker({ map, position, tone, label, title, rank = null, station = null, nearby = false }) {
   const maps = window.google.maps;
   if (station && maps.marker?.AdvancedMarkerElement) {
@@ -1483,7 +1499,7 @@ function brandMarkHtml(station, className = "") {
     .filter(Boolean)
     .join(" ");
   const content = style.icon
-    ? `<img src="${BRAND_ICON_BASE_URL}${escapeHtml(style.icon)}" alt="" loading="lazy" decoding="async" />`
+    ? `<img src="${BRAND_ICON_BASE_URL}${escapeHtml(style.icon)}" alt="" loading="lazy" decoding="async" style="display:block;width:100%;height:100%;max-width:100%;max-height:100%;object-fit:contain;border-radius:inherit;" />`
     : escapeHtml(style.initials);
   return `<span class="${classes}" style="--brand-color:${escapeHtml(style.color)}" aria-label="${escapeHtml(style.label)}">${content}</span>`;
 }
@@ -3158,16 +3174,12 @@ function renderRouteMapWithLeaflet(route, items, routeItems) {
         iconAnchor: [36, 34],
       }),
       title: `${item.station.name} ${item.adjustedCpl.toFixed(1)} c/L`,
+      keyboard: false,
     });
     marker.on("click", () => {
       selectRouteStation(selectionKey, { focusMap: true });
     });
-    marker.on("add", () => {
-      const markerElement = marker.getElement();
-      if (markerElement) {
-        markerElement.dataset.routeStationKey = selectionKey;
-      }
-    });
+    makeMapMarkerDecorative(marker, { routeStationKey: selectionKey });
     if (selectionKey === state.routeMapFocusStationKey) {
       focusedMarker = marker;
       focusedItem = item;
@@ -3757,6 +3769,7 @@ function renderExploreMarkersWithLeaflet(stations, centre) {
         iconAnchor: [44, 40],
       }),
       title: `${item.station.name} ${item.adjustedCpl.toFixed(1)} c/L`,
+      keyboard: false,
     });
     marker.on("click", () => {
       state.selectedStationCode = item.station.stationCode;
@@ -3764,6 +3777,7 @@ function renderExploreMarkersWithLeaflet(stations, centre) {
       renderNearbyList(state.exploreStations);
       renderSelectedStation(state.exploreStations);
     });
+    makeMapMarkerDecorative(marker);
     marker
       .bindPopup(
         `<strong>${escapeHtml(item.station.name)}</strong><br>${item.adjustedCpl.toFixed(1)} c/L ${escapeHtml(state.nearbyFuel)}`,
@@ -3894,7 +3908,7 @@ function handleStationAction(action, stationCode = null) {
   const messages = {
     navigate: `Navigation handoff prepared for ${name}.`,
     favourite: `${name} added to favourites for demo alerts.`,
-    alert: `Price alert set for ${name} when your selected fuel drops below this price.`,
+    alert: `Price alert preview noted for ${name}. Demo only; no alert was scheduled or sent.`,
     report: `Report price flow opened for ${name}. Demo only; no external price was submitted.`,
   };
   status.textContent = messages[action] || "Demo action selected.";
@@ -4015,6 +4029,7 @@ function renderPlanVehicleCard() {
 
 function setRouteSearchExpanded(expanded) {
   state.routeSearchExpanded = Boolean(expanded);
+  els.routeResultsPanel?.classList.toggle("is-editing-route", state.routeSearchExpanded);
   if (els.routeSearchExpanded) {
     els.routeSearchExpanded.hidden = !state.routeSearchExpanded;
   }
@@ -4091,6 +4106,8 @@ function applySavedCommute(routeId) {
   state.nearbyFuel = saved.fuel;
   state.tripPlaces.from = null;
   state.tripPlaces.to = null;
+  state.plannedRoute = null;
+  state.activeRouteKey = "";
   state.stationCache.clear();
   state.selectedStationCode = null;
   state.selectedRouteStationKey = null;
@@ -4249,6 +4266,12 @@ function initialiseControls() {
   });
 
   if (els.savedRouteSuggestions) {
+    els.savedRouteSuggestions.addEventListener("pointerdown", (event) => {
+      const button = event.target.closest("[data-saved-route]");
+      if (!button) return;
+      event.preventDefault();
+      applySavedCommute(button.dataset.savedRoute);
+    });
     els.savedRouteSuggestions.addEventListener("focusin", () => {
       state.savedRouteSuggestionsOpen = true;
       renderSavedRouteSuggestions();

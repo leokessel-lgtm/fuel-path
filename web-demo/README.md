@@ -2,6 +2,8 @@
 
 This is a local web demo for the existing route-scoring prototype.
 
+The first viewport intentionally labels the page as a controlled internal demo. Do not remove that boundary while provider terms, iOS validation, store/privacy evidence or support readiness remain blocked. Android physical performance evidence is captured for the current preview.
+
 It can run in two modes:
 
 - **Sample mode:** uses synthetic local data from `prototype/data/sample-stations.json`.
@@ -23,13 +25,25 @@ Google Maps is used as the base map in local prototype mode. Route geometry uses
 Sample-only static mode:
 
 ```bash
-python3 -m http.server 4173
+python3 -m http.server 4175
 ```
 
 Open:
 
 ```text
-http://127.0.0.1:4173/web-demo/
+http://127.0.0.1:4175/web-demo/
+```
+
+Privacy policy:
+
+```text
+http://127.0.0.1:4175/web-demo/privacy.html
+```
+
+Production privacy policy:
+
+```text
+https://fuel-path.vercel.app/web-demo/privacy
 ```
 
 Live local proxy mode:
@@ -38,20 +52,26 @@ Live local proxy mode:
 set -a
 . prototype/.env
 set +a
-python3 web-demo/server.py --port 4174
+python3 web-demo/server.py --port 4175
 ```
 
 Optional Google Maps local run:
 
 ```bash
 export FUEL_PATH_GOOGLE_MAPS_API_KEY="your-restricted-browser-key"
-python3 web-demo/server.py --port 4174
+python3 web-demo/server.py --port 4175
 ```
 
 Open:
 
 ```text
-http://127.0.0.1:4174/web-demo/
+http://127.0.0.1:4175/web-demo/
+```
+
+Privacy policy:
+
+```text
+http://127.0.0.1:4175/web-demo/privacy.html
 ```
 
 The page will show **Live NSW API** when the local proxy is available and credentials are configured. Otherwise it falls back to sample mode.
@@ -123,6 +143,8 @@ Saved routes are rule-based demo profiles:
 - each saved route has a usual timing, fuel type, tank threshold, minimum saving and maximum detour rule
 - commute alerts only fire when saving, detour and tank rules are all met
 - safe regional routes prioritise range warnings and avoid petrol-cycle claims where the cycle signal does not apply
+
+Notification controls are preview-only in this demo. They must not imply live push delivery, cycle alerts or discount reminders before the physical-device, iOS, backend-sync and validation gates are proven.
 
 This is still a local prototype. Confirm API.NSW usage rights, caching rules, attribution and commercial/fleet permissions before sharing a public or hosted version.
 

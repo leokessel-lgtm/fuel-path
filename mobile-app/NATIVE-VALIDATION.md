@@ -4,7 +4,7 @@ Fuel Path is app-first, so iOS and Android builds need separate validation from 
 
 ## Current Status
 
-Last local preflight: 2026-06-17.
+Last preview-environment preflight: 2026-06-20.
 
 - TypeScript: passed.
 - Expo Doctor: passed, 21 of 21 checks.
@@ -12,10 +12,12 @@ Last local preflight: 2026-06-17.
 - EAS CLI: available as `eas-cli/20.2.0` when run with the repo-local npm cache.
 - EAS account state: logged in as `leokessel`.
 - EAS project: `@leokessel/fuel-path`, project id `240831fe-3325-4f8e-bbf5-2f4d82842f9f`.
-- EAS preview env: production API URL and preview alerts validation token configured.
+- EAS preview env: production API URL, preview alerts validation token and Android Maps key configured.
 - Vercel production env: `ALERTS_CLIENT_WRITE_ENABLED` and `ALERTS_CLIENT_WRITE_TOKEN` configured for preview validation without reusing `ALERTS_WRITE_TOKEN`.
-- Device validation: pending.
-- Push-token readiness: native config now injects `extra.eas.projectId` when `EXPO_PUBLIC_EAS_PROJECT_ID`, `EAS_PROJECT_ID` or the static EAS project id is set; strict validation is blocked until the Android Maps key is present.
+- Android preview APK validation: passed on physical Android. The latest local parity APK `fuel-path-preview-android-local-parity-8199f828.apk` installs and opens on Pixel 9 Pro `49231FDAP0017N`; Google map tiles render on Plan, Nearby and Nearby-after-pan, with no Maps key warning lines. Latest measured physical pass captured 186 frames, 1 janky frame, p95 8 ms and p99 11 ms.
+- Device validation: Android physical render/performance validation has first-pass evidence for the current preview APK; iOS remains pending.
+- Push-token readiness: native config injects `extra.eas.projectId` when `EXPO_PUBLIC_EAS_PROJECT_ID`, `EAS_PROJECT_ID` or the static EAS project id is set; strict preview-environment preflight now passes through `npm run native:preflight`.
+- Local shell strict preflight remains blocked unless `EXPO_PUBLIC_FUEL_PATH_API_BASE_URL`, `EXPO_PUBLIC_FUEL_PATH_ALERTS_VALIDATION_TOKEN` and `FUEL_PATH_ANDROID_GOOGLE_MAPS_API_KEY` are exported locally.
 
 ## Required Environment
 
@@ -43,12 +45,12 @@ export FUEL_PATH_ANDROID_GOOGLE_MAPS_API_KEY=YOUR_RESTRICTED_ANDROID_MAPS_KEY
 The key should be restricted to:
 
 - package name: `com.fuelpath.app`
-- EAS Android signing certificate SHA-1
+- EAS Android signing certificate SHA-1: `cbd45223bd0f8a6791c9ab9d783ff895736ac39e`
 - Maps SDK for Android only
 
 ## Local Preflight
 
-From `mobile-app/`:
+From `mobile-app/`, the plain preflight command uses the EAS preview environment because the alerts validation token and Android Maps key are stored as sensitive EAS variables:
 
 ```sh
 npm run typecheck
@@ -59,6 +61,75 @@ npm_config_cache=.npm-cache npx expo install --check
 npm_config_cache=.npm-cache npx expo config --type public
 ```
 
+Local machine/device readiness is separate from EAS config readiness:
+
+```sh
+npm run native:readiness
+npm run native:readiness -- --strict
+```
+
+Current local machine finding on 20 June 2026:
+
+- Android SDK tooling exists under `~/Library/Android/sdk`; `npm run native:readiness` now finds `adb` and `emulator` without requiring them on PATH.
+- Android SDK Command-line Tools are installed under `~/Library/Android/sdk/cmdline-tools/latest`.
+- A local Temurin JDK is available under `var/tooling/java/` and is intentionally ignored by Git; the native readiness scripts auto-detect it so `sdkmanager` and `avdmanager` work without manually exporting `JAVA_HOME`.
+- Android emulator was updated from the old `x86_64` binary to native `arm64` emulator `36.6.11`.
+- Android AVDs are present: `Fuel_Path_Arm64_API_35`, `Medium_Phone_API_35` and `Pixel_Tablet_API_35`.
+- `Fuel_Path_Arm64_API_35` uses `system-images;android-35;google_apis;arm64-v8a`, boots headless on this Mac and is visible to `adb` as `emulator-5554`.
+- Android Expo Go smoke on `Fuel_Path_Arm64_API_35` now renders the Fuel Path Plan surface after gating Android Expo Go away from the unsupported `expo-notifications` module. Screenshot evidence: `tmp/native-smoke/android-expo-go-plan-clean-20260620T110645.png`.
+- Android map/UI smoke now opens the exact local Expo project URL, rejects Expo Go shell captures, captures Plan/Nearby/pan/Account screenshots and records `dumpsys gfxinfo`. Latest corrected run: `tmp/native-smoke/android-map-smoke-2026-06-20T01-21-51-852Z.md`.
+- Android EAS preview build `f67da375-ad46-484d-8fc8-d5fc71a52e07` completed and was downloaded to `mobile-app/native-artifacts/fuel-path-preview-android-f67da375.apk`. The APK budget passes at 70.68 MB against the 76.29 MB native budget.
+- Installed preview APK physical smoke on Pixel 9 Pro `49231FDAP0017N` now runs through `npm run native:android-performance-smoke`. Latest report: `tmp/native-smoke/android-preview-smoke-2026-06-20T20-59-06-687Z.md`, status `passed`: Plan/Nearby/pan/Account screenshots were captured, Plan/Nearby/Nearby-after-pan all report `blank=false`, there are no Maps key warning lines, and the measured pass captured 186 frames, 1 janky frame, p90 7 ms, p95 8 ms and p99 11 ms. The APK signing SHA-1 is `cbd45223bd0f8a6791c9ab9d783ff895736ac39e`.
+- Android Maps key fix packet now runs through `npm run native:android-maps-key-fix`. Latest packet: `tmp/native-smoke/android-maps-key-fix-2026-06-20T03-29-43-446Z.md`, status `ready_for_cloud_fix`. It records the current APK fingerprint and latest smoke context for any future Maps key changes, and its rerun commands now follow the selected APK artifact instead of pinning an older preview.
+- Native warning overlay fixed by replacing deprecated React Native `SafeAreaView` with `react-native-safe-area-context`; the corrected Android smoke no longer captures the SafeArea warning screen.
+- iOS simulator control is not available: `xcrun simctl` is missing from the current Xcode command-line setup.
+- Local shell native env values are not exported; preview EAS env still passes `npm run native:preflight`.
+- Latest Android physical readiness rerun with Pixel 9 Pro connected passes Android device detection. Full native readiness still blocks on missing iOS `simctl`.
+- Latest Android ARM64 AVD setup plan: `npm run native:android-avd-plan` passes SDK root, Command-line Tools, Android 35 platform, Android 35 ARM64 image, ARM64-compatible AVD and Android emulator checks.
+- Latest iOS simulator setup plan: `npm run native:ios-simulator-plan` confirms the active developer directory is only `/Library/Developer/CommandLineTools`, then blocks on missing `simctl`, missing iOS simulator runtime and no bootable simulator. This is setup evidence only; beta readiness now also requires a passed `ios-validation-*.json` report covering Plan, Nearby and Account with no runtime failures.
+
+This means Android emulator UI/map smoke is locally available through Expo Go and an installed EAS preview APK, and Android physical-device render/performance evidence is now captured for the current preview APK. Backend push-token delivery still needs native-build validation with notification permission and backend sync enabled. Full all-platform native validation remains blocked on iOS simulator/device evidence, not app code alone.
+
+To rerun the Android side on this Mac:
+
+The local readiness script checks whether `sdkmanager` and `avdmanager` are available, and `npm run native:android-avd-plan` prints the current boot command for the ARM64 AVD:
+
+```sh
+npm run native:android-avd-plan
+npm run native:android-map-smoke
+FUEL_PATH_NATIVE_ARTIFACT=native-artifacts/fuel-path-preview-android-local-parity-8199f828.apk npm run native:android-preview-smoke
+npm run native:android-physical-readiness
+FUEL_PATH_NATIVE_ARTIFACT=native-artifacts/fuel-path-preview-android-local-parity-8199f828.apk npm run native:android-performance-smoke
+npm run native:android-performance-summary
+FUEL_PATH_NATIVE_ARTIFACT=native-artifacts/fuel-path-preview-android-local-parity-8199f828.apk npm run native:android-maps-key-fix
+npm run native:blocker-packet
+npm run native:readiness -- --strict
+```
+
+To clear the iOS simulator side, install full Xcode or switch `xcode-select` to a developer directory that includes `simctl`, then capture a passed iOS validation report before treating iOS as beta-ready.
+
+The local iOS planner prints the exact simulator setup path:
+
+```sh
+npm run native:ios-simulator-plan
+```
+
+After capturing iOS screenshots, write the report consumed by beta readiness:
+
+```sh
+npm run native:ios-validation-report -- \
+  --simulator-name "iPhone 16" \
+  --simulator-runtime "iOS 18.5" \
+  --plan-screenshot <path-to-plan-screenshot.png> \
+  --nearby-screenshot <path-to-nearby-screenshot.png> \
+  --account-screenshot <path-to-account-screenshot.png> \
+  --failure-log <optional-ios-runtime-log.txt>
+```
+
+The beta gate looks for an `ios-validation-*.json` report in `tmp/native-smoke/`, or beside an explicitly supplied native blocker packet. The report must have `status: "passed"`, `platform: "ios"`, a simulator or device target, rendered Plan/Nearby/Account screens, existing screenshot evidence for those screens and no runtime failure lines.
+
+Use `npm run native:preflight:local` only when the three native variables have already been exported in the local shell.
+
 Expected:
 
 - no TypeScript errors
@@ -67,6 +138,7 @@ Expected:
 - dependencies match Expo SDK 56
 - public config shows `androidGoogleMapsApiKeyConfigured: true` when the Android Maps key is set
 - public config shows `easProjectIdConfigured: true` and `extra.eas.projectId` when the EAS project id is set
+- `npm run native:readiness -- --strict` passes on the machine used for real device/emulator validation
 
 ## Preview Builds
 
@@ -84,6 +156,17 @@ npm_config_cache=.npm-cache npx eas-cli build --profile preview --platform ios
 ```
 
 Use the `preview` profile for internal validation. Android is configured as an APK to keep first install testing simple.
+
+Latest Android preview build:
+
+- Build id: `f67da375-ad46-484d-8fc8-d5fc71a52e07`
+- EAS URL: `https://expo.dev/accounts/leokessel/projects/fuel-path/builds/f67da375-ad46-484d-8fc8-d5fc71a52e07`
+- Artifact: `mobile-app/native-artifacts/fuel-path-preview-android-f67da375.apk`
+- Artifact SHA-256: `377c0fed4a82f4a3e0a3c57f7837fc0bc64865b52080e930ae10de807dbcd6fd`
+- APK signing SHA-1: `cbd45223bd0f8a6791c9ab9d783ff895736ac39e`
+- APK signing SHA-256: `8af30be0bd2ec9740cfa2ed85392a52b0bf78f61a18e4a3074068dca656ab368`
+- Current blocker: Android physical render/performance is passed for this preview APK, but iOS validation, provider terms, privacy/store evidence and support readiness still block beta readiness.
+- Cloud-side handoff packet for future Maps key changes: `tmp/native-smoke/android-maps-key-fix-2026-06-20T03-29-43-446Z.md`
 
 ## Device Smoke Test
 
@@ -105,6 +188,59 @@ Run these checks on both iOS and Android:
 - Turning the saved-route alert off disables the backend route and cancels the local reminder.
 - Android 13+ shows the notification permission prompt after the `route-alerts` channel is created.
 
+## Android Performance Capture
+
+Run this on a mid-range Android device or a deliberately modest AVD before store or public validation claims.
+
+Target profile:
+
+- Android 12 or later.
+- 4 GB to 6 GB RAM class.
+- 60 Hz screen.
+- Fresh app install, no debugger attached for the measured pass.
+
+The physical-device performance gate is:
+
+```sh
+npm run native:android-physical-readiness
+FUEL_PATH_NATIVE_ARTIFACT=native-artifacts/fuel-path-preview-android-local-parity-8199f828.apk npm run native:android-performance-smoke
+npm run native:android-performance-summary
+```
+
+When a phone and emulator are both visible to adb, target the phone explicitly:
+
+```sh
+FUEL_PATH_ANDROID_DEVICE_SERIAL=<adb-device-serial> \
+FUEL_PATH_NATIVE_ARTIFACT=native-artifacts/fuel-path-preview-android-local-parity-8199f828.apk \
+npm run native:android-performance-smoke
+```
+
+These commands refuse emulator-only validation. Use `native:android-preview-smoke` for emulator render evidence only. The blocker packet distinguishes missing, unauthorised and offline physical Android devices so USB-debugging setup problems are visible in beta readiness. The summary command reviews the latest physical smoke JSON and fails unless the source is a physical Android device, the installed APK artifact is identified, adb device serial/detail is present, render status passed, performance status passed, Plan/Nearby/Nearby-after-pan map screenshots are present as actual files and non-blank, and frame metrics stay within the claim thresholds.
+
+Latest physical-device checks on 21 June 2026 local time: `npm run native:android-physical-readiness` sees Pixel 9 Pro `49231FDAP0017N`; `npm run native:android-performance-smoke -- --artifact native-artifacts/fuel-path-preview-android-local-parity-8199f828.apk --device-serial 49231FDAP0017N` writes `tmp/native-smoke/android-preview-smoke-2026-06-20T20-59-06-687Z.md`, status `passed`; and `npm run native:android-performance-summary` writes `tmp/native-smoke/android-performance-summary-2026-06-20T21-12-06-531Z.md`, status `passed`. The source report is a physical Android device, includes the installed APK artifact, adb serial/detail metadata, existing non-blank Plan/Nearby/Nearby-after-pan map screenshots, no attention items, no Maps warning lines and frame metrics inside thresholds: 186 frames, 1 janky frame, 0.5% janky, p90 7 ms, p95 8 ms and p99 11 ms. `scripts/check-beta-readiness.mjs` consumes the latest performance summary and latest real native blocker packet, ignores synthetic test-generated native packets during auto-selection, blocks native blocker packets older than 24 hours by default, requires the summary to include the three physical map captures before allowing native performance claims, and requires a passed iOS validation report before clearing `ios_native_validation_missing`. Phase 0 readiness remains blocked until iOS validation, provider terms, privacy/store evidence and support readiness are captured.
+
+Latest real native blocker packet on 21 June 2026 local time: `npm run native:blocker-packet` wrote `tmp/native-smoke/native-blocker-packet-2026-06-20T20-33-25-969Z.md`, status `blocked`, with Android ready and only iOS blockers remaining: `ios:full_xcode_missing`, `ios:simctl_missing`, `ios:ios_runtime_missing` and `ios:ios_simulator_missing`. Use this packet as the quick rerun evidence after installing full Xcode.
+
+Root-level readiness check on 20 June 2026: `node mobile-app/scripts/native-device-readiness.mjs --require-physical-android` now correctly resolves `mobile-app/app.json` and passes the EAS project id check from the repo root. Android physical-readiness mode now skips iOS simulator checks by default, so this command stays focused on Android beta evidence. It still blocks on no Android target connected and no physical Android device connected; local shell env values for device API URL, preview alert token and Android Maps key remain warnings because the EAS preview environment holds the sensitive values. Run with `--include-ios` or use `npm run native:ios-simulator-plan` when the validation scope includes iOS.
+
+Scenarios:
+
+| Scenario | Setup | Pass target | Capture |
+| --- | --- | --- | --- |
+| Nearby marker render | Sydney metro, 8 km radius, default fuel | map settles without blank tiles or obvious marker lag | station count, first usable map time, visible jank |
+| Pan and zoom | drag map across dense metro results for 30 seconds | no trapped panel, no uncontrolled camera jump | dropped-frame feel, touch responsiveness |
+| Station select | tap 10 different markers and list rows | selected marker/list state follows tap within about 500 ms | slowest observed selection |
+| Route redraw | Sylvania to Parramatta, then Sydney to Canberra | route line and ranked stops redraw without stale markers | redraw time and stale-state notes |
+| Alert sync path | save route, enable alert, restart app | saved route persists and sync state is honest | push-token/backend sync status |
+
+Record each pass in the table below. Do not mark future performance claims done without current real-device evidence for the relevant build.
+
+| Date | Device | Build ID | Scenario | Result | Notes |
+| --- | --- | --- | --- | --- | --- |
+| 20 Jun 2026 | `Fuel_Path_Arm64_API_35` ARM64 AVD | Expo Go local project | Plan, Nearby, pan, Account render | Partial pass | `tmp/native-smoke/android-map-smoke-2026-06-20T01-21-51-852Z.md`; app surfaces render and no fatal logs, but Expo Go tools overlay is visible, map tiles are mostly blank beige and frame metrics are not production-like. |
+| 20 Jun 2026 | `Fuel_Path_Arm64_API_35` ARM64 AVD | Android preview APK `f67da375-ad46-484d-8fc8-d5fc71a52e07` | Plan, Nearby, pan, Account render | Partial pass | `tmp/native-smoke/android-preview-smoke-2026-06-20T03-18-45-402Z.md`; installed app opens and map screenshots are non-blank with no Maps warning lines. Partial remains because post-settle `dumpsys gfxinfo` reports 75.9% janky frames and p95 125 ms. Not acceptable for performance claims. |
+| 21 Jun 2026 | Pixel 9 Pro `49231FDAP0017N` | Local parity APK `fuel-path-preview-android-local-parity-8199f828.apk` | Plan, Nearby, pan, Account render and measured list/map gesture pass | Pass | `tmp/native-smoke/android-preview-smoke-2026-06-20T20-59-06-687Z.md`; 186 rendered frames, 1 janky frame, 0.5% janky, p95 8 ms, p99 11 ms, non-blank map screenshots and no Maps warning lines. Summary: `tmp/native-smoke/android-performance-summary-2026-06-20T21-12-06-531Z.md`. |
+
 ## First Baselines
 
 Record these after the first successful preview builds:
@@ -119,6 +255,6 @@ Replace the placeholders with measured values before running. The records are st
 | Platform | Build ID | Install size | Download size | Cold start | Notes |
 | --- | --- | ---: | ---: | ---: | --- |
 | iOS | Pending | Pending | Pending | Pending | Pending |
-| Android | Pending | Pending | Pending | Pending | Pending |
+| Android | `fuel-path-preview-android-local-parity-8199f828.apk` | Pixel 9 Pro `49231FDAP0017N` latest local parity pass complete | 70.68 MB | Passed on physical run | Local parity APK installed; map tiles render on physical Android; performance summary passes with 186 frames, 1 janky frame and p95 8 ms. Add lower-end Android coverage before broad public performance claims. |
 
 Flag any later unexplained size growth over 10 percent.

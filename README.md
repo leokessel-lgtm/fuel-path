@@ -20,25 +20,60 @@ docs/*.md     Product, validation, provider and governance notes
 
 Most project notes currently live as Markdown files at the repository root. They can move into `docs/` once the monorepo has settled.
 
+## Current Stabilisation Cut
+
+Active local branch:
+
+```text
+stabilise/latest-local-build
+```
+
+Use this branch as the latest local build branch while stabilising. Do not add new feature scope until the visible Plan, Nearby, Account, web-demo and native smoke flows are clean.
+
+Current latest app shell:
+
+```text
+http://localhost:8081
+```
+
+The Expo/mobile app shell is the newest UI surface. It has the current Fuel Path logo, top-right vehicle shortcut and native-style tab layout.
+
+Current local web-demo validation harness:
+
+```text
+http://localhost:4175/web-demo/
+```
+
+The web demo is still useful for route, price-marker and provider validation, but it is not the latest app shell.
+
+Stabilisation notes live in `docs/stabilisation-cut-2026-06-21.md`.
+The current repo split between stabilisation, backlog and generated artefacts is recorded in `docs/repo-change-split-2026-06-21.md`.
+
 ## Local Run
 
 Start the local backend:
 
 ```sh
-python3 web-demo/server.py --host 127.0.0.1 --port 4174 --env prototype/.env
+python3 web-demo/server.py --host 127.0.0.1 --port 4175 --env prototype/.env
 ```
 
 Start the app preview:
 
 ```sh
 cd mobile-app
-npm run web -- --port 8082
+npm run web -- --port 8081
 ```
 
 Open:
 
 ```text
-http://127.0.0.1:8082
+http://127.0.0.1:8081
+```
+
+Open the local web demo:
+
+```text
+http://127.0.0.1:4175/web-demo/
 ```
 
 ## Vercel Web Demo

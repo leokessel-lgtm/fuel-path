@@ -667,17 +667,18 @@ function ensureLeafletStyles() {
         width: 52px;
       }
       .fuel-path-marker::after {
-        background: ${colors.white};
-        border-bottom: 1px solid rgba(7, 86, 66, 0.18);
-        border-right: 1px solid rgba(7, 86, 66, 0.18);
-        bottom: -5px;
+        border-left: 6px solid transparent;
+        border-right: 6px solid transparent;
+        border-top: 8px solid ${colors.white};
+        bottom: -7px;
         box-sizing: border-box;
         content: "";
-        height: 10px;
+        filter: drop-shadow(0 2px 1px rgba(23, 32, 27, 0.12));
+        height: 0;
         left: 50%;
         position: absolute;
-        transform: translateX(-50%) rotate(45deg);
-        width: 10px;
+        transform: translateX(-50%);
+        width: 0;
       }
       .fuel-path-marker.is-selected {
         border-color: ${colors.green};
@@ -685,8 +686,7 @@ function ensureLeafletStyles() {
         transform: scale(1.12);
       }
       .fuel-path-marker.is-selected::after {
-        border-bottom-color: ${colors.green};
-        border-right-color: ${colors.green};
+        border-top-color: ${colors.white};
       }
       .fuel-path-marker-brand {
         align-items: center;

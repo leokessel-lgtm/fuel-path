@@ -107,6 +107,9 @@ const checks = [
       webMap.includes('<span class="fuel-path-marker-price">') &&
       webMap.includes('<span class="fuel-path-marker-brand">') &&
       webMap.includes(".fuel-path-marker::after") &&
+      webMap.includes("border-top: 8px solid ${colors.white};") &&
+      webMap.includes("border-left: 6px solid transparent;") &&
+      webMap.includes("bottom: -7px;") &&
       !webMap.includes(".fuel-path-marker-cluster::after"),
   },
   {
@@ -131,6 +134,9 @@ const checks = [
       nativeMap.includes("const markerGridSize = 132;") &&
       nativeMap.includes("styles.pinBrand") &&
       nativeMap.includes("styles.pinPointer") &&
+      nativeMap.includes("borderTopColor: colors.white") &&
+      nativeMap.includes("borderTopWidth: 8") &&
+      nativeMap.includes('borderLeftColor: "transparent"') &&
       nativeMap.includes("backgroundColor: colors.greenDark") &&
       nativeMap.indexOf("<Text style={[styles.pinPrice") <
         nativeMap.indexOf("<View style={styles.pinBrand}>") &&

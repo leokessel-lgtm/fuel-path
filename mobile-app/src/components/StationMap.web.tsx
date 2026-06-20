@@ -9,6 +9,16 @@ import { MapPoint, StationViewModel } from "../types";
 const LEAFLET_CSS_ID = "fuel-path-leaflet-css";
 const LEAFLET_CUSTOM_CSS_ID = "fuel-path-leaflet-custom-css";
 const maxStationMarkers = 240;
+const maxPriceMarkers = 14;
+const maxClusterMarkers = 40;
+const markerGridSize = 150;
+
+type ClusterMarker = {
+  count: number;
+  lat: number;
+  lon: number;
+  minPrice: number;
+};
 
 type CameraInsets = {
   top?: number;
@@ -168,20 +178,52 @@ export function StationMap({
       addUserLocationMarker(L, markerLayer, userLocation);
     }
 
-    stations.slice(0, maxStationMarkers).forEach((item) => {
-      const selected = item.station.stationCode === selectedStationCode;
-      const accessibilityLabel = markerAccessibilityLabel(item);
-      const marker = L.marker([item.station.lat, item.station.lon], {
+    const markerGroups = visibleMarkerGroups(
+      stations.slice(0, maxStationMarkers),
+      map.getBounds(),
+      selectedStationCode,
+    );
+
+    markerGroups.clusterMarkers.forEach((cluster) => {
+      const marker = L.marker([cluster.lat, cluster.lon], {
         icon: L.divIcon({
           className: "",
-          html: markerHtml(item, selected),
-          iconAnchor: [42, 48],
-          iconSize: [84, 48],
+          html: clusterMarkerHtml(cluster),
+          iconAnchor: [28, 34],
+          iconSize: [56, 34],
         }),
         alt: "",
         keyboard: false,
         riseOnHover: true,
-        zIndexOffset: selected ? 500 : 0,
+        zIndexOffset: 100,
+      });
+      marker.on("click", () => {
+        runProgrammaticMapMove(programmaticMoveRef, map, () => {
+          map.flyTo([cluster.lat, cluster.lon], Math.min(map.getZoom() + 2, 17), {
+            animate: true,
+          });
+        });
+      });
+      marker.bindTooltip(
+        `${cluster.count} stations, lowest ${cluster.minPrice.toFixed(1)} c/L`,
+        { direction: "top", offset: [0, -22] },
+      );
+      markerLayer.addLayer(marker);
+    });
+
+    markerGroups.priceMarkers.forEach((item) => {
+      const selected = item.station.stationCode === selectedStationCode;
+      const marker = L.marker([item.station.lat, item.station.lon], {
+        icon: L.divIcon({
+          className: "",
+          html: markerHtml(item, selected),
+          iconAnchor: [26, 48],
+          iconSize: [52, 48],
+        }),
+        alt: "",
+        keyboard: false,
+        riseOnHover: true,
+        zIndexOffset: selected ? 600 : 400,
       });
       marker.on("click", () => {
         onSelect(item.station.stationCode);
@@ -352,18 +394,122 @@ function markerHtml(item: StationViewModel, selected: boolean) {
       )}</span>`;
   return `
     <div class="fuel-path-marker${selected ? " is-selected" : ""}" aria-hidden="true">
-      ${logo}
       <span class="fuel-path-marker-price">${item.adjustedCpl.toFixed(1)}</span>
+      <span class="fuel-path-marker-brand">${logo}</span>
     </div>
   `;
 }
 
-function markerAccessibilityLabel(item: StationViewModel) {
-  const brand = item.station.brand || "Unknown brand";
-  const name = item.station.name || "Fuel station";
-  const price = `${item.adjustedCpl.toFixed(1)} cents per litre`;
-  const distance = `${item.distanceKm.toFixed(1)} kilometres away`;
-  return `${name}, ${brand}, ${price}, ${distance}`;
+function clusterMarkerHtml(cluster: ClusterMarker) {
+  return `
+    <div class="fuel-path-marker-cluster" aria-hidden="true">
+      <span class="fuel-path-marker-cluster-count">${cluster.count}</span>
+      <span class="fuel-path-marker-cluster-low">${cluster.minPrice.toFixed(1)}</span>
+    </div>
+  `;
+}
+
+function visibleMarkerGroups(
+  stations: StationViewModel[],
+  bounds: Leaflet.LatLngBounds,
+  selectedStationCode?: string,
+) {
+  const protectedCodes = protectedStationCodes(stations, selectedStationCode);
+  const priceCells = new Set<string>();
+  const clusterGroups = new Map<string, StationViewModel[]>();
+  const priceMarkers: StationViewModel[] = [];
+
+  const ranked = [...stations].sort((left, right) => {
+    const leftProtected = protectedCodes.has(left.station.stationCode) ? 0 : 1;
+    const rightProtected = protectedCodes.has(right.station.stationCode) ? 0 : 1;
+    return (
+      leftProtected - rightProtected ||
+      markerPriorityScore(left) - markerPriorityScore(right)
+    );
+  });
+
+  for (const item of ranked) {
+    const cell = markerCell(item, bounds, markerGridSize);
+    const protectedMarker = protectedCodes.has(item.station.stationCode);
+
+    if (
+      protectedMarker ||
+      (priceMarkers.length < maxPriceMarkers && !priceCells.has(cell))
+    ) {
+      priceMarkers.push(item);
+      priceCells.add(cell);
+      continue;
+    }
+
+    const grouped = clusterGroups.get(cell) || [];
+    grouped.push(item);
+    clusterGroups.set(cell, grouped);
+  }
+
+  const clusterMarkers = Array.from(clusterGroups.values())
+    .filter((items) => items.length >= 2)
+    .map(clusterMarkerForItems)
+    .sort((left, right) => right.count - left.count || left.minPrice - right.minPrice)
+    .slice(0, maxClusterMarkers);
+
+  return { priceMarkers, clusterMarkers };
+}
+
+function clusterMarkerForItems(items: StationViewModel[]): ClusterMarker {
+  const totals = items.reduce(
+    (current, item) => ({
+      count: current.count + 1,
+      lat: current.lat + item.station.lat,
+      lon: current.lon + item.station.lon,
+      minPrice: Math.min(current.minPrice, item.adjustedCpl),
+    }),
+    { count: 0, lat: 0, lon: 0, minPrice: Number.POSITIVE_INFINITY },
+  );
+  return {
+    count: totals.count,
+    lat: totals.lat / totals.count,
+    lon: totals.lon / totals.count,
+    minPrice: totals.minPrice,
+  };
+}
+
+function protectedStationCodes(stations: StationViewModel[], selectedStationCode?: string) {
+  const codes = new Set<string>();
+  if (selectedStationCode) codes.add(selectedStationCode);
+  const cheapest = minBy(stations, (item) => item.adjustedCpl);
+  const closest = minBy(stations, (item) => item.distanceKm);
+  const bestValue = minBy(stations, markerPriorityScore);
+  for (const item of [cheapest, closest, bestValue]) {
+    if (item) codes.add(item.station.stationCode);
+  }
+  return codes;
+}
+
+function minBy<T>(items: T[], score: (item: T) => number) {
+  let best: T | undefined;
+  let bestScore = Number.POSITIVE_INFINITY;
+  for (const item of items) {
+    const nextScore = score(item);
+    if (nextScore < bestScore) {
+      best = item;
+      bestScore = nextScore;
+    }
+  }
+  return best;
+}
+
+function markerPriorityScore(item: StationViewModel) {
+  return item.adjustedCpl + item.distanceKm * 0.85;
+}
+
+function markerCell(item: StationViewModel, bounds: Leaflet.LatLngBounds, gridSize: number) {
+  const west = bounds.getWest();
+  const south = bounds.getSouth();
+  const safeLonDelta = Math.max(bounds.getEast() - west, 0.005);
+  const safeLatDelta = Math.max(bounds.getNorth() - south, 0.005);
+  const x = ((item.station.lon - west) / safeLonDelta) * 1000;
+  const y = ((item.station.lat - south) / safeLatDelta) * 1000;
+  return `${Math.round(x / gridSize)}:${Math.round(y / gridSize)}`;
 }
 
 function imageUri(icon: unknown) {
@@ -507,43 +653,85 @@ function ensureLeafletStyles() {
       .fuel-path-marker {
         align-items: center;
         background: ${colors.white};
-        border: 2px solid ${colors.white};
-        border-radius: 999px;
-        box-shadow: 0 8px 18px rgba(23, 32, 27, 0.18);
+        border: 1px solid rgba(7, 86, 66, 0.18);
+        border-radius: 12px;
+        box-shadow: 0 8px 18px rgba(23, 32, 27, 0.16);
         box-sizing: border-box;
         display: flex;
-        gap: 4px;
-        min-width: 84px;
-        padding: 4px 8px 4px 4px;
-        transition: transform 160ms ease, background 160ms ease;
+        flex-direction: column;
+        height: 46px;
+        justify-content: stretch;
+        overflow: hidden;
+        transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+        width: 52px;
       }
       .fuel-path-marker.is-selected {
-        background: ${colors.green};
-        transform: scale(1.08);
+        border-color: ${colors.green};
+        box-shadow: 0 10px 22px rgba(8, 122, 99, 0.28);
+        transform: scale(1.12);
+      }
+      .fuel-path-marker-brand {
+        align-items: center;
+        background: ${colors.white};
+        display: flex;
+        flex: 1 1 auto;
+        justify-content: center;
+        min-height: 18px;
       }
       .fuel-path-marker-logo,
       .fuel-path-marker-initials {
         align-items: center;
         background: ${colors.white};
-        border-radius: 999px;
+        border-radius: 8px;
         color: ${colors.white};
         display: flex;
-        flex: 0 0 28px;
-        font-size: 10px;
+        flex: 0 0 20px;
+        font-size: 9px;
         font-weight: 900;
-        height: 28px;
+        height: 16px;
         justify-content: center;
         overflow: hidden;
         width: 28px;
       }
       .fuel-path-marker-price {
-        color: ${colors.greenDark};
-        font-size: 13px;
+        align-items: center;
+        background: ${colors.greenDark};
+        color: ${colors.white};
+        display: flex;
+        flex: 0 0 27px;
+        font-size: 14px;
         font-weight: 900;
+        justify-content: center;
         line-height: 1;
+        width: 100%;
       }
       .fuel-path-marker.is-selected .fuel-path-marker-price {
+        background: ${colors.green};
+      }
+      .fuel-path-marker-cluster {
+        align-items: center;
+        background: rgba(17, 20, 18, 0.88);
+        border: 2px solid ${colors.white};
+        border-radius: 999px;
+        box-shadow: 0 8px 18px rgba(23, 32, 27, 0.2);
+        box-sizing: border-box;
         color: ${colors.white};
+        display: flex;
+        gap: 4px;
+        height: 30px;
+        justify-content: center;
+        padding: 3px 8px;
+        white-space: nowrap;
+      }
+      .fuel-path-marker-cluster-count {
+        color: ${colors.white};
+        font-size: 12px;
+        font-weight: 900;
+      }
+      .fuel-path-marker-cluster-low {
+        color: ${colors.greenSoft};
+        font-size: 11px;
+        font-weight: 800;
       }
       .fuel-path-location-pin {
         background: ${colors.ink};

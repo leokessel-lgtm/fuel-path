@@ -13,9 +13,9 @@ import { MapPoint, StationViewModel } from "../types";
 import { BrandBadge } from "./BrandBadge";
 
 const maxStationMarkers = 240;
-const maxPriceMarkers = 34;
+const maxPriceMarkers = 18;
 const maxDotMarkers = 90;
-const markerGridSize = 92;
+const markerGridSize = 132;
 const compactMarkerGridSize = 36;
 const decorativeStationMarkerAccessibility = {
   accessibilityElementsHidden: true,
@@ -293,10 +293,12 @@ export function StationMap({
               zIndex={selected ? 700 : 500}
             >
               <View style={[styles.pin, selected && styles.pinSelected]}>
-                <BrandBadge station={item.station} size={24} />
                 <Text style={[styles.pinPrice, selected && styles.pinPriceSelected]}>
                   {item.adjustedCpl.toFixed(1)}
                 </Text>
+                <View style={styles.pinBrand}>
+                  <BrandBadge station={item.station} size={20} />
+                </View>
               </View>
             </Marker>
           );
@@ -582,26 +584,36 @@ const styles = StyleSheet.create({
     ...shadow.soft,
     alignItems: "center",
     backgroundColor: colors.white,
-    borderColor: colors.white,
-    borderRadius: radii.pill,
-    borderWidth: 2,
-    flexDirection: "row",
-    gap: spacing.xs,
-    minWidth: 76,
-    padding: 4,
-    paddingRight: spacing.sm,
+    borderColor: "rgba(7, 86, 66, 0.18)",
+    borderRadius: radii.md,
+    borderWidth: 1,
+    minWidth: 52,
+    overflow: "hidden",
   },
   pinSelected: {
-    backgroundColor: colors.green,
+    borderColor: colors.green,
     transform: [{ scale: 1.05 }],
   },
   pinPrice: {
-    color: colors.greenDark,
-    fontSize: 13,
+    backgroundColor: colors.greenDark,
+    color: colors.white,
+    fontSize: 14,
     fontWeight: "900",
+    lineHeight: 18,
+    minWidth: 52,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: spacing.xs,
+    textAlign: "center",
   },
   pinPriceSelected: {
-    color: colors.white,
+    backgroundColor: colors.green,
+  },
+  pinBrand: {
+    alignItems: "center",
+    backgroundColor: colors.white,
+    minHeight: 22,
+    justifyContent: "center",
+    width: "100%",
   },
   compactPin: {
     ...shadow.soft,

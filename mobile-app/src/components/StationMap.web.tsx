@@ -9,9 +9,11 @@ import { MapPoint, StationViewModel } from "../types";
 const LEAFLET_CSS_ID = "fuel-path-leaflet-css";
 const LEAFLET_CUSTOM_CSS_ID = "fuel-path-leaflet-custom-css";
 const maxStationMarkers = 240;
-const maxPriceMarkers = 14;
-const maxClusterMarkers = 40;
-const markerGridSize = 150;
+const maxPriceMarkers = 22;
+const maxExtraPriceMarkers = 28;
+const maxClusterMarkers = 24;
+const markerGridSize = 108;
+const minClusterStationCount = 4;
 
 type ClusterMarker = {
   count: number;
@@ -217,8 +219,8 @@ export function StationMap({
         icon: L.divIcon({
           className: "",
           html: markerHtml(item, selected),
-          iconAnchor: [26, 56],
-          iconSize: [52, 56],
+          iconAnchor: [27, 56],
+          iconSize: [54, 56],
         }),
         alt: "",
         keyboard: false,
@@ -446,8 +448,16 @@ function visibleMarkerGroups(
     clusterGroups.set(cell, grouped);
   }
 
-  const clusterMarkers = Array.from(clusterGroups.values())
-    .filter((items) => items.length >= 2)
+  const overflowGroups = Array.from(clusterGroups.values());
+  const extraPriceMarkers = overflowGroups
+    .filter((items) => items.length < minClusterStationCount)
+    .flat()
+    .sort((left, right) => markerPriorityScore(left) - markerPriorityScore(right))
+    .slice(0, Math.max(0, maxExtraPriceMarkers - priceMarkers.length));
+  priceMarkers.push(...extraPriceMarkers);
+
+  const clusterMarkers = overflowGroups
+    .filter((items) => items.length >= minClusterStationCount)
     .map(clusterMarkerForItems)
     .sort((left, right) => right.count - left.count || left.minPrice - right.minPrice)
     .slice(0, maxClusterMarkers);
@@ -664,7 +674,9 @@ function ensureLeafletStyles() {
         overflow: hidden;
         position: relative;
         transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
-        width: 52px;
+        max-width: 54px;
+        min-width: 54px;
+        width: 54px;
       }
       .fuel-path-marker::after {
         border-left: 6px solid transparent;
@@ -683,7 +695,6 @@ function ensureLeafletStyles() {
       .fuel-path-marker.is-selected {
         border-color: ${colors.green};
         box-shadow: 0 10px 22px rgba(8, 122, 99, 0.28);
-        transform: scale(1.12);
       }
       .fuel-path-marker.is-selected::after {
         border-top-color: ${colors.white};
@@ -717,7 +728,7 @@ function ensureLeafletStyles() {
         color: ${colors.white};
         display: flex;
         flex: 0 0 27px;
-        font-size: 14px;
+        font-size: 13px;
         font-weight: 900;
         justify-content: center;
         line-height: 1;

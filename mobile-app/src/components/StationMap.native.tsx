@@ -13,9 +13,9 @@ import { MapPoint, StationViewModel } from "../types";
 import { BrandBadge } from "./BrandBadge";
 
 const maxStationMarkers = 240;
-const maxPriceMarkers = 18;
+const maxPriceMarkers = 24;
 const maxDotMarkers = 90;
-const markerGridSize = 132;
+const markerGridSize = 108;
 const compactMarkerGridSize = 36;
 const decorativeStationMarkerAccessibility = {
   accessibilityElementsHidden: true,
@@ -593,20 +593,20 @@ const styles = StyleSheet.create({
     borderColor: "rgba(7, 86, 66, 0.18)",
     borderRadius: radii.md,
     borderWidth: 1,
-    minWidth: 52,
+    minWidth: 54,
     overflow: "hidden",
+    width: 54,
   },
   pinSelected: {
     borderColor: colors.green,
-    transform: [{ scale: 1.05 }],
   },
   pinPrice: {
     backgroundColor: colors.greenDark,
     color: colors.white,
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "900",
     lineHeight: 18,
-    minWidth: 52,
+    minWidth: 54,
     paddingHorizontal: spacing.xs,
     paddingVertical: spacing.xs,
     textAlign: "center",

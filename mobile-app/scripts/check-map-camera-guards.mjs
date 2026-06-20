@@ -100,8 +100,10 @@ const checks = [
   {
     label: "web station markers stay price-first and density limited",
     ok:
-      webMap.includes("const maxPriceMarkers = 14;") &&
-      webMap.includes("const markerGridSize = 150;") &&
+      webMap.includes("const maxPriceMarkers = 22;") &&
+      webMap.includes("const maxExtraPriceMarkers = 28;") &&
+      webMap.includes("const markerGridSize = 108;") &&
+      webMap.includes("const minClusterStationCount = 4;") &&
       webMap.includes("fuel-path-marker-cluster") &&
       webMap.includes("lowest ${cluster.minPrice.toFixed(1)} c/L") &&
       webMap.includes('<span class="fuel-path-marker-price">') &&
@@ -110,6 +112,8 @@ const checks = [
       webMap.includes("border-top: 8px solid ${colors.white};") &&
       webMap.includes("border-left: 6px solid transparent;") &&
       webMap.includes("bottom: -7px;") &&
+      webMap.includes(".filter((items) => items.length >= minClusterStationCount)") &&
+      !webMap.includes("transform: scale(1.12)") &&
       !webMap.includes(".fuel-path-marker-cluster::after"),
   },
   {
@@ -130,13 +134,15 @@ const checks = [
   {
     label: "native station markers stay price-first and density limited",
     ok:
-      nativeMap.includes("const maxPriceMarkers = 18;") &&
-      nativeMap.includes("const markerGridSize = 132;") &&
+      nativeMap.includes("const maxPriceMarkers = 24;") &&
+      nativeMap.includes("const markerGridSize = 108;") &&
       nativeMap.includes("styles.pinBrand") &&
       nativeMap.includes("styles.pinPointer") &&
       nativeMap.includes("borderTopColor: colors.white") &&
       nativeMap.includes("borderTopWidth: 8") &&
       nativeMap.includes('borderLeftColor: "transparent"') &&
+      nativeMap.includes("width: 54") &&
+      !nativeMap.includes("scale: 1.05") &&
       nativeMap.includes("backgroundColor: colors.greenDark") &&
       nativeMap.indexOf("<Text style={[styles.pinPrice") <
         nativeMap.indexOf("<View style={styles.pinBrand}>") &&

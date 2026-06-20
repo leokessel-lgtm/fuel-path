@@ -32,6 +32,7 @@ export function PlanRouteEditorCard({
   quickPlaces,
   recentLocationsCount,
   routePrecisionHint,
+  routeError,
   savedCommutes,
   showPlanningShortcuts,
   suggestionsError,
@@ -63,6 +64,7 @@ export function PlanRouteEditorCard({
   quickPlaces: QuickPlace[];
   recentLocationsCount: number;
   routePrecisionHint: string;
+  routeError: string;
   savedCommutes: SavedCommute[];
   showPlanningShortcuts: boolean;
   suggestionsError: string;
@@ -159,6 +161,11 @@ export function PlanRouteEditorCard({
       {routePrecisionHint ? (
         <Text style={styles.routePrecisionHint}>{routePrecisionHint}</Text>
       ) : null}
+      {routeError ? (
+        <Text accessibilityRole="alert" style={styles.routeError}>
+          {routeError}
+        </Text>
+      ) : null}
       <Pressable
         accessibilityLabel="Plan route"
         accessibilityRole="button"
@@ -217,6 +224,12 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontSize: typeScale.caption,
     fontWeight: "400",
+    paddingHorizontal: spacing.sm,
+  },
+  routeError: {
+    color: colors.red,
+    fontSize: typeScale.caption,
+    fontWeight: "600",
     paddingHorizontal: spacing.sm,
   },
   currentLocationButton: {

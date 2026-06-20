@@ -255,6 +255,14 @@ const checks = [
       planScreen.includes("overrideToPoint: commute.to"),
   },
   {
+    label: "plan current-location errors stay visible before route starts",
+    ok:
+      planScreen.includes('routeError={!routeStarted ? error : ""}') &&
+      planRouteEditorCard.includes("routeError: string;") &&
+      planRouteEditorCard.includes('accessibilityRole="alert"') &&
+      planRouteEditorCard.includes("styles.routeError"),
+  },
+  {
     label: "fleet-lite policy mode filters route scoring to approved brands",
     ok:
       types.includes("fuelPolicyEnabled: boolean") &&

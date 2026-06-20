@@ -462,6 +462,7 @@ export function PlanScreen({
             quickPlaces={quickPlaces}
             recentLocationsCount={recentLocations.length}
             routePrecisionHint={routePrecisionHint}
+            routeError={!routeStarted ? error : ""}
             savedCommutes={savedCommutes}
             showPlanningShortcuts={showPlanningShortcuts}
             suggestionsError={suggestionsError}
@@ -611,7 +612,6 @@ function routeValueReason(best: StationViewModel) {
   }
   return `${best.station.name} saves about ${formatMoney(saving)} on this route.`;
 }
-
 function formatMoney(value: number) {
   const sign = value < 0 ? "-" : "";
   return `${sign}$${Math.abs(value).toFixed(2)}`;

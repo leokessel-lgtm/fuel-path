@@ -11,6 +11,7 @@ const {
   fuelProviderCapabilityMatrix,
   methodAllowed,
   predictionStatus,
+  providerPublicClaimStatus,
   routeProviderStatus,
   sendJson,
 } = require("./_backend");
@@ -18,10 +19,29 @@ const {
 module.exports = async function handler(req, res) {
   if (!methodAllowed(req, res)) return;
   const providerCapabilities = fuelProviderCapabilityMatrix();
+  const publicClaims = providerPublicClaimStatus(providerCapabilities);
   sendJson(res, 200, {
     api: "fuel-path-hosted-backend-v1",
     credentialsConfigured: hasAnyLiveCredentials(),
     defaultSource: hasAnyLiveCredentials() ? "live" : "sample",
+    sourceScope: {
+      defaultSourceMeaning: "coarse server diagnostic only; use fuelProviders.capabilities for region-level behaviour",
+      regionalSelection: "region-aware",
+      publicLivePriceClaimsAllowed: Boolean(publicClaims.publicLivePriceClaimsAllowed),
+    },
+    releaseReadiness: {
+      publicBeta: {
+        status: "blocked_until_external_evidence",
+        summaryGate: "npm run check:beta-readiness -- --api-base https://fuel-path.vercel.app --allow-blocked",
+        blockers: [
+          "provider_terms_evidence",
+          "physical_device_validation",
+          "ios_validation",
+          "privacy_store_evidence",
+          "support_readiness",
+        ],
+      },
+    },
     fuelProviders: {
       apiNswConfigured: hasLiveCredentials(),
       apiQldConfigured: hasQldCredentials(),
@@ -32,6 +52,7 @@ module.exports = async function handler(req, res) {
       capabilityLabels: ["live", "limited", "pending_access", "fallback", "unsupported"],
       capabilitySummary: capabilitySummary(providerCapabilities),
       capabilities: providerCapabilities,
+      publicClaims,
     },
     cacheSeconds: cacheSeconds(),
     maps: {

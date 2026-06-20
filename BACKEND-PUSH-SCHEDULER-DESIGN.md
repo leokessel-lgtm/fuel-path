@@ -125,6 +125,9 @@ Backend response for an evaluated route should stay flat:
   "routeId": "commute-123",
   "status": "send_alert",
   "reason": "saving_above_threshold",
+  "outcome": "send_alert",
+  "outcomeLabel": "Send alert",
+  "outcomeSummary": "U-Go Taren Point is worth checking: about $7.40 after 3.2 min detour.",
   "stationCode": "12345",
   "stationName": "U-Go Taren Point",
   "adjustedCpl": 155.9,
@@ -150,6 +153,14 @@ Non-send statuses:
 - `missing_push_token`
 - `permission_missing`
 - `failed`
+
+Outcome buckets stay user-facing and flat:
+
+- `send_alert`
+- `watch_only`
+- `skip_alert`
+- `quiet_today`
+- `range_first`
 
 ## Data Model Sketch
 

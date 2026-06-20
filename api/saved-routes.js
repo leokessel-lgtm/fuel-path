@@ -2,6 +2,7 @@ const {
   alertsStatus,
   alertsWriteAuthorised,
   alertsWriteSecurity,
+  deleteBackendSavedRoute,
   listBackendSavedRoutes,
   methodAllowed,
   numberParam,
@@ -11,7 +12,7 @@ const {
 } = require("./_backend");
 
 module.exports = async function handler(req, res) {
-  if (!methodAllowed(req, res, ["GET", "POST"])) return;
+  if (!methodAllowed(req, res, ["GET", "POST", "DELETE"])) return;
 
   try {
     if (req.method === "GET") {
@@ -35,6 +36,18 @@ module.exports = async function handler(req, res) {
           : "Saved route sync requires ALERTS_WRITE_TOKEN before durable storage is enabled.",
         alerts: await alertsStatus(),
       });
+      return;
+    }
+
+    if (req.method === "DELETE") {
+      sendJson(
+        res,
+        202,
+        await deleteBackendSavedRoute({
+          routeId: stringParam(req.query.routeId || req.query.id || req.body?.routeId || req.body?.id),
+          userId: stringParam(req.query.userId || req.body?.userId),
+        }),
+      );
       return;
     }
 

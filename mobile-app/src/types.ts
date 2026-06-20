@@ -6,9 +6,21 @@ export type AppPreferences = {
   vehicleName: string;
   vehicleRego: string;
   fuel: FuelCode;
+  minSavingDollars: number;
+  maxDetourMinutes: number;
+  fuelPolicyEnabled: boolean;
+  approvedPolicyBrands: string[];
   selectedDiscounts: string[];
+  discountRedemptions?: Record<string, DiscountRedemptionState>;
   homeLocation?: MapPoint;
   workLocation?: MapPoint;
+};
+
+export type DiscountRedemptionStatus = "available" | "redeemed_today";
+
+export type DiscountRedemptionState = {
+  status: DiscountRedemptionStatus;
+  updatedAt: string;
 };
 
 export type CommuteAlertStatus =
@@ -27,6 +39,9 @@ export type SavedCommute = {
   fuel: FuelCode;
   alertEnabled: boolean;
   alertTime: string;
+  minSavingDollars: number;
+  maxDetourMinutes: number;
+  tankThresholdPercent: number;
   alertStatus?: CommuteAlertStatus;
   alertStatusMessage?: string;
   backendSyncedAt?: string;
@@ -91,12 +106,23 @@ export type StationViewModel = {
   adjustedCpl: number;
   discountCpl: number;
   discountLabel?: string;
+  possibleLowerCpl?: number;
+  possibleLowerLabel?: string;
+  possibleLowerDisclosure?: string;
+  possibleDiscountCpl?: number;
   distanceKm: number;
   fuel?: string;
   score?: number;
   netSaving?: number;
   detourMinutes?: number;
+  detourFuelLitres?: number;
+  detourCost?: number;
+  timeCost?: number;
+  netAfterDetourAndTimeCost?: number;
   rank?: number;
+  reachable?: boolean;
+  warnings?: string[];
+  matchesDecisionRule?: boolean;
 };
 
 export type MapPoint = {
@@ -107,6 +133,8 @@ export type MapPoint = {
   matchType?: string;
   confidence?: string;
   type?: string;
+  lookupStatus?: string;
+  sourceLabel?: string;
 };
 
 export type RegionCapabilityStatus =
@@ -132,11 +160,62 @@ export type RouteTimingAdvice = {
     | "fill_today_on_route"
     | "fill_today_with_detour"
     | "wait_if_can"
+    | "range_first"
+    | "skip_detour"
     | "neutral"
     | "no_cycle_signal";
   visible: boolean;
   label: string;
   reason?: string;
+};
+
+export type RouteDecisionSummary = {
+  action: "fill_now" | "fill_on_route" | "wait" | "skip" | "range_first";
+  label: string;
+  reason?: string;
+  stationCode?: string;
+  stationName?: string;
+  whyNotCheapest?: string;
+  economics?: {
+    baselineCpl?: number;
+    pumpCpl?: number;
+    adjustedCpl?: number;
+    fillLitres?: number;
+    grossFuelSaving?: number;
+    detourKm?: number;
+    detourMinutes?: number;
+    detourFuelLitres?: number;
+    detourCost?: number;
+    timeCost?: number;
+    timeCostDollarsPerMinute?: number;
+    netSavingAfterDetourFuel?: number;
+    netSavingAfterDetourFuelAndTime?: number;
+  } | null;
+  decisionRule?: {
+    minSavingDollars?: number;
+    maxDetourMinutes?: number;
+  };
+  alternatives: {
+    kind: "best_value" | "cheapest" | "closest" | "safest";
+    label: string;
+    note: string;
+    selected: boolean;
+    stationCode: string;
+    stationName: string;
+    adjustedCpl?: number;
+    netSaving?: number;
+    detourMinutes?: number;
+    detourFuelLitres?: number;
+    timeCost?: number;
+    netAfterDetourAndTimeCost?: number;
+  }[];
+  trust: {
+    source: string;
+    sourceType: string;
+    officialLive: boolean;
+    updatedAt?: string;
+    freshnessMinutes?: number;
+  };
 };
 
 export type NearbyResponse = {
@@ -177,9 +256,14 @@ export type ScoreResponse = {
     routeDistanceKm: number;
     baselineCpl: number;
     eligibleCandidates: number;
+    minSavingDollars?: number;
+    maxDetourMinutes?: number;
+    brandFilter?: boolean;
+    brands?: string[];
     staleExcludedCandidates?: number;
     freshnessCutoffHours?: number;
     timingAdvice?: RouteTimingAdvice;
+    decisionSummary?: RouteDecisionSummary;
   };
   recommendations: ScoreCandidate[];
   contextStations: Station[];

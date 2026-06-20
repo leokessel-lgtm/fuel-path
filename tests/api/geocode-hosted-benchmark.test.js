@@ -1,0 +1,161 @@
+const assert = require("node:assert/strict");
+const { execFile, execFileSync } = require("node:child_process");
+const fs = require("node:fs");
+const http = require("node:http");
+const os = require("node:os");
+const path = require("node:path");
+const test = require("node:test");
+const { promisify } = require("node:util");
+
+const execFileAsync = promisify(execFile);
+const ROOT = path.resolve(__dirname, "../..");
+const ADDRESS_ROWS = [
+  ["GANSW0001", "1 Adelaide Street, Balgowlah Heights NSW 2093", "1", "Adelaide", "Street", "Balgowlah Heights", "NSW", "2093", "151.25889968", "-33.80797092"],
+  ["GAACT0001", "1 Abercorn Crescent, Isabella Plains ACT 2905", "1", "Abercorn", "Crescent", "Isabella Plains", "ACT", "2905", "149.09854244", "-35.42628067"],
+  ["GAVIC0001", "1 Abbotswood Drive, Hoppers Crossing VIC 3029", "1", "Abbotswood", "Drive", "Hoppers Crossing", "VIC", "3029", "144.67410998", "-37.84943482"],
+  ["GAQLD0001", "1 Abel Smith Crescent, Mount Ommaney QLD 4074", "1", "Abel Smith", "Crescent", "Mount Ommaney", "QLD", "4074", "152.93577894", "-27.54763984"],
+  ["GAWA0001", "1 Abbotsford Street, West Leederville WA 6007", "1", "Abbotsford", "Street", "West Leederville", "WA", "6007", "115.8372549", "-31.94182946"],
+  ["GASA0001", "1 Abercrombie Court, Clarence Gardens SA 5039", "1", "Abercrombie", "Court", "Clarence Gardens", "SA", "5039", "138.57502939", "-34.97354964"],
+  ["GATAS0001", "1 Baltonsborough Road, Austins Ferry TAS 7011", "1", "Baltonsborough", "Road", "Austins Ferry", "TAS", "7011", "147.24392043", "-42.7704639"],
+  ["GANT0001", "1 Palmerston Circuit, Palmerston City NT 0830", "1", "Palmerston", "Circuit", "Palmerston City", "NT", "0830", "130.98505609", "-12.47843981"],
+];
+
+test("hosted national benchmark runs against an HTTP geocode API contract", async () => {
+  const fixture = buildAddressFixture();
+  const api = await startMockGeocodeApi();
+  try {
+    const { stdout } = await execFileAsync(
+      process.execPath,
+      [
+        "scripts/geocode-hosted-national-benchmark.mjs",
+        "--mode",
+        "http",
+        "--api-base",
+        api.url,
+        "--address-sqlite",
+        fixture.sqlitePath,
+        "--address-count",
+        "8",
+        "--poi-count",
+        "8",
+        "--min-poi-top-rate",
+        "0.75",
+        "--max-address-p90-chars",
+        "80",
+        "--max-poi-p90-chars",
+        "80",
+        "--delay-ms",
+        "0",
+      ],
+      { cwd: ROOT, timeout: 30_000 },
+    );
+    const jsonPath = stdout.match(/"jsonPath": "([^"]+)"/)?.[1];
+    assert.ok(jsonPath, stdout);
+    const result = JSON.parse(fs.readFileSync(path.join(ROOT, jsonPath), "utf8"));
+
+    assert.equal(result.summary.byKind.address.cases, 8);
+    assert.equal(result.summary.byKind.address.finalTopMatch, 8);
+    assert.equal(result.summary.byKind.poi.cases, 8);
+    assert.equal(result.fetchCalls.httpGeocode > 0, true);
+  } finally {
+    await api.close();
+    fs.rmSync(fixture.dir, { recursive: true, force: true });
+  }
+});
+
+function buildAddressFixture() {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-hosted-benchmark-"));
+  const inputPath = path.join(dir, "GNAF_CORE.psv");
+  const sqlitePath = path.join(dir, "gnaf-hosted-benchmark.sqlite");
+  fs.writeFileSync(
+    inputPath,
+    [
+      "ADDRESS_DETAIL_PID|ADDRESS_LABEL|NUMBER_FIRST|STREET_NAME|STREET_TYPE|LOCALITY_NAME|STATE|POSTCODE|GEOCODE_TYPE|LONGITUDE|LATITUDE",
+      ...ADDRESS_ROWS.map((row) => row.join("|")),
+    ].join("\n"),
+  );
+  execFileSync(
+    process.execPath,
+    ["scripts/build-gnaf-address-index.mjs", "--input", inputPath, "--output", sqlitePath],
+    { cwd: ROOT, stdio: "ignore" },
+  );
+  return { dir, inputPath, sqlitePath };
+}
+
+async function startMockGeocodeApi() {
+  const server = http.createServer((request, response) => {
+    const url = new URL(request.url, "http://127.0.0.1");
+    if (url.pathname !== "/api/geocode") {
+      sendJson(response, 404, { error: "not_found" });
+      return;
+    }
+    const query = url.searchParams.get("q") || "";
+    const limit = Math.max(1, Math.min(Number(url.searchParams.get("limit") || 5), 8));
+    const addressSuggestions = ADDRESS_ROWS
+      .map((row) => ({
+        label: row[1],
+        state: row[6],
+        postcode: row[7],
+        lat: Number(row[9]),
+        lon: Number(row[8]),
+        provider: "fuel_path_gnaf",
+        type: "address",
+        matchType: normalise(row[1].replace(/,/g, "")).startsWith(normalise(query)) ? "address_prefix" : "address_token_overlap",
+      }))
+      .filter((row) => addressMatchesQuery(row.label, query));
+
+    const poiState = stateFromQuery(query);
+    const poiSuggestion = {
+      label: poiState ? `${query} ${poiState}` : query,
+      state: poiState,
+      lat: -33,
+      lon: 151,
+      provider: "fuel_path_hint",
+      type: "poi",
+    };
+    const suggestions = addressSuggestions.length ? addressSuggestions.slice(0, limit) : [poiSuggestion];
+    sendJson(response, 200, {
+      provider: "test",
+      lookupStatus: "ok",
+      location: suggestions[0],
+      suggestions,
+    });
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  return {
+    url: `http://127.0.0.1:${address.port}`,
+    close: () => new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve()))),
+  };
+}
+
+function addressMatchesQuery(label, query) {
+  const haystack = normalise(label.replace(/,/g, ""));
+  const needle = normalise(query);
+  if (haystack.startsWith(needle)) return true;
+  const tokens = needle.split(/\s+/).filter((token) => token.length >= 3);
+  return tokens.length >= 2 && tokens.every((token) => haystack.includes(token));
+}
+
+function stateFromQuery(query) {
+  const state = query.match(/\b(NSW|ACT|VIC|QLD|WA|SA|TAS|NT)\b/i)?.[1]?.toUpperCase();
+  if (state) return state;
+  if (/cataract|bruny|queenstown|cradle/i.test(query)) return "TAS";
+  if (/canberra|tidbinbilla|namadgi/i.test(query)) return "ACT";
+  if (/sydney|bondi|taronga/i.test(query)) return "NSW";
+  if (/melbourne|promontory/i.test(query)) return "VIC";
+  if (/brisbane|island|gorge/i.test(query)) return "QLD";
+  if (/perth|rottnest|karijini/i.test(query)) return "WA";
+  if (/adelaide|kangaroo|coober/i.test(query)) return "SA";
+  if (/uluru|kakadu|darwin/i.test(query)) return "NT";
+  return "";
+}
+
+function sendJson(response, status, payload) {
+  response.writeHead(status, { "content-type": "application/json" });
+  response.end(JSON.stringify(payload));
+}
+
+function normalise(value) {
+  return String(value || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
+}

@@ -1,29 +1,25 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  ActivityIndicator,
   Linking,
   Platform,
-  Pressable,
-  ScrollView,
   StyleSheet,
-  Text,
-  TextInput,
   View,
 } from "react-native";
 
-import { geocodeAddress, getNearbyStations, searchLocations } from "../api/fuelPathApi";
+import { geocodeAddress, getNearbyStations } from "../api/fuelPathApi";
 import { FuelSelector } from "../components/FuelSelector";
-import { StationMap } from "../components/StationMap";
-import { StationRow } from "../components/StationRow";
-import { getCurrentMapPoint, getGrantedCurrentMapPoint } from "../services/currentLocation";
-import { colors, radii, shadow, spacing, typeScale } from "../theme";
-import { AppPreferences, FuelCode, MapPoint, StationViewModel } from "../types";
+import { NearbyLocationSearch } from "../components/NearbyLocationSearch";
 import {
-  predictionDisciplineCue,
-  stationAttentionCue,
-  stationTimestampLine,
-} from "../utils/decisionEvidence";
-import { sortStations, stationPriceView, tomorrowPriceView } from "../utils/pricing";
+  defaultNearbySortMode,
+  NearbySortMode,
+  NearbyStationSheet,
+} from "../components/NearbyStationSheet";
+import { StationMap } from "../components/StationMap";
+import { useNearbyLocationSearch } from "../hooks/useNearbyLocationSearch";
+import { getCurrentMapPoint, getGrantedCurrentMapPoint } from "../services/currentLocation";
+import { spacing } from "../theme";
+import { AppPreferences, FuelCode, MapPoint, StationViewModel } from "../types";
+import { sortStations, stationPriceView } from "../utils/pricing";
 
 const defaultNearbyCentre: MapPoint = {
   lat: -34.0114122,
@@ -40,14 +36,6 @@ type MapSearchArea = {
   radiusKm: number;
 };
 
-type SortMode = "distance" | "price" | "value";
-
-const sortOptions: Array<{ key: SortMode; label: string; accessibilityLabel: string }> = [
-  { key: "distance", label: "Closest", accessibilityLabel: "Sort by closest station" },
-  { key: "price", label: "Cheapest", accessibilityLabel: "Sort by cheapest station in map view" },
-  { key: "value", label: "Best value", accessibilityLabel: "Sort by best balance of price and distance" },
-];
-
 export function NearbyScreen({
   preferences,
   onFuelChange,
@@ -57,31 +45,41 @@ export function NearbyScreen({
 }) {
   const [stations, setStations] = useState<StationViewModel[]>([]);
   const [centre, setCentre] = useState<MapPoint>(defaultNearbyCentre);
+  const [currentLocation, setCurrentLocation] = useState<MapPoint>();
   const [nearbyRadiusKm, setNearbyRadiusKm] = useState(defaultNearbyRadiusKm);
   const [cameraFocusVersion, setCameraFocusVersion] = useState(0);
-  const [locationQuery, setLocationQuery] = useState("");
-  const [recentLocations, setRecentLocations] = useState<MapPoint[]>([]);
-  const [locationSuggestions, setLocationSuggestions] = useState<MapPoint[]>([]);
-  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
-  const [locationSearchActive, setLocationSearchActive] = useState(false);
   const [selectedCode, setSelectedCode] = useState<string>();
   const [selectionDismissed, setSelectionDismissed] = useState(false);
   const [visibleStationCodes, setVisibleStationCodes] = useState<string[]>([]);
-  const [sortMode, setSortMode] = useState<SortMode>();
+  const [sortMode, setSortMode] = useState<NearbySortMode>(defaultNearbySortMode);
   const [sheetExpanded, setSheetExpanded] = useState(false);
-  const previousSortMode = useRef<SortMode | undefined>(sortMode);
+  const previousSortMode = useRef<NearbySortMode | undefined>(sortMode);
   const [loading, setLoading] = useState(true);
   const [resolvingLocation, setResolvingLocation] = useState(false);
   const [error, setError] = useState("");
   const [stationNotice, setStationNotice] = useState("");
-  const [locationError, setLocationError] = useState("");
-  const addressSessionTokenRef = useRef(makeLocationSessionToken());
+  const {
+    addRecentLocation,
+    clearLocationSearch,
+    getAddressSessionToken,
+    locationError,
+    locationQuery,
+    locationSearchActive,
+    locationSuggestions,
+    recentLocations,
+    resetAddressSessionToken,
+    setLocationError,
+    setLocationQuery,
+    suggestionsLoading,
+    updateLocationQuery,
+  } = useNearbyLocationSearch();
 
   useEffect(() => {
     let active = true;
     getGrantedCurrentMapPoint()
       .then((nextCentre) => {
         if (active) {
+          setCurrentLocation(nextCentre);
           setCentre(nextCentre);
           setCameraFocusVersion((current) => current + 1);
         }
@@ -90,13 +88,6 @@ export function NearbyScreen({
     return () => {
       active = false;
     };
-  }, []);
-
-  const addRecentLocation = useCallback((location: MapPoint) => {
-    setRecentLocations((current) => {
-      const deduped = current.filter((item) => item.label !== location.label);
-      return [location, ...deduped].slice(0, 5);
-    });
   }, []);
 
   useEffect(() => {
@@ -152,46 +143,13 @@ export function NearbyScreen({
     };
   }, [centre, nearbyRadiusKm, preferences]);
 
-  useEffect(() => {
-    if (!locationSearchActive) return;
-    const query = locationQuery.trim();
-    if (query.length < 3) {
-      setLocationSuggestions([]);
-      setSuggestionsLoading(false);
-      return;
-    }
-
-    let active = true;
-    setSuggestionsLoading(true);
-    setLocationError("");
-    const timer = setTimeout(() => {
-      searchLocations(query, 5, addressSessionTokenRef.current)
-        .then((suggestions) => {
-          if (active) setLocationSuggestions(suggestions);
-        })
-        .catch((err: Error) => {
-          if (!active) return;
-          setLocationSuggestions([]);
-          setLocationError(err.message);
-        })
-        .finally(() => {
-          if (active) setSuggestionsLoading(false);
-        });
-    }, 650);
-
-    return () => {
-      active = false;
-      clearTimeout(timer);
-    };
-  }, [locationQuery, locationSearchActive]);
-
   const applyLocationSearch = async () => {
     const query = locationQuery.trim();
     if (!query) return;
     setResolvingLocation(true);
     setLocationError("");
     try {
-      const location = await geocodeAddress(query);
+      const location = await geocodeAddress(query, getAddressSessionToken());
       const nextCentre = {
         lat: location.lat,
         lon: location.lon,
@@ -202,11 +160,10 @@ export function NearbyScreen({
       setCameraFocusVersion((current) => current + 1);
       setLocationQuery(nextCentre.label);
       addRecentLocation(nextCentre);
-      setLocationSuggestions([]);
-      setLocationSearchActive(false);
-      addressSessionTokenRef.current = makeLocationSessionToken();
+      clearLocationSearch();
+      resetAddressSessionToken();
       setSheetExpanded(false);
-      setSortMode(undefined);
+      setSortMode(defaultNearbySortMode);
     } catch (err) {
       setLocationError(err instanceof Error ? err.message : "Could not find that location");
     } finally {
@@ -219,15 +176,15 @@ export function NearbyScreen({
     setLocationError("");
     try {
       const nextCentre = await getCurrentMapPoint();
+      setCurrentLocation(nextCentre);
       setCentre(nextCentre);
       setNearbyRadiusKm(defaultNearbyRadiusKm);
       setCameraFocusVersion((current) => current + 1);
       setLocationQuery("");
-      setLocationSuggestions([]);
-      setLocationSearchActive(false);
-      addressSessionTokenRef.current = makeLocationSessionToken();
+      clearLocationSearch();
+      resetAddressSessionToken();
       setSheetExpanded(false);
-      setSortMode(undefined);
+      setSortMode(defaultNearbySortMode);
     } catch (err) {
       setLocationError(err instanceof Error ? err.message : "Current location is not available.");
     } finally {
@@ -258,9 +215,7 @@ export function NearbyScreen({
       Math.abs(current - nextRadiusKm) < 2 ? current : nextRadiusKm,
     );
     setLocationQuery("");
-    setLocationSuggestions([]);
-    setLocationSearchActive(false);
-    setLocationError("");
+    clearLocationSearch();
   }, []);
 
   const selectRecentLocation = (location: MapPoint) => {
@@ -268,11 +223,9 @@ export function NearbyScreen({
     setNearbyRadiusKm(defaultNearbyRadiusKm);
     setCameraFocusVersion((current) => current + 1);
     setLocationQuery(location.label);
-    setLocationSuggestions([]);
-    setLocationSearchActive(false);
-    setLocationError("");
+    clearLocationSearch();
     setSheetExpanded(false);
-    setSortMode(undefined);
+    setSortMode(defaultNearbySortMode);
   };
 
   const selectLocationSuggestion = (location: MapPoint) => {
@@ -286,12 +239,10 @@ export function NearbyScreen({
     setCameraFocusVersion((current) => current + 1);
     setLocationQuery(nextCentre.label);
     addRecentLocation(nextCentre);
-    setLocationSuggestions([]);
-    setLocationSearchActive(false);
-    setLocationError("");
-    addressSessionTokenRef.current = makeLocationSessionToken();
+    clearLocationSearch();
+    resetAddressSessionToken();
     setSheetExpanded(false);
-    setSortMode(undefined);
+    setSortMode(defaultNearbySortMode);
   };
 
   const visibleStationSet = useMemo(() => new Set(visibleStationCodes), [visibleStationCodes]);
@@ -307,17 +258,6 @@ export function NearbyScreen({
     [listSourceStations, sortMode],
   );
   const selected = stations.find((item) => item.station.stationCode === selectedCode);
-  const selectedTomorrow = selected ? tomorrowPriceView(selected) : null;
-  const selectedAttentionCue = selected ? stationAttentionCue(selected) : null;
-  const selectedPredictionCue = selected ? predictionDisciplineCue(selected) : "";
-  const selectedMetaLine = selected
-    ? [
-        selected.station.phone || selected.station.brand,
-        stationTimestampLine(selected.station),
-      ]
-        .filter(Boolean)
-        .join(" | ")
-    : "";
   const nearbyCameraInsets = useMemo(
     () => ({
       top: 170,
@@ -328,7 +268,7 @@ export function NearbyScreen({
     [],
   );
 
-  const handleSortPress = (nextSortMode: SortMode) => {
+  const handleSortPress = (nextSortMode: NearbySortMode) => {
     setSortMode(nextSortMode);
     setSheetExpanded(true);
     setSelectionDismissed(false);
@@ -403,286 +343,46 @@ export function NearbyScreen({
           onViewportStationsChange={handleViewportStationsChange}
           onMapSearchAreaChange={handleMapSearchAreaChange}
           cameraFocusKey={`nearby-${cameraFocusVersion}`}
-          showCentreMarker={centre.label === "Current location"}
+          showCentreMarker={false}
+          userLocation={currentLocation}
           cameraInsets={nearbyCameraInsets}
         />
       </View>
 
       <View style={styles.topControls}>
-        <View style={styles.searchControlRow}>
-          <View style={styles.locationCard}>
-            <View style={styles.locationInputRow}>
-              <TextInput
-                accessibilityLabel="Nearby location"
-                value={locationQuery}
-                onChangeText={(value) => {
-                  setLocationQuery(value);
-                  setLocationError("");
-                  setLocationSearchActive(true);
-                }}
-                onFocus={() => setLocationSearchActive(true)}
-                onSubmitEditing={applyLocationSearch}
-                placeholder="Search address, suburb or place"
-                placeholderTextColor={colors.muted}
-                returnKeyType="search"
-                style={styles.locationInput}
-              />
-              {locationQuery.trim() || resolvingLocation ? (
-                <Pressable
-                  accessibilityLabel="Find nearby location"
-                  onPress={applyLocationSearch}
-                  disabled={resolvingLocation}
-                  style={[styles.locationButton, resolvingLocation && styles.buttonDisabled]}
-                >
-                  <Text style={styles.locationButtonText}>
-                    {resolvingLocation ? "..." : "Find"}
-                  </Text>
-                </Pressable>
-              ) : null}
-            </View>
-            {locationSearchActive && locationQuery.trim().length >= 3 ? (
-              <View style={styles.lookupResults}>
-                {suggestionsLoading ? (
-                  <Text style={styles.lookupLoading}>Searching...</Text>
-                ) : null}
-                {locationSuggestions.map((location) => (
-                  <Pressable
-                    accessibilityLabel={`Use suggested location ${location.label}`}
-                    key={`${location.lat}:${location.lon}:${location.label}`}
-                    onPress={() => selectLocationSuggestion(location)}
-                    style={styles.lookupResultRow}
-                  >
-                    <View style={styles.lookupResultPin} />
-                    <View style={styles.lookupResultCopy}>
-                      <Text numberOfLines={1} style={styles.lookupResultTitle}>
-                        {suggestionTitle(location)}
-                      </Text>
-                      <Text numberOfLines={1} style={styles.lookupResultMeta}>
-                        {suggestionMeta(location)}
-                      </Text>
-                    </View>
-                  </Pressable>
-                ))}
-              </View>
-            ) : null}
-            {locationSearchActive && !locationQuery.trim() && recentLocations.length ? (
-              <View style={styles.lookupResults}>
-                {recentLocations.map((location) => (
-                  <Pressable
-                    accessibilityLabel={`Use recent search ${location.label}`}
-                    key={`${location.lat}:${location.lon}:${location.label}`}
-                    onPress={() => selectRecentLocation(location)}
-                    style={styles.lookupResultRow}
-                  >
-                    <View style={styles.recentSearchDot} />
-                    <View style={styles.lookupResultCopy}>
-                      <Text numberOfLines={1} style={styles.lookupResultTitle}>
-                        {suggestionTitle(location)}
-                      </Text>
-                      <Text numberOfLines={1} style={styles.lookupResultMeta}>
-                        {suggestionMeta(location)}
-                      </Text>
-                    </View>
-                  </Pressable>
-                ))}
-              </View>
-            ) : null}
-            {locationError ? <Text style={styles.locationError}>{locationError}</Text> : null}
-          </View>
-          <Pressable
-            accessibilityLabel="Use current location"
-            onPress={useCurrentLocation}
-            disabled={resolvingLocation}
-            style={({ pressed }) => [
-              styles.currentLocationPill,
-              pressed && styles.currentLocationPillPressed,
-              resolvingLocation && styles.buttonDisabled,
-            ]}
-          >
-            <View style={styles.currentLocationIcon}>
-              <View style={styles.currentLocationCrossVertical} />
-              <View style={styles.currentLocationCrossHorizontal} />
-              <View style={styles.currentLocationRing} />
-              <View style={styles.currentLocationDot} />
-            </View>
-          </Pressable>
-        </View>
+        <NearbyLocationSearch
+          locationError={locationError}
+          locationQuery={locationQuery}
+          locationSearchActive={locationSearchActive}
+          locationSuggestions={locationSuggestions}
+          onApplyLocationSearch={applyLocationSearch}
+          onQueryChange={updateLocationQuery}
+          onSelectRecentLocation={selectRecentLocation}
+          onSelectSuggestion={selectLocationSuggestion}
+          onUseCurrentLocation={useCurrentLocation}
+          recentLocations={recentLocations}
+          resolvingLocation={resolvingLocation}
+          suggestionsLoading={suggestionsLoading}
+        />
         <FuelSelector value={preferences.fuel} onChange={onFuelChange} />
       </View>
 
-      <View style={[styles.sheet, sheetExpanded ? styles.sheetExpanded : styles.sheetCollapsed]}>
-        <View style={styles.sheetHeader}>
-          <Pressable
-            accessibilityLabel={sheetExpanded ? "Collapse station list" : "Expand station list"}
-            onPress={() => setSheetExpanded((current) => !current)}
-            style={styles.grabberTouch}
-          >
-            <View style={styles.grabber} />
-          </Pressable>
-          {sheetExpanded ? (
-            <Pressable
-              accessibilityLabel="Show map"
-              onPress={() => setSheetExpanded(false)}
-              style={styles.mapButton}
-            >
-              <Text style={styles.mapButtonText}>Map</Text>
-            </Pressable>
-          ) : null}
-        </View>
-
-        {loading ? (
-          <View style={styles.loadingState}>
-            <ActivityIndicator color={colors.green} />
-            <Text style={styles.muted}>Loading live FuelCheck stations...</Text>
-          </View>
-        ) : null}
-
-        {error ? (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyTitle}>Could not load stations</Text>
-            <Text style={styles.muted}>{error}</Text>
-          </View>
-        ) : null}
-
-        {!loading && !error && stationNotice && !stations.length ? (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyTitle}>No priced stations found</Text>
-            <Text style={styles.muted}>{stationNotice}</Text>
-          </View>
-        ) : null}
-
-        {!loading && !error ? (
-          <>
-            {stationNotice && stations.length ? (
-              <View style={styles.noticeCard}>
-                <Text style={styles.noticeText}>{stationNotice}</Text>
-              </View>
-            ) : null}
-            {selected ? (
-              <View style={[styles.selectedCard, !sheetExpanded && styles.selectedCardCollapsed]}>
-                <View style={styles.selectedHeader}>
-                  <View style={styles.selectedCopy}>
-                    <Text numberOfLines={1} style={styles.selectedTitle}>
-                      {selected.station.name}
-                    </Text>
-                    {selected.station.address ? (
-                      <Text numberOfLines={1} style={styles.selectedDetail}>
-                        {selected.station.address}
-                      </Text>
-                    ) : null}
-                    <View style={styles.selectedMetaRow}>
-                      <View style={styles.selectedStatus}>
-                        <Text numberOfLines={1} style={styles.muted}>
-                          {stationOpenLabel(selected.station.openNow)}
-                        </Text>
-                        <View
-                          style={[
-                            styles.statusDot,
-                            { backgroundColor: stationOpenDotColor(selected.station.openNow) },
-                          ]}
-                        />
-                      </View>
-                      {selectedMetaLine ? <Text style={styles.metaSeparator}>|</Text> : null}
-                      <Text numberOfLines={1} style={styles.selectedMetaRest}>
-                        {selectedMetaLine}
-                      </Text>
-                    </View>
-                    {selectedAttentionCue || selectedPredictionCue ? (
-                      <View style={styles.evidenceRow}>
-                        {selectedAttentionCue ? (
-                          <Text numberOfLines={1} style={styles.evidenceChip}>
-                            {selectedAttentionCue.label}
-                          </Text>
-                        ) : null}
-                        {selectedPredictionCue ? (
-                          <Text numberOfLines={1} style={styles.evidenceChip}>
-                            {selectedPredictionCue}
-                          </Text>
-                        ) : null}
-                      </View>
-                    ) : null}
-                  </View>
-                  <Pressable
-                    accessibilityLabel="Close selected station"
-                    onPress={handleCloseSelectedStation}
-                    style={styles.closeButton}
-                  >
-                    <Text style={styles.closeButtonText}>X</Text>
-                  </Pressable>
-                </View>
-                <View style={styles.selectedActions}>
-                  <View style={styles.selectedPrice}>
-                    <Text style={styles.selectedPriceBasis}>
-                      {selected.discountCpl > 0 ? `Pump ${selected.pumpCpl.toFixed(1)}` : "Pump price"}
-                    </Text>
-                    <Text style={styles.priceValue}>
-                      {selected.adjustedCpl.toFixed(1)}
-                      <Text style={styles.priceUnitInline}> c/L</Text>
-                    </Text>
-                    {selectedTomorrow ? (
-                      <Text
-                        numberOfLines={1}
-                        style={[
-                          styles.selectedTomorrowPrice,
-                          selectedTomorrow.direction === "down" && styles.tomorrowPriceDown,
-                          selectedTomorrow.direction === "up" && styles.tomorrowPriceUp,
-                        ]}
-                      >
-                        {selectedTomorrow.detailLabel}
-                      </Text>
-                    ) : null}
-                  </View>
-                  <View style={styles.distanceBadge}>
-                    <Text style={styles.distanceBadgeText}>
-                      {selected.distanceKm.toFixed(1)} km
-                    </Text>
-                  </View>
-                  <Pressable
-                    accessibilityLabel={`Navigate to ${selected.station.name}`}
-                    onPress={() => handleNavigateToStation(selected)}
-                    style={styles.navigateButton}
-                  >
-                    <Text style={styles.navigateButtonIcon}>↗</Text>
-                  </Pressable>
-                </View>
-              </View>
-            ) : null}
-            <View style={styles.sortRow}>
-              {sortOptions.map((option) => {
-                const selectedSort = sortMode === option.key;
-                return (
-                  <Pressable
-                    accessibilityLabel={option.accessibilityLabel}
-                    key={option.key}
-                    onPress={() => handleSortPress(option.key)}
-                    style={[styles.sortButton, selectedSort && styles.sortButtonSelected]}
-                  >
-                    <Text style={[styles.sortText, selectedSort && styles.sortTextSelected]}>
-                      {option.label}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-            {sheetExpanded ? (
-              <ScrollView
-                style={styles.list}
-                contentContainerStyle={styles.listContent}
-                showsVerticalScrollIndicator
-              >
-                {sortedStations.map((item) => (
-                  <StationRow
-                    item={item}
-                    key={item.station.stationCode}
-                    selected={item.station.stationCode === selectedCode}
-                    onPress={() => handleListStationSelect(item.station.stationCode)}
-                  />
-                ))}
-              </ScrollView>
-            ) : null}
-          </>
-        ) : null}
-      </View>
+      <NearbyStationSheet
+        error={error}
+        loading={loading}
+        onCloseSelectedStation={handleCloseSelectedStation}
+        onNavigateToStation={handleNavigateToStation}
+        onSelectStation={handleListStationSelect}
+        onSortPress={handleSortPress}
+        onToggleExpanded={setSheetExpanded}
+        selected={selected}
+        selectedCode={selectedCode}
+        sheetExpanded={sheetExpanded}
+        sortedStations={sortedStations}
+        sortMode={sortMode}
+        stationNotice={stationNotice}
+        stations={stations}
+      />
     </View>
   );
 }
@@ -721,31 +421,6 @@ function stationLimitForRadius(radiusKm: number) {
 function shortLocationLabel(query: string, resolvedLabel: string) {
   if (query.length <= 42) return query;
   return resolvedLabel.split(",").slice(0, 3).join(",").trim() || query;
-}
-
-function makeLocationSessionToken() {
-  return `nearby-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-}
-
-function suggestionTitle(point: MapPoint) {
-  return point.label.split(",")[0]?.trim() || point.label;
-}
-
-function suggestionMeta(point: MapPoint) {
-  const parts = point.label.split(",").map((part) => part.trim()).filter(Boolean);
-  return parts.slice(1, 4).join(", ") || "Australia";
-}
-
-function stationOpenLabel(openNow?: boolean) {
-  if (openNow === false) return "Closed";
-  if (openNow === true) return "Open now";
-  return "Hours unknown";
-}
-
-function stationOpenDotColor(openNow?: boolean) {
-  if (openNow === false) return colors.red;
-  if (openNow === true) return colors.green;
-  return colors.muted;
 }
 
 function stationContextNotice(context: {
@@ -789,434 +464,5 @@ const styles = StyleSheet.create({
     right: spacing.md,
     top: spacing.md,
     zIndex: 5,
-  },
-  searchControlRow: {
-    alignItems: "flex-start",
-    flexDirection: "row",
-    gap: spacing.sm,
-  },
-  locationCard: {
-    ...shadow.soft,
-    backgroundColor: colors.white,
-    borderRadius: radii.lg,
-    flex: 1,
-    gap: spacing.sm,
-    padding: spacing.sm,
-  },
-  locationInputRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: spacing.sm,
-  },
-  locationInput: {
-    backgroundColor: colors.panel,
-    borderColor: colors.line,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    color: colors.ink,
-    flex: 1,
-    fontSize: typeScale.body,
-    fontWeight: "800",
-    minHeight: 42,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-  },
-  locationButton: {
-    alignItems: "center",
-    backgroundColor: colors.green,
-    borderRadius: radii.md,
-    justifyContent: "center",
-    minHeight: 42,
-    paddingHorizontal: spacing.md,
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  locationButtonText: {
-    color: colors.white,
-    fontSize: typeScale.caption,
-    fontWeight: "900",
-  },
-  lookupResults: {
-    borderTopColor: colors.line,
-    borderTopWidth: 1,
-    gap: spacing.xs,
-    paddingTop: spacing.sm,
-  },
-  lookupLoading: {
-    color: colors.muted,
-    fontSize: typeScale.caption,
-    fontWeight: "800",
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-  },
-  lookupResultRow: {
-    alignItems: "center",
-    borderRadius: radii.md,
-    flexDirection: "row",
-    gap: spacing.sm,
-    minHeight: 44,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-  },
-  recentSearchDot: {
-    backgroundColor: colors.greenSoft,
-    borderColor: colors.green,
-    borderRadius: radii.pill,
-    borderWidth: 2,
-    height: 12,
-    width: 12,
-  },
-  lookupResultPin: {
-    backgroundColor: colors.green,
-    borderColor: colors.white,
-    borderRadius: radii.pill,
-    borderBottomLeftRadius: 3,
-    borderWidth: 2,
-    height: 15,
-    transform: [{ rotate: "-45deg" }],
-    width: 15,
-  },
-  lookupResultCopy: {
-    flex: 1,
-    minWidth: 0,
-  },
-  lookupResultTitle: {
-    color: colors.ink,
-    flex: 1,
-    fontSize: typeScale.caption,
-    fontWeight: "900",
-  },
-  lookupResultMeta: {
-    color: colors.muted,
-    fontSize: 11,
-    fontWeight: "700",
-    marginTop: 1,
-  },
-  currentLocationPill: {
-    ...shadow.soft,
-    alignItems: "center",
-    backgroundColor: colors.white,
-    borderColor: colors.line,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    height: 48,
-    justifyContent: "center",
-    width: 50,
-  },
-  currentLocationPillPressed: {
-    opacity: 0.82,
-  },
-  currentLocationIcon: {
-    alignItems: "center",
-    height: 24,
-    justifyContent: "center",
-    position: "relative",
-    width: 24,
-  },
-  currentLocationCrossVertical: {
-    backgroundColor: colors.green,
-    borderRadius: radii.pill,
-    height: 24,
-    position: "absolute",
-    width: 2,
-  },
-  currentLocationCrossHorizontal: {
-    backgroundColor: colors.green,
-    borderRadius: radii.pill,
-    height: 2,
-    position: "absolute",
-    width: 24,
-  },
-  currentLocationRing: {
-    backgroundColor: colors.white,
-    borderColor: colors.green,
-    borderRadius: radii.pill,
-    borderWidth: 2,
-    height: 16,
-    position: "absolute",
-    width: 16,
-  },
-  currentLocationDot: {
-    backgroundColor: colors.green,
-    borderRadius: radii.pill,
-    height: 6,
-    position: "absolute",
-    width: 6,
-  },
-  locationError: {
-    color: colors.red,
-    fontSize: 11,
-    fontWeight: "800",
-  },
-  sheet: {
-    ...shadow.soft,
-    backgroundColor: colors.white,
-    borderRadius: radii.xl,
-    gap: spacing.md,
-    bottom: spacing.sm,
-    left: spacing.md,
-    padding: spacing.md,
-    position: "absolute",
-    right: spacing.md,
-    zIndex: 6,
-  },
-  sheetCollapsed: {
-    maxHeight: 305,
-  },
-  sheetExpanded: {
-    height: "66%",
-  },
-  sheetHeader: {
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "center",
-    minHeight: 20,
-  },
-  grabberTouch: {
-    alignItems: "center",
-    flex: 1,
-    paddingVertical: spacing.xs,
-  },
-  mapButton: {
-    backgroundColor: colors.greenSoft,
-    borderRadius: radii.pill,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    position: "absolute",
-    right: 0,
-  },
-  mapButtonText: {
-    color: colors.greenDark,
-    fontSize: 11,
-    fontWeight: "900",
-  },
-  grabber: {
-    alignSelf: "center",
-    backgroundColor: colors.line,
-    borderRadius: radii.pill,
-    height: 4,
-    width: 44,
-  },
-  sortRow: {
-    flexDirection: "row",
-    gap: spacing.xs,
-  },
-  noticeCard: {
-    backgroundColor: "#fff7ed",
-    borderColor: "#fed7aa",
-    borderRadius: radii.md,
-    borderWidth: 1,
-    marginBottom: spacing.sm,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-  },
-  noticeText: {
-    color: colors.amber,
-    fontSize: typeScale.caption,
-    fontWeight: "800",
-  },
-  sortButton: {
-    alignItems: "center",
-    backgroundColor: colors.panel,
-    borderRadius: radii.pill,
-    flex: 1,
-    paddingVertical: spacing.sm,
-  },
-  sortButtonSelected: {
-    backgroundColor: colors.green,
-  },
-  sortText: {
-    color: colors.ink,
-    fontSize: typeScale.caption,
-    fontWeight: "900",
-  },
-  sortTextSelected: {
-    color: colors.white,
-  },
-  loadingState: {
-    alignItems: "center",
-    gap: spacing.sm,
-    padding: spacing.lg,
-  },
-  emptyState: {
-    backgroundColor: colors.panel,
-    borderRadius: radii.md,
-    gap: spacing.xs,
-    padding: spacing.md,
-  },
-  emptyTitle: {
-    color: colors.ink,
-    fontWeight: "900",
-  },
-  muted: {
-    color: colors.muted,
-    fontSize: typeScale.caption,
-    fontWeight: "700",
-    lineHeight: 17,
-  },
-  selectedCard: {
-    backgroundColor: colors.greenSoft,
-    borderRadius: radii.md,
-    gap: spacing.xs,
-    padding: spacing.md,
-  },
-  selectedCardCollapsed: {
-    paddingVertical: spacing.sm,
-  },
-  selectedHeader: {
-    alignItems: "flex-start",
-    flexDirection: "row",
-    gap: spacing.sm,
-  },
-  selectedCopy: {
-    flex: 1,
-    minWidth: 0,
-  },
-  selectedTitle: {
-    color: colors.ink,
-    fontSize: typeScale.body,
-    fontWeight: "900",
-  },
-  selectedDetail: {
-    color: colors.ink,
-    fontSize: typeScale.caption,
-    fontWeight: "700",
-    lineHeight: 17,
-  },
-  selectedMetaRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 6,
-    minWidth: 0,
-  },
-  selectedStatus: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 4,
-  },
-  statusDot: {
-    borderRadius: radii.pill,
-    height: 7,
-    width: 7,
-  },
-  metaSeparator: {
-    color: colors.muted,
-    fontSize: typeScale.caption,
-    fontWeight: "700",
-  },
-  selectedMetaRest: {
-    color: colors.muted,
-    flex: 1,
-    fontSize: typeScale.caption,
-    fontWeight: "700",
-    lineHeight: 17,
-    minWidth: 0,
-  },
-  evidenceRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing.xs,
-    marginTop: spacing.xs,
-  },
-  evidenceChip: {
-    backgroundColor: colors.white,
-    borderColor: colors.line,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    color: colors.ink,
-    fontSize: 9,
-    fontWeight: "900",
-    maxWidth: 150,
-    overflow: "hidden",
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-  },
-  closeButton: {
-    alignItems: "center",
-    backgroundColor: colors.white,
-    borderRadius: radii.pill,
-    height: 30,
-    justifyContent: "center",
-    width: 30,
-  },
-  closeButtonText: {
-    color: colors.ink,
-    fontSize: 12,
-    fontWeight: "900",
-  },
-  selectedActions: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: spacing.sm,
-    justifyContent: "space-between",
-  },
-  selectedPrice: {
-    alignItems: "flex-start",
-    flex: 1,
-    minWidth: 0,
-  },
-  selectedPriceBasis: {
-    color: colors.muted,
-    fontSize: 10,
-    fontWeight: "900",
-  },
-  priceValue: {
-    color: colors.greenDark,
-    fontSize: typeScale.title,
-    fontWeight: "900",
-  },
-  priceUnitInline: {
-    color: colors.muted,
-    fontSize: typeScale.caption,
-    fontWeight: "900",
-  },
-  selectedTomorrowPrice: {
-    color: colors.muted,
-    fontSize: typeScale.caption,
-    fontWeight: "900",
-    marginTop: 2,
-  },
-  tomorrowPriceDown: {
-    color: colors.greenDark,
-  },
-  tomorrowPriceUp: {
-    color: colors.amber,
-  },
-  distanceBadge: {
-    alignItems: "center",
-    backgroundColor: colors.white,
-    borderColor: colors.green,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    minHeight: 32,
-    justifyContent: "center",
-    paddingHorizontal: spacing.md,
-  },
-  distanceBadgeText: {
-    color: colors.greenDark,
-    fontSize: typeScale.caption,
-    fontWeight: "900",
-  },
-  navigateButton: {
-    alignItems: "center",
-    backgroundColor: colors.green,
-    borderRadius: radii.pill,
-    height: 38,
-    justifyContent: "center",
-    width: 38,
-  },
-  navigateButtonIcon: {
-    color: colors.white,
-    fontSize: 20,
-    fontWeight: "900",
-    lineHeight: 22,
-  },
-  list: {
-    flex: 1,
-  },
-  listContent: {
-    gap: spacing.sm,
-    paddingBottom: spacing.md,
   },
 });

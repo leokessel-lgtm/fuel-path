@@ -1,4 +1,5 @@
 import {
+  AppPreferences,
   NotificationPermissionState,
   SavedCommute,
   Station,
@@ -32,6 +33,10 @@ export function isOfficialLivePriceSource(source?: string) {
     "api_wa",
     "api_vic_servo_saver",
     "api_vic",
+    "api_sa_fuel_price_reporting",
+    "api_sa",
+    "api_tas_fuelcheck",
+    "api_tas",
   ]).has(String(source || "").toLowerCase());
 }
 
@@ -148,13 +153,6 @@ export function routeOutcomeLabel(item: StationViewModel) {
   return "Not worth detour";
 }
 
-export function priceBasisLine(item: StationViewModel) {
-  if (item.discountCpl > 0) {
-    return `Pump ${item.pumpCpl.toFixed(1)} c/L`;
-  }
-  return "Pump price";
-}
-
 export function predictionDisciplineCue(item: StationViewModel) {
   const fuel = item.fuel || "";
   const tomorrow = fuel ? item.station.futurePrices?.tomorrow?.prices?.[fuel] : undefined;
@@ -164,7 +162,7 @@ export function predictionDisciplineCue(item: StationViewModel) {
 
 export function alertGateSummary(notificationPermission: NotificationPermissionState) {
   if (notificationPermission === "granted") {
-    return "Alerts can send only when route value, freshness, region access and duplicate checks pass.";
+    return "Route watches are on this device; delivery still needs native push and backend evidence before beta.";
   }
   if (notificationPermission === "unavailable") {
     return "Backend checks route value, freshness, region access and duplicates, but push delivery needs a supported native build.";
@@ -174,11 +172,12 @@ export function alertGateSummary(notificationPermission: NotificationPermissionS
 
 export function commuteAlertRuleLine(commute: SavedCommute) {
   if (!commute.alertEnabled) return "No alert checks while this route is off.";
+  const routeRule = `Checks from ${commute.tankThresholdPercent}% tank, $${commute.minSavingDollars}+ saving and ${commute.maxDetourMinutes} min max detour.`;
   if (commute.alertStatus === "backend_synced") {
-    return "Backend checks saving, detour, freshness and duplicate cooldown.";
+    return `${routeRule} Backend also checks freshness, duplicate cooldown and one alert per run.`;
   }
   if (commute.alertStatus === "scheduled") {
-    return "Local reminder only until backend push sync is ready.";
+    return `${routeRule} Local reminder only until backend push sync is ready.`;
   }
   if (commute.alertStatus === "needs_permission") {
     return "Blocked until notification permission is granted.";
@@ -190,6 +189,47 @@ export function commuteAlertRuleLine(commute: SavedCommute) {
     return "Sync failed. Route kept locally.";
   }
   return "Waiting for route alert checks.";
+}
+
+export function weeklyFleetLiteReportSummary({
+  preferences,
+  savedCommutes,
+}: {
+  preferences: AppPreferences;
+  savedCommutes: SavedCommute[];
+}) {
+  const activeRoutes = savedCommutes.filter((commute) => commute.alertEnabled);
+  const backendSyncedRoutes = activeRoutes.filter((commute) => commute.alertStatus === "backend_synced");
+  const localOnlyRoutes = activeRoutes.filter((commute) => commute.alertStatus === "scheduled");
+  const blockedRoutes = savedCommutes.filter((commute) =>
+    ["needs_permission", "unavailable", "failed"].includes(String(commute.alertStatus || "")),
+  );
+  const minSaving = activeRoutes.length
+    ? Math.min(...activeRoutes.map((commute) => commute.minSavingDollars))
+    : preferences.minSavingDollars;
+  const maxDetour = activeRoutes.length
+    ? Math.max(...activeRoutes.map((commute) => commute.maxDetourMinutes))
+    : preferences.maxDetourMinutes;
+  const policyBrands = preferences.fuelPolicyEnabled
+    ? preferences.approvedPolicyBrands.join(", ")
+    : "Any brand";
+  const reportReady = activeRoutes.length > 0 && blockedRoutes.length === 0;
+
+  return {
+    activeRouteCount: activeRoutes.length,
+    backendSyncedRouteCount: backendSyncedRoutes.length,
+    blockedRouteCount: blockedRoutes.length,
+    localOnlyRouteCount: localOnlyRoutes.length,
+    maxDetourMinutes: maxDetour,
+    minSavingDollars: minSaving,
+    outcomeLine: "Buckets: send alert, watch only, skip alert, quiet today, range first.",
+    policyBrands,
+    reportLine: reportReady
+      ? "Weekly report can summarise watched routes and alert outcomes."
+      : activeRoutes.length
+        ? "Weekly report is waiting on native push/backend proof before claiming delivery."
+        : "Save and enable a route before weekly reporting has real signal.",
+  };
 }
 
 function formatMoney(value: number) {

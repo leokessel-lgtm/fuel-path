@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { colors, radii, shadow, spacing } from "../theme";
+import { colors, mapSkin, radii, shadow, spacing } from "../theme";
 import { MapPoint, StationViewModel } from "../types";
 import { BrandBadge } from "./BrandBadge";
 
@@ -26,6 +26,7 @@ export function StationMap({
   routeEndpoints,
   routePoints = [],
   cameraInsets,
+  userLocation,
 }: {
   centre: MapPoint;
   stations: StationViewModel[];
@@ -38,6 +39,7 @@ export function StationMap({
   routeEndpoints?: { from: MapPoint; to: MapPoint };
   routePoints?: MapPoint[];
   cameraInsets?: CameraInsets;
+  userLocation?: MapPoint;
 }) {
   useEffect(() => {
     onViewportStationsChange?.(stations.map((item) => item.station.stationCode));
@@ -51,6 +53,7 @@ export function StationMap({
       : [routeEndpoints.from, routeEndpoints.to]
     : [
         centre,
+        ...(userLocation ? [userLocation] : []),
         ...stations.map((item) => ({
           lat: item.station.lat,
           lon: item.station.lon,
@@ -62,6 +65,11 @@ export function StationMap({
   return (
     <View style={styles.map}>
       <View style={styles.mapGrid} />
+      {!routeEndpoints && userLocation ? (
+        <View style={[styles.userLocationPin, positionForPoint(userLocation, bounds, activeInsets)]}>
+          <View style={styles.userLocationPinInner} />
+        </View>
+      ) : null}
       {!routeEndpoints && showCentreMarker ? (
         <View style={[styles.locationPin, positionForPoint(centre, bounds, activeInsets)]}>
           <View style={styles.locationPinInner} />
@@ -86,7 +94,9 @@ export function StationMap({
             ]}
           >
             <BrandBadge station={item.station} size={28} />
-            <Text style={styles.pinPrice}>{item.adjustedCpl.toFixed(1)}</Text>
+            <Text style={[styles.pinPrice, selected && styles.pinPriceSelected]}>
+              {item.adjustedCpl.toFixed(1)}
+            </Text>
           </Pressable>
         );
       })}
@@ -185,7 +195,7 @@ const styles = StyleSheet.create({
     opacity: 0.9,
   },
   routeDot: {
-    backgroundColor: colors.green,
+    backgroundColor: mapSkin.route,
     borderRadius: radii.pill,
     height: 7,
     marginLeft: -3,
@@ -217,10 +227,35 @@ const styles = StyleSheet.create({
     top: 8,
     width: 8,
   },
+  userLocationPin: {
+    ...shadow.soft,
+    backgroundColor: colors.blue,
+    borderColor: colors.white,
+    borderRadius: radii.pill,
+    borderBottomLeftRadius: 4,
+    borderWidth: 3,
+    height: 30,
+    marginLeft: -15,
+    marginTop: -30,
+    position: "absolute",
+    transform: [{ rotate: "-45deg" }],
+    width: 30,
+  },
+  userLocationPinInner: {
+    backgroundColor: colors.white,
+    borderColor: colors.blueSoft,
+    borderRadius: radii.pill,
+    borderWidth: 2,
+    height: 10,
+    left: 7,
+    position: "absolute",
+    top: 7,
+    width: 10,
+  },
   pin: {
     ...shadow.soft,
     alignItems: "center",
-    backgroundColor: colors.green,
+    backgroundColor: colors.white,
     borderColor: colors.white,
     borderRadius: radii.pill,
     borderWidth: 2,
@@ -234,17 +269,20 @@ const styles = StyleSheet.create({
     position: "absolute",
   },
   pinSelected: {
-    backgroundColor: colors.ink,
+    backgroundColor: colors.green,
     transform: [{ scale: 1.05 }],
   },
   pinPrice: {
-    color: colors.white,
+    color: colors.greenDark,
     fontSize: 13,
     fontWeight: "900",
   },
+  pinPriceSelected: {
+    color: colors.white,
+  },
   destinationPin: {
     ...shadow.soft,
-    backgroundColor: colors.green,
+    backgroundColor: mapSkin.route,
     borderColor: colors.white,
     borderRadius: radii.pill,
     borderBottomLeftRadius: 4,

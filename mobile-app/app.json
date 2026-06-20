@@ -9,7 +9,13 @@
     "userInterfaceStyle": "light",
     "ios": {
       "bundleIdentifier": "com.fuelpath.app",
-      "supportsTablet": true
+      "supportsTablet": true,
+      "config": {
+        "usesNonExemptEncryption": false
+      },
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.fuelpath.app",

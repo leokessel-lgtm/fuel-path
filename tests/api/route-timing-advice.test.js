@@ -27,6 +27,35 @@ test("route timing advice promotes fill today when route value is strong and on-
   assert.equal(scored.context.timingAdvice.visible, true);
   assert.equal(scored.context.timingAdvice.label, "Fill today on this route");
   assert.match(scored.context.timingAdvice.reason, /Metro Sylvania/);
+  assert.equal(scored.context.decisionSummary.action, "fill_on_route");
+  assert.equal(scored.context.decisionSummary.stationName, "Metro Sylvania");
+  assert.equal(scored.context.decisionSummary.decisionRule.minSavingDollars, 5);
+  assert.equal(scored.context.decisionSummary.decisionRule.maxDetourMinutes, 8);
+  assert.equal(scored.context.decisionSummary.economics.netSavingAfterDetourFuel, scored.candidates[0].netSaving);
+  assert.equal(scored.context.decisionSummary.economics.detourFuelLitres, scored.candidates[0].detourFuelLitres);
+  assert.equal(scored.context.decisionSummary.economics.detourCost, scored.candidates[0].detourCost);
+  assert.equal(scored.context.decisionSummary.economics.timeCost, scored.candidates[0].timeCost);
+  assert.equal(
+    scored.context.decisionSummary.economics.netSavingAfterDetourFuelAndTime,
+    scored.candidates[0].netAfterDetourAndTimeCost,
+  );
+  assert.equal(scored.context.decisionSummary.economics.timeCostDollarsPerMinute, 0.08);
+  assert.equal(scored.context.decisionSummary.alternatives.length, 4);
+  assert.deepEqual(
+    scored.context.decisionSummary.alternatives.map((item) => item.kind),
+    ["best_value", "cheapest", "closest", "safest"],
+  );
+  assert.equal(scored.context.decisionSummary.alternatives[0].selected, true);
+  assert.equal(scored.context.decisionSummary.alternatives[0].netSaving, scored.candidates[0].netSaving);
+  assert.equal(scored.context.decisionSummary.alternatives[0].detourFuelLitres, scored.candidates[0].detourFuelLitres);
+  assert.equal(scored.context.decisionSummary.alternatives[0].timeCost, scored.candidates[0].timeCost);
+  assert.equal(scored.context.decisionSummary.trust.source, "sample");
+  assert.equal(scored.context.decisionSummary.trust.sourceType, "sample_or_demo");
+  assert.equal(scored.candidates[0].station.provenance.source, "sample");
+  assert.equal(scored.candidates[0].station.provenance.sourceType, "sample_or_demo");
+  assert.equal(scored.candidates[0].station.provenance.requestedFuelAvailable, true);
+  assert.equal("lat" in scored.candidates[0].station.provenance, false);
+  assert.equal("lon" in scored.candidates[0].station.provenance, false);
 });
 
 test("route timing advice explains detour when fill value is still worth checking", () => {
@@ -53,9 +82,47 @@ test("route timing advice explains detour when fill value is still worth checkin
   assert.equal(scored.context.timingAdvice.visible, true);
   assert.equal(scored.context.timingAdvice.label, "Fill today, but check the detour");
   assert.match(scored.context.timingAdvice.reason, /after \d+\.\d min detour/);
+  assert.equal(scored.context.decisionSummary.action, "fill_now");
 });
 
-test("route timing advice stays hidden when route value is not useful", () => {
+test("route decision summary explains why cheapest is not always the recommendation", () => {
+  const scored = scoreRoute({
+    source: "sample",
+    route: routeFixture(),
+    stations: stationFixtures([
+      ["cheap-detour", "BP Miranda", 100, 0.2],
+      ["best-on-route", "Metro Sylvania", 150, 0],
+      ["high-on-route", "Ampol Kirrawee", 220, -0.001],
+      ["high-two", "Shell Kirrawee", 222, 0.001],
+      ["high-three", "United Caringbah", 224, 0.002],
+    ]),
+    fuel: "U91",
+    tankLitres: 10,
+    tankPercent: 45,
+    economy: 8.2,
+    reserveKm: 35,
+    corridorKm: 25,
+    minSavingDollars: 2,
+    eligibleDiscounts: new Set(),
+    includeMemberPrices: false,
+    includeClosed: false,
+  });
+
+  assert.equal(scored.candidates[0].station.stationCode, "best-on-route");
+  assert.equal(scored.context.decisionSummary.action, "fill_on_route");
+  assert.match(scored.context.decisionSummary.whyNotCheapest, /BP Miranda is cheapest/);
+  assert.match(scored.context.decisionSummary.whyNotCheapest, /detour fuel/);
+  assert.equal(
+    scored.context.decisionSummary.alternatives.find((item) => item.kind === "cheapest")?.stationCode,
+    "cheap-detour",
+  );
+  assert.equal(
+    scored.context.decisionSummary.alternatives.find((item) => item.kind === "best_value")?.stationCode,
+    "best-on-route",
+  );
+});
+
+test("route timing advice tells the user to skip when route value is below their rule", () => {
   const scored = scoreRoute({
     source: "sample",
     route: routeFixture(),
@@ -75,9 +142,280 @@ test("route timing advice stays hidden when route value is not useful", () => {
     includeClosed: false,
   });
 
+  assert.equal(scored.context.timingAdvice.action, "skip_detour");
+  assert.equal(scored.context.timingAdvice.visible, true);
+  assert.equal(scored.context.timingAdvice.label, "Skip for now");
+  assert.match(scored.context.timingAdvice.reason, /below your \$5\.00 rule/);
+  assert.equal(scored.candidates[0].matchesDecisionRule, false);
+  assert.equal(scored.context.minSavingDollars, 5);
+  assert.equal(scored.context.maxDetourMinutes, 8);
+});
+
+test("route timing advice can recommend waiting only on locked official tomorrow prices", () => {
+  const scored = scoreRoute({
+    source: "api_wa_fuelwatch",
+    route: routeFixture(),
+    stations: stationFixtures([
+      ["wait-stop", "Vibe Perth", 180, 0],
+      ["mid-on-route", "BP Perth", 181, 0.001],
+      ["high-on-route", "Ampol Perth", 182, -0.001],
+    ]).map((station) =>
+      station.stationCode === "wait-stop"
+        ? {
+            ...station,
+            source: "api_wa_fuelwatch",
+            futurePrices: {
+              tomorrow: {
+                label: "WA locked tomorrow price",
+                effectiveFrom: "2026-06-18T00:00:00.000Z",
+                prices: { U91: 150 },
+              },
+            },
+          }
+        : { ...station, source: "api_wa_fuelwatch" },
+    ),
+    fuel: "U91",
+    tankLitres: 55,
+    tankPercent: 45,
+    economy: 8.2,
+    reserveKm: 35,
+    corridorKm: 3,
+    eligibleDiscounts: new Set(),
+    includeMemberPrices: false,
+    includeClosed: false,
+  });
+
+  assert.equal(scored.context.timingAdvice.action, "wait_if_can");
+  assert.equal(scored.context.timingAdvice.visible, true);
+  assert.equal(scored.context.timingAdvice.label, "Wait if you can");
+  assert.match(scored.context.timingAdvice.reason, /locked tomorrow price/);
+  assert.equal(scored.context.decisionSummary.action, "wait");
+  assert.equal(scored.context.decisionSummary.trust.officialLive, true);
+  assert.equal(scored.candidates[0].station.provenance.futurePriceAvailable, true);
+});
+
+test("route timing advice does not recommend waiting from demo tomorrow prices", () => {
+  const scored = scoreRoute({
+    source: "sample",
+    route: routeFixture(),
+    stations: stationFixtures([
+      ["wait-stop", "Demo Fuel", 180, 0],
+      ["mid-on-route", "BP Demo", 181, 0.001],
+      ["high-on-route", "Ampol Demo", 182, -0.001],
+    ]).map((station) =>
+      station.stationCode === "wait-stop"
+        ? {
+            ...station,
+            futurePrices: {
+              tomorrow: {
+                label: "Demo tomorrow price",
+                effectiveFrom: "2026-06-18T00:00:00.000Z",
+                prices: { U91: 150 },
+              },
+            },
+          }
+        : station,
+    ),
+    fuel: "U91",
+    tankLitres: 55,
+    tankPercent: 45,
+    economy: 8.2,
+    reserveKm: 35,
+    corridorKm: 3,
+    eligibleDiscounts: new Set(),
+    includeMemberPrices: false,
+    includeClosed: false,
+  });
+
+  assert.equal(scored.context.timingAdvice.action, "skip_detour");
+  assert.equal(scored.context.decisionSummary.action, "skip");
+  assert.equal(scored.context.decisionSummary.trust.officialLive, false);
+  assert.equal(scored.candidates[0].station.provenance.futurePriceAvailable, true);
+});
+
+test("route timing advice tells the user range first when every candidate is beyond reserve", () => {
+  const scored = scoreRoute({
+    source: "sample",
+    route: routeFixture(),
+    stations: stationFixtures([
+      ["cheap-out-of-range", "Metro Sylvania", 140, 0],
+      ["mid-out-of-range", "BP Miranda", 145, 0.001],
+      ["high-out-of-range", "Ampol Kirrawee", 150, -0.001],
+    ]),
+    fuel: "U91",
+    tankLitres: 40,
+    tankPercent: 8,
+    economy: 9.5,
+    reserveKm: 80,
+    corridorKm: 3,
+    minSavingDollars: 1,
+    maxDetourMinutes: 8,
+    eligibleDiscounts: new Set(),
+    includeMemberPrices: false,
+    includeClosed: false,
+  });
+
+  assert.equal(scored.candidates.length > 0, true);
+  assert.equal(scored.candidates[0].reachable, false);
+  assert.equal(scored.context.timingAdvice.action, "range_first");
+  assert.equal(scored.context.timingAdvice.visible, true);
+  assert.equal(scored.context.timingAdvice.label, "Range-first");
+  assert.match(scored.context.timingAdvice.reason, /range risk/);
+  assert.equal(scored.context.decisionSummary.action, "range_first");
+  assert.equal(scored.context.decisionSummary.alternatives.find((item) => item.kind === "safest")?.note, "Range risk");
+});
+
+test("route timing advice respects max detour preference before recommending a saving", () => {
+  const scored = scoreRoute({
+    source: "sample",
+    route: routeFixture(),
+    stations: stationFixtures([
+      ["cheap-detour", "BP Miranda", 120, 0.02],
+      ["mid-on-route", "Metro Sylvania", 180, 0],
+      ["high-on-route", "Ampol Kirrawee", 190, -0.001],
+    ]),
+    fuel: "U91",
+    tankLitres: 55,
+    tankPercent: 45,
+    economy: 8.2,
+    reserveKm: 35,
+    corridorKm: 3,
+    minSavingDollars: 3,
+    maxDetourMinutes: 1,
+    eligibleDiscounts: new Set(),
+    includeMemberPrices: false,
+    includeClosed: false,
+  });
+
+  assert.equal(scored.context.timingAdvice.action, "skip_detour");
+  assert.equal(scored.context.timingAdvice.visible, true);
+  assert.match(scored.context.timingAdvice.reason, /above your 1 min detour rule/);
+  assert.equal(scored.candidates[0].matchesDecisionRule, false);
+  assert.equal(
+    scored.candidates[0].warnings.some((warning) => warning.includes("above 1 min detour rule")),
+    true,
+  );
+});
+
+test("route scoring prefilters stations outside the route envelope", () => {
+  const scored = scoreRoute({
+    source: "sample",
+    route: routeFixture(),
+    stations: [
+      ...stationFixtures([
+        ["near-one", "Metro Sylvania", 180, 0],
+        ["near-two", "BP Miranda", 182, 0.001],
+      ]),
+      {
+        stationCode: "far-cheap",
+        name: "Far Cheap Fuel",
+        brand: "Far",
+        lat: -35,
+        lon: 150,
+        openNow: true,
+        source: "sample",
+        updatedAt: "2026-06-17T00:00:00.000Z",
+        prices: { U91: 100 },
+      },
+    ],
+    fuel: "U91",
+    tankLitres: 55,
+    tankPercent: 45,
+    economy: 8.2,
+    reserveKm: 35,
+    corridorKm: 3,
+    eligibleDiscounts: new Set(),
+    includeMemberPrices: false,
+    includeClosed: false,
+  });
+
+  assert.equal(scored.context.routePrefilteredStations, 1);
+  assert.equal(scored.candidates.some((candidate) => candidate.station.stationCode === "far-cheap"), false);
+});
+
+test("route scoring does not recommend stations missing the requested fuel grade", () => {
+  const scored = scoreRoute({
+    source: "sample",
+    route: routeFixture(),
+    stations: stationFixtures([
+      ["p98-only", "Metro Sylvania", 150, 0],
+      ["also-p98-only", "BP Miranda", 160, 0.001],
+    ]).map((station) => ({
+      ...station,
+      prices: { P98: station.prices.U91 },
+    })),
+    fuel: "U91",
+    tankLitres: 55,
+    tankPercent: 45,
+    economy: 8.2,
+    reserveKm: 35,
+    corridorKm: 3,
+    eligibleDiscounts: new Set(),
+    includeMemberPrices: false,
+    includeClosed: false,
+  });
+
+  assert.equal(scored.candidates.length, 0);
   assert.equal(scored.context.timingAdvice.action, "no_cycle_signal");
-  assert.equal(scored.context.timingAdvice.visible, false);
-  assert.equal(scored.context.timingAdvice.label, "");
+  assert.equal(scored.context.stationsInCorridor, 0);
+});
+
+test("route scoring excludes stale non-official sample prices from recommendations", () => {
+  const scored = scoreRoute({
+    source: "sample",
+    route: routeFixture(),
+    stations: stationFixtures([
+      ["stale-cheap", "Metro Sylvania", 120, 0],
+      ["fresh-mid", "BP Miranda", 180, 0.001],
+    ]).map((station) =>
+      station.stationCode === "stale-cheap"
+        ? { ...station, updatedAt: "2026-06-01T00:00:00.000Z" }
+        : station,
+    ),
+    fuel: "U91",
+    tankLitres: 55,
+    tankPercent: 45,
+    economy: 8.2,
+    reserveKm: 35,
+    corridorKm: 3,
+    eligibleDiscounts: new Set(),
+    includeMemberPrices: false,
+    includeClosed: false,
+  });
+
+  assert.equal(scored.context.staleExcludedCandidates, 1);
+  assert.equal(scored.candidates.some((candidate) => candidate.station.stationCode === "stale-cheap"), false);
+  assert.equal(scored.candidates.some((candidate) => candidate.station.stationCode === "fresh-mid"), true);
+});
+
+test("route scoring excludes unavailable or out-of-fuel prices from recommendations", () => {
+  const scored = scoreRoute({
+    source: "sample",
+    route: routeFixture(),
+    stations: [
+      ...stationFixtures([
+        ["zero-price", "Metro Sylvania", 0, 0],
+        ["sentinel-price", "BP Miranda", 9999, 0.001],
+        ["negative-price", "Ampol Kirrawee", -10, -0.001],
+        ["fresh-mid", "United Caringbah", 180, 0.002],
+      ]),
+    ],
+    fuel: "U91",
+    tankLitres: 55,
+    tankPercent: 45,
+    economy: 8.2,
+    reserveKm: 35,
+    corridorKm: 3,
+    eligibleDiscounts: new Set(),
+    includeMemberPrices: false,
+    includeClosed: false,
+  });
+
+  assert.equal(scored.context.invalidPriceExcludedCandidates, 3);
+  assert.equal(scored.candidates.some((candidate) => candidate.station.stationCode === "zero-price"), false);
+  assert.equal(scored.candidates.some((candidate) => candidate.station.stationCode === "sentinel-price"), false);
+  assert.equal(scored.candidates.some((candidate) => candidate.station.stationCode === "negative-price"), false);
+  assert.equal(scored.candidates.some((candidate) => candidate.station.stationCode === "fresh-mid"), true);
 });
 
 function routeFixture() {

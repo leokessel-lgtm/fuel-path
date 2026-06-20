@@ -9,22 +9,41 @@ let sqliteCache = null;
 
 function addressIndexStatus() {
   const sqlitePath = configuredSqlitePath();
+  const apiConfigured = Boolean(configuredApiUrl());
+  const postgresConfigured = Boolean(configuredPostgresUrl());
   const seedRecords = loadSeedRecords();
   return {
-    configured: Boolean(sqlitePath) || seedRecords.length > 0,
-    mode: sqlitePath ? "sqlite" : seedRecords.length ? "seed" : "disabled",
+    configured: apiConfigured || postgresConfigured || Boolean(sqlitePath) || seedRecords.length > 0,
+    mode: apiConfigured ? "api" : postgresConfigured ? "postgres" : sqlitePath ? "sqlite" : seedRecords.length ? "seed" : "disabled",
+    apiConfigured,
+    postgresConfigured,
     sqliteConfigured: Boolean(sqlitePath),
     seedRecords: seedRecords.length,
-    source: sqlitePath || DEFAULT_SEED_PATH,
+    source: apiConfigured
+      ? configuredApiUrl()
+      : postgresConfigured
+        ? "fuel_path_gnaf_addresses"
+        : sqlitePath || DEFAULT_SEED_PATH,
     provider: "fuel_path_gnaf",
     attribution:
       "G-NAF © Geoscape Australia licensed by the Commonwealth of Australia under the Open G-NAF End User Licence Agreement.",
   };
 }
 
-function searchAddressIndex(query, limit = 5) {
+async function searchAddressIndex(query, limit = 5) {
+  const rawQuery = String(query || "");
   const needle = normaliseAddressText(query);
   if (needle.length < 4) return [];
+
+  if (configuredApiUrl()) {
+    const apiResults = await searchApiIndex(rawQuery, needle, limit);
+    if (apiResults.length) return apiResults;
+  }
+
+  if (configuredPostgresUrl()) {
+    const postgresResults = await searchPostgresIndex(needle, limit);
+    if (postgresResults.length) return postgresResults;
+  }
 
   const sqlitePath = configuredSqlitePath();
   if (sqlitePath) {
@@ -33,6 +52,81 @@ function searchAddressIndex(query, limit = 5) {
   }
 
   return searchSeedIndex(needle, limit);
+}
+
+async function searchApiIndex(rawQuery, needle, limit) {
+  try {
+    const url = new URL("/search", configuredApiUrl());
+    url.searchParams.set("q", rawQuery);
+    url.searchParams.set("limit", String(Math.max(1, Math.min(Number(limit) || 5, 20))));
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    const response = await fetch(url.toString(), {
+      headers: apiHeaders(),
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+    if (!response.ok) return [];
+    const payload = await response.json();
+    const rows = Array.isArray(payload?.suggestions) ? payload.suggestions : Array.isArray(payload) ? payload : [];
+    return rows
+      .map((row) => addressRecordToSuggestion(row, row.matchType || apiMatchType(row, needle), Number(row.score || 950)))
+      .filter((row) => Number.isFinite(row.lat) && Number.isFinite(row.lon));
+  } catch {
+    return [];
+  }
+}
+
+async function searchPostgresIndex(needle, limit) {
+  const sql = postgresClient();
+  if (!sql) return [];
+  try {
+    const queryState = detectQueryStateCode(needle);
+    const rows = queryState
+      ? await sql`
+        SELECT id, label, lat, lon, state, postcode, accuracy, search_text
+        FROM fuel_path_gnaf_addresses
+        WHERE state = ${queryState}
+          AND (
+            search_text LIKE ${`${needle}%`}
+            OR search_text LIKE ${`% ${needle}%`}
+            OR search_text % ${needle}
+          )
+        ORDER BY
+          CASE
+            WHEN search_text = ${needle} THEN 0
+            WHEN search_text LIKE ${`${needle}%`} THEN 1
+            WHEN search_text LIKE ${`% ${needle}%`} THEN 2
+            ELSE 3
+          END,
+          similarity(search_text, ${needle}) DESC,
+          LENGTH(label)
+        LIMIT ${Math.max(1, Math.min(Number(limit) || 5, 20))}
+      `
+      : await sql`
+        SELECT id, label, lat, lon, state, postcode, accuracy, search_text
+        FROM fuel_path_gnaf_addresses
+        WHERE search_text LIKE ${`${needle}%`}
+          OR search_text LIKE ${`% ${needle}%`}
+          OR search_text % ${needle}
+        ORDER BY
+          CASE
+            WHEN search_text = ${needle} THEN 0
+            WHEN search_text LIKE ${`${needle}%`} THEN 1
+            WHEN search_text LIKE ${`% ${needle}%`} THEN 2
+            ELSE 3
+          END,
+          similarity(search_text, ${needle}) DESC,
+          LENGTH(label)
+        LIMIT ${Math.max(1, Math.min(Number(limit) || 5, 20))}
+      `;
+    return rows
+      .map((row) => ({ row, matchType: postgresMatchType(row, needle) }))
+      .filter(({ row, matchType }) => addressMatchQualityPass(row, needle, matchType))
+      .map(({ row, matchType }) => addressRecordToSuggestion(row, matchType, 1000));
+  } catch {
+    return [];
+  }
 }
 
 function searchSeedIndex(needle, limit) {
@@ -47,12 +141,15 @@ function searchSeedIndex(needle, limit) {
 function searchSqliteIndex(needle, limit) {
   const database = openSqliteIndex();
   if (!database) return [];
+  const sqlitePath = configuredSqlitePath();
+  if (isLargeSqliteIndex(sqlitePath) && !shouldSearchLargeSqliteIndex(needle)) return [];
 
-  const terms = needle.split(" ").filter(Boolean).slice(0, 8);
+  const terms = sqliteFtsTermsForNeedle(needle);
   if (!terms.length) return [];
 
   try {
     const ftsQuery = terms.map((term) => `${escapeFtsTerm(term)}*`).join(" ");
+    const expandedLimit = Math.max(Math.min(Number(limit) || 5, 20) * 8, 40);
     const statement = database.prepare(`
       SELECT id, label, lat, lon, state, postcode, accuracy, search_text
       FROM address_fts
@@ -61,8 +158,12 @@ function searchSqliteIndex(needle, limit) {
       LIMIT ?
     `);
     return statement
-      .all(ftsQuery, limit)
-      .map((row) => addressRecordToSuggestion(row, sqliteMatchType(row.search_text, needle), 1000));
+      .all(ftsQuery, expandedLimit)
+      .map((row) => ({ row, matchType: sqliteMatchType(row, needle) }))
+      .filter(({ row, matchType }) => addressMatchQualityPass(row, needle, matchType))
+      .sort((left, right) => addressIndexRank(right, needle) - addressIndexRank(left, needle) || left.row.label.length - right.row.label.length)
+      .slice(0, limit)
+      .map(({ row, matchType }) => addressRecordToSuggestion(row, matchType, addressIndexRank({ row, matchType }, needle)));
   } catch {
     try {
       const statement = database.prepare(`
@@ -74,7 +175,10 @@ function searchSqliteIndex(needle, limit) {
       `);
       return statement
         .all(`%${needle}%`, limit)
-        .map((row) => addressRecordToSuggestion(row, sqliteMatchType(row.search_text, needle), 700));
+        .map((row) => ({ row, matchType: sqliteMatchType(row, needle) }))
+        .filter(({ row, matchType }) => addressMatchQualityPass(row, needle, matchType))
+        .sort((left, right) => addressIndexRank(right, needle) - addressIndexRank(left, needle) || left.row.label.length - right.row.label.length)
+        .map(({ row, matchType }) => addressRecordToSuggestion(row, matchType, addressIndexRank({ row, matchType }, needle)));
     } catch {
       return [];
     }
@@ -147,6 +251,37 @@ function configuredSqlitePath() {
   return fs.existsSync(resolved) ? resolved : "";
 }
 
+function configuredApiUrl() {
+  return process.env.FUEL_PATH_GNAF_API_URL || "";
+}
+
+function apiHeaders() {
+  const token = process.env.FUEL_PATH_GNAF_API_TOKEN || "";
+  return {
+    Accept: "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
+
+function configuredPostgresUrl() {
+  return process.env.FUEL_PATH_GNAF_DATABASE_URL || "";
+}
+
+function postgresClient() {
+  const connectionString = configuredPostgresUrl();
+  if (!connectionString) return null;
+  if (postgresClient.cache?.connectionString === connectionString) return postgresClient.cache.sql;
+  try {
+    const { neon } = require("@neondatabase/serverless");
+    const sql = neon(connectionString);
+    postgresClient.cache = { connectionString, sql };
+    return sql;
+  } catch {
+    postgresClient.cache = null;
+    return null;
+  }
+}
+
 function openSqliteIndex() {
   const sqlitePath = configuredSqlitePath();
   if (!sqlitePath) return null;
@@ -162,11 +297,146 @@ function openSqliteIndex() {
   }
 }
 
-function sqliteMatchType(searchText, needle) {
-  const text = normaliseAddressText(searchText);
-  if (text === needle) return "exact_address";
+function isLargeSqliteIndex(sqlitePath) {
+  if (!sqlitePath) return false;
+  const threshold = Number(process.env.FUEL_PATH_GNAF_LARGE_SQLITE_BYTES || 1_000_000_000);
+  try {
+    return fs.statSync(sqlitePath).size >= threshold;
+  } catch {
+    return false;
+  }
+}
+
+function shouldSearchLargeSqliteIndex(needle) {
+  const terms = sqliteFtsTermsForNeedle(needle);
+  if (terms.length < 3) return false;
+  const hasHouseNumber = terms.some((term) => /^\d+[a-z]?$/.test(term));
+  if (!hasHouseNumber) return false;
+  const alphaTerms = terms.filter((term) => /[a-z]/.test(term) && !isStateCode(term));
+  if (alphaTerms.length < 2) return false;
+  if (alphaTerms.some((term) => term.length >= 4)) return true;
+  return /\b\d{4}\b/.test(needle) || terms.some(isStateCode);
+}
+
+function sqliteFtsTermsForNeedle(needle) {
+  const tokens = normaliseAddressText(needle).split(" ").filter(Boolean).slice(0, 10);
+  return tokens
+    .filter((token, index) => {
+      if (SQLITE_FTS_STOP_TERMS.has(token)) return false;
+      if (/^\d{1,2}$/.test(token) && index === 0 && /^\d+$/.test(tokens[index + 1] || "")) return false;
+      if (
+        /^\d{1,2}$/.test(token) &&
+        SQLITE_UNIT_TERMS.has(tokens[index - 1] || "") &&
+        /^\d+$/.test(tokens[index + 1] || "")
+      ) {
+        return false;
+      }
+      return true;
+    })
+    .slice(0, 8);
+}
+
+const SQLITE_FTS_STOP_TERMS = new Set([
+  "avenue",
+  "boulevard",
+  "circuit",
+  "close",
+  "court",
+  "crescent",
+  "drive",
+  "highway",
+  "lane",
+  "parade",
+  "place",
+  "road",
+  "street",
+  "terrace",
+  "townhouse",
+  "unit",
+]);
+
+const SQLITE_UNIT_TERMS = new Set(["apartment", "flat", "suite", "townhouse", "unit"]);
+
+function isStateCode(value) {
+  return ["act", "nsw", "nt", "ot", "qld", "sa", "tas", "vic", "wa"].includes(String(value || "").toLowerCase());
+}
+
+function sqliteMatchType(row, needle) {
+  const text = normaliseAddressText(row?.search_text);
+  const label = normaliseAddressText(row?.label);
+  if (text === needle || label === needle) return "exact_address";
   if (text.startsWith(needle)) return "address_prefix";
-  return "address_contains";
+  if (text.includes(needle) || label.includes(needle)) return "address_contains";
+  return "address_token_overlap";
+}
+
+function postgresMatchType(row, needle) {
+  return sqliteMatchType(row, needle);
+}
+
+function detectQueryStateCode(needle) {
+  const tokens = new Set(String(needle || "").toUpperCase().split(/\s+/).filter(Boolean));
+  return ["NSW", "ACT", "QLD", "VIC", "SA", "WA", "TAS", "NT", "OT"].find((code) => tokens.has(code)) || "";
+}
+
+function addressMatchQualityPass(row, needle, matchType) {
+  if (["exact_address", "address_prefix"].includes(matchType)) return true;
+  const queryTokens = significantAddressTokens(needle);
+  if (queryTokens.length < 3) return true;
+  const rowTokens = new Set(significantAddressTokens(`${row?.search_text || ""} ${row?.label || ""}`));
+  const overlap = queryTokens.filter((token) => rowTokens.has(token)).length;
+  return overlap >= Math.min(3, queryTokens.length);
+}
+
+function addressIndexRank(candidate, needle) {
+  const { row, matchType } = candidate;
+  const label = normaliseAddressText(row?.label);
+  const text = normaliseAddressText(row?.search_text);
+  if (matchType === "exact_address") return 1000;
+  if (label.startsWith(needle)) return 960;
+  if (text.startsWith(needle)) return 930;
+  if (matchType === "address_contains") return 760;
+  const queryTokens = significantAddressTokens(needle);
+  const rowTokens = new Set(significantAddressTokens(`${row?.search_text || ""} ${row?.label || ""}`));
+  const overlap = queryTokens.filter((token) => rowTokens.has(token)).length;
+  return 500 + overlap;
+}
+
+function significantAddressTokens(value) {
+  const stopwords = new Set([
+    "act",
+    "australia",
+    "avenue",
+    "ave",
+    "drive",
+    "dr",
+    "highway",
+    "hwy",
+    "lane",
+    "ln",
+    "new",
+    "nsw",
+    "nt",
+    "place",
+    "pl",
+    "qld",
+    "road",
+    "rd",
+    "sa",
+    "street",
+    "st",
+    "tas",
+    "unit",
+    "vic",
+    "wa",
+  ]);
+  return normaliseAddressText(value)
+    .split(/\s+/)
+    .filter((token) => token.length > 1 && !stopwords.has(token));
+}
+
+function apiMatchType(row, needle) {
+  return sqliteMatchType({ label: row?.label, search_text: row?.search_text || row?.searchText }, needle);
 }
 
 function escapeFtsTerm(value) {
@@ -188,6 +458,9 @@ function normaliseAddressText(value) {
 
 module.exports = {
   addressIndexStatus,
+  addressMatchQualityPass,
   normaliseAddressText,
   searchAddressIndex,
+  shouldSearchLargeSqliteIndex,
+  sqliteFtsTermsForNeedle,
 };

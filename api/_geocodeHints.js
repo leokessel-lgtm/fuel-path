@@ -26,6 +26,7 @@ const ADDITIONAL_LOCAL_GEOCODE_HINTS = [
   hint("Sydney Olympic Park NSW 2127", -33.845, 151.0672, "suburb"),
   hint("Castle Hill NSW 2154", -33.7306, 151.0069, "suburb"),
   hint("North Sydney Station, North Sydney NSW 2060", -33.8411, 151.2073, "station"),
+  hint("Artarmon NSW 2064", -33.8089, 151.1842, "suburb", ["artamon", "artamon nsw"]),
   hint("Rhodes NSW 2138", -33.828, 151.085, "suburb"),
   hint("Blacktown NSW 2148", -33.771, 150.906, "suburb"),
   hint("Campbelltown NSW 2560", -34.066, 150.814, "suburb"),

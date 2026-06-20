@@ -3,7 +3,7 @@ import { StyleSheet, View } from "react-native";
 import type * as Leaflet from "leaflet";
 
 import { brandStyleForStation } from "../data/brandAssets";
-import { colors, radii } from "../theme";
+import { colors, mapSkin, radii } from "../theme";
 import { MapPoint, StationViewModel } from "../types";
 
 const LEAFLET_CSS_ID = "fuel-path-leaflet-css";
@@ -29,6 +29,7 @@ export function StationMap({
   routeEndpoints,
   routePoints = [],
   cameraInsets,
+  userLocation,
 }: {
   centre: MapPoint;
   stations: StationViewModel[];
@@ -41,6 +42,7 @@ export function StationMap({
   routeEndpoints?: { from: MapPoint; to: MapPoint };
   routePoints?: MapPoint[];
   cameraInsets?: CameraInsets;
+  userLocation?: MapPoint;
 }) {
   const mapElementRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<Leaflet.Map | null>(null);
@@ -68,8 +70,8 @@ export function StationMap({
       }).setView([centre.lat, centre.lon], 13);
 
       L.control.zoom({ position: "bottomright" }).addTo(map);
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        attribution: "&copy; OpenStreetMap contributors",
+      L.tileLayer(mapSkin.baseTileUrl, {
+        attribution: mapSkin.baseAttribution,
         maxZoom: 19,
       }).addTo(map);
       map.on("dragstart zoomstart", () => {
@@ -139,6 +141,7 @@ export function StationMap({
     const cameraContextChanged = cameraContextKey !== lastCameraContextKeyRef.current;
     if (cameraContextChanged) {
       userMovedMapRef.current = false;
+      lastReportedUserCentreKeyRef.current = "";
       lastCameraContextKeyRef.current = cameraContextKey;
     }
 
@@ -146,9 +149,9 @@ export function StationMap({
       if (routeLatLngs.length >= 2) {
         const routeLine = L.polyline(routeLatLngs, {
           className: "fuel-path-route-line",
-          color: colors.green,
+          color: mapSkin.route,
           opacity: 0.85,
-          weight: 5,
+          weight: 6,
         });
         markerLayer.addLayer(routeLine);
         fitPoints.push(...routeLatLngs);
@@ -161,6 +164,9 @@ export function StationMap({
     } else if (showCentreMarker) {
       addLocationMarker(L, markerLayer, centre);
     }
+    if (!routeEndpoints && userLocation) {
+      addUserLocationMarker(L, markerLayer, userLocation);
+    }
 
     stations.slice(0, maxStationMarkers).forEach((item) => {
       const selected = item.station.stationCode === selectedStationCode;
@@ -168,18 +174,18 @@ export function StationMap({
       const marker = L.marker([item.station.lat, item.station.lon], {
         icon: L.divIcon({
           className: "",
-          html: markerHtml(item, selected, accessibilityLabel),
+          html: markerHtml(item, selected),
           iconAnchor: [42, 48],
           iconSize: [84, 48],
         }),
-        alt: accessibilityLabel,
+        alt: "",
+        keyboard: false,
         riseOnHover: true,
-        title: accessibilityLabel,
         zIndexOffset: selected ? 500 : 0,
       });
       marker.on("click", () => {
         onSelect(item.station.stationCode);
-        runProgrammaticMapMove(programmaticMoveRef, () => {
+        runProgrammaticMapMove(programmaticMoveRef, map, () => {
           map.panInside([item.station.lat, item.station.lon], {
             animate: true,
             ...leafletPadding(activeInsets),
@@ -196,7 +202,7 @@ export function StationMap({
 
     const fitKey = `${fitKeyForPoints(cameraPoints)}|${cameraInsetsKey(activeInsets)}`;
     if (fitKey !== lastFitKeyRef.current && (!userMovedMapRef.current || cameraContextChanged)) {
-      runProgrammaticMapMove(programmaticMoveRef, () => {
+      runProgrammaticMapMove(programmaticMoveRef, map, () => {
         map.invalidateSize();
         map.fitBounds(L.latLngBounds(cameraPoints), {
           ...leafletPadding(activeInsets),
@@ -207,7 +213,7 @@ export function StationMap({
     } else {
       const selected = stations.find((item) => item.station.stationCode === selectedStationCode);
       if (selected && !userMovedMapRef.current) {
-        runProgrammaticMapMove(programmaticMoveRef, () => {
+        runProgrammaticMapMove(programmaticMoveRef, map, () => {
           map.panInside([selected.station.lat, selected.station.lon], {
             animate: true,
             ...leafletPadding(activeInsets),
@@ -263,6 +269,7 @@ export function StationMap({
     cameraInsets,
     selectedStationCode,
     stations,
+    userLocation,
   ]);
 
   return (
@@ -298,6 +305,25 @@ function addLocationMarker(
   markerLayer.addLayer(marker);
 }
 
+function addUserLocationMarker(
+  L: typeof Leaflet,
+  markerLayer: Leaflet.LayerGroup,
+  location: MapPoint,
+) {
+  const marker = L.marker([location.lat, location.lon], {
+    icon: L.divIcon({
+      className: "",
+      html: `<div aria-label="My location" class="fuel-path-user-location-pin"><span></span></div>`,
+      iconAnchor: [15, 30],
+      iconSize: [30, 30],
+    }),
+    title: "My location",
+    zIndexOffset: 900,
+  });
+  marker.bindTooltip("My location", { direction: "top" });
+  markerLayer.addLayer(marker);
+}
+
 function addDestinationMarker(
   L: typeof Leaflet,
   markerLayer: Leaflet.LayerGroup,
@@ -316,7 +342,7 @@ function addDestinationMarker(
   markerLayer.addLayer(marker);
 }
 
-function markerHtml(item: StationViewModel, selected: boolean, accessibilityLabel: string) {
+function markerHtml(item: StationViewModel, selected: boolean) {
   const style = brandStyleForStation(item.station);
   const iconUri = imageUri(style.icon);
   const logo = iconUri
@@ -325,7 +351,7 @@ function markerHtml(item: StationViewModel, selected: boolean, accessibilityLabe
         style.initials,
       )}</span>`;
   return `
-    <div class="fuel-path-marker${selected ? " is-selected" : ""}" role="button" aria-label="${escapeHtml(accessibilityLabel)}">
+    <div class="fuel-path-marker${selected ? " is-selected" : ""}" aria-hidden="true">
       ${logo}
       <span class="fuel-path-marker-price">${item.adjustedCpl.toFixed(1)}</span>
     </div>
@@ -427,13 +453,31 @@ function toRad(value: number) {
 
 function runProgrammaticMapMove(
   programmaticMoveRef: { current: boolean },
+  map: Leaflet.Map,
   move: () => void,
 ) {
   programmaticMoveRef.current = true;
-  move();
-  window.setTimeout(() => {
+  let settled = false;
+  let fallbackTimer: ReturnType<typeof window.setTimeout> | undefined;
+  const finishProgrammaticMove = () => {
+    if (settled) return;
+    settled = true;
     programmaticMoveRef.current = false;
-  }, 500);
+    if (fallbackTimer) window.clearTimeout(fallbackTimer);
+    map.off("moveend", finishProgrammaticMove);
+    map.off("zoomend", finishProgrammaticMove);
+  };
+
+  map.once("moveend", finishProgrammaticMove);
+  map.once("zoomend", finishProgrammaticMove);
+  fallbackTimer = window.setTimeout(finishProgrammaticMove, 1_200);
+
+  try {
+    move();
+  } catch (error) {
+    finishProgrammaticMove();
+    throw error;
+  }
 }
 
 function ensureLeafletStyles() {
@@ -462,10 +506,10 @@ function ensureLeafletStyles() {
       }
       .fuel-path-marker {
         align-items: center;
-        background: ${colors.green};
+        background: ${colors.white};
         border: 2px solid ${colors.white};
         border-radius: 999px;
-        box-shadow: 0 8px 18px rgba(23, 32, 27, 0.24);
+        box-shadow: 0 8px 18px rgba(23, 32, 27, 0.18);
         box-sizing: border-box;
         display: flex;
         gap: 4px;
@@ -474,7 +518,7 @@ function ensureLeafletStyles() {
         transition: transform 160ms ease, background 160ms ease;
       }
       .fuel-path-marker.is-selected {
-        background: ${colors.ink};
+        background: ${colors.green};
         transform: scale(1.08);
       }
       .fuel-path-marker-logo,
@@ -493,10 +537,13 @@ function ensureLeafletStyles() {
         width: 28px;
       }
       .fuel-path-marker-price {
-        color: ${colors.white};
+        color: ${colors.greenDark};
         font-size: 13px;
         font-weight: 900;
         line-height: 1;
+      }
+      .fuel-path-marker.is-selected .fuel-path-marker-price {
+        color: ${colors.white};
       }
       .fuel-path-location-pin {
         background: ${colors.ink};
@@ -519,11 +566,34 @@ function ensureLeafletStyles() {
         top: 7px;
         width: 8px;
       }
-      .fuel-path-destination-pin {
-        background: ${colors.green};
+      .fuel-path-user-location-pin {
+        background: ${colors.blue};
         border: 3px solid ${colors.white};
         border-radius: 999px 999px 999px 4px;
-        box-shadow: 0 8px 18px rgba(23, 32, 27, 0.18);
+        box-shadow: 0 8px 18px rgba(45, 95, 154, 0.28);
+        box-sizing: border-box;
+        height: 30px;
+        position: relative;
+        transform: rotate(-45deg);
+        width: 30px;
+      }
+      .fuel-path-user-location-pin span {
+        background: ${colors.white};
+        border: 2px solid ${colors.blueSoft};
+        border-radius: 999px;
+        box-sizing: border-box;
+        display: block;
+        height: 10px;
+        left: 7px;
+        position: absolute;
+        top: 7px;
+        width: 10px;
+      }
+      .fuel-path-destination-pin {
+        background: ${mapSkin.route};
+        border: 3px solid ${colors.white};
+        border-radius: 999px 999px 999px 4px;
+        box-shadow: 0 8px 18px ${mapSkin.routeShadow};
         box-sizing: border-box;
         height: 28px;
         position: relative;

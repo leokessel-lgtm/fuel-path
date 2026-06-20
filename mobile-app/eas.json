@@ -16,6 +16,16 @@
         "buildType": "apk"
       }
     },
+    "localParity": {
+      "environment": "preview",
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_FUEL_PATH_API_BASE_URL": "http://192.168.86.47:4176"
+      },
+      "android": {
+        "buildType": "apk"
+      }
+    },
     "production": {
       "environment": "production",
       "autoIncrement": true

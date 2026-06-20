@@ -126,6 +126,42 @@ async function listPredictionBacktestRecords({ region = "", fuel = "", limit = 5
   return rows.map(rowToRecord);
 }
 
+async function purgePredictionBacktests({
+  now = new Date().toISOString(),
+  dryRun = false,
+  olderThanDays = 365,
+} = {}) {
+  if (testStorage?.purgePredictionBacktests) {
+    return testStorage.purgePredictionBacktests({ now, dryRun, olderThanDays });
+  }
+
+  const cutoff = cutoffIso(now, olderThanDays);
+  if (!databaseUrl()) {
+    const staleRecord = (record) => olderThan(record.recordedAt, cutoff);
+    const deletedCount = memoryStore.records.filter(staleRecord).length;
+    if (!dryRun) memoryStore.records = memoryStore.records.filter((record) => !staleRecord(record));
+    return { dryRun, cutoff, deletedCount };
+  }
+
+  const sql = await getSql();
+  await ensureTable(sql);
+  if (dryRun) {
+    const rows = await sql`
+      SELECT COUNT(*)::int AS count
+      FROM fuel_path_prediction_backtests
+      WHERE recorded_at < ${cutoff}
+    `;
+    return { dryRun: true, cutoff, deletedCount: Number(rows[0]?.count || 0) };
+  }
+
+  const rows = await sql`
+    DELETE FROM fuel_path_prediction_backtests
+    WHERE recorded_at < ${cutoff}
+    RETURNING id
+  `;
+  return { dryRun: false, cutoff, deletedCount: rows.length };
+}
+
 function appendMemoryRecord(record, { maxRecords = DEFAULT_MAX_RECORDS } = {}) {
   memoryStore.records.push(record);
   if (memoryStore.records.length > maxRecords) {
@@ -213,6 +249,20 @@ function databaseUrl() {
   );
 }
 
+function cutoffIso(now, days) {
+  const base = new Date(now);
+  const safeBase = Number.isNaN(base.getTime()) ? new Date() : base;
+  const safeDays = Math.max(1, Number(days || 1));
+  return new Date(safeBase.getTime() - safeDays * 24 * 60 * 60 * 1000).toISOString();
+}
+
+function olderThan(value, cutoff) {
+  if (!value) return false;
+  const date = new Date(value);
+  const cutoffDate = new Date(cutoff);
+  return !Number.isNaN(date.getTime()) && !Number.isNaN(cutoffDate.getTime()) && date < cutoffDate;
+}
+
 function dateOnly(value) {
   if (!value) return "";
   if (value instanceof Date) return value.toISOString().slice(0, 10);
@@ -247,5 +297,6 @@ module.exports = {
   appendPredictionBacktestRecord,
   listPredictionBacktestRecords,
   predictionStorageStatus,
+  purgePredictionBacktests,
   setPredictionStorageForTests,
 };

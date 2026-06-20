@@ -8,7 +8,7 @@ import MapView, {
   type Region,
 } from "react-native-maps";
 
-import { colors, radii, shadow, spacing } from "../theme";
+import { colors, mapSkin, radii, shadow, spacing } from "../theme";
 import { MapPoint, StationViewModel } from "../types";
 import { BrandBadge } from "./BrandBadge";
 
@@ -17,6 +17,10 @@ const maxPriceMarkers = 34;
 const maxDotMarkers = 90;
 const markerGridSize = 92;
 const compactMarkerGridSize = 36;
+const decorativeStationMarkerAccessibility = {
+  accessibilityElementsHidden: true,
+  importantForAccessibility: "no-hide-descendants" as const,
+};
 
 type CameraInsets = {
   top?: number;
@@ -37,6 +41,7 @@ export function StationMap({
   routeEndpoints,
   routePoints = [],
   cameraInsets,
+  userLocation,
 }: {
   centre: MapPoint;
   stations: StationViewModel[];
@@ -49,6 +54,7 @@ export function StationMap({
   routeEndpoints?: { from: MapPoint; to: MapPoint };
   routePoints?: MapPoint[];
   cameraInsets?: CameraInsets;
+  userLocation?: MapPoint;
 }) {
   const mapRef = useRef<MapView | null>(null);
   const markerRefs = useRef<Record<string, MapMarker | null>>({});
@@ -101,8 +107,17 @@ export function StationMap({
     ].join("|");
     const cameraContextChanged = cameraKey !== lastCameraKeyRef.current;
     if (!cameraContextChanged && userMovedMapRef.current) return;
+    if (cameraContextChanged) {
+      userGestureStartedRef.current = false;
+      lastReportedUserCentreKeyRef.current = "";
+      setMapMovedByUser(false);
+    }
 
     runProgrammaticMapMove(programmaticMoveRef, () => {
+      if (cameraCoordinates.length === 1) {
+        mapRef.current?.animateToRegion(regionForPoint(cameraCoordinates[0]), 260);
+        return;
+      }
       mapRef.current?.fitToCoordinates(
         cameraCoordinates.map((point) => ({
           latitude: point.lat,
@@ -203,9 +218,22 @@ export function StationMap({
               latitude: point.lat,
               longitude: point.lon,
             }))}
-            strokeColor={colors.green}
-            strokeWidth={5}
+            strokeColor={mapSkin.route}
+            strokeWidth={6}
           />
+        ) : null}
+
+        {!routeEndpoints && userLocation ? (
+          <Marker
+            coordinate={{ latitude: userLocation.lat, longitude: userLocation.lon }}
+            title="My location"
+            tracksViewChanges={false}
+            zIndex={900}
+          >
+            <View style={styles.userLocationPin}>
+              <View style={styles.userLocationPinInner} />
+            </View>
+          </Marker>
         ) : null}
 
         {!routeEndpoints && showCentreMarker ? (
@@ -239,11 +267,10 @@ export function StationMap({
 
         {markerGroups.dotMarkers.map((item) => (
           <Marker
+            {...decorativeStationMarkerAccessibility}
             coordinate={{ latitude: item.station.lat, longitude: item.station.lon }}
-            description={`${item.adjustedCpl.toFixed(1)} c/L`}
             key={`dot-${item.station.stationCode}`}
             onPress={() => handleMarkerPress(item.station.stationCode)}
-            title={item.station.name}
             tracksViewChanges={false}
             zIndex={100}
           >
@@ -255,20 +282,21 @@ export function StationMap({
           const selected = item.station.stationCode === selectedStationCode;
           return (
             <Marker
+              {...decorativeStationMarkerAccessibility}
               coordinate={{ latitude: item.station.lat, longitude: item.station.lon }}
-              description={`${item.adjustedCpl.toFixed(1)} c/L`}
               key={item.station.stationCode}
               onPress={() => handleMarkerPress(item.station.stationCode)}
               ref={(marker) => {
                 markerRefs.current[item.station.stationCode] = marker;
               }}
-              title={item.station.name}
               tracksViewChanges={false}
               zIndex={selected ? 700 : 500}
             >
               <View style={[styles.pin, selected && styles.pinSelected]}>
                 <BrandBadge station={item.station} size={24} />
-                <Text style={styles.pinPrice}>{item.adjustedCpl.toFixed(1)}</Text>
+                <Text style={[styles.pinPrice, selected && styles.pinPriceSelected]}>
+                  {item.adjustedCpl.toFixed(1)}
+                </Text>
               </View>
             </Marker>
           );
@@ -508,9 +536,31 @@ const styles = StyleSheet.create({
     top: 8,
     width: 8,
   },
+  userLocationPin: {
+    ...shadow.soft,
+    backgroundColor: colors.blue,
+    borderColor: colors.white,
+    borderRadius: radii.pill,
+    borderBottomLeftRadius: 4,
+    borderWidth: 3,
+    height: 30,
+    transform: [{ rotate: "-45deg" }],
+    width: 30,
+  },
+  userLocationPinInner: {
+    backgroundColor: colors.white,
+    borderColor: colors.blueSoft,
+    borderRadius: radii.pill,
+    borderWidth: 2,
+    height: 10,
+    left: 7,
+    position: "absolute",
+    top: 7,
+    width: 10,
+  },
   destinationPin: {
     ...shadow.soft,
-    backgroundColor: colors.green,
+    backgroundColor: mapSkin.route,
     borderColor: colors.white,
     borderRadius: radii.pill,
     borderBottomLeftRadius: 4,
@@ -531,7 +581,7 @@ const styles = StyleSheet.create({
   pin: {
     ...shadow.soft,
     alignItems: "center",
-    backgroundColor: colors.green,
+    backgroundColor: colors.white,
     borderColor: colors.white,
     borderRadius: radii.pill,
     borderWidth: 2,
@@ -542,13 +592,16 @@ const styles = StyleSheet.create({
     paddingRight: spacing.sm,
   },
   pinSelected: {
-    backgroundColor: colors.ink,
+    backgroundColor: colors.green,
     transform: [{ scale: 1.05 }],
   },
   pinPrice: {
-    color: colors.white,
+    color: colors.greenDark,
     fontSize: 13,
     fontWeight: "900",
+  },
+  pinPriceSelected: {
+    color: colors.white,
   },
   compactPin: {
     ...shadow.soft,

@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en-AU">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#f6f7f4" />
+    <title>Fuel Path Privacy Policy</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23075642'/%3E%3Ctext x='32' y='39' text-anchor='middle' font-family='Arial,sans-serif' font-size='20' font-weight='700' fill='white'%3EFP%3C/text%3E%3C/svg%3E"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body class="document-body">
+    <main class="document-shell">
+      <header class="document-header">
+        <a class="document-back-link" href="./">Fuel Path</a>
+        <h1>Privacy Policy</h1>
+        <p>Last updated: 19 June 2026</p>
+      </header>
+
+      <section class="document-warning">
+        This policy matches the current v1 behaviour and is published as the
+        current hosted privacy-policy surface. Before public store submission,
+        Fuel Path still needs the final privacy contact method, store-listing
+        links and a check against the exact production build.
+      </section>
+
+      <section class="document-section">
+        <h2>Summary</h2>
+        <p>
+          Fuel Path helps drivers compare fuel stops near them and along planned
+          routes. The app is designed to work without passive location tracking,
+          advertising tracking, contact access, photo access, microphone access
+          or camera access.
+        </p>
+        <p>
+          Fuel Path uses the minimum location, route, vehicle and alert data
+          needed to calculate fuel recommendations, show saved places and send
+          opt-in saved-route alerts.
+        </p>
+      </section>
+
+      <section class="document-section">
+        <h2>Information Fuel Path Uses</h2>
+        <h3>Location</h3>
+        <p>
+          Fuel Path may use your current location when you tap a
+          current-location control. This is used to show nearby fuel stations,
+          start trip planning from your current position, or save a location or
+          route when you choose to do so.
+        </p>
+        <p>
+          Fuel Path does not request background location permission in v1 and
+          does not infer routine routes from passive movement.
+        </p>
+
+        <h3>Saved Places, Routes And Recents</h3>
+        <p>
+          You can save Home, Work, recent locations and commute routes. These are
+          used to make route planning faster and calculate fuel recommendations.
+        </p>
+        <ul>
+          <li>Home and Work are stored on your device until you edit or clear them.</li>
+          <li>Recent route locations are limited to the latest 8 unique locations and can be removed individually or cleared.</li>
+          <li>Saved commutes are limited to the latest 20 routes and can be removed from Account.</li>
+        </ul>
+        <p>
+          Saved commute routes may be synced to the Fuel Path backend only when
+          backend route-alert sync is configured for a validation or production
+          build.
+        </p>
+
+        <h3>Vehicle, Fuel And Discounts</h3>
+        <p>
+          Fuel Path may store your selected fuel type, optional vehicle details,
+          selected discount programs and discount redemption state on your
+          device. Fuel Path does not need payment card details, bank details or
+          government identity documents.
+        </p>
+
+        <h3>Notifications And Push Tokens</h3>
+        <p>
+          Saved-route alerts are opt-in. If you enable route alerts on a native
+          iOS or Android build, Fuel Path may request notification permission and
+          create an Expo push token for that device. Push tokens are used only to
+          deliver saved-route fuel alerts, not generic marketing.
+        </p>
+      </section>
+
+      <section class="document-section">
+        <h2>Backend Records</h2>
+        <p>
+          When backend alert sync is enabled, Fuel Path may store a generated
+          local user/device identity, saved route details needed to evaluate
+          alerts, push device token and platform, alert evaluation records,
+          delivery status and duplicate-suppression evidence.
+        </p>
+        <p>
+          Prediction back-test records contain model, region, fuel, predicted
+          value, actual value and error metrics. They do not store Home, Work,
+          route coordinates, push tokens or device identity.
+        </p>
+      </section>
+
+      <section class="document-section">
+        <h2>Third-Party Services</h2>
+        <p>
+          Fuel Path may use third-party services for maps, routing, address
+          lookup, fuel data, hosting, push delivery and database storage.
+          Google Places fallback is backend-controlled and gated by session
+          tokens, field masks, daily quota and durable production quota storage.
+        </p>
+        <p>
+          Provider usage, caching, attribution and public-sharing rights must be
+          confirmed before public launch claims are made for live provider
+          coverage.
+        </p>
+      </section>
+
+      <section class="document-section">
+        <h2>Retention And Controls</h2>
+        <ul>
+          <li>Local profile, Home/Work, saved routes and recents stay on device until edited, removed, cleared, app data is cleared or the app is uninstalled.</li>
+          <li>Backend invalidated or inactive push devices are removed by retention cleanup after 90 days.</li>
+          <li>Backend disabled saved routes are removed by retention cleanup after 90 days.</li>
+          <li>Old backend alert evaluations are removed after 180 days.</li>
+          <li>Old prediction back-tests are removed after 12 months.</li>
+        </ul>
+        <p>
+          You can deny location permission, enter locations manually, clear Home
+          and Work, remove recents, remove saved commutes, leave route alerts
+          off, turn route alerts off, or clear app data.
+        </p>
+        <p>
+          When backend alert sync is configured, removing a saved commute also
+          attempts to remove the matching backend saved-route record.
+        </p>
+      </section>
+
+      <section class="document-section">
+        <h2>Security</h2>
+        <p>
+          Fuel Path keeps provider keys server-side where possible. Backend
+          saved-route alert mutation endpoints require write tokens. Production
+          logs and provenance telemetry must not include precise Home/Work
+          labels or coordinates, full saved-route coordinates, push tokens,
+          local alert identities or provider secrets.
+        </p>
+      </section>
+
+      <section class="document-section">
+        <h2>Data Fuel Path Does Not Need In V1</h2>
+        <ul>
+          <li>Contacts.</li>
+          <li>Photos or videos.</li>
+          <li>Microphone or camera access.</li>
+          <li>Payment card or bank details.</li>
+          <li>Government identity documents.</li>
+          <li>Advertising identifiers.</li>
+          <li>Background location.</li>
+        </ul>
+      </section>
+
+      <section class="document-section">
+        <h2>Claims Fuel Path Does Not Make In V1</h2>
+        <ul>
+          <li>Live fuel prices are available everywhere in Australia.</li>
+          <li>The cheapest fuel is always the best decision.</li>
+          <li>Prediction accuracy without measured back-test evidence.</li>
+          <li>Alerts will be sent when a region, provider, route, token or freshness gate blocks them.</li>
+        </ul>
+      </section>
+
+      <section class="document-section">
+        <h2>Children</h2>
+        <p>
+          Fuel Path is designed for licensed drivers and fuel-planning users. It
+          is not designed for children.
+        </p>
+      </section>
+
+      <section class="document-section">
+        <h2>Policy Changes</h2>
+        <p>
+          This policy should be updated before release whenever Fuel Path adds
+          login, payments, analytics, crash reporting, advertising, account
+          deletion, background location, new data providers or new
+          push-notification purposes.
+        </p>
+      </section>
+
+      <section class="document-section">
+        <h2>Contact</h2>
+        <p>
+          The final published policy must include the correct Fuel Path privacy
+          contact method before store submission or public launch.
+        </p>
+      </section>
+
+      <section class="document-section">
+        <h2>Publication Gates</h2>
+        <ul>
+          <li>Stable hosted privacy policy URL.</li>
+          <li>Correct privacy contact method.</li>
+          <li>Final production provider terms, attribution, caching and public-sharing permissions.</li>
+          <li>Real-device validation for notification, location, map and push-token behaviour.</li>
+          <li>Final store data-safety answers matched to the production build.</li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>

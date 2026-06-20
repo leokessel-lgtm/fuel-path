@@ -28,6 +28,10 @@ db.exec(`
     state TEXT,
     postcode TEXT,
     accuracy TEXT,
+    locality TEXT,
+    alias_principal TEXT,
+    primary_secondary TEXT,
+    geocode_type TEXT,
     search_text TEXT NOT NULL
   );
   CREATE VIRTUAL TABLE address_fts USING fts5(
@@ -36,6 +40,10 @@ db.exec(`
     state UNINDEXED,
     postcode UNINDEXED,
     accuracy UNINDEXED,
+    locality UNINDEXED,
+    alias_principal UNINDEXED,
+    primary_secondary UNINDEXED,
+    geocode_type UNINDEXED,
     search_text,
     lat UNINDEXED,
     lon UNINDEXED
@@ -43,12 +51,16 @@ db.exec(`
 `);
 
 const insertAddress = db.prepare(`
-  INSERT OR REPLACE INTO addresses (id, label, lat, lon, state, postcode, accuracy, search_text)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  INSERT OR REPLACE INTO addresses (
+    id, label, lat, lon, state, postcode, accuracy, locality, alias_principal, primary_secondary, geocode_type, search_text
+  )
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `);
 const insertFts = db.prepare(`
-  INSERT INTO address_fts (id, label, state, postcode, accuracy, search_text, lat, lon)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  INSERT INTO address_fts (
+    id, label, state, postcode, accuracy, locality, alias_principal, primary_secondary, geocode_type, search_text, lat, lon
+  )
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `);
 
 let count = 0;
@@ -64,6 +76,10 @@ for await (const record of readRecords(inputPath)) {
     address.state,
     address.postcode,
     address.accuracy,
+    address.locality,
+    address.aliasPrincipal,
+    address.primarySecondary,
+    address.geocodeType,
     address.searchText,
   );
   insertFts.run(
@@ -72,6 +88,10 @@ for await (const record of readRecords(inputPath)) {
     address.state,
     address.postcode,
     address.accuracy,
+    address.locality,
+    address.aliasPrincipal,
+    address.primarySecondary,
+    address.geocodeType,
     address.searchText,
     address.lat,
     address.lon,
@@ -139,7 +159,11 @@ function normaliseRecord(record, index) {
   ]) || `gnaf-${index}`;
   const state = firstValue(record, ["state", "STATE", "STATE_ABBREVIATION", "STATE_NAME"]) || "";
   const postcode = firstValue(record, ["postcode", "POSTCODE"]) || "";
-  const accuracy = firstValue(record, ["accuracy", "ACCURACY", "GEOCODE_TYPE_CODE"]) || "gnaf";
+  const locality = firstValue(record, ["locality", "LOCALITY_NAME", "suburb", "SUBURB"]) || "";
+  const aliasPrincipal = firstValue(record, ["ALIAS_PRINCIPAL", "alias_principal"]) || "";
+  const primarySecondary = firstValue(record, ["PRIMARY_SECONDARY", "primary_secondary"]) || "";
+  const geocodeType = firstValue(record, ["GEOCODE_TYPE", "GEOCODE_TYPE_CODE", "accuracy", "ACCURACY"]) || "gnaf";
+  const accuracy = geocodeType;
   return {
     id: String(id),
     label: String(label),
@@ -147,25 +171,78 @@ function normaliseRecord(record, index) {
     lon,
     state: String(state),
     postcode: String(postcode),
+    locality: String(locality),
+    aliasPrincipal: String(aliasPrincipal),
+    primarySecondary: String(primarySecondary),
+    geocodeType: String(geocodeType),
     accuracy: String(accuracy),
-    searchText: normaliseAddressText(`${label} ${state} ${postcode}`),
+    searchText: buildSearchText(record, label),
   };
 }
 
 function composeGnafLabel(record) {
-  const number = [
+  const flat = [
+    firstValue(record, ["FLAT_TYPE", "flat_type"]),
     firstValue(record, ["FLAT_NUMBER", "flat_number"]),
+  ].filter(Boolean).join(" ");
+  const numberFirst = [
+    firstValue(record, ["NUMBER_FIRST_PREFIX", "number_first_prefix"]),
+    firstValue(record, ["NUMBER_FIRST", "number_first"]),
+    firstValue(record, ["NUMBER_FIRST_SUFFIX", "number_first_suffix"]),
+  ].filter(Boolean).join("");
+  const numberLast = [
+    firstValue(record, ["NUMBER_LAST_PREFIX", "number_last_prefix"]),
+    firstValue(record, ["NUMBER_LAST", "number_last"]),
+    firstValue(record, ["NUMBER_LAST_SUFFIX", "number_last_suffix"]),
+  ].filter(Boolean).join("");
+  const number = numberFirst && numberLast ? `${numberFirst}-${numberLast}` : numberFirst;
+  const lot = [
+    firstValue(record, ["LOT_NUMBER_PREFIX", "lot_number_prefix"]),
+    firstValue(record, ["LOT_NUMBER", "lot_number"]),
+    firstValue(record, ["LOT_NUMBER_SUFFIX", "lot_number_suffix"]),
+  ].filter(Boolean).join("");
+  const street = [
+    firstValue(record, ["STREET_NAME", "street_name"]),
+    firstValue(record, ["STREET_TYPE", "STREET_TYPE_CODE", "street_type", "street_type_code"]),
+    firstValue(record, ["STREET_SUFFIX", "street_suffix"]),
+  ].filter(Boolean).join(" ");
+  const locality = firstValue(record, ["LOCALITY_NAME", "locality_name", "locality"]) || "";
+  const state = firstValue(record, ["STATE_ABBREVIATION", "STATE", "state"]) || "";
+  const postcode = firstValue(record, ["POSTCODE", "postcode"]) || "";
+  return [flat, lot ? `Lot ${lot}` : "", number, street, locality, state, postcode].filter(Boolean).join(" ").trim();
+}
+
+function buildSearchText(record, label) {
+  const flatNumber = firstValue(record, ["FLAT_NUMBER", "flat_number"]);
+  const flatType = firstValue(record, ["FLAT_TYPE", "flat_type"]) || "Unit";
+  const numberFirst = [
+    firstValue(record, ["NUMBER_FIRST_PREFIX", "number_first_prefix"]),
     firstValue(record, ["NUMBER_FIRST", "number_first"]),
     firstValue(record, ["NUMBER_FIRST_SUFFIX", "number_first_suffix"]),
   ].filter(Boolean).join("");
   const street = [
     firstValue(record, ["STREET_NAME", "street_name"]),
-    firstValue(record, ["STREET_TYPE_CODE", "street_type_code"]),
+    firstValue(record, ["STREET_TYPE", "STREET_TYPE_CODE", "street_type", "street_type_code"]),
+    firstValue(record, ["STREET_SUFFIX", "street_suffix"]),
   ].filter(Boolean).join(" ");
-  const locality = firstValue(record, ["LOCALITY_NAME", "locality_name"]) || "";
+  const locality = firstValue(record, ["LOCALITY_NAME", "locality_name", "locality"]) || "";
   const state = firstValue(record, ["STATE_ABBREVIATION", "STATE", "state"]) || "";
   const postcode = firstValue(record, ["POSTCODE", "postcode"]) || "";
-  return [number, street, locality, state, postcode].filter(Boolean).join(" ").trim();
+  const aliases = firstValue(record, ["aliases", "ALIASES"]);
+  const values = [
+    label,
+    `${label} ${state} ${postcode}`,
+    [numberFirst, street, locality, state, postcode].filter(Boolean).join(" "),
+  ];
+  if (flatNumber && numberFirst && street) {
+    values.push(
+      [`${flatNumber}/${numberFirst}`, street, locality, state, postcode].filter(Boolean).join(" "),
+      [flatType, flatNumber, numberFirst, street, locality, state, postcode].filter(Boolean).join(" "),
+      [flatNumber, numberFirst, street, locality, state, postcode].filter(Boolean).join(" "),
+    );
+  }
+  if (aliases) values.push(aliases);
+  return [...new Set(values.map(normaliseAddressText).filter(Boolean))].join(" ");
 }
 
 function firstValue(record, keys) {

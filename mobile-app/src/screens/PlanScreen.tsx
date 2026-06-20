@@ -1,20 +1,24 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  ActivityIndicator,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
 
-import { geocodeAddress, getRoute, scoreRoute, searchLocations } from "../api/fuelPathApi";
-import { FuelSelector } from "../components/FuelSelector";
+import { geocodeAddress, getRoute, scoreRoute } from "../api/fuelPathApi";
+import {
+  cheapestTradeOffExplanation,
+  routeDecisionAlternatives,
+} from "../components/DecisionEvidencePanel";
+import { PlanRouteEditorCard } from "../components/PlanRouteEditorCard";
+import { PlanRouteSheet } from "../components/PlanRouteSheet";
+import { QuickPlace } from "../components/QuickPlaceShortcuts";
+import { routeInputPrecisionHint } from "../components/RouteAddressSuggestions";
 import { StationMap } from "../components/StationMap";
-import { StationRow } from "../components/StationRow";
+import { useRouteAddressSuggestions } from "../hooks/useRouteAddressSuggestions";
 import { getCurrentMapPoint } from "../services/currentLocation";
-import { colors, radii, shadow, spacing, typeScale } from "../theme";
+import { colors, radii, shadow, spacing, surfaces, typeScale, typography } from "../theme";
 import {
   AppPreferences,
   FuelCode,
@@ -25,8 +29,8 @@ import {
   StationViewModel,
   RouteTimingAdvice,
 } from "../types";
-import { stationTimestampLine } from "../utils/decisionEvidence";
-import { stationPriceView, tomorrowPriceView } from "../utils/pricing";
+import { eligibleDiscountIds } from "../utils/discountRedemptions";
+import { stationPriceView } from "../utils/pricing";
 
 type PlanScreenProps = {
   preferences: AppPreferences;
@@ -48,36 +52,55 @@ type LoadRouteOptions = {
   overrideToPoint?: MapPoint;
 };
 
+const defaultPlanCentre: MapPoint = {
+  lat: -34.0158,
+  lon: 151.1054,
+  label: "66B Easton Ave, Sylvania NSW 2224",
+};
+
 export function PlanScreen({
+  recentLocations = [],
   preferences,
+  onAddRecentLocation,
+  onClearRecentLocations,
   onFuelChange,
+  onRemoveRecentLocation,
   onSaveCommute,
   savedCommutes,
 }: PlanScreenProps) {
-  const [from, setFrom] = useState("Canberra ACT");
-  const [to, setTo] = useState("Sydney CBD NSW");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
   const [fromPoint, setFromPoint] = useState<MapPoint>();
   const [toPoint, setToPoint] = useState<MapPoint>();
   const [result, setResult] = useState<ScoreResponse | null>(null);
+  const [routeStarted, setRouteStarted] = useState(false);
   const [routeEndpoints, setRouteEndpoints] = useState<{ from: MapPoint; to: MapPoint }>();
   const [routePoints, setRoutePoints] = useState<MapPoint[]>([]);
   const [selectedCode, setSelectedCode] = useState<string>();
-  const [activeAddressField, setActiveAddressField] = useState<"from" | "to" | null>(null);
-  const [fromSuggestions, setFromSuggestions] = useState<MapPoint[]>([]);
-  const [toSuggestions, setToSuggestions] = useState<MapPoint[]>([]);
-  const [suggestionsLoading, setSuggestionsLoading] = useState<"from" | "to" | null>(null);
-  const [suggestionsError, setSuggestionsError] = useState("");
   const [loading, setLoading] = useState(false);
   const [locatingFrom, setLocatingFrom] = useState(false);
   const [routeControlsCollapsed, setRouteControlsCollapsed] = useState(false);
   const [stationPanelOpen, setStationPanelOpen] = useState(false);
+  const [routeSheetMinimised, setRouteSheetMinimised] = useState(false);
   const [error, setError] = useState("");
   const routeEditVersionRef = useRef(0);
   const routeRequestIdRef = useRef(0);
-  const addressSessionTokensRef = useRef({
-    from: makeLocationSessionToken(),
-    to: makeLocationSessionToken(),
-  });
+  const {
+    activeAddressField,
+    clearAddressSuggestionError,
+    clearAddressSuggestions,
+    fromSuggestions,
+    getAddressSessionToken,
+    resetAddressSessionToken,
+    setActiveAddressField,
+    suggestionsError,
+    suggestionsLoading,
+    toSuggestions,
+  } = useRouteAddressSuggestions({ from, to });
+  const eligiblePreferenceDiscounts = eligibleDiscountIds(preferences);
+  const approvedPolicyBrands = preferences.fuelPolicyEnabled
+    ? preferences.approvedPolicyBrands
+    : [];
 
   const loadRoute = async ({
     collapseOnSuccess = true,
@@ -86,29 +109,52 @@ export function PlanScreen({
     overrideToLabel,
     overrideToPoint,
   }: LoadRouteOptions = {}) => {
+    const fromLabel = (overrideFromLabel || from).trim();
+    const toLabel = (overrideToLabel || to).trim();
+    if (!overrideFromPoint && !fromPoint && !fromLabel) {
+      setError("Add a start location before planning this route.");
+      setRouteControlsCollapsed(false);
+      return;
+    }
+    if (!overrideToPoint && !toPoint && !toLabel) {
+      setError("Add a destination before planning this route.");
+      setRouteControlsCollapsed(false);
+      return;
+    }
+    const precisionHint =
+      (!overrideFromPoint && !fromPoint ? routeInputPrecisionHint("start", fromLabel) : "") ||
+      (!overrideToPoint && !toPoint ? routeInputPrecisionHint("destination", toLabel) : "");
+    if (precisionHint) {
+      setError(precisionHint);
+      setRouteControlsCollapsed(false);
+      return;
+    }
+
     const requestId = routeRequestIdRef.current + 1;
     const editVersionAtStart = routeEditVersionRef.current;
     routeRequestIdRef.current = requestId;
+    setRouteStarted(true);
     setLoading(true);
     setError("");
-    setSuggestionsError("");
+    clearAddressSuggestionError();
     setActiveAddressField(null);
     try {
       const resolvedFromPoint =
         overrideFromPoint ||
         fromPoint ||
-        (await geocodeAddress(from, addressSessionTokensRef.current.from));
+        (await geocodeAddress(from, getAddressSessionToken("from")));
       const resolvedToPoint =
         overrideToPoint ||
         toPoint ||
-        (await geocodeAddress(to, addressSessionTokensRef.current.to));
-      const fromLabel = overrideFromLabel || from;
-      const toLabel = overrideToLabel || to;
+        (await geocodeAddress(to, getAddressSessionToken("to")));
       const route = await getRoute(resolvedFromPoint, resolvedToPoint);
       const score = await scoreRoute({
+        approvedPolicyBrands,
         fuel: preferences.fuel,
+        eligibleDiscounts: eligiblePreferenceDiscounts,
+        maxDetourMinutes: preferences.maxDetourMinutes,
+        minSavingDollars: preferences.minSavingDollars,
         route,
-        eligibleDiscounts: preferences.selectedDiscounts,
       });
       if (
         requestId !== routeRequestIdRef.current ||
@@ -124,7 +170,10 @@ export function PlanScreen({
       setRoutePoints(route.points);
       setResult(score);
       setSelectedCode(score.recommendations[0]?.station.stationCode);
+      onAddRecentLocation?.(resolvedFromPoint);
+      onAddRecentLocation?.(resolvedToPoint);
       setStationPanelOpen(false);
+      setRouteSheetMinimised(false);
       setRouteControlsCollapsed(collapseOnSuccess);
       resetAddressSessionToken("from");
       resetAddressSessionToken("to");
@@ -140,6 +189,7 @@ export function PlanScreen({
       setResult(null);
       setRouteControlsCollapsed(false);
       setStationPanelOpen(false);
+      setRouteSheetMinimised(false);
       setError(err instanceof Error ? err.message : "Could not plan route");
     } finally {
       if (requestId === routeRequestIdRef.current) {
@@ -150,26 +200,32 @@ export function PlanScreen({
 
   const markRouteEdited = () => {
     routeEditVersionRef.current += 1;
+    setRouteStarted(false);
+    setRouteEndpoints(undefined);
+    setRoutePoints([]);
+    setResult(null);
+    setSelectedCode(undefined);
+    setError("");
   };
 
-  const resetAddressSessionToken = (field: "from" | "to") => {
-    addressSessionTokensRef.current[field] = makeLocationSessionToken();
+  const reopenRouteEditor = () => {
+    setRouteControlsCollapsed(false);
+    setStationPanelOpen(false);
+    setRouteSheetMinimised(false);
   };
 
   const handleFromChange = (value: string) => {
     markRouteEdited();
     setFrom(value);
     setFromPoint(undefined);
-    setRouteControlsCollapsed(false);
-    setStationPanelOpen(false);
+    reopenRouteEditor();
   };
 
   const handleToChange = (value: string) => {
     markRouteEdited();
     setTo(value);
     setToPoint(undefined);
-    setRouteControlsCollapsed(false);
-    setStationPanelOpen(false);
+    reopenRouteEditor();
   };
 
   const selectAddressSuggestion = (field: "from" | "to", point: MapPoint) => {
@@ -178,16 +234,14 @@ export function PlanScreen({
     if (field === "from") {
       setFrom(label);
       setFromPoint(point);
-      setFromSuggestions([]);
     } else {
       setTo(label);
       setToPoint(point);
-      setToSuggestions([]);
     }
+    clearAddressSuggestions(field);
     setActiveAddressField(null);
-    setSuggestionsError("");
-    setRouteControlsCollapsed(false);
-    setStationPanelOpen(false);
+    clearAddressSuggestionError();
+    reopenRouteEditor();
     resetAddressSessionToken(field);
   };
 
@@ -199,8 +253,7 @@ export function PlanScreen({
       markRouteEdited();
       setFromPoint(nextFromPoint);
       setFrom(nextFromPoint.label);
-      setRouteControlsCollapsed(false);
-      setStationPanelOpen(false);
+      reopenRouteEditor();
       setActiveAddressField(null);
       resetAddressSessionToken("from");
     } catch (err) {
@@ -219,11 +272,10 @@ export function PlanScreen({
     setFromPoint(commute.from);
     setToPoint(commute.to);
     setActiveAddressField(null);
-    setFromSuggestions([]);
-    setToSuggestions([]);
-    setSuggestionsError("");
-    setRouteControlsCollapsed(false);
-    setStationPanelOpen(false);
+    clearAddressSuggestions("from");
+    clearAddressSuggestions("to");
+    clearAddressSuggestionError();
+    reopenRouteEditor();
     loadRoute({
       overrideFromLabel: fromLabel,
       overrideFromPoint: commute.from,
@@ -232,50 +284,35 @@ export function PlanScreen({
     });
   };
 
-  useEffect(() => {
-    loadRoute();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [preferences.fuel, preferences.selectedDiscounts.join("|")]);
-
-  useEffect(() => {
-    const field = activeAddressField;
-    if (!field) return;
-
-    const query = (field === "from" ? from : to).trim();
-    if (query.length < 3) {
-      if (field === "from") setFromSuggestions([]);
-      if (field === "to") setToSuggestions([]);
-      setSuggestionsLoading(null);
-      setSuggestionsError("");
-      return;
+  const applyQuickPlace = (field: "from" | "to", point: MapPoint) => {
+    markRouteEdited();
+    const label = displayLocationLabel(point, point.label);
+    if (field === "from") {
+      setFrom(label);
+      setFromPoint(point);
+    } else {
+      setTo(label);
+      setToPoint(point);
     }
+    clearAddressSuggestions(field);
+    setActiveAddressField(null);
+    clearAddressSuggestionError();
+    reopenRouteEditor();
+    resetAddressSessionToken(field);
+  };
 
-    let active = true;
-    setSuggestionsLoading(field);
-    setSuggestionsError("");
-    const timer = setTimeout(() => {
-      searchLocations(query, 5, addressSessionTokensRef.current[field])
-        .then((suggestions) => {
-          if (!active) return;
-          if (field === "from") setFromSuggestions(suggestions);
-          if (field === "to") setToSuggestions(suggestions);
-        })
-        .catch((err: Error) => {
-          if (!active) return;
-          if (field === "from") setFromSuggestions([]);
-          if (field === "to") setToSuggestions([]);
-          setSuggestionsError(err.message);
-        })
-        .finally(() => {
-          if (active) setSuggestionsLoading(null);
-        });
-    }, 350);
-
-    return () => {
-      active = false;
-      clearTimeout(timer);
-    };
-  }, [activeAddressField, from, to]);
+  useEffect(() => {
+    if (!routeEndpoints) return;
+    loadRoute({ collapseOnSuccess: routeControlsCollapsed });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    eligiblePreferenceDiscounts.join("|"),
+    approvedPolicyBrands.join("|"),
+    preferences.fuelPolicyEnabled,
+    preferences.fuel,
+    preferences.maxDetourMinutes,
+    preferences.minSavingDollars,
+  ]);
 
   const routeRecommendations = useMemo(
     () => (result?.recommendations || []).map(routeCandidateToStation),
@@ -295,12 +332,45 @@ export function PlanScreen({
   );
   const best = candidates[0];
   const selected = mapStations.find((item) => item.station.stationCode === selectedCode) || best;
-  const bestTomorrow = best ? tomorrowPriceView(best) : null;
-  const selectedTomorrow = selected ? tomorrowPriceView(selected) : null;
+  const backendDecisionSummary = result?.context.decisionSummary;
+  const decisionAlternatives = useMemo(
+    () => routeDecisionAlternatives(candidates, backendDecisionSummary),
+    [backendDecisionSummary, candidates],
+  );
+  const cheapestExplanation = useMemo(
+    () => backendDecisionSummary?.whyNotCheapest || cheapestTradeOffExplanation(candidates),
+    [backendDecisionSummary?.whyNotCheapest, candidates],
+  );
+  const routePrecisionHint =
+    (!fromPoint && from.trim() ? routeInputPrecisionHint("start", from) : "") ||
+    (!toPoint && to.trim() ? routeInputPrecisionHint("destination", to) : "");
+  const canPlanRoute = Boolean((fromPoint || from.trim()) && (toPoint || to.trim()) && !routePrecisionHint);
+  const showPlanningShortcuts = routeStarted;
+  const quickPlaces = useMemo(
+    () =>
+      [
+        preferences.homeLocation
+          ? { key: "home", kind: "home", label: "Home", point: preferences.homeLocation }
+          : null,
+        preferences.workLocation
+          ? { key: "work", kind: "work", label: "Work", point: preferences.workLocation }
+          : null,
+        ...recentLocations.slice(0, 4).map((point, index) => ({
+          key: `recent-${index}-${point.lat}-${point.lon}`,
+          kind: "recent",
+          label: shortPointName(point),
+          point,
+        })),
+      ].filter((item): item is QuickPlace => Boolean(item)),
+    [preferences.homeLocation, preferences.workLocation, recentLocations],
+  );
   const recommendationCopy = best
     ? routeRecommendationCopy(best, result?.context.timingAdvice)
     : null;
   const routeNotice = result ? routeContextNotice(result.context) : "";
+  const policyNotice = preferences.fuelPolicyEnabled
+    ? `Policy mode active: ${preferences.approvedPolicyBrands.join(", ")} only.`
+    : "";
   const currentRouteSaved = Boolean(
     routeEndpoints &&
       savedCommutes.some((commute) =>
@@ -311,16 +381,16 @@ export function PlanScreen({
     () => ({
       top: routeControlsCollapsed ? 86 : 230,
       right: 18,
-      bottom: stationPanelOpen ? 260 : 255,
+      bottom: routeSheetMinimised ? 88 : stationPanelOpen ? 260 : 255,
       left: 18,
     }),
-    [routeControlsCollapsed, stationPanelOpen],
+    [routeControlsCollapsed, routeSheetMinimised, stationPanelOpen],
   );
   const routeSummary = `${from} to ${to}`;
-
   const handleStationSelect = (stationCode: string) => {
     setSelectedCode(stationCode);
     setStationPanelOpen(true);
+    setRouteSheetMinimised(false);
   };
 
   const handleSaveCurrentCommute = () => {
@@ -337,7 +407,7 @@ export function PlanScreen({
     <View style={styles.screen}>
       <View style={styles.mapLayer}>
         <StationMap
-          centre={routeEndpoints?.from || { lat: -35.2809, lon: 149.13, label: "Start" }}
+          centre={routeEndpoints?.from || fromPoint || defaultPlanCentre}
           stations={mapStations}
           selectedStationCode={selectedCode}
           onSelect={handleStationSelect}
@@ -347,7 +417,7 @@ export function PlanScreen({
         />
       </View>
 
-      <View style={styles.topControls}>
+      <View style={[styles.topControls, !routeStarted && styles.topControlsOnly]}>
         {routeControlsCollapsed && routeEndpoints && !error ? (
           <Pressable
             accessibilityLabel="Edit planned route"
@@ -362,307 +432,78 @@ export function PlanScreen({
               </Text>
               <Text numberOfLines={1} style={styles.routeSummaryMeta}>
                 {preferences.vehicleName || preferences.vehicleRego || "Vehicle"} | {preferences.fuel}
+                {preferences.fuelPolicyEnabled ? " | Policy" : ""}
               </Text>
             </View>
             <Text style={styles.editChip}>Edit</Text>
           </Pressable>
         ) : (
-          <View style={styles.searchCard}>
-          <Text style={styles.eyebrow}>Plan trip</Text>
-          {savedCommutes.length ? (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.savedCommuteRow}
-            >
-              {savedCommutes.map((commute) => (
-                <Pressable
-                  accessibilityLabel={`Use saved commute ${commute.name}`}
-                  accessibilityRole="button"
-                  key={commute.id}
-                  onPress={() => applySavedCommute(commute)}
-                  style={({ pressed }) => [
-                    styles.savedCommuteChip,
-                    pressed && styles.savedCommuteChipPressed,
-                  ]}
-                >
-                  <Text numberOfLines={1} style={styles.savedCommuteName}>
-                    {commute.name}
-                  </Text>
-                  <Text numberOfLines={1} style={styles.savedCommuteMeta}>
-                    {commute.fuel} | {commute.alertEnabled ? "Alerts on" : "No alerts"}
-                  </Text>
-                </Pressable>
-              ))}
-            </ScrollView>
-          ) : null}
-          <View style={styles.inputRow}>
-            <View style={styles.inputShell}>
-              <TextInput
-                accessibilityLabel="From"
-                value={from}
-                onChangeText={handleFromChange}
-                onFocus={() => setActiveAddressField("from")}
-                onSubmitEditing={() => loadRoute()}
-                placeholder="Start address, suburb or place"
-                returnKeyType="search"
-                style={[styles.input, styles.inputWithIcon]}
-              />
-              <Pressable
-                accessibilityLabel="Use current location as start"
-                disabled={locatingFrom}
-                hitSlop={8}
-                onPress={useCurrentFromLocation}
-                style={({ pressed }) => [
-                  styles.currentLocationButton,
-                  pressed && styles.currentLocationButtonPressed,
-                  locatingFrom && styles.currentLocationButtonDisabled,
-                ]}
-              >
-                <View style={styles.currentLocationIcon}>
-                  <View style={styles.currentLocationLineVertical} />
-                  <View style={styles.currentLocationLineHorizontal} />
-                  <View style={styles.currentLocationDot} />
-                </View>
-              </Pressable>
-            </View>
-            {activeAddressField === "from" ? (
-              <AddressSuggestions
-                error={suggestionsError}
-                loading={suggestionsLoading === "from"}
-                onSelect={(point) => selectAddressSuggestion("from", point)}
-                suggestions={fromSuggestions}
-              />
-            ) : null}
-            <TextInput
-              accessibilityLabel="To"
-              value={to}
-              onChangeText={handleToChange}
-              onFocus={() => setActiveAddressField("to")}
-              onSubmitEditing={() => loadRoute()}
-              placeholder="Destination address, suburb or place"
-              returnKeyType="search"
-              style={styles.input}
-            />
-            {activeAddressField === "to" ? (
-              <AddressSuggestions
-                error={suggestionsError}
-                loading={suggestionsLoading === "to"}
-                onSelect={(point) => selectAddressSuggestion("to", point)}
-                suggestions={toSuggestions}
-              />
-            ) : null}
-          </View>
-          <FuelSelector value={preferences.fuel} onChange={onFuelChange} />
-          <Pressable
-            accessibilityLabel="Plan route"
-            accessibilityRole="button"
-            onPress={() => loadRoute()}
-            style={styles.primaryButton}
-          >
-            <Text style={styles.primaryButtonText}>Plan route</Text>
-          </Pressable>
-          </View>
+          <PlanRouteEditorCard
+            activeAddressField={activeAddressField}
+            canPlanRoute={canPlanRoute}
+            fuel={preferences.fuel}
+            from={from}
+            fromPoint={fromPoint}
+            fromSuggestions={fromSuggestions}
+            loading={loading}
+            locatingFrom={locatingFrom}
+            onClearRecentLocations={onClearRecentLocations}
+            onFromChange={handleFromChange}
+            onFromFocus={() => setActiveAddressField("from")}
+            onFuelChange={onFuelChange}
+            onPlanRoute={() => loadRoute()}
+            onRemoveRecentLocation={onRemoveRecentLocation}
+            onSelectAddressSuggestion={selectAddressSuggestion}
+            onSelectQuickPlace={applyQuickPlace}
+            onSelectSavedCommute={applySavedCommute}
+            onToChange={handleToChange}
+            onToFocus={() => setActiveAddressField("to")}
+            onUseCurrentFromLocation={useCurrentFromLocation}
+            quickPlaces={quickPlaces}
+            recentLocationsCount={recentLocations.length}
+            routePrecisionHint={routePrecisionHint}
+            savedCommutes={savedCommutes}
+            showPlanningShortcuts={showPlanningShortcuts}
+            suggestionsError={suggestionsError}
+            suggestionsLoading={suggestionsLoading}
+            to={to}
+            toPoint={toPoint}
+            toSuggestions={toSuggestions}
+          />
         )}
       </View>
 
-      <View style={[styles.sheet, stationPanelOpen ? styles.stationSheet : styles.resultsSheet]}>
-        <View style={styles.grabber} />
-        {stationPanelOpen && selected ? (
-          <View style={styles.stationDetailPanel}>
-            <View style={styles.sheetHeaderRow}>
-              <View>
-                <Text style={styles.eyebrow}>Station detail</Text>
-                <Text numberOfLines={1} style={styles.selectedTitle}>
-                  {selected.station.name}
-                </Text>
-              </View>
-              <Pressable
-                accessibilityLabel="Show suggested fuel stops"
-                accessibilityRole="button"
-                onPress={() => setStationPanelOpen(false)}
-                style={styles.textButton}
-              >
-                <Text style={styles.textButtonLabel}>Stops</Text>
-              </Pressable>
-            </View>
-            <StationRow item={selected} selected onPress={() => {}} />
-            <View style={styles.stationFacts}>
-              <View style={styles.factPill}>
-                <Text style={styles.factLabel}>Your price</Text>
-                <Text style={styles.factValue}>{selected.adjustedCpl.toFixed(1)} c/L</Text>
-              </View>
-              <View style={styles.factPill}>
-                <Text style={styles.factLabel}>Saving</Text>
-                <Text style={styles.factValue}>{formatMoney(selected.netSaving || 0)}</Text>
-              </View>
-              <View style={styles.factPill}>
-                <Text style={styles.factLabel}>Detour</Text>
-                <Text style={styles.factValue}>{(selected.detourMinutes || 0).toFixed(1)} min</Text>
-              </View>
-              {selectedTomorrow ? (
-                <View style={styles.factPill}>
-                  <Text style={styles.factLabel}>Tomorrow</Text>
-                  <Text
-                    numberOfLines={1}
-                    style={[
-                      styles.factValue,
-                      selectedTomorrow.direction === "down" && styles.tomorrowPriceDown,
-                      selectedTomorrow.direction === "up" && styles.tomorrowPriceUp,
-                    ]}
-                  >
-                    {selectedTomorrow.cpl.toFixed(1)} c/L
-                  </Text>
-                </View>
-              ) : null}
-            </View>
-            <Text style={styles.muted}>{stationTimestampLine(selected.station)}</Text>
-          </View>
-        ) : (
-          <>
-            {loading ? (
-              <View style={styles.loadingRow}>
-                <ActivityIndicator color={colors.green} />
-                <Text style={styles.muted}>Scoring live route prices...</Text>
-              </View>
-            ) : null}
-            {error ? (
-              <>
-                <Text style={styles.decisionTitle}>Route needs attention</Text>
-              <Text style={styles.muted}>{error}</Text>
-            </>
-          ) : null}
-          {!loading && !error && best ? (
-            <>
-              {routeNotice ? (
-                <View style={styles.noticeCard}>
-                  <Text style={styles.noticeText}>{routeNotice}</Text>
-                </View>
-              ) : null}
-              <Pressable
-                accessibilityLabel={`Open ${best.station.name} recommendation detail`}
-                accessibilityRole="button"
-                onPress={() => handleStationSelect(best.station.stationCode)}
-                style={styles.compactRecommendation}
-              >
-                <View style={styles.recommendationCopy}>
-                  <Text style={styles.eyebrow}>Recommendation</Text>
-                  <Text numberOfLines={1} style={styles.compactDecisionTitle}>
-                    {recommendationCopy?.title}
-                  </Text>
-                  <Text numberOfLines={1} style={styles.compactReason}>
-                    {recommendationCopy?.reason}
-                  </Text>
-                </View>
-                <View style={styles.recommendationPrice}>
-                  <Text style={styles.priceValue}>{best.adjustedCpl.toFixed(1)}</Text>
-                  <Text style={styles.priceUnit}>c/L</Text>
-                  {bestTomorrow ? (
-                    <Text
-                      numberOfLines={1}
-                      style={[
-                        styles.recommendationTomorrowPrice,
-                        bestTomorrow.direction === "down" && styles.tomorrowPriceDown,
-                        bestTomorrow.direction === "up" && styles.tomorrowPriceUp,
-                      ]}
-                    >
-                      {bestTomorrow.shortLabel}
-                    </Text>
-                  ) : null}
-                </View>
-              </Pressable>
-            </>
-          ) : null}
-          {!loading && !error && !best ? (
-            <View style={styles.emptyRouteState}>
-              <Text style={styles.decisionTitle}>No fuel stops found</Text>
-              <Text style={styles.muted}>
-                {routeNotice ||
-                  "Route found, but no eligible stations match this fuel, freshness and open-station settings."}
-              </Text>
-            </View>
-          ) : null}
-
-          <View style={styles.sheetHeaderRow}>
-            <Text style={styles.selectedTitle}>Suggested fuel stops</Text>
-            {routeEndpoints ? (
-              <Pressable
-                accessibilityLabel={currentRouteSaved ? "Route already saved" : "Save commute"}
-                accessibilityRole="button"
-                disabled={currentRouteSaved}
-                onPress={handleSaveCurrentCommute}
-                style={[
-                  styles.textButton,
-                  currentRouteSaved && styles.textButtonDisabled,
-                ]}
-              >
-                <Text style={styles.textButtonLabel}>
-                  {currentRouteSaved ? "Saved" : "Save"}
-                </Text>
-              </Pressable>
-            ) : (
-              <Text style={styles.muted}>Tap for detail</Text>
-            )}
-          </View>
-          <ScrollView
-            contentContainerStyle={styles.stopsListContent}
-            showsVerticalScrollIndicator
-            style={styles.stopsList}
-          >
-            {candidates.map((item) => (
-              <StationRow
-                item={item}
-                key={item.station.stationCode}
-                selected={item.station.stationCode === selectedCode}
-                onPress={() => handleStationSelect(item.station.stationCode)}
-              />
-            ))}
-          </ScrollView>
-          </>
-        )}
-      </View>
-    </View>
-  );
-}
-
-function AddressSuggestions({
-  error,
-  loading,
-  onSelect,
-  suggestions,
-}: {
-  error: string;
-  loading: boolean;
-  onSelect: (point: MapPoint) => void;
-  suggestions: MapPoint[];
-}) {
-  if (!loading && !error && !suggestions.length) return null;
-
-  return (
-    <View style={styles.suggestionPanel}>
-      {loading ? <Text style={styles.suggestionStatus}>Searching locations...</Text> : null}
-      {!loading && error ? <Text style={styles.suggestionError}>{error}</Text> : null}
-      {!loading
-        ? suggestions.map((point) => (
-            <Pressable
-              accessibilityLabel={`Use ${point.label}`}
-              accessibilityRole="button"
-              key={`${point.lat}:${point.lon}:${point.label}`}
-              onPress={() => onSelect(point)}
-              style={({ pressed }) => [
-                styles.suggestionItem,
-                pressed && styles.suggestionItemPressed,
-              ]}
-            >
-              <Text numberOfLines={1} style={styles.suggestionTitle}>
-                {suggestionTitle(point)}
-              </Text>
-              <Text numberOfLines={1} style={styles.suggestionMeta}>
-                {suggestionMeta(point)}
-              </Text>
-            </Pressable>
-          ))
-        : null}
+      {routeStarted ? (
+        <PlanRouteSheet
+          best={best}
+          candidates={candidates}
+          cheapestExplanation={cheapestExplanation}
+          currentRouteSaved={currentRouteSaved}
+          decisionAlternatives={decisionAlternatives}
+          decisionSummary={backendDecisionSummary}
+          error={error}
+          loading={loading}
+          maxDetourMinutes={preferences.maxDetourMinutes}
+          minSavingDollars={preferences.minSavingDollars}
+          onMinimise={() => setRouteSheetMinimised(true)}
+          onRestore={() => setRouteSheetMinimised(false)}
+          onSaveCommute={handleSaveCurrentCommute}
+          onSelectStation={handleStationSelect}
+          onShowStops={() => setStationPanelOpen(false)}
+          policyActive={preferences.fuelPolicyEnabled}
+          policyBrands={preferences.approvedPolicyBrands}
+          policyNotice={policyNotice}
+          recommendationCopy={recommendationCopy}
+          routeEndpointsPresent={Boolean(routeEndpoints)}
+          routeNotice={routeNotice}
+          routeSheetMinimised={routeSheetMinimised}
+          routeSummary={routeSummary}
+          selected={selected}
+          selectedCode={selectedCode}
+          stationPanelOpen={stationPanelOpen}
+          statusCapability={result?.context.capability}
+        />
+      ) : null}
     </View>
   );
 }
@@ -674,11 +515,22 @@ function routeCandidateToStation(candidate: ScoreCandidate, index: number): Stat
     adjustedCpl: Number(candidate.adjustedCpl),
     discountCpl: Number(candidate.discountCpl || 0),
     discountLabel: candidate.discountLabel || candidate.discountLabels?.join(", "),
+    possibleLowerCpl: candidate.possibleLowerCpl,
+    possibleLowerLabel: candidate.possibleLowerLabel,
+    possibleLowerDisclosure: candidate.possibleLowerDisclosure,
+    possibleDiscountCpl: candidate.possibleDiscountCpl,
     distanceKm: Number(candidate.distanceToRouteKm || candidate.distanceKm || 0),
     fuel: candidate.fuel,
     netSaving: Number(candidate.netSaving || 0),
     detourMinutes: Number(candidate.detourMinutes || 0),
+    detourFuelLitres: Number(candidate.detourFuelLitres || 0),
+    detourCost: Number(candidate.detourCost || 0),
+    timeCost: Number(candidate.timeCost || 0),
+    netAfterDetourAndTimeCost: Number(candidate.netAfterDetourAndTimeCost || 0),
     rank: index + 1,
+    reachable: candidate.reachable,
+    warnings: candidate.warnings || [],
+    matchesDecisionRule: candidate.matchesDecisionRule,
   };
 }
 
@@ -733,15 +585,21 @@ function routeRecommendationCopy(
 }
 
 function usefulTimingAdvice(timingAdvice: RouteTimingAdvice) {
-  return ["fill_today_on_route", "fill_today_with_detour", "wait_if_can"].includes(
-    timingAdvice.action,
-  );
+  return [
+    "fill_today_on_route",
+    "fill_today_with_detour",
+    "wait_if_can",
+    "range_first",
+    "skip_detour",
+  ].includes(timingAdvice.action);
 }
 
 function timingAdviceLabel(action: RouteTimingAdvice["action"]) {
   if (action === "fill_today_on_route") return "Fill today on this route";
   if (action === "fill_today_with_detour") return "Fill today, but check the detour";
   if (action === "wait_if_can") return "Wait if you can";
+  if (action === "range_first") return "Range-first";
+  if (action === "skip_detour") return "Skip this detour";
   return "";
 }
 
@@ -777,10 +635,6 @@ function routeContextNotice(context: ScoreResponse["context"]) {
   return "No live fuel provider covers this route yet.";
 }
 
-function makeLocationSessionToken() {
-  return `fp-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
-}
-
 function displayLocationLabel(point: MapPoint, fallback: string) {
   const label = point.label || fallback;
   const parts = label.split(",").map((part) => part.trim()).filter(Boolean);
@@ -813,15 +667,6 @@ function closeCoordinate(left: number, right: number) {
   return Math.abs(left - right) < 0.0002;
 }
 
-function suggestionTitle(point: MapPoint) {
-  return point.label.split(",")[0]?.trim() || point.label;
-}
-
-function suggestionMeta(point: MapPoint) {
-  const parts = point.label.split(",").map((part) => part.trim()).filter(Boolean);
-  return parts.slice(1, 4).join(", ") || "Australia";
-}
-
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
@@ -838,21 +683,17 @@ const styles = StyleSheet.create({
     left: spacing.md,
     position: "absolute",
     right: spacing.md,
-    top: spacing.md,
+    top: spacing.sm,
     zIndex: 5,
   },
-  searchCard: {
-    ...shadow.soft,
-    backgroundColor: colors.white,
-    borderRadius: radii.xl,
-    gap: spacing.md,
-    padding: spacing.md,
+  topControlsOnly: {
+    top: spacing.lg,
   },
   routeSummaryCard: {
-    ...shadow.soft,
+    ...shadow.float,
+    ...surfaces.floating,
     alignItems: "center",
-    backgroundColor: colors.white,
-    borderRadius: radii.xl,
+    borderRadius: radii.xxl,
     flexDirection: "row",
     gap: spacing.md,
     minHeight: 66,
@@ -864,15 +705,11 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   routeSummaryTitle: {
-    color: colors.ink,
-    fontSize: typeScale.body,
-    fontWeight: "900",
+    ...typography.bodyStrong,
     marginTop: 2,
   },
   routeSummaryMeta: {
-    color: colors.muted,
-    fontSize: typeScale.caption,
-    fontWeight: "800",
+    ...typography.bodyMuted,
     marginTop: 2,
   },
   editChip: {
@@ -880,335 +717,13 @@ const styles = StyleSheet.create({
     borderRadius: radii.pill,
     color: colors.greenDark,
     fontSize: typeScale.caption,
-    fontWeight: "900",
+    fontWeight: "700",
     overflow: "hidden",
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
   },
   eyebrow: {
-    color: colors.greenDark,
-    fontSize: 10,
-    fontWeight: "900",
+    ...typography.eyebrow,
     textTransform: "uppercase",
-  },
-  savedCommuteRow: {
-    gap: spacing.sm,
-    paddingRight: spacing.sm,
-  },
-  savedCommuteChip: {
-    backgroundColor: colors.greenSoft,
-    borderColor: colors.green,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    minWidth: 156,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-  },
-  savedCommuteChipPressed: {
-    backgroundColor: colors.white,
-  },
-  savedCommuteName: {
-    color: colors.ink,
-    fontSize: typeScale.caption,
-    fontWeight: "900",
-  },
-  savedCommuteMeta: {
-    color: colors.greenDark,
-    fontSize: 10,
-    fontWeight: "800",
-    marginTop: 2,
-  },
-  inputRow: {
-    gap: spacing.sm,
-  },
-  inputShell: {
-    justifyContent: "center",
-    position: "relative",
-  },
-  input: {
-    backgroundColor: colors.panel,
-    borderColor: colors.line,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    color: colors.ink,
-    fontSize: typeScale.body,
-    fontWeight: "800",
-    padding: spacing.md,
-  },
-  inputWithIcon: {
-    paddingRight: 52,
-  },
-  suggestionPanel: {
-    backgroundColor: colors.white,
-    borderColor: colors.line,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    gap: 1,
-    overflow: "hidden",
-  },
-  suggestionItem: {
-    backgroundColor: colors.white,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-  },
-  suggestionItemPressed: {
-    backgroundColor: colors.greenSoft,
-  },
-  suggestionTitle: {
-    color: colors.ink,
-    fontSize: typeScale.body,
-    fontWeight: "900",
-  },
-  suggestionMeta: {
-    color: colors.muted,
-    fontSize: typeScale.caption,
-    fontWeight: "700",
-    marginTop: 2,
-  },
-  suggestionStatus: {
-    color: colors.muted,
-    fontSize: typeScale.caption,
-    fontWeight: "800",
-    padding: spacing.md,
-  },
-  suggestionError: {
-    color: colors.red,
-    fontSize: typeScale.caption,
-    fontWeight: "800",
-    padding: spacing.md,
-  },
-  currentLocationButton: {
-    alignItems: "center",
-    backgroundColor: colors.white,
-    borderColor: colors.line,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    bottom: 7,
-    height: 34,
-    justifyContent: "center",
-    position: "absolute",
-    right: spacing.sm,
-    top: 7,
-    width: 34,
-  },
-  currentLocationButtonPressed: {
-    backgroundColor: colors.greenSoft,
-    borderColor: colors.green,
-  },
-  currentLocationButtonDisabled: {
-    opacity: 0.55,
-  },
-  currentLocationIcon: {
-    alignItems: "center",
-    borderColor: colors.green,
-    borderRadius: 9,
-    borderWidth: 2,
-    height: 18,
-    justifyContent: "center",
-    width: 18,
-  },
-  currentLocationLineVertical: {
-    backgroundColor: colors.green,
-    height: 24,
-    position: "absolute",
-    width: 2,
-  },
-  currentLocationLineHorizontal: {
-    backgroundColor: colors.green,
-    height: 2,
-    position: "absolute",
-    width: 24,
-  },
-  currentLocationDot: {
-    backgroundColor: colors.green,
-    borderColor: colors.white,
-    borderRadius: 4,
-    borderWidth: 1,
-    height: 8,
-    width: 8,
-  },
-  primaryButton: {
-    alignItems: "center",
-    backgroundColor: colors.green,
-    borderRadius: radii.md,
-    paddingVertical: spacing.md,
-  },
-  primaryButtonText: {
-    color: colors.white,
-    fontSize: typeScale.body,
-    fontWeight: "900",
-  },
-  sheet: {
-    ...shadow.soft,
-    backgroundColor: colors.white,
-    borderRadius: radii.xl,
-    bottom: spacing.sm,
-    gap: spacing.sm,
-    left: spacing.md,
-    padding: spacing.md,
-    position: "absolute",
-    right: spacing.md,
-    zIndex: 6,
-  },
-  resultsSheet: {
-    height: 280,
-  },
-  stationSheet: {
-    height: 260,
-  },
-  grabber: {
-    alignSelf: "center",
-    backgroundColor: colors.line,
-    borderRadius: radii.pill,
-    height: 4,
-    width: 44,
-  },
-  compactRecommendation: {
-    alignItems: "center",
-    backgroundColor: colors.greenSoft,
-    borderRadius: radii.md,
-    flexDirection: "row",
-    gap: spacing.md,
-    padding: spacing.md,
-  },
-  noticeCard: {
-    backgroundColor: "#fff7ed",
-    borderColor: "#fed7aa",
-    borderRadius: radii.md,
-    borderWidth: 1,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-  },
-  noticeText: {
-    color: colors.amber,
-    fontSize: typeScale.caption,
-    fontWeight: "800",
-  },
-  recommendationCopy: {
-    flex: 1,
-    minWidth: 0,
-  },
-  compactDecisionTitle: {
-    color: colors.ink,
-    fontSize: typeScale.lead,
-    fontWeight: "900",
-    marginTop: 2,
-  },
-  compactReason: {
-    color: colors.greenDark,
-    fontSize: typeScale.caption,
-    fontWeight: "800",
-    marginTop: 2,
-  },
-  emptyRouteState: {
-    backgroundColor: colors.panel,
-    borderRadius: radii.md,
-    gap: spacing.xs,
-    padding: spacing.md,
-  },
-  recommendationPrice: {
-    alignItems: "flex-end",
-    minWidth: 78,
-  },
-  sheetHeaderRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: spacing.md,
-    justifyContent: "space-between",
-  },
-  textButton: {
-    backgroundColor: colors.panel,
-    borderRadius: radii.pill,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-  },
-  textButtonDisabled: {
-    opacity: 0.58,
-  },
-  textButtonLabel: {
-    color: colors.greenDark,
-    fontSize: typeScale.caption,
-    fontWeight: "900",
-  },
-  stopsList: {
-    flex: 1,
-  },
-  stopsListContent: {
-    gap: spacing.sm,
-    paddingBottom: spacing.md,
-  },
-  stationDetailPanel: {
-    gap: spacing.sm,
-  },
-  stationFacts: {
-    flexDirection: "row",
-    gap: spacing.sm,
-  },
-  factPill: {
-    backgroundColor: colors.panel,
-    borderRadius: radii.md,
-    flex: 1,
-    padding: spacing.sm,
-  },
-  factLabel: {
-    color: colors.muted,
-    fontSize: 10,
-    fontWeight: "900",
-    textTransform: "uppercase",
-  },
-  factValue: {
-    color: colors.ink,
-    fontSize: typeScale.caption,
-    fontWeight: "900",
-    marginTop: 2,
-  },
-  loadingRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: spacing.sm,
-  },
-  decisionTitle: {
-    color: colors.ink,
-    fontSize: typeScale.title,
-    fontWeight: "900",
-  },
-  reason: {
-    color: colors.ink,
-    fontSize: typeScale.body,
-    fontWeight: "700",
-    lineHeight: 20,
-  },
-  muted: {
-    color: colors.muted,
-    fontSize: typeScale.caption,
-    fontWeight: "700",
-  },
-  selectedTitle: {
-    color: colors.ink,
-    fontSize: typeScale.body,
-    fontWeight: "900",
-  },
-  priceValue: {
-    color: colors.greenDark,
-    fontSize: typeScale.title,
-    fontWeight: "900",
-  },
-  priceUnit: {
-    color: colors.muted,
-    fontSize: 10,
-    fontWeight: "900",
-  },
-  recommendationTomorrowPrice: {
-    color: colors.muted,
-    fontSize: 10,
-    fontWeight: "900",
-    marginTop: 2,
-    maxWidth: 96,
-  },
-  tomorrowPriceDown: {
-    color: colors.greenDark,
-  },
-  tomorrowPriceUp: {
-    color: colors.amber,
   },
 });

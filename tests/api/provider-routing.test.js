@@ -23,6 +23,9 @@ test("national capability matrix covers every Australian state and territory", (
       FUEL_PATH_WA_FUELWATCH_ENABLED: "1",
       VIC_SERVO_SAVER_API_BASE_URL: "",
       VIC_SERVO_SAVER_API_KEY: "",
+      FUEL_PATH_NSW_ACT_USAGE_TERMS_CONFIRMED: "1",
+      FUEL_PATH_QLD_USAGE_TERMS_CONFIRMED: "1",
+      FUEL_PATH_TAS_USAGE_TERMS_CONFIRMED: "1",
     },
     () => {
       const capabilities = fuelProviderCapabilityMatrix();
@@ -38,9 +41,21 @@ test("national capability matrix covers every Australian state and territory", (
       assert.equal(capabilities.find((item) => item.region === "WA")?.capability, "live");
       assert.equal(capabilities.find((item) => item.region === "VIC")?.capability, "pending_access");
       assert.equal(capabilities.find((item) => item.region === "SA")?.capability, "live");
-      assert.equal(capabilities.find((item) => item.region === "TAS")?.capability, "pending_access");
+      assert.equal(capabilities.find((item) => item.region === "TAS")?.capability, "live");
       assert.equal(capabilities.find((item) => item.region === "NT")?.capability, "pending_access");
-      assert.deepEqual(capabilitySummary(capabilities), { live: 5, pending_access: 3 });
+      assert.match(
+        capabilities.find((item) => item.region === "TAS")?.accessPath || "",
+        /TAS nearby payloads/,
+      );
+      assert.match(
+        capabilities.find((item) => item.region === "VIC")?.nextAction || "",
+        /Servo Saver Public API access/,
+      );
+      assert.match(
+        capabilities.find((item) => item.region === "NT")?.accessPath || "",
+        /No public API contract is confirmed/,
+      );
+      assert.deepEqual(capabilitySummary(capabilities), { live: 6, pending_access: 2 });
     },
   );
 });
@@ -57,6 +72,17 @@ test("status endpoint exposes the national capability contract", async () => {
   const response = await callStatus();
 
   assert.equal(response.status, 200);
+  assert.equal(response.payload.sourceScope.defaultSourceMeaning.includes("coarse server diagnostic only"), true);
+  assert.equal(response.payload.sourceScope.regionalSelection, "region-aware");
+  assert.equal(
+    response.payload.sourceScope.publicLivePriceClaimsAllowed,
+    response.payload.fuelProviders.publicClaims.publicLivePriceClaimsAllowed,
+  );
+  assert.equal(response.payload.releaseReadiness.publicBeta.status, "blocked_until_external_evidence");
+  assert.equal(
+    response.payload.releaseReadiness.publicBeta.blockers.includes("physical_device_validation"),
+    true,
+  );
   assert.deepEqual(response.payload.fuelProviders.capabilityLabels, [
     "live",
     "limited",
@@ -67,6 +93,112 @@ test("status endpoint exposes the national capability contract", async () => {
   assert.equal(response.payload.fuelProviders.capabilities.length, 8);
   assert.equal(response.payload.fuelProviders.capabilities.some((item) => item.region === "SA"), true);
   assert.equal(typeof response.payload.fuelProviders.capabilitySummary, "object");
+  assert.equal(typeof response.payload.fuelProviders.publicClaims, "object");
+  assert.equal(Array.isArray(response.payload.fuelProviders.publicClaims.blockers), true);
+});
+
+test("status endpoint keeps provider and map secrets out of diagnostic payloads", async () => {
+  await withEnv(
+    {
+      NSW_FUEL_API_KEY: "secret-nsw-key",
+      NSW_FUEL_API_SECRET: "secret-nsw-secret",
+      QLD_FUEL_API_TOKEN: "secret-qld-token",
+      FUEL_PATH_GOOGLE_MAPS_API_KEY: "secret-google-map-key",
+      FUEL_PATH_GOOGLE_ROUTES_API_KEY: "secret-google-routes-key",
+    },
+    async () => {
+      const response = await callStatus();
+      const payloadText = JSON.stringify(response.payload);
+
+      assert.equal(response.status, 200);
+      assert.equal(response.payload.maps.googleMapsConfigured, true);
+      assert.equal(response.payload.maps.googleDirectionsEnabled, true);
+      assert.equal(response.payload.maps.googleMapsApiKey, "");
+      assert.equal(payloadText.includes("secret-nsw-key"), false);
+      assert.equal(payloadText.includes("secret-nsw-secret"), false);
+      assert.equal(payloadText.includes("secret-qld-token"), false);
+      assert.equal(payloadText.includes("secret-google-map-key"), false);
+      assert.equal(payloadText.includes("secret-google-routes-key"), false);
+    },
+  );
+});
+
+test("status endpoint separates technical live access from public live-price claim readiness", async () => {
+  await withEnv(
+    {
+      NSW_FUEL_API_KEY: "test-key",
+      NSW_FUEL_API_SECRET: "test-secret",
+      QLD_FUEL_API_TOKEN: "test-token",
+      FUEL_PATH_PRODUCTION_HARDENING: "1",
+      FUEL_PATH_NSW_ACT_USAGE_TERMS_CONFIRMED: "",
+      FUEL_PATH_QLD_USAGE_TERMS_CONFIRMED: "",
+      FUEL_PATH_TAS_USAGE_TERMS_CONFIRMED: "",
+      FUEL_PATH_PROVIDER_TERMS_EVIDENCE_CONFIRMED: "",
+    },
+    async () => {
+      const response = await callStatus();
+      const claims = response.payload.fuelProviders.publicClaims;
+
+      assert.equal(claims.status, "blocked");
+      assert.equal(claims.publicLivePriceClaimsAllowed, false);
+      assert.equal(claims.blockers.includes("nsw_terms_not_confirmed"), true);
+      assert.equal(claims.blockers.includes("act_terms_not_confirmed"), true);
+      assert.equal(claims.blockers.includes("qld_terms_not_confirmed"), true);
+      assert.equal(claims.blockers.includes("tas_terms_not_confirmed"), true);
+      assert.deepEqual(claims.termsBlocked.sort(), ["ACT", "NSW", "QLD", "TAS"].sort());
+      assert.deepEqual(claims.evidenceRequired, []);
+    },
+  );
+
+  await withEnv(
+    {
+      NSW_FUEL_API_KEY: "test-key",
+      NSW_FUEL_API_SECRET: "test-secret",
+      QLD_FUEL_API_TOKEN: "test-token",
+      FUEL_PATH_PRODUCTION_HARDENING: "1",
+      FUEL_PATH_NSW_ACT_USAGE_TERMS_CONFIRMED: "1",
+      FUEL_PATH_QLD_USAGE_TERMS_CONFIRMED: "1",
+      FUEL_PATH_TAS_USAGE_TERMS_CONFIRMED: "1",
+      FUEL_PATH_PROVIDER_TERMS_EVIDENCE_CONFIRMED: "",
+    },
+    async () => {
+      const response = await callStatus();
+      const claims = response.payload.fuelProviders.publicClaims;
+
+      assert.equal(claims.status, "blocked");
+      assert.equal(claims.publicLivePriceClaimsAllowed, false);
+      assert.equal(claims.blockers.includes("nsw_terms_evidence_not_attested"), true);
+      assert.equal(claims.blockers.includes("act_terms_evidence_not_attested"), true);
+      assert.equal(claims.blockers.includes("qld_terms_evidence_not_attested"), true);
+      assert.equal(claims.blockers.includes("tas_terms_evidence_not_attested"), true);
+      assert.deepEqual(claims.evidenceRequired.sort(), ["ACT", "NSW", "QLD", "TAS"].sort());
+    },
+  );
+});
+
+test("status endpoint allows public live-price claims only when provider terms evidence is attested", async () => {
+  await withEnv(
+    {
+      NSW_FUEL_API_KEY: "test-key",
+      NSW_FUEL_API_SECRET: "test-secret",
+      QLD_FUEL_API_TOKEN: "test-token",
+      FUEL_PATH_PRODUCTION_HARDENING: "1",
+      FUEL_PATH_NSW_ACT_USAGE_TERMS_CONFIRMED: "1",
+      FUEL_PATH_QLD_USAGE_TERMS_CONFIRMED: "1",
+      FUEL_PATH_TAS_USAGE_TERMS_CONFIRMED: "1",
+      FUEL_PATH_PROVIDER_TERMS_EVIDENCE_CONFIRMED: "1",
+    },
+    async () => {
+      const response = await callStatus();
+      const claims = response.payload.fuelProviders.publicClaims;
+
+      assert.equal(claims.status, "ready");
+      assert.equal(claims.publicLivePriceClaimsAllowed, true);
+      assert.deepEqual(claims.blockers, []);
+      assert.deepEqual(claims.evidenceRequired, []);
+      assert.equal(claims.evidenceAttested, true);
+    },
+  );
 });
 
 test("ACT coordinates are treated as NSW provider coverage", () => {
@@ -74,7 +206,9 @@ test("ACT coordinates are treated as NSW provider coverage", () => {
 
   assert.equal(pointInAct(canberra), true);
   assert.equal(pointInVic(canberra), false);
-  assert.deepEqual(liveProviderKeysForArea([canberra], 8), ["nsw"]);
+  withEnv({ NSW_FUEL_API_KEY: "test-nsw-key", NSW_FUEL_API_SECRET: "test-nsw-secret" }, () => {
+    assert.deepEqual(liveProviderKeysForArea([canberra], 8), ["nsw"]);
+  });
 });
 
 test("NSW side of the VIC border remains on NSW provider coverage", () => {
@@ -83,8 +217,10 @@ test("NSW side of the VIC border remains on NSW provider coverage", () => {
 
   assert.equal(pointInVic(albury), false);
   assert.equal(pointInVic(moama), false);
-  assert.deepEqual(liveProviderKeysForArea([albury], 8), ["nsw"]);
-  assert.deepEqual(liveProviderKeysForArea([moama], 8), ["nsw"]);
+  withEnv({ NSW_FUEL_API_KEY: "test-nsw-key", NSW_FUEL_API_SECRET: "test-nsw-secret" }, () => {
+    assert.deepEqual(liveProviderKeysForArea([albury], 8), ["nsw"]);
+    assert.deepEqual(liveProviderKeysForArea([moama], 8), ["nsw"]);
+  });
 });
 
 test("VIC side of the border remains on VIC provider coverage", () => {
@@ -106,15 +242,19 @@ test("eastern NSW route points do not get misclassified as VIC", () => {
 
   assert.equal(pointInVic(wollongong), false);
   assert.equal(pointInVic(eden), false);
-  assert.deepEqual(liveProviderKeysForArea([wollongong], 8), ["nsw"]);
-  assert.deepEqual(liveProviderKeysForArea([eden], 8), ["nsw"]);
+  withEnv({ NSW_FUEL_API_KEY: "test-nsw-key", NSW_FUEL_API_SECRET: "test-nsw-secret" }, () => {
+    assert.deepEqual(liveProviderKeysForArea([wollongong], 8), ["nsw"]);
+    assert.deepEqual(liveProviderKeysForArea([eden], 8), ["nsw"]);
+  });
 });
 
 test("multi-point NSW/VIC routes include the correct live provider order", () => {
   const albury = { lat: -36.0737, lon: 146.9135 };
   const wodonga = { lat: -36.1241, lon: 146.8818 };
 
-  assert.deepEqual(liveProviderKeysForArea([albury, wodonga], 8), ["vic", "nsw"]);
+  withEnv({ NSW_FUEL_API_KEY: "test-nsw-key", NSW_FUEL_API_SECRET: "test-nsw-secret" }, () => {
+    assert.deepEqual(liveProviderKeysForArea([albury, wodonga], 8), ["vic", "nsw"]);
+  });
 });
 
 test("unsupported geographies do not fall through to NSW", () => {
@@ -144,6 +284,181 @@ test("SA routes to live provider only when token is configured", () => {
     assert.deepEqual(liveProviderKeysForArea([adelaide], 8), ["sa"]);
     assert.equal(capabilitiesForPoints([adelaide])[0]?.capability, "live");
   });
+});
+
+test("production FuelCheck NSW and QLD routes fail closed until usage terms are confirmed", async () => {
+  const sydney = { lat: -33.8688, lon: 151.2093 };
+  const brisbane = { lat: -27.4698, lon: 153.0251 };
+
+  await withEnv(
+    {
+      NSW_FUEL_API_KEY: "test-nsw-key",
+      NSW_FUEL_API_SECRET: "test-nsw-secret",
+      QLD_FUEL_API_TOKEN: "test-qld-token",
+      FUEL_PATH_PRODUCTION_HARDENING: "1",
+      FUEL_PATH_NSW_ACT_USAGE_TERMS_CONFIRMED: "",
+      FUEL_PATH_QLD_USAGE_TERMS_CONFIRMED: "",
+    },
+    async () => {
+      assert.deepEqual(liveProviderKeysForArea([sydney], 8), []);
+      assert.deepEqual(liveProviderKeysForArea([brisbane], 8), []);
+      assert.equal(capabilitiesForPoints([sydney])[0]?.capability, "limited");
+      assert.equal(capabilitiesForPoints([brisbane])[0]?.capability, "limited");
+
+      const nsw = await loadStationData({
+        requestedSource: "nsw",
+        forceRefresh: true,
+        points: [sydney],
+        radiusKm: 8,
+        fuels: ["U91"],
+      });
+      const qld = await loadStationData({
+        requestedSource: "qld",
+        forceRefresh: true,
+        points: [brisbane],
+        radiusKm: 8,
+        fuels: ["U91"],
+      });
+
+      assert.equal(nsw.source, "live_unavailable");
+      assert.equal(nsw.provider, "nsw");
+      assert.equal(nsw.stations.length, 0);
+      assert.match(nsw.warning, /FuelCheck NSW\/ACT public usage, caching and attribution terms are not confirmed/);
+      assert.equal(qld.source, "live_unavailable");
+      assert.equal(qld.provider, "qld");
+      assert.equal(qld.stations.length, 0);
+      assert.match(qld.warning, /QLD Fuel Prices public usage, caching and attribution terms are not confirmed/);
+    },
+  );
+});
+
+test("production FuelCheck NSW and QLD routes enable only after usage terms flags", () => {
+  const sydney = { lat: -33.8688, lon: 151.2093 };
+  const brisbane = { lat: -27.4698, lon: 153.0251 };
+
+  withEnv(
+    {
+      NSW_FUEL_API_KEY: "test-nsw-key",
+      NSW_FUEL_API_SECRET: "test-nsw-secret",
+      QLD_FUEL_API_TOKEN: "test-qld-token",
+      FUEL_PATH_PRODUCTION_HARDENING: "1",
+      FUEL_PATH_NSW_ACT_USAGE_TERMS_CONFIRMED: "1",
+      FUEL_PATH_QLD_USAGE_TERMS_CONFIRMED: "1",
+    },
+    () => {
+      assert.deepEqual(liveProviderKeysForArea([sydney], 8), ["nsw"]);
+      assert.deepEqual(liveProviderKeysForArea([brisbane], 8), ["qld"]);
+      assert.equal(capabilitiesForPoints([sydney])[0]?.capability, "live");
+      assert.equal(capabilitiesForPoints([brisbane])[0]?.capability, "live");
+    },
+  );
+});
+
+test("TAS routes to API.NSW v2 only when FuelCheck credentials are configured", () => {
+  const hobart = { lat: -42.8821, lon: 147.3272 };
+
+  withEnv({ NSW_FUEL_API_KEY: "", NSW_FUEL_API_SECRET: "" }, () => {
+    assert.deepEqual(liveProviderKeysForArea([hobart], 8), []);
+    assert.equal(capabilitiesForPoints([hobart])[0]?.capability, "pending_access");
+  });
+
+  withEnv({ NSW_FUEL_API_KEY: "test-nsw-key", NSW_FUEL_API_SECRET: "test-nsw-secret" }, () => {
+    assert.deepEqual(liveProviderKeysForArea([hobart], 8), ["tas"]);
+    assert.equal(capabilitiesForPoints([hobart])[0]?.capability, "live");
+  });
+
+  withEnv({
+    NSW_FUEL_API_KEY: "test-nsw-key",
+    NSW_FUEL_API_SECRET: "test-nsw-secret",
+    FUEL_PATH_PRODUCTION_HARDENING: "1",
+  }, () => {
+    assert.deepEqual(liveProviderKeysForArea([hobart], 8), []);
+    assert.equal(capabilitiesForPoints([hobart])[0]?.capability, "limited");
+  });
+
+  withEnv({
+    NSW_FUEL_API_KEY: "test-nsw-key",
+    NSW_FUEL_API_SECRET: "test-nsw-secret",
+    FUEL_PATH_PRODUCTION_HARDENING: "1",
+    FUEL_PATH_TAS_USAGE_TERMS_CONFIRMED: "1",
+  }, () => {
+    assert.deepEqual(liveProviderKeysForArea([hobart], 8), ["tas"]);
+    assert.equal(capabilitiesForPoints([hobart])[0]?.capability, "live");
+  });
+});
+
+test("production TAS source fails closed until usage terms are confirmed", async () => {
+  await withEnv(
+    {
+      NSW_FUEL_API_KEY: "test-nsw-key",
+      NSW_FUEL_API_SECRET: "test-nsw-secret",
+      FUEL_PATH_PRODUCTION_HARDENING: "1",
+      FUEL_PATH_TAS_USAGE_TERMS_CONFIRMED: "",
+    },
+    async () => {
+      const data = await loadStationData({
+        requestedSource: "tas",
+        forceRefresh: true,
+        points: [{ lat: -42.8821, lon: 147.3272 }],
+        radiusKm: 8,
+        fuels: ["U91"],
+      });
+
+      assert.equal(data.source, "live_unavailable");
+      assert.equal(data.provider, "tas");
+      assert.equal(data.degraded, true);
+      assert.equal(data.stations.length, 0);
+      assert.match(data.warning, /usage, caching and attribution terms are not confirmed/);
+    },
+  );
+});
+
+test("TAS FuelCheck adapter loads Hobart nearby prices through API.NSW v2", async () => {
+  await withEnv(
+    {
+      NSW_FUEL_API_KEY: "test-nsw-key",
+      NSW_FUEL_API_SECRET: "test-nsw-secret",
+      NSW_FUEL_TAS_NEARBY_URL: "https://api.onegov.nsw.gov.au/FuelPriceCheck/v2/fuel/prices/nearby",
+    },
+    async () => {
+      const mockFetch = installFetchMock(async (url, options = {}) => {
+        const parsed = new URL(String(url));
+        if (parsed.searchParams.get("grant_type") === "client_credentials") return jsonResponse({ access_token: "token" });
+        assert.equal(parsed.pathname, "/FuelPriceCheck/v2/fuel/prices/nearby");
+        assert.equal(options.method, "POST");
+        const body = JSON.parse(options.body);
+        assert.equal(body.fueltype, "U91");
+        assert.equal(body.latitude, "-42.8821");
+        assert.equal(body.longitude, "147.3272");
+        return jsonResponse(tasNearbyPayload());
+      });
+
+      try {
+        const data = await loadStationData({
+          requestedSource: "tas",
+          forceRefresh: true,
+          points: [{ lat: -42.8821, lon: 147.3272 }],
+          radiusKm: 8,
+          fuels: ["U91"],
+        });
+
+        assert.equal(data.source, "api_tas");
+        assert.equal(data.provider, "api_tas");
+        assert.equal(data.capability, "live");
+        assert.equal(data.degraded, false);
+        assert.equal(data.providerHealth.tas.status, "ok");
+        assert.equal(data.stations.length, 1);
+        assert.equal(data.stations[0].stationCode, "TAS-95");
+        assert.equal(data.stations[0].name, "United North Hobart");
+        assert.equal(data.stations[0].suburb, "North Hobart");
+        assert.equal(data.stations[0].prices.U91, 158.9);
+        assert.equal(data.stations[0].source, "api_tas_fuelcheck");
+        assert.equal(mockFetch.calls.length, 2);
+      } finally {
+        mockFetch.restore();
+      }
+    },
+  );
 });
 
 test("unsupported station loads return explicit empty unsupported context", async () => {
@@ -185,6 +500,30 @@ test("sample fallback marks data as fallback capability", async () => {
   assert.match(data.warning, /fallback data for TAS/);
 });
 
+test("production hardening disables demo fallback responses", async () => {
+  await withEnv({ FUEL_PATH_PRODUCTION_HARDENING: "1", FUEL_PATH_ALLOW_SAMPLE_SOURCE: "" }, async () => {
+    const sample = await loadStationData({
+      requestedSource: "sample",
+      points: [{ lat: -33.8688, lon: 151.2093 }],
+      radiusKm: 8,
+    });
+    const liveUnavailable = await loadStationData({
+      requestedSource: "vic",
+      points: [{ lat: -37.8136, lon: 144.9631 }],
+      radiusKm: 8,
+    });
+
+    assert.equal(sample.source, "sample_disabled");
+    assert.equal(sample.stations.length, 0);
+    assert.equal(sample.degraded, true);
+    assert.match(sample.warning, /disabled in production/);
+    assert.equal(liveUnavailable.source, "live_unavailable");
+    assert.equal(liveUnavailable.stations.length, 0);
+    assert.equal(liveUnavailable.degraded, true);
+    assert.match(liveUnavailable.warning, /VIC Servo Saver API access is not configured/);
+  });
+});
+
 test("unsupported station handler response stays explicit", async () => {
   const response = await callStations({
     lat: 0,
@@ -201,6 +540,12 @@ test("unsupported station handler response stays explicit", async () => {
   assert.equal(response.payload.context.stationCount, 0);
   assert.equal(response.payload.context.returnedCount, 0);
   assert.equal(response.payload.stations.length, 0);
+  assert.equal(response.payload.context.provenance.source, "unsupported_region");
+  assert.equal(response.payload.context.provenance.provider, "unsupported_region");
+  assert.equal(response.payload.context.provenance.cacheMode, "none");
+  assert.equal(response.payload.context.provenance.degraded, false);
+  assert.deepEqual(response.payload.context.provenance.providerStatuses, {});
+  assert.equal(JSON.stringify(response.payload.context.provenance).includes("Null Island"), false);
   assert.match(response.payload.context.warning, /No live fuel provider covers this area yet/);
 });
 
@@ -283,6 +628,61 @@ function callStatus() {
   });
 }
 
+function tasNearbyPayload() {
+  return {
+    stations: [
+      {
+        brandid: "1-SVWL-138E",
+        stationid: "5288-2M",
+        brand: "United",
+        code: 95,
+        name: "United North Hobart",
+        address: "353-357 Argyle Street, NORTH HOBART TAS 7000",
+        location: {
+          distance: 1.5,
+          latitude: -42.870897,
+          longitude: 147.317047,
+        },
+        state: "TAS",
+      },
+    ],
+    prices: [
+      {
+        stationcode: 95,
+        fueltype: "U91",
+        price: 158.9,
+        priceunit: "litre",
+        lastupdated: "2026-06-19 04:45:08",
+        state: "TAS",
+      },
+    ],
+  };
+}
+
+function jsonResponse(payload, status = 200) {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    statusText: status >= 200 && status < 300 ? "OK" : "Error",
+    text: async () => JSON.stringify(payload),
+  };
+}
+
+function installFetchMock(handler) {
+  const originalFetch = global.fetch;
+  const calls = [];
+  global.fetch = async (url, options = {}) => {
+    calls.push({ url: String(url), options });
+    return handler(url, options);
+  };
+  return {
+    calls,
+    restore() {
+      global.fetch = originalFetch;
+    },
+  };
+}
+
 function withEnv(values, fn) {
   const previous = {};
   for (const key of Object.keys(values)) {
@@ -291,8 +691,16 @@ function withEnv(values, fn) {
     else process.env[key] = values[key];
   }
   try {
-    return fn();
-  } finally {
+    const result = fn();
+    if (result && typeof result.then === "function") return result.finally(restore);
+    restore();
+    return result;
+  } catch (error) {
+    restore();
+    throw error;
+  }
+
+  function restore() {
     for (const key of Object.keys(values)) {
       if (previous[key] === undefined) delete process.env[key];
       else process.env[key] = previous[key];

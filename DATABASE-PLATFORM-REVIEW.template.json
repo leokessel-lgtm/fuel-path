@@ -1,0 +1,90 @@
+{
+  "reviewedAt": "",
+  "reviewer": "",
+  "current": {
+    "provider": "oracle_api",
+    "accessPattern": "token_protected_api",
+    "rowCount": 16905824,
+    "postgresPrivate": true,
+    "publicApiTokenProtected": true,
+    "readinessEvidence": "tmp/gnaf-hosted-readiness-2026-06-19T20-59-public-api.clean.json",
+    "benchmark": {
+      "cases": 900,
+      "addressCases": 600,
+      "poiCases": 300,
+      "finalTopRate": 1,
+      "p90AnyChars": 18,
+      "p95LatencyMs": 0,
+      "evidenceFile": "tmp/geocode-hosted-national-benchmark-2026-06-20T20-34-17-079Z.json"
+    }
+  },
+  "candidate": {
+    "provider": "supabase",
+    "role": "gnaf_lookup",
+    "rowCount": 0,
+    "loadedAt": "",
+    "dedicatedProject": false,
+    "mobileDirectAccess": false,
+    "indexes": [
+      "fuel_path_gnaf_addresses_search_prefix_idx",
+      "fuel_path_gnaf_addresses_search_trgm_idx",
+      "fuel_path_gnaf_addresses_state_postcode_idx",
+      "fuel_path_gnaf_addresses_locality_idx"
+    ],
+    "benchmark": {
+      "cases": 0,
+      "addressCases": 0,
+      "poiCases": 0,
+      "finalTopRate": 0,
+      "p90AnyChars": 0,
+      "p95LatencyMs": 0,
+      "p99LatencyMs": 0,
+      "generatedAt": "",
+      "evidenceFile": ""
+    },
+    "storage": {
+      "estimatedGb": 0,
+      "monthlyCostAud": 0,
+      "includesIndexes": false,
+      "reviewedAt": "",
+      "sourceRefs": [
+        "https://supabase.com/docs/guides/platform/database-size",
+        "https://supabase.com/docs/guides/platform/billing-on-supabase"
+      ]
+    },
+    "connection": {
+      "serverSideOnly": true,
+      "mobileDirectAccess": false,
+      "poolingMode": "",
+      "runtimePlan": "",
+      "secretHandling": ""
+    },
+    "backup": {
+      "dailyBackups": false,
+      "pitrDecision": "",
+      "restoreTestPlan": "",
+      "backupRefs": [
+        "https://supabase.com/docs/guides/platform/backups",
+        "https://supabase.com/docs/guides/platform/manage-your-usage/point-in-time-recovery"
+      ]
+    },
+    "operations": {
+      "owner": "",
+      "monitoringPlan": "",
+      "incidentPlan": "",
+      "budgetAlertPlan": ""
+    }
+  },
+  "rollback": {
+    "currentOracleApiRetained": true,
+    "rollbackPlan": "",
+    "rollbackTestPlan": ""
+  },
+  "sources": [
+    "https://supabase.com/docs/guides/database/connecting-to-postgres",
+    "https://supabase.com/docs/guides/database/connection-management",
+    "https://supabase.com/docs/guides/platform/backups",
+    "https://supabase.com/docs/guides/platform/database-size",
+    "https://supabase.com/docs/guides/platform/compute-and-disk"
+  ]
+}

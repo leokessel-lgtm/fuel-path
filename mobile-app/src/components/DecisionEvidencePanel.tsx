@@ -1,0 +1,363 @@
+import { StyleSheet, Text, View } from "react-native";
+
+import { stationTimestampLine } from "../utils/decisionEvidence";
+import { colors, radii, spacing, surfaces, typeScale } from "../theme";
+import { RouteDecisionSummary, StationViewModel } from "../types";
+
+export type DecisionAlternative = {
+  label: string;
+  note: string;
+  stationCode: string;
+  stationName: string;
+  selected?: boolean;
+};
+
+export function routeDecisionAlternatives(
+  candidates: StationViewModel[],
+  summary?: RouteDecisionSummary,
+): DecisionAlternative[] {
+  if (summary?.alternatives?.length) {
+    return summary.alternatives.map((item) => ({
+      label: decisionAlternativeLabel(item.kind, item.label),
+      note: item.note,
+      selected: item.selected,
+      stationCode: item.stationCode,
+      stationName: item.stationName,
+    }));
+  }
+  if (!candidates.length) return [];
+  const bestValue = candidates[0];
+  const cheapest = minBy(candidates, (item) => item.adjustedCpl);
+  const closest = minBy(candidates, (item) => Number(item.detourMinutes ?? item.distanceKm ?? 0));
+  const safest = safestCandidate(candidates);
+
+  return [
+    decisionAlternative("Best value", bestValue, routeValueSummary(bestValue)),
+    decisionAlternative("Cheapest", cheapest, `${cheapest.adjustedCpl.toFixed(1)} c/L after wallet`),
+    decisionAlternative("Closest", closest, `${Number(closest.detourMinutes || 0).toFixed(1)} min detour`),
+    decisionAlternative("Safest", safest, safetySummary(safest)),
+  ];
+}
+
+export function cheapestTradeOffExplanation(candidates: StationViewModel[]) {
+  if (!candidates.length) return "";
+  const best = candidates[0];
+  const cheapest = minBy(candidates, (item) => item.adjustedCpl);
+  const cheapestDetour = Number(cheapest.detourMinutes || 0);
+  const cheapestSaving = Number(cheapest.netSaving || 0);
+  const cheapestFuel = Number(cheapest.detourFuelLitres || 0);
+
+  if (cheapest.station.stationCode === best.station.stationCode) {
+    return "Cheapest also wins because the route saving stays ahead after detour time and fuel used.";
+  }
+
+  return `${cheapest.station.name} is cheapest at ${cheapest.adjustedCpl.toFixed(1)} c/L, but nets ${formatMoney(cheapestSaving)} after ${cheapestDetour.toFixed(1)} min and ${cheapestFuel.toFixed(1)} L detour fuel.`;
+}
+
+export function DecisionEvidencePanel({
+  alternatives,
+  candidate,
+  capability,
+  cheapestExplanation,
+  decisionSummary,
+  maxDetourMinutes,
+  minSavingDollars,
+  policyActive,
+  policyBrands,
+}: {
+  alternatives: DecisionAlternative[];
+  candidate: StationViewModel;
+  capability?: string;
+  cheapestExplanation: string;
+  decisionSummary?: RouteDecisionSummary;
+  maxDetourMinutes: number;
+  minSavingDollars: number;
+  policyActive: boolean;
+  policyBrands: string[];
+}) {
+  const economics = decisionSummary?.economics;
+  const saving = Number(economics?.netSavingAfterDetourFuel ?? candidate.netSaving ?? 0);
+  const detour = Number(economics?.detourMinutes ?? candidate.detourMinutes ?? 0);
+  const detourFuel = Number(economics?.detourFuelLitres ?? candidate.detourFuelLitres ?? 0);
+  const timeCost = Number(economics?.timeCost ?? candidate.timeCost ?? 0);
+  const afterTime = Number(
+    economics?.netSavingAfterDetourFuelAndTime ??
+      candidate.netAfterDetourAndTimeCost ??
+      saving - timeCost,
+  );
+  const ruleMinSaving = Number(decisionSummary?.decisionRule?.minSavingDollars ?? minSavingDollars);
+  const ruleMaxDetour = Number(decisionSummary?.decisionRule?.maxDetourMinutes ?? maxDetourMinutes);
+  const possiblePrice = candidate.possibleLowerCpl;
+  const capabilityLabel = capability ? capabilityLabelFor(capability) : "Live data";
+  const trustLine = stationTimestampLine(candidate.station);
+
+  return (
+    <View style={styles.evidencePanel}>
+      <View style={styles.evidencePanelHeader}>
+        <Text style={styles.evidencePanelTitle}>Why this stop</Text>
+        <Text
+          style={[
+            styles.capabilityChip,
+            capability && capability !== "live" ? styles.capabilityChipCaution : null,
+          ]}
+        >
+          {capabilityLabel}
+        </Text>
+      </View>
+      <View style={styles.evidenceGrid}>
+        <EvidenceMetric label="Pump" value={`${candidate.pumpCpl.toFixed(1)} c/L`} />
+        <EvidenceMetric label="Your price" value={`${candidate.adjustedCpl.toFixed(1)} c/L`} />
+        <EvidenceMetric
+          label="Possible only"
+          value={possiblePrice !== undefined ? `${possiblePrice.toFixed(1)} c/L` : "None configured"}
+        />
+        <EvidenceMetric label="Saving" value={formatMoney(saving)} />
+        <EvidenceMetric label="Detour" value={`${detour.toFixed(1)} min`} />
+        <EvidenceMetric label="Fuel used" value={`${detourFuel.toFixed(1)} L`} />
+        <EvidenceMetric label="Time cost" value={formatMoney(timeCost)} />
+        <EvidenceMetric label="After time" value={formatMoney(afterTime)} />
+        <EvidenceMetric label="Rule" value={`$${ruleMinSaving}+ / ${ruleMaxDetour} min`} />
+        <EvidenceMetric
+          label="Policy"
+          value={policyActive ? `Approved: ${policyBrands.join(", ")}` : "Any brand"}
+        />
+      </View>
+      <Text numberOfLines={2} style={styles.evidenceTrustLine}>
+        {trustLine}
+      </Text>
+      {cheapestExplanation ? (
+        <Text numberOfLines={3} style={styles.cheapestExplanation}>
+          {cheapestExplanation}
+        </Text>
+      ) : null}
+      {alternatives.length ? (
+        <View style={styles.tradeOffPanel}>
+          <Text style={styles.tradeOffTitle}>Decision trade-offs</Text>
+          <View style={styles.tradeOffGrid}>
+            {alternatives.map((item) => (
+              <View
+                key={item.label}
+                style={[
+                  styles.tradeOffItem,
+                  item.stationCode === candidate.station.stationCode && styles.tradeOffItemSelected,
+                ]}
+              >
+                <Text style={styles.tradeOffLabel}>{item.label}</Text>
+                <Text numberOfLines={1} style={styles.tradeOffStation}>
+                  {item.stationName}
+                </Text>
+                <Text numberOfLines={1} style={styles.tradeOffNote}>
+                  {item.note}
+                </Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+function EvidenceMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.evidenceMetric}>
+      <Text style={styles.evidenceMetricLabel}>{label}</Text>
+      <Text numberOfLines={1} style={styles.evidenceMetricValue}>
+        {value}
+      </Text>
+    </View>
+  );
+}
+
+function decisionAlternative(
+  label: string,
+  candidate: StationViewModel,
+  note: string,
+): DecisionAlternative {
+  return {
+    label,
+    note,
+    stationCode: candidate.station.stationCode,
+    stationName: candidate.station.name,
+  };
+}
+
+function decisionAlternativeLabel(
+  kind: RouteDecisionSummary["alternatives"][number]["kind"],
+  fallback: string,
+) {
+  if (kind === "best_value") return "Best value";
+  if (kind === "cheapest") return "Cheapest";
+  if (kind === "closest") return "Closest";
+  if (kind === "safest") return "Safest";
+  return fallback;
+}
+
+function safestCandidate(candidates: StationViewModel[]) {
+  const safe = candidates.filter((item) => {
+    const warnings = (item.warnings || []).join(" ").toLowerCase();
+    return (
+      item.reachable !== false &&
+      item.station.openNow !== false &&
+      !/range|closed|unavailable|out of fuel|stale|fallback/i.test(warnings)
+    );
+  });
+  return minBy(safe.length ? safe : candidates, (item) =>
+    Number(item.detourMinutes ?? item.distanceKm ?? 0) + (item.station.openNow === false ? 1000 : 0),
+  );
+}
+
+function routeValueSummary(candidate: StationViewModel) {
+  return `${formatMoney(Number(candidate.netSaving || 0))} after ${Number(candidate.detourMinutes || 0).toFixed(1)} min`;
+}
+
+function safetySummary(candidate: StationViewModel) {
+  if (candidate.reachable === false) return "Range risk";
+  if (candidate.station.openNow === false) return "Closed";
+  if ((candidate.warnings || []).length) return "Check warning";
+  return "No range/open warning";
+}
+
+function minBy<T>(items: T[], score: (item: T) => number): T {
+  return items.reduce((best, item) => (score(item) < score(best) ? item : best), items[0]);
+}
+
+function formatMoney(value: number) {
+  const sign = value < 0 ? "-" : "";
+  return `${sign}$${Math.abs(value).toFixed(2)}`;
+}
+
+function capabilityLabelFor(capability: string) {
+  if (capability === "live") return "Live data";
+  if (capability === "limited") return "Limited";
+  if (capability === "pending_access") return "Pending access";
+  if (capability === "fallback") return "Fallback";
+  if (capability === "unsupported") return "Unsupported";
+  return "Data check";
+}
+
+const styles = StyleSheet.create({
+  evidencePanel: {
+    ...surfaces.softPanel,
+    borderColor: colors.line,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    gap: spacing.sm,
+    padding: spacing.sm,
+  },
+  evidencePanelHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: spacing.sm,
+    justifyContent: "space-between",
+  },
+  evidencePanelTitle: {
+    color: colors.ink,
+    fontSize: typeScale.caption,
+    fontWeight: "600",
+  },
+  capabilityChip: {
+    backgroundColor: colors.greenSoft,
+    borderRadius: radii.pill,
+    color: colors.greenDark,
+    fontSize: 10,
+    fontWeight: "700",
+    overflow: "hidden",
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+  },
+  capabilityChipCaution: {
+    backgroundColor: colors.amberSoft,
+    color: colors.amber,
+  },
+  evidenceGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.xs,
+  },
+  evidenceMetric: {
+    backgroundColor: colors.white,
+    borderColor: colors.line,
+    borderRadius: radii.sm,
+    borderWidth: 1,
+    flexBasis: "18%",
+    flexGrow: 1,
+    justifyContent: "center",
+    minHeight: 48,
+    paddingHorizontal: spacing.xs,
+  },
+  evidenceMetricLabel: {
+    color: colors.muted,
+    fontSize: 9,
+    fontWeight: "500",
+    textAlign: "center",
+    textTransform: "uppercase",
+  },
+  evidenceMetricValue: {
+    color: colors.ink,
+    fontSize: typeScale.caption,
+    fontWeight: "600",
+    marginTop: 2,
+    textAlign: "center",
+  },
+  evidenceTrustLine: {
+    color: colors.muted,
+    fontSize: 10,
+    fontWeight: "400",
+    lineHeight: 14,
+  },
+  cheapestExplanation: {
+    color: colors.ink,
+    fontSize: typeScale.caption,
+    fontWeight: "400",
+    lineHeight: 18,
+  },
+  tradeOffPanel: {
+    borderTopColor: colors.line,
+    borderTopWidth: 1,
+    gap: spacing.xs,
+    paddingTop: spacing.sm,
+  },
+  tradeOffTitle: {
+    color: colors.ink,
+    fontSize: typeScale.caption,
+    fontWeight: "600",
+  },
+  tradeOffGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.xs,
+  },
+  tradeOffItem: {
+    backgroundColor: colors.white,
+    borderColor: colors.line,
+    borderRadius: radii.sm,
+    borderWidth: 1,
+    flexBasis: "48%",
+    flexGrow: 1,
+    minHeight: 62,
+    padding: spacing.xs,
+  },
+  tradeOffItemSelected: {
+    backgroundColor: colors.greenSoft,
+    borderColor: colors.green,
+  },
+  tradeOffLabel: {
+    color: colors.muted,
+    fontSize: 9,
+    fontWeight: "700",
+    textTransform: "uppercase",
+  },
+  tradeOffStation: {
+    color: colors.ink,
+    fontSize: typeScale.caption,
+    fontWeight: "600",
+    marginTop: 2,
+  },
+  tradeOffNote: {
+    color: colors.muted,
+    fontSize: 10,
+    fontWeight: "400",
+    marginTop: 2,
+  },
+});

@@ -20,15 +20,27 @@ export const discountPrograms: DiscountRule[] = [
     centsPerLitre: 5,
   },
   {
+    id: "rac_member",
+    label: "RAC-style member discount",
+    shortLabel: "RAC member",
+    centsPerLitre: 4,
+  },
+  {
+    id: "costco_member",
+    label: "Costco member price estimate",
+    shortLabel: "Costco",
+    centsPerLitre: 6,
+  },
+  {
+    id: "seven_eleven_lock",
+    label: "7-Eleven manual price lock",
+    shortLabel: "7-Eleven lock",
+    centsPerLitre: 4,
+  },
+  {
     id: "fleet_card",
     label: "Fleet card estimate",
     shortLabel: "Fleet card",
     centsPerLitre: 3,
-  },
-  {
-    id: "linkt_rewards",
-    label: "Linkt Rewards fuel offer",
-    shortLabel: "Linkt Rewards",
-    centsPerLitre: 6,
   },
 ];

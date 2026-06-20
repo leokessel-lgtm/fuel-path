@@ -27,6 +27,35 @@ type RouteResponse = {
   points: MapPoint[];
 };
 
+type LookupReadiness = {
+  status: "ready" | "not_ready";
+  publicExactAddressClaimsAllowed: boolean;
+  blockers: string[];
+  nextAction: string;
+  addressIndex: {
+    mode: string;
+    hosted: boolean;
+    reportedAddressRows: number | null;
+    minAddressRows: number;
+    rowCountReady: boolean | null;
+  };
+  exactSmoke: {
+    status: string;
+    passed: boolean;
+  };
+  hostedBenchmark: {
+    status: string;
+    passed: boolean;
+    lastRunAt: string;
+    cases: number | null;
+    requiredCases: number;
+    addressTopRate: number | null;
+    poiTopRate: number | null;
+    addressP90Chars: number | null;
+    poiP90Chars: number | null;
+  };
+};
+
 async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
@@ -70,6 +99,7 @@ export async function getApiStatus() {
       sessionTokenRequired: boolean;
       googlePlacesConfigured: boolean;
       mapboxConfigured: boolean;
+      lookupReadiness?: LookupReadiness;
     };
   }>("/api/status");
 }
@@ -102,7 +132,12 @@ export async function getNearbyStations({
 
 export async function geocodeAddress(label: string, sessionToken?: string) {
   const suggestions = await searchLocations(label, 1, sessionToken);
-  if (!suggestions[0]) throw new Error(`No location found for ${label}`);
+  if (!suggestions[0]) {
+    throw new Error("We couldn't find that address. Try a fuller address, suburb or postcode.");
+  }
+  if (addressLikeQuery(label) && weakAutoRouteLocation(suggestions[0])) {
+    throw new Error("Choose a suggestion to confirm this address, or add suburb or postcode.");
+  }
   return suggestions[0];
 }
 
@@ -115,25 +150,114 @@ export async function searchLocations(label: string, limit = 5, sessionToken?: s
   if (cached && Date.now() < cached.expiresAt) return cached.suggestions;
   if (cached) locationSearchCache.delete(cacheKey);
 
-  const payload = await fetchJson<GeocodeResponse>(
-    `/api/geocode?${query({ q: label, limit, sessionToken })}`,
-  );
+  let payload: GeocodeResponse;
+  try {
+    payload = await fetchJson<GeocodeResponse>(
+      `/api/geocode?${query({ q: label, limit, sessionToken })}`,
+    );
+  } catch (error) {
+    throw new Error(locationLookupErrorMessage(error));
+  }
   const suggestions = payload.suggestions?.length
     ? payload.suggestions
     : payload.location
       ? [payload.location]
       : [];
-  if (!suggestions.length) {
-    throw new Error(
-      payload.warning ||
-        "Address lookup is limited right now. Try a fuller address, suburb or postcode.",
-    );
-  }
+  const rankedSuggestions = rankLocationSuggestions(suggestions, label);
+  const decoratedSuggestions = rankedSuggestions.map((suggestion) => ({
+    ...suggestion,
+    lookupStatus: payload.lookupStatus,
+    sourceLabel: lookupSourceLabel(suggestion.provider, suggestion.matchType, payload.lookupStatus, suggestion.type, label),
+  }));
   locationSearchCache.set(cacheKey, {
     expiresAt: Date.now() + LOCATION_SEARCH_CACHE_MS,
-    suggestions,
+    suggestions: decoratedSuggestions,
   });
-  return suggestions;
+  return decoratedSuggestions;
+}
+
+function locationLookupErrorMessage(error: unknown) {
+  const message = error instanceof Error ? error.message : "";
+  if (/rate.?limited|cooling down|temporarily unavailable|provider|nominatim|google|mapbox|here|geoapify|addressr/i.test(message)) {
+    return "We couldn't check that address right now. Add suburb or postcode, or try again shortly.";
+  }
+  return "We couldn't find that address. Try a fuller address, suburb or postcode.";
+}
+
+function rankLocationSuggestions(suggestions: MapPoint[], queryText: string) {
+  if (!addressLikeQuery(queryText)) return suggestions;
+  const expected = addressQueryParts(queryText);
+  if (!expected) return suggestions;
+  return suggestions
+    .map((suggestion, index) => ({
+      index,
+      score: addressSuggestionScore(suggestion, expected),
+      suggestion,
+    }))
+    .sort((left, right) => left.score - right.score || left.index - right.index)
+    .map((item) => item.suggestion);
+}
+
+function addressQueryParts(value: string) {
+  const match = value
+    .trim()
+    .match(/(?:unit|apt|apartment|flat|suite|townhouse)?\s*(?:\d+[a-z]?\/)?(\d+[a-z]?)\s+([a-z][a-z\s'-]*?)\s+\b(?:street|st|road|rd|avenue|ave|drive|dr|highway|hwy|terrace|circuit|way|lane|ln|place|pl|court|ct)\b/i);
+  if (!match) return null;
+  return {
+    houseNumber: match[1].toLowerCase(),
+    streetWords: match[2].trim().toLowerCase().split(/\s+/).filter(Boolean),
+  };
+}
+
+function addressSuggestionScore(point: MapPoint, expected: { houseNumber: string; streetWords: string[] }) {
+  const label = point.label.toLowerCase();
+  const title = point.label.split(",")[0]?.trim().toLowerCase() || "";
+  let score = 0;
+  if (!title.startsWith(expected.houseNumber)) score += 100;
+  if (!label.includes(expected.houseNumber)) score += 30;
+  for (const word of expected.streetWords) {
+    if (!label.includes(word)) score += 20;
+  }
+  if (point.type && !["address", "house", "residential", "road"].includes(point.type)) score += 25;
+  return score;
+}
+
+function lookupSourceLabel(provider?: string, matchType?: string, lookupStatus?: string, type?: string, queryText = "") {
+  if (lookupStatus === "degraded") return "Lookup limited";
+  const addressLike = addressLikeQuery(queryText);
+  if (provider === "fuel_path_gnaf") {
+    if (matchType === "exact_address") return "Exact address";
+    return "Address match";
+  }
+  if (provider === "fuel_path_hint" || provider === "fuel_path_regional_gazetteer") {
+    if (addressLike) return "Street/area only";
+    if (["poi", "station", "airport"].includes(String(type || ""))) return "Place match";
+    return "Approx. area";
+  }
+  if (provider === "fuel_path") return "Station match";
+  if (provider === "google" || provider === "addressr") return "External lookup";
+  if (provider === "nominatim") {
+    if (addressLikeQuery(queryText)) return "Needs confirmation";
+    return "Validation lookup";
+  }
+  return "";
+}
+
+function addressLikeQuery(value: string) {
+  const text = value.trim();
+  if (text.length < 8) return false;
+  const hasStreetType = /\b(street|st|road|rd|avenue|ave|drive|dr|highway|hwy|terrace|circuit|way|lane|ln|place|pl|court|ct)\b/i.test(text);
+  const hasLeadingAddressToken = /^(?:unit|apt|apartment|flat|suite|townhouse)?\s*\d+[a-z]?(?:\/\d+[a-z]?)?\s+[a-z]/i.test(text);
+  return hasStreetType || hasLeadingAddressToken;
+}
+
+function weakAutoRouteLocation(point: MapPoint) {
+  if (point.provider === "fuel_path_gnaf" && point.type === "address") return false;
+  if (point.sourceLabel === "Needs confirmation") return true;
+  if (point.sourceLabel === "Street/area only") return true;
+  if (point.provider === "google" || point.provider === "addressr" || point.provider === "nominatim") return false;
+  if (point.confidence === "low") return true;
+  return point.sourceLabel === "Approx. area";
 }
 
 export async function getRoute(from: MapPoint, to: MapPoint) {
@@ -150,14 +274,21 @@ export async function getRoute(from: MapPoint, to: MapPoint) {
 }
 
 export async function scoreRoute({
+  approvedPolicyBrands = [],
   fuel,
-  route,
   eligibleDiscounts,
+  maxDetourMinutes,
+  minSavingDollars,
+  route,
 }: {
+  approvedPolicyBrands?: string[];
   fuel: FuelCode;
-  route: RouteResponse;
   eligibleDiscounts: string[];
+  maxDetourMinutes: number;
+  minSavingDollars: number;
+  route: RouteResponse;
 }) {
+  const policyBrands = approvedPolicyBrands.map((brand) => brand.trim()).filter(Boolean);
   return fetchJson<ScoreResponse>("/api/score", {
     method: "POST",
     headers: {
@@ -174,12 +305,16 @@ export async function scoreRoute({
         points: compactPoints(route.points),
       },
       fuel,
+      minSavingDollars,
+      maxDetourMinutes,
       tankLitres: 55,
       tankPercent: 45,
       economy: 8.2,
       reserveKm: 35,
       corridorKm: 2.5,
       eligibleDiscounts,
+      brandFilter: policyBrands.length > 0,
+      brands: policyBrands,
       includeMemberPrices: false,
       includeClosed: false,
     }),

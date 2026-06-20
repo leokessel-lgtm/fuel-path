@@ -144,6 +144,87 @@ test("WA FuelWatch live loader requests only the requested fuel and caches regio
   );
 });
 
+test("WA FuelWatch cooldown serves stale cache instead of hammering a failing provider", async () => {
+  await withEnvAsync(
+    {
+      FUEL_PATH_WA_MAX_REGION_IDS: "6",
+      FUEL_PATH_LIVE_CACHE_SECONDS: "600",
+      FUEL_PATH_PROVIDER_FAILURE_THRESHOLD: "2",
+      FUEL_PATH_PROVIDER_COOLDOWN_SECONDS: "120",
+      FUEL_PATH_WA_FUELWATCH_ENABLED: "1",
+    },
+    async () => {
+      const previousFetch = global.fetch;
+      const previousWarn = console.warn;
+      let failProvider = false;
+      let upstreamCalls = 0;
+      console.warn = () => {};
+      global.fetch = async (url) => {
+        upstreamCalls += 1;
+        if (failProvider) {
+          return {
+            ok: false,
+            status: 503,
+            text: async () => "provider unavailable",
+          };
+        }
+
+        const parsed = new URL(String(url));
+        const day = parsed.searchParams.get("Day") || "today";
+        return {
+          ok: true,
+          text: async () =>
+            waRssItem({
+              date: day === "tomorrow" ? "2026-06-18" : "2026-06-17",
+              price: day === "tomorrow" ? "169.9" : "148.9",
+              title: "148.9: Broome Cooldown Fuel",
+              tradingName: "Broome Cooldown Fuel",
+              location: "BROOME",
+              address: "1 Cable Beach Rd",
+              latitude: "-17.961",
+              longitude: "122.236",
+            }),
+        };
+      };
+
+      try {
+        const request = {
+          forceRefresh: true,
+          points: [{ lat: -17.961, lon: 122.236 }],
+          radiusKm: 8,
+          fuels: ["U91"],
+          now: new Date("2026-06-17T08:00:00Z"),
+        };
+        const seeded = await loadLiveWaStations(request);
+        assert.equal(seeded.stations.length, 1);
+        assert.equal(upstreamCalls, 2);
+
+        failProvider = true;
+        const [firstFailure, parallelFailure] = await Promise.all([
+          loadLiveWaStations(request),
+          loadLiveWaStations(request),
+        ]);
+        const callsAfterSharedFailure = upstreamCalls;
+        const secondFailure = await loadLiveWaStations(request);
+        const callsAfterCircuitOpened = upstreamCalls;
+        const cooledDown = await loadLiveWaStations(request);
+
+        assert.equal(firstFailure.cacheMode, "stale");
+        assert.equal(parallelFailure.cacheMode, "stale");
+        assert.equal(secondFailure.cacheMode, "stale");
+        assert.equal(cooledDown.cacheMode, "stale");
+        assert.equal(cooledDown.degraded, true);
+        assert.match(cooledDown.warning, /cooling down/);
+        assert.equal(callsAfterSharedFailure, 4);
+        assert.equal(upstreamCalls, callsAfterCircuitOpened);
+      } finally {
+        global.fetch = previousFetch;
+        console.warn = previousWarn;
+      }
+    },
+  );
+});
+
 function waRssItem({
   date,
   price,

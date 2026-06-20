@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { colors, radii, spacing, typeScale } from "../theme";
+import { colors, radii, spacing, surfaces, typeScale } from "../theme";
 import { FuelCode } from "../types";
 
 const fuelCodes: FuelCode[] = ["E10", "U91", "P95", "P98", "DL", "PDL"];
@@ -37,23 +37,23 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   chip: {
+    ...surfaces.floating,
     backgroundColor: colors.white,
-    borderColor: colors.line,
     borderRadius: radii.pill,
-    borderWidth: 1,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
   },
   chipSelected: {
-    backgroundColor: colors.green,
-    borderColor: colors.green,
+    backgroundColor: colors.black,
+    borderColor: colors.black,
   },
   label: {
     color: colors.ink,
     fontSize: typeScale.caption,
-    fontWeight: "900",
+    fontWeight: "500",
   },
   labelSelected: {
     color: colors.white,
+    fontWeight: "700",
   },
 });

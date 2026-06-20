@@ -217,8 +217,8 @@ export function StationMap({
         icon: L.divIcon({
           className: "",
           html: markerHtml(item, selected),
-          iconAnchor: [26, 48],
-          iconSize: [52, 48],
+          iconAnchor: [26, 56],
+          iconSize: [52, 56],
         }),
         alt: "",
         keyboard: false,
@@ -662,13 +662,31 @@ function ensureLeafletStyles() {
         height: 46px;
         justify-content: stretch;
         overflow: hidden;
+        position: relative;
         transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
         width: 52px;
+      }
+      .fuel-path-marker::after {
+        background: ${colors.white};
+        border-bottom: 1px solid rgba(7, 86, 66, 0.18);
+        border-right: 1px solid rgba(7, 86, 66, 0.18);
+        bottom: -5px;
+        box-sizing: border-box;
+        content: "";
+        height: 10px;
+        left: 50%;
+        position: absolute;
+        transform: translateX(-50%) rotate(45deg);
+        width: 10px;
       }
       .fuel-path-marker.is-selected {
         border-color: ${colors.green};
         box-shadow: 0 10px 22px rgba(8, 122, 99, 0.28);
         transform: scale(1.12);
+      }
+      .fuel-path-marker.is-selected::after {
+        border-bottom-color: ${colors.green};
+        border-right-color: ${colors.green};
       }
       .fuel-path-marker-brand {
         align-items: center;

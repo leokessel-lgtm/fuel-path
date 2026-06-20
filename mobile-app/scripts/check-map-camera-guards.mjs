@@ -105,7 +105,9 @@ const checks = [
       webMap.includes("fuel-path-marker-cluster") &&
       webMap.includes("lowest ${cluster.minPrice.toFixed(1)} c/L") &&
       webMap.includes('<span class="fuel-path-marker-price">') &&
-      webMap.includes('<span class="fuel-path-marker-brand">'),
+      webMap.includes('<span class="fuel-path-marker-brand">') &&
+      webMap.includes(".fuel-path-marker::after") &&
+      !webMap.includes(".fuel-path-marker-cluster::after"),
   },
   {
     label: "native station pins stay decorative while station rows own semantics",
@@ -128,9 +130,11 @@ const checks = [
       nativeMap.includes("const maxPriceMarkers = 18;") &&
       nativeMap.includes("const markerGridSize = 132;") &&
       nativeMap.includes("styles.pinBrand") &&
+      nativeMap.includes("styles.pinPointer") &&
       nativeMap.includes("backgroundColor: colors.greenDark") &&
       nativeMap.indexOf("<Text style={[styles.pinPrice") <
-        nativeMap.indexOf("<View style={styles.pinBrand}>"),
+        nativeMap.indexOf("<View style={styles.pinBrand}>") &&
+      nativeMap.includes("pinPointerSelected"),
   },
   {
     label: "app shell uses the Fuel Path logo lockup",

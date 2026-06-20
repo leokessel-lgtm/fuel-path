@@ -292,13 +292,16 @@ export function StationMap({
               tracksViewChanges={false}
               zIndex={selected ? 700 : 500}
             >
-              <View style={[styles.pin, selected && styles.pinSelected]}>
-                <Text style={[styles.pinPrice, selected && styles.pinPriceSelected]}>
-                  {item.adjustedCpl.toFixed(1)}
-                </Text>
-                <View style={styles.pinBrand}>
-                  <BrandBadge station={item.station} size={20} />
+              <View style={styles.pinAnchor}>
+                <View style={[styles.pin, selected && styles.pinSelected]}>
+                  <Text style={[styles.pinPrice, selected && styles.pinPriceSelected]}>
+                    {item.adjustedCpl.toFixed(1)}
+                  </Text>
+                  <View style={styles.pinBrand}>
+                    <BrandBadge station={item.station} size={20} />
+                  </View>
                 </View>
+                <View style={[styles.pinPointer, selected && styles.pinPointerSelected]} />
               </View>
             </Marker>
           );
@@ -580,6 +583,9 @@ const styles = StyleSheet.create({
     top: 8,
     width: 8,
   },
+  pinAnchor: {
+    alignItems: "center",
+  },
   pin: {
     ...shadow.soft,
     alignItems: "center",
@@ -614,6 +620,21 @@ const styles = StyleSheet.create({
     minHeight: 22,
     justifyContent: "center",
     width: "100%",
+  },
+  pinPointer: {
+    backgroundColor: colors.white,
+    borderBottomColor: "rgba(7, 86, 66, 0.18)",
+    borderBottomWidth: 1,
+    borderRightColor: "rgba(7, 86, 66, 0.18)",
+    borderRightWidth: 1,
+    height: 10,
+    marginTop: -6,
+    transform: [{ rotate: "45deg" }],
+    width: 10,
+  },
+  pinPointerSelected: {
+    borderBottomColor: colors.green,
+    borderRightColor: colors.green,
   },
   compactPin: {
     ...shadow.soft,

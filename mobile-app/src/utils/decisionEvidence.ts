@@ -5,7 +5,7 @@ import {
   Station,
   StationViewModel,
 } from "../types";
-import { formatRelativeUpdatedAt, formatUpdatedAt } from "./pricing";
+import { formatRelativeUpdatedAt } from "./pricing";
 
 export type EvidenceLevel = "high" | "medium" | "low";
 
@@ -123,13 +123,55 @@ export function stationEvidenceLine(item: StationViewModel) {
   return `${timestamp} | ${confidence.label}`;
 }
 
-export function stationTimestampLine(station: Station) {
+export function stationTimestampLine(station: Station, now = new Date()) {
   if (!station.updatedAt) return "Price timestamp unknown";
   if (isOfficialLivePriceSource(station.source)) {
-    return `Price unchanged since ${formatUpdatedAt(station.updatedAt)}`;
+    return priceUnchangedLine(station.updatedAt, now);
   }
   const freshness = stationFreshness(station);
   return freshness.label;
+}
+
+function priceUnchangedLine(value: string, now = new Date()) {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "Price timestamp unknown";
+
+  const ageMs = Math.max(0, now.getTime() - parsed.getTime());
+  const ageHours = Math.floor(ageMs / 3600000);
+  if (ageHours < 24) {
+    return `Price unchanged since ${formatTimeOfDay(parsed)}`;
+  }
+
+  const ageDays = Math.floor(ageHours / 24);
+  if (ageDays < 7) {
+    return `Price unchanged for ${ageDays} ${ageDays === 1 ? "day" : "days"}`;
+  }
+
+  return `Price unchanged for ${formatLongAge(ageDays)}`;
+}
+
+function formatTimeOfDay(value: Date) {
+  return new Intl.DateTimeFormat("en-AU", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  })
+    .format(value)
+    .replace(/\s/g, "")
+    .toLowerCase();
+}
+
+function formatLongAge(days: number) {
+  if (days < 30) {
+    const weeks = Math.max(1, Math.floor(days / 7));
+    return weeks === 1 ? "a week" : `${weeks} weeks`;
+  }
+  if (days < 365) {
+    const months = Math.max(1, Math.floor(days / 30));
+    return months === 1 ? "a month" : `${months} months`;
+  }
+  const years = Math.max(1, Math.floor(days / 365));
+  return years === 1 ? "a year" : `${years} years`;
 }
 
 export function stationOpenLabel(openNow?: boolean) {

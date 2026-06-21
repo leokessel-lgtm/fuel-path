@@ -240,6 +240,17 @@ const checks = [
       !nearbyStationSheet.includes("selectedPumpPrice"),
   },
   {
+    label: "official price timestamps use age-aware unchanged copy",
+    ok:
+      decisionEvidence.includes("function priceUnchangedLine(value: string, now = new Date())") &&
+      decisionEvidence.includes("Price unchanged since ${formatTimeOfDay(parsed)}") &&
+      decisionEvidence.includes("Price unchanged for ${ageDays} ${ageDays === 1 ? \"day\" : \"days\"}") &&
+      decisionEvidence.includes('return weeks === 1 ? "a week" : `${weeks} weeks`;') &&
+      decisionEvidence.includes('return months === 1 ? "a month" : `${months} months`;') &&
+      decisionEvidence.includes('return years === 1 ? "a year" : `${years} years`;') &&
+      !decisionEvidence.includes("formatUpdatedAt"),
+  },
+  {
     label: "nearby expanded station list removes duplicate selected card and reaches higher",
     ok:
       nearbyStationSheet.includes("{selected && !sheetExpanded ? (") &&

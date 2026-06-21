@@ -67,6 +67,43 @@ db.exec(`
     lat UNINDEXED,
     lon UNINDEXED
   );
+  CREATE TABLE address_typeahead_entries (
+    entry_id TEXT PRIMARY KEY,
+    address_id TEXT NOT NULL,
+    label TEXT NOT NULL,
+    lat REAL NOT NULL,
+    lon REAL NOT NULL,
+    state TEXT,
+    postcode TEXT,
+    locality TEXT,
+    display_title TEXT,
+    display_subtitle TEXT,
+    key_text TEXT NOT NULL,
+    prefix_key TEXT NOT NULL,
+    base_signature TEXT NOT NULL,
+    entry_type TEXT NOT NULL,
+    refine_required INTEGER DEFAULT 0,
+    unit TEXT,
+    rank_weight INTEGER NOT NULL
+  );
+  CREATE VIRTUAL TABLE address_typeahead_fts USING fts5(
+    entry_id UNINDEXED,
+    key_text,
+    label UNINDEXED,
+    state UNINDEXED,
+    postcode UNINDEXED,
+    entry_type UNINDEXED,
+    refine_required UNINDEXED,
+    rank_weight UNINDEXED
+  );
+  CREATE TABLE address_prefix_entries (
+    prefix TEXT NOT NULL,
+    entry_id TEXT NOT NULL,
+    rank_weight INTEGER NOT NULL,
+    PRIMARY KEY (prefix, entry_id)
+  );
+  CREATE INDEX address_prefix_entries_prefix_idx ON address_prefix_entries(prefix);
+  CREATE INDEX address_typeahead_entries_base_idx ON address_typeahead_entries(base_signature);
 `);
 
 const insertAddress = db.prepare(`
@@ -82,6 +119,23 @@ const insertFts = db.prepare(`
     display_title, display_subtitle, suggestion_type, refine_required, refine_hint, base_key, search_key, search_text, lat, lon
   )
   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+`);
+const insertTypeaheadEntry = db.prepare(`
+  INSERT OR REPLACE INTO address_typeahead_entries (
+    entry_id, address_id, label, lat, lon, state, postcode, locality, display_title, display_subtitle,
+    key_text, prefix_key, base_signature, entry_type, refine_required, unit, rank_weight
+  )
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+`);
+const insertTypeaheadFts = db.prepare(`
+  INSERT INTO address_typeahead_fts (
+    entry_id, key_text, label, state, postcode, entry_type, refine_required, rank_weight
+  )
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+`);
+const insertPrefixEntry = db.prepare(`
+  INSERT OR IGNORE INTO address_prefix_entries (prefix, entry_id, rank_weight)
+  VALUES (?, ?, ?)
 `);
 
 let total = 0;
@@ -156,6 +210,40 @@ for (const state of states) {
       address.lat,
       address.lon,
     );
+    for (const entry of address.typeaheadEntries || []) {
+      insertTypeaheadEntry.run(
+        entry.entryId,
+        address.id,
+        entry.label,
+        address.lat,
+        address.lon,
+        address.state,
+        address.postcode,
+        address.locality,
+        entry.displayTitle,
+        entry.displaySubtitle,
+        entry.keyText,
+        entry.prefixKey,
+        entry.baseSignature,
+        entry.entryType,
+        entry.refineRequired ? 1 : 0,
+        entry.unit,
+        entry.rankWeight,
+      );
+      insertTypeaheadFts.run(
+        entry.entryId,
+        entry.keyText,
+        entry.label,
+        address.state,
+        address.postcode,
+        entry.entryType,
+        entry.refineRequired ? 1 : 0,
+        entry.rankWeight,
+      );
+      for (const prefix of compactPrefixes(entry.prefixKey)) {
+        insertPrefixEntry.run(prefix, entry.entryId, entry.rankWeight);
+      }
+    }
     stateCount += 1;
     total += 1;
     if (stateCount % 100000 === 0) {
@@ -246,6 +334,10 @@ function normaliseRawRecord(row, state, locality, street, geocode) {
   ].filter(Boolean).join(", ");
   if (!label || !streetAddress || !locality.name) return null;
   const searchKeys = buildSearchKeys({ ...keySource, label });
+  const display = {
+    title: displayTitle({ buildingName: titleCase(row.BUILDING_NAME), unit, streetAddress, label }),
+    subtitle: [unit ? streetAddress : "", localityPart].filter(Boolean).join(", "),
+  };
   return {
     id: row.ADDRESS_DETAIL_PID,
     label,
@@ -258,14 +350,21 @@ function normaliseRawRecord(row, state, locality, street, geocode) {
     primarySecondary: row.PRIMARY_SECONDARY || "",
     geocodeType: geocode.geocodeType,
     accuracy: geocode.geocodeType,
-    displayTitle: displayTitle({ buildingName: titleCase(row.BUILDING_NAME), unit, streetAddress, label }),
-    displaySubtitle: [unit ? streetAddress : "", localityPart].filter(Boolean).join(", "),
+    displayTitle: display.title,
+    displaySubtitle: display.subtitle,
     suggestionType: "exact_address",
     refineRequired: false,
     refineHint: "",
     baseKey: searchKeys.baseKey,
     searchKey: searchKeys.searchKey,
     searchText: buildSearchText({ label, searchValues: searchKeys.values }),
+    typeaheadEntries: buildTypeaheadEntries({
+      id: row.ADDRESS_DETAIL_PID,
+      label,
+      source: keySource,
+      display,
+      keys: searchKeys,
+    }),
   };
 }
 
@@ -308,6 +407,71 @@ function buildSearchKeys(source) {
 
 function buildSearchText({ label, searchValues }) {
   return [...new Set([label, ...(searchValues || [])].map(normaliseAddressText).filter(Boolean))].join(" ");
+}
+
+function buildTypeaheadEntries({ id, label, source, display, keys }) {
+  const unit = source.flatNumber ? normaliseAddressText(`${source.flatType || "Unit"} ${source.flatNumber}`) : "";
+  const baseSignature = keys.baseKey || normaliseAddressText(label);
+  const entries = [
+    {
+      entryId: `${id}:exact:label`,
+      label,
+      displayTitle: display.title,
+      displaySubtitle: display.subtitle,
+      keyText: normaliseAddressText(label),
+      prefixKey: normaliseAddressText(label),
+      baseSignature,
+      entryType: "exact",
+      refineRequired: false,
+      unit,
+      rankWeight: unit ? 920 : 1000,
+    },
+  ];
+  if (keys.baseKey) {
+    entries.push({
+      entryId: `${id}:exact:base`,
+      label,
+      displayTitle: display.title,
+      displaySubtitle: display.subtitle,
+      keyText: [unit, keys.baseKey].filter(Boolean).join(" "),
+      prefixKey: [unit, keys.baseKey].filter(Boolean).join(" "),
+      baseSignature,
+      entryType: "exact",
+      refineRequired: false,
+      unit,
+      rankWeight: unit ? 940 : 1000,
+    });
+  }
+  if (keys.baseKey && unit) {
+    const baseTitle = source.buildingName || [source.number, source.streetName].filter(Boolean).join(" ");
+    const place = [source.locality, source.state, source.postcode].filter(Boolean).join(" ");
+    entries.push({
+      entryId: `${id}:base:refine`,
+      label: [baseTitle, place].filter(Boolean).join(", "),
+      displayTitle: baseTitle,
+      displaySubtitle: place,
+      keyText: [normaliseAddressText(source.buildingName), keys.baseKey].filter(Boolean).join(" "),
+      prefixKey: [normaliseAddressText(source.buildingName), keys.baseKey].filter(Boolean).join(" "),
+      baseSignature,
+      entryType: "base_refine",
+      refineRequired: true,
+      unit: "",
+      rankWeight: 980,
+    });
+  }
+  return entries.filter((entry) => entry.keyText.length >= 4);
+}
+
+function compactPrefixes(value) {
+  const text = normaliseAddressText(value);
+  const prefixes = new Set();
+  for (let length = 3; length <= Math.min(15, text.length); length += 1) {
+    prefixes.add(text.slice(0, length));
+  }
+  for (let index = 0; index < text.length && index < 15; index += 1) {
+    if (text[index] === " ") prefixes.add(text.slice(0, index + 1));
+  }
+  return [...prefixes].filter((prefix) => prefix.length >= 3);
 }
 
 function displayTitle({ buildingName, unit, streetAddress, label }) {

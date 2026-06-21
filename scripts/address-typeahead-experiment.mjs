@@ -18,6 +18,7 @@ const NOISE_PER_SEED = Number(args.noisePerSeed || 120);
 const OUTPUT_SQLITE = path.resolve(args.outputSqlite || `tmp/address-typeahead-experiment-${RUN_ID}.sqlite`);
 const LIMIT = Number(args.limit || 5);
 const MAX_PREFIX = Number(args.maxPrefix || 15);
+const PROFILE = args.profile || "balanced";
 
 if (!fs.existsSync(SOURCE_SQLITE)) throw new Error(`Address SQLite does not exist: ${SOURCE_SQLITE}`);
 
@@ -29,6 +30,7 @@ const cases = sampledRows.cases.map((row, index) => ({
   ...row,
   id: `case-${String(index + 1).padStart(4, "0")}`,
   query: String(row.label || "").replace(/,/g, "").replace(/\s+/g, " ").trim(),
+  segment: addressSegment(row),
 }));
 const allRows = dedupeRows([...sampledRows.indexRows, ...sampledRows.cases]);
 
@@ -58,6 +60,7 @@ const payload = {
     addressCount: ADDRESS_COUNT,
     noisePerSeed: NOISE_PER_SEED,
     maxPrefix: MAX_PREFIX,
+    profile: PROFILE,
   },
   sampled: {
     cases: cases.length,
@@ -67,6 +70,11 @@ const payload = {
     typeahead: summarise(rows.map((row) => row.typeahead), rows),
     prefix: summarise(rows.map((row) => row.prefix), rows),
     hybrid: summarise(rows.map((row) => row.hybrid), rows),
+  },
+  bySegment: {
+    typeahead: summariseBySegment(rows, "typeahead"),
+    prefix: summariseBySegment(rows, "prefix"),
+    hybrid: summariseBySegment(rows, "hybrid"),
   },
   rows,
 };
@@ -270,6 +278,7 @@ function searchPrefix(db, needle, limit) {
 }
 
 function searchHybrid(db, needle, limit) {
+  if (queryContainsUnitLikeToken(needle)) return searchTypeahead(db, needle, limit);
   const prefixRows = searchPrefix(db, needle, limit);
   if (prefixRows.length && !prefixRowsAmbiguous(prefixRows)) return prefixRows;
   return searchTypeahead(db, needle, limit);
@@ -416,6 +425,28 @@ function summarise(results, sourceRows) {
   };
 }
 
+function summariseBySegment(rows, mode) {
+  return Object.fromEntries(
+    [...new Set(rows.map((row) => row.segment || "standard"))]
+      .sort()
+      .map((segment) => [segment, summarise(rows.filter((row) => row.segment === segment).map((row) => row[mode]), rows.filter((row) => row.segment === segment))]),
+  );
+}
+
+function addressSegment(row) {
+  const parsed = parseAddress(row.label);
+  const ruralRemote = ruralRemoteLocality(row.locality, row.state, row.label);
+  if (parsed?.unit && ruralRemote) return "rural_remote_unit";
+  if (parsed?.unit) return "unit_or_building";
+  if (ruralRemote) return "rural_remote";
+  return "standard";
+}
+
+function ruralRemoteLocality(locality, state, label) {
+  const text = normalise(`${locality || ""} ${state || ""} ${label || ""}`);
+  return /\b(alice springs|albany|austins ferry|broome|burnie|coober pedy|devonport|geraldton|humpty doo|kalgoorlie|karratha|katherine|longreach|mount gambier|nhulunbuy|orange|palmerston city|port lincoln|queenstown|renmark|smithton|tamworth|tennant creek|ulverstone|victor harbor|wagga wagga|whyalla|yulara)\b/.test(text);
+}
+
 function addressSeedsForState(state) {
   const base = {
     NSW: ["balgowlah heights nsw", "sylvania nsw", "sydney nsw", "parramatta nsw", "newcastle nsw", "wollongong nsw", "tamworth nsw", "orange nsw", "wagga wagga nsw"],
@@ -427,7 +458,19 @@ function addressSeedsForState(state) {
     TAS: ["hobart tas", "launceston tas", "queenstown tas", "austins ferry tas", "devonport tas", "burnie tas", "ulverstone tas", "smithton tas"],
     NT: ["darwin nt", "alice springs nt", "palmerston city nt", "tennant creek nt", "katherine nt", "nhulunbuy nt", "yulara nt", "humpty doo nt"],
   };
-  return base[state] || [`${state.toLowerCase()}`];
+  const seeds = base[state] || [`${state.toLowerCase()}`];
+  if (PROFILE !== "rural-unit") return seeds;
+  const ruralFirst = {
+    NSW: ["tamworth nsw", "orange nsw", "wagga wagga nsw", "newcastle nsw", "wollongong nsw"],
+    ACT: ["tuggeranong act", "belconnen act", "gungahlin act", "isabella plains act"],
+    VIC: ["wodonga vic", "traralgon vic", "shepparton vic", "bendigo vic", "ballarat vic"],
+    QLD: ["longreach qld", "townsville qld", "cairns qld", "mackay qld", "rockhampton qld", "toowoomba qld"],
+    WA: ["karratha wa", "broome wa", "albany wa", "geraldton wa", "bunbury wa", "kalgoorlie wa"],
+    SA: ["coober pedy sa", "mount gambier sa", "port lincoln sa", "whyalla sa", "renmark sa", "victor harbor sa"],
+    TAS: ["queenstown tas", "austins ferry tas", "devonport tas", "burnie tas", "ulverstone tas", "smithton tas"],
+    NT: ["alice springs nt", "tennant creek nt", "katherine nt", "nhulunbuy nt", "yulara nt", "humpty doo nt"],
+  };
+  return [...new Set([...(ruralFirst[state] || []), ...seeds])];
 }
 
 function addressSampleQualityPass(row) {
@@ -487,6 +530,11 @@ function normalise(value) {
     .replace(/[^a-z0-9]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function queryContainsUnitLikeToken(needle) {
+  const terms = new Set(["apartment", "apt", "flat", "level", "lvl", "office", "shop", "suite", "townhouse", "unit"]);
+  return normalise(needle).split(/\s+/).some((token) => terms.has(token));
 }
 
 function percentile(values, percentileValue) {

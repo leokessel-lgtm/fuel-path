@@ -308,6 +308,121 @@ test("G-NAF SQLite exact address ranking beats nearby house numbers", async () =
   });
 });
 
+test("hybrid typeahead avoids same-street wrong locality and preserves exact unit intent", async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-gnaf-hybrid-safety-"));
+  const inputPath = path.join(tempDir, "GNAF_CORE.psv");
+  const outputPath = path.join(tempDir, "gnaf-hybrid-safety.sqlite");
+  fs.writeFileSync(
+    inputPath,
+    [
+      [
+        "ADDRESS_DETAIL_PID",
+        "ADDRESS_LABEL",
+        "BUILDING_NAME",
+        "FLAT_TYPE",
+        "FLAT_NUMBER",
+        "NUMBER_FIRST",
+        "STREET_NAME",
+        "STREET_TYPE",
+        "LOCALITY_NAME",
+        "STATE",
+        "POSTCODE",
+        "GEOCODE_TYPE",
+        "LONGITUDE",
+        "LATITUDE",
+      ].join("|"),
+      [
+        "GAACT0201",
+        "279 Canberra Avenue, Symonston ACT 2609",
+        "",
+        "",
+        "",
+        "279",
+        "Canberra",
+        "Avenue",
+        "Symonston",
+        "ACT",
+        "2609",
+        "PROPERTY CENTROID",
+        "149.160",
+        "-35.346",
+      ].join("|"),
+      [
+        "GAACT0202",
+        "279 Canberra Avenue, Fyshwick ACT 2609",
+        "",
+        "",
+        "",
+        "279",
+        "Canberra",
+        "Avenue",
+        "Fyshwick",
+        "ACT",
+        "2609",
+        "PROPERTY CENTROID",
+        "149.171",
+        "-35.331",
+      ].join("|"),
+      [
+        "GAACT0203",
+        "Canberra Lakes Estate, Unit 65, 11 Joy Cummings Place, Belconnen ACT 2617",
+        "Canberra Lakes Estate",
+        "Unit",
+        "65",
+        "11",
+        "Joy Cummings",
+        "Place",
+        "Belconnen",
+        "ACT",
+        "2617",
+        "PROPERTY CENTROID",
+        "149.079",
+        "-35.240",
+      ].join("|"),
+      [
+        "GAACT0204",
+        "Canberra Lakes Estate, Unit 8, 11 Joy Cummings Place, Belconnen ACT 2617",
+        "Canberra Lakes Estate",
+        "Unit",
+        "8",
+        "11",
+        "Joy Cummings",
+        "Place",
+        "Belconnen",
+        "ACT",
+        "2617",
+        "PROPERTY CENTROID",
+        "149.080",
+        "-35.241",
+      ].join("|"),
+    ].join("\n"),
+  );
+
+  execFileSync(
+    process.execPath,
+    [
+      "scripts/build-gnaf-address-index.mjs",
+      "--input",
+      inputPath,
+      "--output",
+      outputPath,
+    ],
+    { cwd: path.resolve(__dirname, "../.."), stdio: "ignore" },
+  );
+
+  await withEnv({ FUEL_PATH_GNAF_SQLITE_PATH: outputPath }, async () => {
+    const symonstonSuggestions = await searchAddressIndex("279 Canberra Avenue Symonston", 3);
+    const unitSuggestions = await searchAddressIndex("Canberra Lakes Estate Unit 65 11 Joy Cummings Place Belconnen", 3);
+    const baseSuggestions = await searchAddressIndex("Canberra Lakes Estate", 3);
+
+    assert.equal(symonstonSuggestions[0].label, "279 Canberra Avenue, Symonston ACT 2609");
+    assert.equal(unitSuggestions[0].label, "Canberra Lakes Estate, Unit 65, 11 Joy Cummings Place, Belconnen ACT 2617");
+    assert.equal(unitSuggestions[0].refineRequired, false);
+    assert.equal(baseSuggestions[0].refineRequired, true);
+    assert.equal(baseSuggestions[0].sourceLabel, "Building");
+  });
+});
+
 test("geocode cache separates seed-only and configured G-NAF index results", async () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-gnaf-cache-mode-"));
   const inputPath = path.join(tempDir, "GNAF_CORE.psv");

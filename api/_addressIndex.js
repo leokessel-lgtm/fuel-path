@@ -152,6 +152,10 @@ function searchSqliteIndex(needle, limit) {
   const database = openSqliteIndex();
   if (!database) return [];
   const sqlitePath = configuredSqlitePath();
+  if (sqliteHybridIndexAvailable(database)) {
+    const hybridResults = searchSqliteHybridIndex(database, needle, limit);
+    if (hybridResults.length) return hybridResults;
+  }
   if (isLargeSqliteIndex(sqlitePath) && !shouldSearchLargeSqliteIndex(needle)) return [];
 
   const terms = sqliteFtsTermsForNeedle(needle);
@@ -193,6 +197,90 @@ function searchSqliteIndex(needle, limit) {
       return [];
     }
   }
+}
+
+function searchSqliteHybridIndex(database, needle, limit) {
+  if (queryContainsUnitLikeToken(needle)) {
+    const typeaheadRows = searchSqliteTypeaheadEntries(database, needle, limit);
+    return typeaheadRows.map((row) => addressRecordToSuggestion(hybridRowToAddressRecord(row), hybridMatchType(row, needle), Number(row.rank_weight || 900)));
+  }
+  const prefixRows = searchSqlitePrefixEntries(database, needle, limit);
+  if (prefixRows.length && !prefixRowsAmbiguous(prefixRows)) {
+    return prefixRows.map((row) => addressRecordToSuggestion(hybridRowToAddressRecord(row), hybridMatchType(row, needle), Number(row.rank_weight || 950)));
+  }
+  const typeaheadRows = searchSqliteTypeaheadEntries(database, needle, limit);
+  return typeaheadRows.map((row) => addressRecordToSuggestion(hybridRowToAddressRecord(row), hybridMatchType(row, needle), Number(row.rank_weight || 900)));
+}
+
+function searchSqlitePrefixEntries(database, needle, limit) {
+  const prefix = normaliseAddressText(needle).slice(0, 15);
+  if (prefix.length < 3) return [];
+  return database.prepare(`
+    SELECT e.*
+    FROM address_prefix_entries p
+    JOIN address_typeahead_entries e ON e.entry_id = p.entry_id
+    WHERE p.prefix = ?
+    ORDER BY p.rank_weight DESC, LENGTH(e.label), e.label
+    LIMIT ?
+  `).all(prefix, Math.max(1, Math.min(Number(limit) || 5, 20)));
+}
+
+function searchSqliteTypeaheadEntries(database, needle, limit) {
+  const terms = normaliseAddressText(needle).split(/\s+/).filter(Boolean).slice(0, 8);
+  if (!terms.length) return [];
+  const ftsQuery = terms.map((term) => `${escapeFtsTerm(term)}*`).join(" ");
+  return database.prepare(`
+    SELECT e.*
+    FROM address_typeahead_fts f
+    JOIN address_typeahead_entries e ON e.entry_id = f.entry_id
+    WHERE address_typeahead_fts MATCH ?
+    ORDER BY
+      CASE
+        WHEN e.key_text = ? THEN 0
+        WHEN e.key_text LIKE ? THEN 1
+        WHEN e.key_text LIKE ? THEN 2
+        ELSE 3
+      END,
+      e.rank_weight DESC,
+      rank,
+      LENGTH(e.label),
+      e.label
+    LIMIT ?
+  `).all(ftsQuery, needle, `${needle}%`, `% ${needle}%`, Math.max(1, Math.min(Number(limit) || 5, 20)));
+}
+
+function prefixRowsAmbiguous(rows) {
+  const strongRows = rows.filter((row) => Number(row.rank_weight || 0) >= 980);
+  const signatures = new Set(strongRows.map((row) => row.base_signature).filter(Boolean));
+  return signatures.size > 1;
+}
+
+function hybridRowToAddressRecord(row) {
+  return {
+    id: row.entry_id,
+    label: row.label,
+    lat: row.lat,
+    lon: row.lon,
+    state: row.state,
+    postcode: row.postcode,
+    locality: row.locality,
+    accuracy: "address_typeahead",
+    search_text: row.key_text,
+    display_title: row.display_title,
+    display_subtitle: row.display_subtitle,
+    suggestion_type: row.entry_type === "base_refine" ? "base_address" : "exact_address",
+    refine_required: row.refine_required,
+    refine_hint: Number(row.refine_required || 0) ? "Choose or type the exact unit before routing." : "",
+  };
+}
+
+function hybridMatchType(row, needle) {
+  if (Number(row.refine_required || 0)) return "building_refine";
+  const key = normaliseAddressText(row.key_text);
+  const label = normaliseAddressText(row.label);
+  if (key === needle || label === needle) return "exact_address";
+  if (key.startsWith(needle) || label.startsWith(needle)) return "address_prefix";
+  return "address_token_overlap";
 }
 
 function scoreRecord(record, needle) {
@@ -348,6 +436,22 @@ function sqliteSchemaColumns(database, table) {
   return columns;
 }
 
+function sqliteHybridIndexAvailable(database) {
+  return sqliteTableExists(database, "address_typeahead_entries") &&
+    sqliteTableExists(database, "address_typeahead_fts") &&
+    sqliteTableExists(database, "address_prefix_entries");
+}
+
+function sqliteTableExists(database, table) {
+  const cacheKey = `${configuredSqlitePath()}:${table}`;
+  if (!sqliteTableExists.cache) sqliteTableExists.cache = new Map();
+  if (sqliteTableExists.cache.has(cacheKey)) return sqliteTableExists.cache.get(cacheKey);
+  const row = database.prepare("SELECT name FROM sqlite_master WHERE type IN ('table', 'view') AND name = ?").get(table);
+  const exists = Boolean(row?.name);
+  sqliteTableExists.cache.set(cacheKey, exists);
+  return exists;
+}
+
 function isLargeSqliteIndex(sqlitePath) {
   if (!sqlitePath) return false;
   const threshold = Number(process.env.FUEL_PATH_GNAF_LARGE_SQLITE_BYTES || 1_000_000_000);
@@ -406,7 +510,12 @@ const SQLITE_FTS_STOP_TERMS = new Set([
   "unit",
 ]);
 
-const SQLITE_UNIT_TERMS = new Set(["apartment", "flat", "suite", "townhouse", "unit"]);
+const SQLITE_UNIT_TERMS = new Set(["apartment", "apt", "flat", "level", "lvl", "office", "shop", "suite", "townhouse", "unit"]);
+
+function queryContainsUnitLikeToken(needle) {
+  const tokens = normaliseAddressText(needle).split(/\s+/).filter(Boolean);
+  return tokens.some((token) => SQLITE_UNIT_TERMS.has(token));
+}
 
 function isStateCode(value) {
   return ["act", "nsw", "nt", "ot", "qld", "sa", "tas", "vic", "wa"].includes(String(value || "").toLowerCase());

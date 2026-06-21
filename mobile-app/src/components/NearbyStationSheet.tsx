@@ -1,4 +1,14 @@
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  type GestureResponderEvent,
+} from "react-native";
 
 import { colors, radii, shadow, spacing, surfaces, typeScale, typography } from "../theme";
 import { StationViewModel } from "../types";
@@ -13,6 +23,10 @@ import { StationRow } from "./StationRow";
 export type NearbySortMode = "distance" | "price" | "value";
 
 export const defaultNearbySortMode: NearbySortMode = "value";
+const sheetDragActivatePx = 8;
+const sheetExpandDragPx = -60;
+const sheetCollapseDragPx = 70;
+const sheetDismissDragPx = 170;
 
 export const nearbySortOptions: Array<{
   key: NearbySortMode;
@@ -55,14 +69,112 @@ export function NearbyStationSheet({
   stationNotice: string;
   stations: StationViewModel[];
 }) {
+  const [dragOffsetY, setDragOffsetY] = useState(0);
+  const dragStartYRef = useRef(0);
+  const dragMovedRef = useRef(false);
+  const suppressNextPressRef = useRef(false);
+
+  const settleSheetDrag = (dy: number, toggleOnTap = true) => {
+    setDragOffsetY(0);
+    if (toggleOnTap && !dragMovedRef.current && Math.abs(dy) < sheetDragActivatePx) {
+      onToggleExpanded(!sheetExpanded);
+      return;
+    }
+    if (dy > sheetDismissDragPx) {
+      if (selected && !sheetExpanded) onCloseSelectedStation();
+      onToggleExpanded(false);
+      return;
+    }
+    if (dy > sheetCollapseDragPx) {
+      onToggleExpanded(false);
+      return;
+    }
+    if (dy < sheetExpandDragPx) {
+      onToggleExpanded(true);
+    }
+  };
+  const updateDragOffset = (pageY: number) => {
+    const dy = pageY - dragStartYRef.current;
+    dragMovedRef.current = dragMovedRef.current || Math.abs(dy) > sheetDragActivatePx;
+    setDragOffsetY(clampSheetDrag(dy, sheetExpanded));
+    return dy;
+  };
+  const finishWebDrag = (pageY: number) => {
+    const dy = pageY - dragStartYRef.current;
+    if (dragMovedRef.current) {
+      suppressNextPressRef.current = true;
+      settleSheetDrag(dy, false);
+      return;
+    }
+    setDragOffsetY(0);
+  };
+  const webDragProps =
+    Platform.OS === "web"
+      ? ({
+          onMouseDown: (event: { nativeEvent?: { pageY?: number } }) => {
+            dragStartYRef.current = Number(event.nativeEvent?.pageY || 0);
+            dragMovedRef.current = false;
+            const handleMove = (moveEvent: MouseEvent) => updateDragOffset(moveEvent.pageY);
+            const handleUp = (upEvent: MouseEvent) => {
+              window.removeEventListener("mousemove", handleMove);
+              finishWebDrag(upEvent.pageY);
+            };
+            window.addEventListener("mousemove", handleMove);
+            window.addEventListener("mouseup", handleUp, { once: true });
+          },
+          onTouchStart: (event: { nativeEvent?: { touches?: Array<{ pageY?: number }> } }) => {
+            const firstTouch = event.nativeEvent?.touches?.[0];
+            dragStartYRef.current = Number(firstTouch?.pageY || 0);
+            dragMovedRef.current = false;
+            const handleMove = (moveEvent: TouchEvent) => {
+              const touch = moveEvent.touches[0];
+              if (touch) updateDragOffset(touch.pageY);
+            };
+            const handleEnd = (endEvent: TouchEvent) => {
+              window.removeEventListener("touchmove", handleMove);
+              const touch = endEvent.changedTouches[0];
+              finishWebDrag(touch?.pageY || dragStartYRef.current);
+            };
+            window.addEventListener("touchmove", handleMove, { passive: true });
+            window.addEventListener("touchend", handleEnd, { once: true });
+          },
+        } as Record<string, unknown>)
+      : {};
+
   return (
-    <View style={[styles.sheet, sheetExpanded ? styles.sheetExpanded : styles.sheetCollapsed]}>
+    <View
+      style={[
+        styles.sheet,
+        sheetExpanded ? styles.sheetExpanded : styles.sheetCollapsed,
+        dragOffsetY !== 0 && { transform: [{ translateY: dragOffsetY }] },
+      ]}
+    >
       <View style={styles.sheetHeader}>
         <Pressable
           accessibilityLabel={sheetExpanded ? "Collapse station list" : "Expand station list"}
           accessibilityRole="button"
           hitSlop={10}
-          onPress={() => onToggleExpanded(!sheetExpanded)}
+          onPress={() => {
+            if (suppressNextPressRef.current) {
+              suppressNextPressRef.current = false;
+              return;
+            }
+            onToggleExpanded(!sheetExpanded);
+          }}
+          onResponderGrant={(event) => {
+            dragStartYRef.current = responderPageY(event);
+            dragMovedRef.current = false;
+          }}
+          onResponderMove={(event) => {
+            updateDragOffset(responderPageY(event));
+          }}
+          onResponderRelease={(event) => {
+            suppressNextPressRef.current = true;
+            settleSheetDrag(responderPageY(event) - dragStartYRef.current);
+          }}
+          onResponderTerminate={() => setDragOffsetY(0)}
+          onStartShouldSetResponder={() => true}
+          {...webDragProps}
           style={styles.grabberTouch}
         >
           <View style={styles.grabber} />
@@ -152,6 +264,16 @@ export function NearbyStationSheet({
       ) : null}
     </View>
   );
+}
+
+function responderPageY(event: GestureResponderEvent) {
+  return Number(event.nativeEvent.pageY || 0);
+}
+
+function clampSheetDrag(value: number, sheetExpanded: boolean) {
+  const min = sheetExpanded ? -24 : -190;
+  const max = sheetExpanded ? 220 : 180;
+  return Math.max(min, Math.min(max, value));
 }
 
 function SelectedStationCard({

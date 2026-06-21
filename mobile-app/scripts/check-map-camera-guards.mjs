@@ -234,6 +234,19 @@ const checks = [
   {
     label: "nearby grabber is an accessible recovery control",
     ok:
+      nearbyStationSheet.includes("clampSheetDrag") &&
+      nearbyStationSheet.includes("responderPageY") &&
+      nearbyStationSheet.includes("webDragProps") &&
+      nearbyStationSheet.includes("onMouseDown") &&
+      nearbyStationSheet.includes("onTouchStart") &&
+      nearbyStationSheet.includes("finishWebDrag") &&
+      nearbyStationSheet.includes("suppressNextPressRef") &&
+      nearbyStationSheet.includes("onStartShouldSetResponder={() => true}") &&
+      nearbyStationSheet.includes("onResponderMove") &&
+      nearbyStationSheet.includes("onResponderRelease") &&
+      nearbyStationSheet.includes("sheetDismissDragPx") &&
+      nearbyStationSheet.includes("dy > sheetDismissDragPx") &&
+      nearbyStationSheet.includes("if (selected && !sheetExpanded) onCloseSelectedStation();") &&
       nearbyStationSheet.includes('accessibilityRole="button"') &&
       nearbyStationSheet.includes("hitSlop={10}") &&
       nearbyStationSheet.includes('accessibilityLabel={sheetExpanded ? "Collapse station list" : "Expand station list"}'),

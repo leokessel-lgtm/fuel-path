@@ -71,7 +71,6 @@ export function DecisionEvidencePanel({
   const saving = Number(economics?.netSavingAfterDetourFuel ?? candidate.netSaving ?? 0);
   const detour = Number(economics?.detourMinutes ?? candidate.detourMinutes ?? 0);
   const detourFuel = Number(economics?.detourFuelLitres ?? candidate.detourFuelLitres ?? 0);
-  const timeCost = Number(economics?.timeCost ?? candidate.timeCost ?? 0);
   const capabilityLabel = capability ? capabilityLabelFor(capability) : "Live data";
   const trustLine = stationTimestampLine(candidate.station);
 
@@ -94,7 +93,6 @@ export function DecisionEvidencePanel({
         <EvidenceMetric label="Saving" value={formatMoney(saving)} />
         <EvidenceMetric label="Detour" value={`${detour.toFixed(1)} min`} />
         <EvidenceMetric label="Fuel used" value={`${detourFuel.toFixed(1)} L`} />
-        <EvidenceMetric label="Time cost" value={formatMoney(timeCost)} />
       </View>
       <Text numberOfLines={2} style={styles.evidenceTrustLine}>
         {trustLine}

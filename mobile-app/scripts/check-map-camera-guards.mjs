@@ -315,9 +315,10 @@ const checks = [
       planScreen.includes("setRouteStarted(false);") &&
       planScreen.includes("const showPlanningShortcuts = routeStarted;") &&
       planScreen.includes("resolveRouteCameraInsets") &&
-      routeCameraInsets.includes("const routeMapGap = 18;") &&
+      routeCameraInsets.includes("const routeHorizontalInset = 26;") &&
+      routeCameraInsets.includes("const routeMapGap = 12;") &&
       routeCameraInsets.includes("const routeStationMarkerHeight = 64;") &&
-      routeCameraInsets.includes("const routeResultsSheetInset = 320;") &&
+      routeCameraInsets.includes("const routeResultsSheetInset = 302;") &&
       routeCameraInsets.includes("routeSummaryOverlayHeight + routeStationMarkerHeight + routeMapGap") &&
       planScreen.includes("<View style={styles.mapLayer}>") &&
       planScreen.includes("{routeStarted ? (") &&
@@ -364,7 +365,7 @@ const checks = [
       planScreen.includes("detourFuelLitres") &&
       decisionEvidencePanel.includes("decisionSummary?.economics") &&
       decisionEvidencePanel.includes('label="Fuel used"') &&
-      decisionEvidencePanel.includes('label="Time cost"') &&
+      !decisionEvidencePanel.includes('label="Time cost"') &&
       !decisionEvidencePanel.includes('label="After time"') &&
       decisionEvidencePanel.includes("detourFuel.toFixed(1)"),
   },

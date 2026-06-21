@@ -6,12 +6,13 @@ export type RouteCameraInsetsState = {
   stationPanelOpen: boolean;
 };
 
-const routeMapGap = 18;
+const routeHorizontalInset = 26;
+const routeMapGap = 12;
 const routeStationMarkerHeight = 64;
 const routeSummaryOverlayHeight = spacing.sm + 82;
-const routeResultsSheetInset = 320;
-const routeStationSheetInset = 300;
-const routeMinimisedSheetInset = 116;
+const routeResultsSheetInset = 302;
+const routeStationSheetInset = 286;
+const routeMinimisedSheetInset = 104;
 
 export function routeCameraInsets({
   routeControlsCollapsed,
@@ -22,12 +23,12 @@ export function routeCameraInsets({
     top: routeControlsCollapsed
       ? routeSummaryOverlayHeight + routeStationMarkerHeight + routeMapGap
       : 230,
-    right: 18,
+    right: routeHorizontalInset,
     bottom: routeSheetMinimised
       ? routeMinimisedSheetInset
       : stationPanelOpen
         ? routeStationSheetInset
         : routeResultsSheetInset,
-    left: 18,
+    left: routeHorizontalInset,
   };
 }

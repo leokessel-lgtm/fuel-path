@@ -55,7 +55,7 @@ type LoadRouteOptions = {
 const defaultPlanCentre: MapPoint = {
   lat: -34.0158,
   lon: 151.1054,
-  label: "66B Easton Ave, Sylvania NSW 2224",
+  label: "Sylvania NSW 2224",
 };
 
 export function PlanScreen({
@@ -414,6 +414,7 @@ export function PlanScreen({
           routeEndpoints={routeEndpoints}
           routePoints={routePoints}
           cameraInsets={routeCameraInsets}
+          showCentreMarker={Boolean(fromPoint)}
         />
       </View>
 

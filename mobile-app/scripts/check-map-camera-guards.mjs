@@ -298,7 +298,8 @@ const checks = [
     ok:
       planScreen.includes("const [routeStarted, setRouteStarted] = useState(false);") &&
       planScreen.includes("const defaultPlanCentre: MapPoint") &&
-      planScreen.includes('label: "66B Easton Ave, Sylvania NSW 2224"') &&
+      planScreen.includes('label: "Sylvania NSW 2224"') &&
+      planScreen.includes("showCentreMarker={Boolean(fromPoint)}") &&
       planScreen.includes("setRouteStarted(true);") &&
       planScreen.includes("setRouteStarted(false);") &&
       planScreen.includes("const showPlanningShortcuts = routeStarted;") &&

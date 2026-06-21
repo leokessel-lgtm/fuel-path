@@ -136,6 +136,8 @@ const checks = [
       webMap.includes("const routeStationCameraPoints = routeEndpoints") &&
       webMap.includes("...routeStationCameraPoints") &&
       webMap.includes("const fitCameraPoints = routeEndpoints ? [...fitPoints, ...routeStationCameraPoints] : cameraPoints") &&
+      webMap.includes("map.panTo([selected.station.lat, selected.station.lon]") &&
+      webMap.includes("map.panTo([item.station.lat, item.station.lon]") &&
       !webMap.includes('`${item.station.name} - ${item.adjustedCpl.toFixed(1)} c/L`') &&
       webMap.includes("nearestStationsForCamera(stations, centre, 12)") &&
       webMap.includes("showCentreMarker ? 15 : 14") &&

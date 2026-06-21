@@ -238,10 +238,16 @@ export function StationMap({
       marker.on("click", () => {
         onSelect(item.station.stationCode);
         runProgrammaticMapMove(programmaticMoveRef, map, () => {
-          map.panInside([item.station.lat, item.station.lon], {
-            animate: true,
-            ...leafletPadding(activeInsets),
-          });
+          if (routeEndpoints) {
+            map.panInside([item.station.lat, item.station.lon], {
+              animate: true,
+              ...leafletPadding(activeInsets),
+            });
+          } else {
+            map.panTo([item.station.lat, item.station.lon], {
+              animate: true,
+            });
+          }
         });
       });
       marker.bindTooltip(item.station.name, {
@@ -268,10 +274,16 @@ export function StationMap({
       const selected = stations.find((item) => item.station.stationCode === selectedStationCode);
       if (selected && !userMovedMapRef.current) {
         runProgrammaticMapMove(programmaticMoveRef, map, () => {
-          map.panInside([selected.station.lat, selected.station.lon], {
-            animate: true,
-            ...leafletPadding(activeInsets),
-          });
+          if (routeEndpoints) {
+            map.panInside([selected.station.lat, selected.station.lon], {
+              animate: true,
+              ...leafletPadding(activeInsets),
+            });
+          } else {
+            map.panTo([selected.station.lat, selected.station.lon], {
+              animate: true,
+            });
+          }
         });
       }
     }

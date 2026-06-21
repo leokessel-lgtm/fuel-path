@@ -52,6 +52,7 @@ export function stationPriceView(
 }
 
 function bestPossibleDiscount(station: Station, preferences: AppPreferences) {
+  if (preferences.selectedDiscounts.length === 0) return undefined;
   return [...(station.discounts || [])]
     .filter((discount) => Number(discount.centsPerLitre || 0) > 0)
     .sort((left, right) => Number(right.centsPerLitre || 0) - Number(left.centsPerLitre || 0))

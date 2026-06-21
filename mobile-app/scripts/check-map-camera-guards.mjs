@@ -564,6 +564,7 @@ const checks = [
       types.includes("possibleLowerCpl?: number") &&
       types.includes("possibleLowerDisclosure?: string") &&
       pricing.includes("bestPossibleDiscount") &&
+      pricing.includes("if (preferences.selectedDiscounts.length === 0) return undefined;") &&
       pricing.includes("possible if configured, not guaranteed") &&
       pricing.includes("possible if unused, not guaranteed") &&
       pricing.includes("Possible lower price, not guaranteed.") &&

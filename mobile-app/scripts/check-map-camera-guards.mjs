@@ -128,6 +128,11 @@ const checks = [
       webMap.includes("object-fit: contain;") &&
       webMap.includes(".fuel-path-marker.is-selected .fuel-path-marker-price") &&
       webMap.includes("background: ${colors.black};") &&
+      webMap.includes("tooltipAnchor: [0, -58]") &&
+      webMap.includes("marker.bindTooltip(item.station.name") &&
+      webMap.includes('className: "fuel-path-marker-tooltip"') &&
+      webMap.includes(".fuel-path-marker-tooltip {") &&
+      !webMap.includes('`${item.station.name} - ${item.adjustedCpl.toFixed(1)} c/L`') &&
       webMap.includes("nearestStationsForCamera(stations, centre, 12)") &&
       webMap.includes("showCentreMarker ? 15 : 14") &&
       webMap.includes(".filter((items) => items.length >= minClusterStationCount)") &&

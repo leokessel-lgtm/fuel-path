@@ -222,6 +222,7 @@ export function StationMap({
           html: markerHtml(item, selected),
           iconAnchor: [27, 56],
           iconSize: [54, 56],
+          tooltipAnchor: [0, -58],
         }),
         alt: "",
         keyboard: false,
@@ -237,10 +238,11 @@ export function StationMap({
           });
         });
       });
-      marker.bindTooltip(
-        `${item.station.name} - ${item.adjustedCpl.toFixed(1)} c/L`,
-        { direction: "top", offset: [0, -28] },
-      );
+      marker.bindTooltip(item.station.name, {
+        className: "fuel-path-marker-tooltip",
+        direction: "top",
+        offset: [0, -6],
+      });
       markerLayer.addLayer(marker);
       fitPoints.push([item.station.lat, item.station.lon]);
     });
@@ -776,6 +778,20 @@ function ensureLeafletStyles() {
       }
       .fuel-path-marker.is-selected .fuel-path-marker-price {
         background: ${colors.black};
+      }
+      .fuel-path-marker-tooltip {
+        background: ${colors.white};
+        border: 1px solid rgba(23, 32, 27, 0.16);
+        border-radius: 8px;
+        box-shadow: 0 8px 18px rgba(23, 32, 27, 0.16);
+        color: ${colors.ink};
+        font-size: 13px;
+        font-weight: 700;
+        padding: 5px 8px;
+        white-space: nowrap;
+      }
+      .fuel-path-marker-tooltip::before {
+        border-top-color: ${colors.white};
       }
       .fuel-path-marker-cluster {
         align-items: center;

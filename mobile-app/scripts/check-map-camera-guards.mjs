@@ -153,9 +153,13 @@ const checks = [
       stationRow.includes("styles.mapAction") &&
       stationRow.includes("styles.mapActionCircle") &&
       stationRow.includes("styles.mapActionIcon") &&
+      stationRow.includes("styles.actionDistancePill") &&
+      stationRow.includes("styles.actionDistanceText") &&
+      stationRow.includes("{item.distanceKm.toFixed(1)} km") &&
       stationRow.includes(">↗<") &&
       !stationRow.includes("mapActionText") &&
       !stationRow.includes("styles.priceUnit") &&
+      !stationRow.includes("styles.distanceText") &&
       stationRow.indexOf("styles.priceTile") < stationRow.indexOf("styles.titleRow") &&
       stationRow.indexOf("styles.titleRow") < stationRow.indexOf("styles.mapAction") &&
       stationRow.includes("stationEvidenceLine(item)") &&

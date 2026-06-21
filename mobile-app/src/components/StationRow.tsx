@@ -46,9 +46,8 @@ export function StationRow({
             {item.station.address || item.station.brand}
           </Text>
         </View>
-        <Text numberOfLines={1} style={styles.distanceText}>
-          {item.distanceKm.toFixed(1)} km
-          <Text style={styles.statusText}> | {stationOpenLabel(item.station.openNow)}</Text>
+        <Text numberOfLines={1} style={styles.statusText}>
+          {stationOpenLabel(item.station.openNow)}
         </Text>
         <Text numberOfLines={1} style={styles.evidence}>
           {stationEvidenceLine(item)}
@@ -67,6 +66,9 @@ export function StationRow({
       <View style={styles.mapAction}>
         <View style={styles.mapActionCircle}>
           <Text style={styles.mapActionIcon}>↗</Text>
+        </View>
+        <View style={styles.actionDistancePill}>
+          <Text style={styles.actionDistanceText}>{item.distanceKm.toFixed(1)} km</Text>
         </View>
         {attentionCue ? (
           <Text
@@ -170,15 +172,11 @@ const styles = StyleSheet.create({
     fontWeight: "400",
     minWidth: 0,
   },
-  distanceText: {
-    color: colors.greenDark,
-    fontSize: typeScale.caption,
-    fontWeight: "700",
-    marginTop: 2,
-  },
   statusText: {
     color: colors.muted,
+    fontSize: typeScale.caption,
     fontWeight: "400",
+    marginTop: 2,
   },
   evidence: {
     color: colors.muted,
@@ -215,7 +213,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flexShrink: 0,
     gap: 2,
-    minWidth: 42,
+    minWidth: 58,
   },
   mapActionCircle: {
     alignItems: "center",
@@ -230,6 +228,23 @@ const styles = StyleSheet.create({
     fontSize: 21,
     fontWeight: "800",
     lineHeight: 22,
+  },
+  actionDistancePill: {
+    alignItems: "center",
+    backgroundColor: colors.black,
+    borderColor: colors.green,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    justifyContent: "center",
+    marginTop: 3,
+    minHeight: 24,
+    paddingHorizontal: spacing.sm,
+  },
+  actionDistanceText: {
+    color: colors.white,
+    fontSize: 11,
+    fontWeight: "800",
+    lineHeight: 16,
   },
   confidence: {
     backgroundColor: colors.greenSoft,

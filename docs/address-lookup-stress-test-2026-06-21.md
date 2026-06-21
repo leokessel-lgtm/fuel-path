@@ -208,6 +208,27 @@ Next recommendation:
 4. Rerun the 1000-address-only benchmark after the typeahead rebuild and use `resolvable P90 <= 15` as the first target. Keep exact unit P90 separate.
 5. Only after that, compare a representative subset against Google Places if `FUEL_PATH_GOOGLE_PLACES_API_KEY` or `FUEL_PATH_GOOGLE_MAPS_API_KEY` is configured.
 
+## Typeahead vs Prefix Experiment - 22 June 2026
+
+Follow-up artefact:
+
+- `docs/address-typeahead-prefix-experiment-2026-06-22.md`
+- `tmp/address-typeahead-experiment-2026-06-22-typeahead-prefix-hybrid-700-rankfix.json`
+
+The experiment tested both options against 700 sampled address cases from the national SQLite.
+
+Result:
+
+- rebuilt typeahead FTS: 700/700 final resolvable, P90 10
+- compact prefix table: 694/700 final resolvable, P90 10 on successful cases
+- hybrid prefix + typeahead fallback: 700/700 final resolvable, P90 10
+
+Decision:
+
+- Use a combination.
+- Compact prefix alone is too risky because same-number/same-street and sibling unit/shop cases can silently choose the wrong address.
+- Rebuilt typeahead is required as the safe fallback and disambiguation layer.
+
 ## Next Test Pass
 
 Run the next benchmark with:

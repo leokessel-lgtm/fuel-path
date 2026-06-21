@@ -671,7 +671,7 @@ function ensureLeafletStyles() {
         flex-direction: column;
         height: 46px;
         justify-content: stretch;
-        overflow: hidden;
+        overflow: visible;
         position: relative;
         transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
         max-width: 54px;
@@ -702,6 +702,8 @@ function ensureLeafletStyles() {
       .fuel-path-marker-brand {
         align-items: center;
         background: ${colors.white};
+        border-bottom-left-radius: 12px;
+        border-bottom-right-radius: 12px;
         display: flex;
         flex: 1 1 auto;
         justify-content: center;
@@ -725,6 +727,8 @@ function ensureLeafletStyles() {
       .fuel-path-marker-price {
         align-items: center;
         background: ${colors.greenDark};
+        border-top-left-radius: 11px;
+        border-top-right-radius: 11px;
         color: ${colors.white};
         display: flex;
         flex: 0 0 27px;

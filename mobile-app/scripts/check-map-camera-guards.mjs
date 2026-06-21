@@ -112,6 +112,8 @@ const checks = [
       webMap.includes("border-top: 8px solid ${colors.white};") &&
       webMap.includes("border-left: 6px solid transparent;") &&
       webMap.includes("bottom: -7px;") &&
+      webMap.includes("overflow: visible;") &&
+      webMap.includes("border-bottom-left-radius: 12px;") &&
       webMap.includes(".filter((items) => items.length >= minClusterStationCount)") &&
       !webMap.includes("transform: scale(1.12)") &&
       !webMap.includes(".fuel-path-marker-cluster::after"),

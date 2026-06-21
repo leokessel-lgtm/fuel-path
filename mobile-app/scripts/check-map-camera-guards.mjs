@@ -303,6 +303,7 @@ const checks = [
       planScreen.includes("setRouteStarted(true);") &&
       planScreen.includes("setRouteStarted(false);") &&
       planScreen.includes("const showPlanningShortcuts = routeStarted;") &&
+      planScreen.includes("bottom: routeSheetMinimised ? 108 : stationPanelOpen ? 330 : 430") &&
       planScreen.includes("<View style={styles.mapLayer}>") &&
       planScreen.includes("{routeStarted ? (") &&
       planScreen.includes("!routeStarted && styles.topControlsOnly"),
@@ -322,6 +323,11 @@ const checks = [
     ok:
       planScreen.includes("routeDecisionAlternatives") &&
       planRouteSheet.includes("DecisionEvidencePanel") &&
+      planRouteSheet.includes("BrandBadge") &&
+      planRouteSheet.includes("recommendationPriceTile") &&
+      planRouteSheet.includes("recommendationStationName") &&
+      planRouteSheet.includes("recommendationRouteValue") &&
+      planRouteSheet.includes("recommendationDetourPill") &&
       planScreen.includes("cheapestTradeOffExplanation") &&
       decisionEvidencePanel.includes("Decision trade-offs") &&
       decisionEvidencePanel.includes("decisionAlternativeLabel") &&

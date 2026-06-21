@@ -379,9 +379,9 @@ export function PlanScreen({
   );
   const routeCameraInsets = useMemo(
     () => ({
-      top: routeControlsCollapsed ? 86 : 230,
+      top: routeControlsCollapsed ? 96 : 230,
       right: 18,
-      bottom: routeSheetMinimised ? 88 : stationPanelOpen ? 260 : 255,
+      bottom: routeSheetMinimised ? 108 : stationPanelOpen ? 330 : 430,
       left: 18,
     }),
     [routeControlsCollapsed, routeSheetMinimised, stationPanelOpen],

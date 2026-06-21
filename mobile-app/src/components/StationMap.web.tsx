@@ -129,12 +129,18 @@ export function StationMap({
     const cameraStations = showCentreMarker
       ? nearestStationsForCamera(stations, centre, 12)
       : stations.slice(0, maxStationMarkers);
+    const routeStationCameraPoints = routeEndpoints
+      ? stations
+          .slice(0, maxPriceMarkers)
+          .map((item) => [item.station.lat, item.station.lon] as [number, number])
+      : [];
     const cameraPoints = routeEndpoints
       ? routeLatLngs.length >= 2
-        ? routeLatLngs
+        ? [...routeLatLngs, ...routeStationCameraPoints]
         : [
             [routeEndpoints.from.lat, routeEndpoints.from.lon] as [number, number],
             [routeEndpoints.to.lat, routeEndpoints.to.lon] as [number, number],
+            ...routeStationCameraPoints,
           ]
       : [
           [centre.lat, centre.lon] as [number, number],
@@ -247,11 +253,12 @@ export function StationMap({
       fitPoints.push([item.station.lat, item.station.lon]);
     });
 
-    const fitKey = `${fitKeyForPoints(cameraPoints)}|${cameraInsetsKey(activeInsets)}`;
+    const fitCameraPoints = routeEndpoints ? [...fitPoints, ...routeStationCameraPoints] : cameraPoints;
+    const fitKey = `${fitKeyForPoints(fitCameraPoints)}|${cameraInsetsKey(activeInsets)}`;
     if (fitKey !== lastFitKeyRef.current && (!userMovedMapRef.current || cameraContextChanged)) {
       runProgrammaticMapMove(programmaticMoveRef, map, () => {
         map.invalidateSize();
-        map.fitBounds(L.latLngBounds(cameraPoints), {
+        map.fitBounds(L.latLngBounds(fitCameraPoints), {
           ...leafletPadding(activeInsets),
           maxZoom: routeEndpoints ? 15 : showCentreMarker ? 15 : 14,
         });

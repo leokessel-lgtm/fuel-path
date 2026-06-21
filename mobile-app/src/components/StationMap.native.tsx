@@ -78,8 +78,13 @@ export function StationMap({
   );
   const cameraCoordinates = useMemo(() => {
     if (routeEndpoints) {
-      if (visibleRoutePoints.length >= 2) return visibleRoutePoints;
-      return [routeEndpoints.from, routeEndpoints.to];
+      const routeStationCameraPoints = stations.slice(0, maxPriceMarkers).map((item) => ({
+        lat: item.station.lat,
+        lon: item.station.lon,
+        label: item.station.name,
+      }));
+      if (visibleRoutePoints.length >= 2) return [...visibleRoutePoints, ...routeStationCameraPoints];
+      return [routeEndpoints.from, routeEndpoints.to, ...routeStationCameraPoints];
     }
     const cameraStations = showCentreMarker
       ? nearestStationsForCamera(stations, centre, 12)

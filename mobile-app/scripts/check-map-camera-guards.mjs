@@ -32,6 +32,7 @@ const discountPrograms = read("src/data/discountPrograms.ts");
 const fuelPathApi = read("src/api/fuelPathApi.ts");
 const types = read("src/types.ts");
 const locationEvidence = read("src/utils/locationEvidence.ts");
+const routeCameraInsets = read("src/utils/routeCameraInsets.ts");
 const preferencesStore = read("src/services/preferencesStore.ts");
 const recentLocationsStore = read("src/services/recentLocationsStore.ts");
 const savedCommutesStore = read("src/services/savedCommutesStore.ts");
@@ -132,6 +133,9 @@ const checks = [
       webMap.includes("marker.bindTooltip(item.station.name") &&
       webMap.includes('className: "fuel-path-marker-tooltip"') &&
       webMap.includes(".fuel-path-marker-tooltip {") &&
+      webMap.includes("const routeStationCameraPoints = routeEndpoints") &&
+      webMap.includes("...routeStationCameraPoints") &&
+      webMap.includes("const fitCameraPoints = routeEndpoints ? [...fitPoints, ...routeStationCameraPoints] : cameraPoints") &&
       !webMap.includes('`${item.station.name} - ${item.adjustedCpl.toFixed(1)} c/L`') &&
       webMap.includes("nearestStationsForCamera(stations, centre, 12)") &&
       webMap.includes("showCentreMarker ? 15 : 14") &&
@@ -184,6 +188,8 @@ const checks = [
       nativeMap.includes("height: 46") &&
       nativeMap.includes("minHeight: 24") &&
       nativeMap.includes("<BrandBadge station={item.station} size={22} />") &&
+      nativeMap.includes("const routeStationCameraPoints = stations.slice(0, maxPriceMarkers).map") &&
+      nativeMap.includes("return [...visibleRoutePoints, ...routeStationCameraPoints]") &&
       brandBadge.includes('resizeMode="contain"') &&
       !nativeMap.includes("scale: 1.05") &&
       nativeMap.includes("backgroundColor: colors.greenDark") &&
@@ -303,7 +309,11 @@ const checks = [
       planScreen.includes("setRouteStarted(true);") &&
       planScreen.includes("setRouteStarted(false);") &&
       planScreen.includes("const showPlanningShortcuts = routeStarted;") &&
-      planScreen.includes("bottom: routeSheetMinimised ? 108 : stationPanelOpen ? 330 : 430") &&
+      planScreen.includes("resolveRouteCameraInsets") &&
+      routeCameraInsets.includes("const routeMapGap = 18;") &&
+      routeCameraInsets.includes("const routeStationMarkerHeight = 64;") &&
+      routeCameraInsets.includes("const routeResultsSheetInset = 320;") &&
+      routeCameraInsets.includes("routeSummaryOverlayHeight + routeStationMarkerHeight + routeMapGap") &&
       planScreen.includes("<View style={styles.mapLayer}>") &&
       planScreen.includes("{routeStarted ? (") &&
       planScreen.includes("!routeStarted && styles.topControlsOnly"),

@@ -31,6 +31,7 @@ import {
 } from "../types";
 import { eligibleDiscountIds } from "../utils/discountRedemptions";
 import { stationPriceView } from "../utils/pricing";
+import { routeCameraInsets as resolveRouteCameraInsets } from "../utils/routeCameraInsets";
 
 type PlanScreenProps = {
   preferences: AppPreferences;
@@ -378,12 +379,12 @@ export function PlanScreen({
       ),
   );
   const routeCameraInsets = useMemo(
-    () => ({
-      top: routeControlsCollapsed ? 96 : 230,
-      right: 18,
-      bottom: routeSheetMinimised ? 108 : stationPanelOpen ? 330 : 430,
-      left: 18,
-    }),
+    () =>
+      resolveRouteCameraInsets({
+        routeControlsCollapsed,
+        routeSheetMinimised,
+        stationPanelOpen,
+      }),
     [routeControlsCollapsed, routeSheetMinimised, stationPanelOpen],
   );
   const routeSummary = `${from} to ${to}`;

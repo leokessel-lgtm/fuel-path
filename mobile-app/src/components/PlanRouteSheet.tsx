@@ -20,15 +20,12 @@ export function PlanRouteSheet({
   decisionSummary,
   error,
   loading,
-  maxDetourMinutes,
-  minSavingDollars,
   onMinimise,
   onSaveCommute,
   onSelectStation,
   onShowStops,
   onRestore,
   policyActive,
-  policyBrands,
   policyNotice,
   recommendationCopy,
   routeEndpointsPresent,
@@ -48,15 +45,12 @@ export function PlanRouteSheet({
   decisionSummary?: ScoreResponse["context"]["decisionSummary"];
   error: string;
   loading: boolean;
-  maxDetourMinutes: number;
-  minSavingDollars: number;
   onMinimise: () => void;
   onRestore: () => void;
   onSaveCommute: () => void;
   onSelectStation: (stationCode: string) => void;
   onShowStops: () => void;
   policyActive: boolean;
-  policyBrands: string[];
   policyNotice: string;
   recommendationCopy: { title: string; reason: string } | null;
   routeEndpointsPresent: boolean;
@@ -133,12 +127,9 @@ export function PlanRouteSheet({
               decisionSummary={decisionSummary}
               error={error}
               loading={loading}
-              maxDetourMinutes={maxDetourMinutes}
-              minSavingDollars={minSavingDollars}
               onSaveCommute={onSaveCommute}
               onSelectStation={onSelectStation}
               policyActive={policyActive}
-              policyBrands={policyBrands}
               policyNotice={policyNotice}
               recommendationCopy={recommendationCopy}
               routeEndpointsPresent={routeEndpointsPresent}
@@ -190,12 +181,6 @@ function StationDetailPanel({
           <Text style={styles.factLabel}>Your price</Text>
           <Text style={styles.factValue}>{selected.adjustedCpl.toFixed(1)} c/L</Text>
         </View>
-        {selected.possibleLowerCpl !== undefined ? (
-          <View style={styles.factPill}>
-            <Text style={styles.factLabel}>Possible only</Text>
-            <Text style={styles.factValue}>{selected.possibleLowerCpl.toFixed(1)} c/L</Text>
-          </View>
-        ) : null}
         <View style={styles.factPill}>
           <Text style={styles.factLabel}>Saving</Text>
           <Text style={styles.factValue}>{formatMoney(selected.netSaving || 0)}</Text>
@@ -235,12 +220,9 @@ function RouteResultsPanel({
   decisionSummary,
   error,
   loading,
-  maxDetourMinutes,
-  minSavingDollars,
   onSaveCommute,
   onSelectStation,
   policyActive,
-  policyBrands,
   policyNotice,
   recommendationCopy,
   routeEndpointsPresent,
@@ -257,12 +239,9 @@ function RouteResultsPanel({
   decisionSummary?: ScoreResponse["context"]["decisionSummary"];
   error: string;
   loading: boolean;
-  maxDetourMinutes: number;
-  minSavingDollars: number;
   onSaveCommute: () => void;
   onSelectStation: (stationCode: string) => void;
   policyActive: boolean;
-  policyBrands: string[];
   policyNotice: string;
   recommendationCopy: { title: string; reason: string } | null;
   routeEndpointsPresent: boolean;
@@ -357,10 +336,6 @@ function RouteResultsPanel({
             capability={statusCapability}
             cheapestExplanation={cheapestExplanation}
             decisionSummary={decisionSummary}
-            maxDetourMinutes={maxDetourMinutes}
-            minSavingDollars={minSavingDollars}
-            policyActive={policyActive}
-            policyBrands={policyBrands}
           />
         </>
       ) : null}

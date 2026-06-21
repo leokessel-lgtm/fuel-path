@@ -168,7 +168,7 @@ const checks = [
       stationRow.indexOf("styles.priceTile") < stationRow.indexOf("styles.titleRow") &&
       stationRow.indexOf("styles.titleRow") < stationRow.indexOf("styles.mapAction") &&
       stationRow.includes("stationEvidenceLine(item)") &&
-      stationRow.includes("Possible lower price, not guaranteed"),
+      !stationRow.includes("Possible lower price, not guaranteed"),
   },
   {
     label: "native station markers stay price-first and density limited",
@@ -350,7 +350,7 @@ const checks = [
       decisionEvidencePanel.includes("decisionSummary?.economics") &&
       decisionEvidencePanel.includes('label="Fuel used"') &&
       decisionEvidencePanel.includes('label="Time cost"') &&
-      decisionEvidencePanel.includes('label="After time"') &&
+      !decisionEvidencePanel.includes('label="After time"') &&
       decisionEvidencePanel.includes("detourFuel.toFixed(1)"),
   },
   {
@@ -418,7 +418,7 @@ const checks = [
       fuelPathApi.includes("brandFilter: policyBrands.length > 0") &&
       fuelPathApi.includes("brands: policyBrands") &&
       planScreen.includes("Policy mode active") &&
-      decisionEvidencePanel.includes('label="Policy"') &&
+      !decisionEvidencePanel.includes('label="Policy"') &&
       appShell.includes("toggleFuelPolicy") &&
       appShell.includes("togglePolicyBrand"),
   },
@@ -627,9 +627,9 @@ const checks = [
       pricing.includes("possible if unused, not guaranteed") &&
       pricing.includes("Possible lower price, not guaranteed.") &&
       stationRow.includes("Confirmed:") &&
-      stationRow.includes("Possible, not guaranteed:") &&
-      stationRow.includes("possible only") &&
-      planRouteSheet.includes(">Possible only<") &&
+      !stationRow.includes("Possible, not guaranteed:") &&
+      !stationRow.includes("possible only") &&
+      !planRouteSheet.includes(">Possible only<") &&
       discountWalletCard.includes("pump price, confirmed wallet price") &&
       discountPrograms.includes("costco_member") &&
       discountPrograms.includes("seven_eleven_lock") &&

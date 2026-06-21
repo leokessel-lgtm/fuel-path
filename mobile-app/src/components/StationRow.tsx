@@ -57,11 +57,6 @@ export function StationRow({
             Confirmed: {item.discountLabel}
           </Text>
         ) : null}
-        {item.possibleLowerCpl !== undefined ? (
-          <Text numberOfLines={1} style={styles.possibleDiscount}>
-            Possible, not guaranteed: possible only {item.possibleLowerCpl.toFixed(1)}
-          </Text>
-        ) : null}
       </View>
       <View style={styles.mapAction}>
         <View style={styles.mapActionCircle}>
@@ -110,9 +105,6 @@ function stationRowAccessibilityLabel(item: StationViewModel) {
     stationEvidenceLine(item),
   ];
   if (item.discountCpl) parts.push(`Confirmed discount: ${item.discountLabel}`);
-  if (item.possibleLowerCpl !== undefined) {
-    parts.push(`Possible lower price, not guaranteed: ${item.possibleLowerLabel}`);
-  }
   const attentionCue = stationAttentionCue(item);
   if (attentionCue) parts.push(attentionCue.label);
   const tomorrow = tomorrowPriceView(item);
@@ -187,12 +179,6 @@ const styles = StyleSheet.create({
   discount: {
     color: colors.greenDark,
     fontSize: typeScale.caption,
-    fontWeight: "500",
-    marginTop: 2,
-  },
-  possibleDiscount: {
-    color: colors.amber,
-    fontSize: 10,
     fontWeight: "500",
     marginTop: 2,
   },

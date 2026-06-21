@@ -483,15 +483,12 @@ export function PlanScreen({
           decisionSummary={backendDecisionSummary}
           error={error}
           loading={loading}
-          maxDetourMinutes={preferences.maxDetourMinutes}
-          minSavingDollars={preferences.minSavingDollars}
           onMinimise={() => setRouteSheetMinimised(true)}
           onRestore={() => setRouteSheetMinimised(false)}
           onSaveCommute={handleSaveCurrentCommute}
           onSelectStation={handleStationSelect}
           onShowStops={() => setStationPanelOpen(false)}
           policyActive={preferences.fuelPolicyEnabled}
-          policyBrands={preferences.approvedPolicyBrands}
           policyNotice={policyNotice}
           recommendationCopy={recommendationCopy}
           routeEndpointsPresent={Boolean(routeEndpoints)}

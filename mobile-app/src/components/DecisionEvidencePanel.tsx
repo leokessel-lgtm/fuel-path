@@ -60,34 +60,18 @@ export function DecisionEvidencePanel({
   capability,
   cheapestExplanation,
   decisionSummary,
-  maxDetourMinutes,
-  minSavingDollars,
-  policyActive,
-  policyBrands,
 }: {
   alternatives: DecisionAlternative[];
   candidate: StationViewModel;
   capability?: string;
   cheapestExplanation: string;
   decisionSummary?: RouteDecisionSummary;
-  maxDetourMinutes: number;
-  minSavingDollars: number;
-  policyActive: boolean;
-  policyBrands: string[];
 }) {
   const economics = decisionSummary?.economics;
   const saving = Number(economics?.netSavingAfterDetourFuel ?? candidate.netSaving ?? 0);
   const detour = Number(economics?.detourMinutes ?? candidate.detourMinutes ?? 0);
   const detourFuel = Number(economics?.detourFuelLitres ?? candidate.detourFuelLitres ?? 0);
   const timeCost = Number(economics?.timeCost ?? candidate.timeCost ?? 0);
-  const afterTime = Number(
-    economics?.netSavingAfterDetourFuelAndTime ??
-      candidate.netAfterDetourAndTimeCost ??
-      saving - timeCost,
-  );
-  const ruleMinSaving = Number(decisionSummary?.decisionRule?.minSavingDollars ?? minSavingDollars);
-  const ruleMaxDetour = Number(decisionSummary?.decisionRule?.maxDetourMinutes ?? maxDetourMinutes);
-  const possiblePrice = candidate.possibleLowerCpl;
   const capabilityLabel = capability ? capabilityLabelFor(capability) : "Live data";
   const trustLine = stationTimestampLine(candidate.station);
 
@@ -107,20 +91,10 @@ export function DecisionEvidencePanel({
       <View style={styles.evidenceGrid}>
         <EvidenceMetric label="Pump" value={`${candidate.pumpCpl.toFixed(1)} c/L`} />
         <EvidenceMetric label="Your price" value={`${candidate.adjustedCpl.toFixed(1)} c/L`} />
-        <EvidenceMetric
-          label="Possible only"
-          value={possiblePrice !== undefined ? `${possiblePrice.toFixed(1)} c/L` : "None configured"}
-        />
         <EvidenceMetric label="Saving" value={formatMoney(saving)} />
         <EvidenceMetric label="Detour" value={`${detour.toFixed(1)} min`} />
         <EvidenceMetric label="Fuel used" value={`${detourFuel.toFixed(1)} L`} />
         <EvidenceMetric label="Time cost" value={formatMoney(timeCost)} />
-        <EvidenceMetric label="After time" value={formatMoney(afterTime)} />
-        <EvidenceMetric label="Rule" value={`$${ruleMinSaving}+ / ${ruleMaxDetour} min`} />
-        <EvidenceMetric
-          label="Policy"
-          value={policyActive ? `Approved: ${policyBrands.join(", ")}` : "Any brand"}
-        />
       </View>
       <Text numberOfLines={2} style={styles.evidenceTrustLine}>
         {trustLine}

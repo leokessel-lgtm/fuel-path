@@ -224,6 +224,22 @@ const checks = [
       nearbyStationSheet.includes("sheetExpanded && stationNotice && stations.length"),
   },
   {
+    label: "nearby map selection clears sort highlight and uses row-style selected card",
+    ok:
+      nearbyScreen.includes("const [sortMode, setSortMode] = useState<NearbySortMode | undefined>(defaultNearbySortMode);") &&
+      nearbyScreen.includes("setSortMode(undefined);") &&
+      nearbyStationSheet.includes("sortMode?: NearbySortMode;") &&
+      nearbyStationSheet.includes("styles.selectedPriceTile") &&
+      nearbyStationSheet.includes("styles.selectedFuelLabel") &&
+      nearbyStationSheet.includes("styles.selectedTitleRow") &&
+      nearbyStationSheet.includes("<BrandBadge station={selected.station} size={28} />") &&
+      nearbyStationSheet.includes("styles.selectedActionColumn") &&
+      nearbyStationSheet.includes("styles.distanceBadge") &&
+      nearbyStationSheet.includes("stationEvidenceLine(selected)") &&
+      !nearbyStationSheet.includes("selectedActions") &&
+      !nearbyStationSheet.includes("selectedPumpPrice"),
+  },
+  {
     label: "nearby expanded station list removes duplicate selected card and reaches higher",
     ok:
       nearbyStationSheet.includes("{selected && !sheetExpanded ? (") &&
@@ -585,7 +601,6 @@ const checks = [
       stationRow.includes("Possible, not guaranteed:") &&
       stationRow.includes("possible only") &&
       planRouteSheet.includes(">Possible only<") &&
-      nearbyStationSheet.includes("possible only") &&
       discountWalletCard.includes("pump price, confirmed wallet price") &&
       discountPrograms.includes("costco_member") &&
       discountPrograms.includes("seven_eleven_lock") &&

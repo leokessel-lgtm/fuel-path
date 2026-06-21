@@ -51,7 +51,7 @@ export function NearbyScreen({
   const [selectedCode, setSelectedCode] = useState<string>();
   const [selectionDismissed, setSelectionDismissed] = useState(false);
   const [visibleStationCodes, setVisibleStationCodes] = useState<string[]>([]);
-  const [sortMode, setSortMode] = useState<NearbySortMode>(defaultNearbySortMode);
+  const [sortMode, setSortMode] = useState<NearbySortMode | undefined>(defaultNearbySortMode);
   const [sheetExpanded, setSheetExpanded] = useState(false);
   const previousSortMode = useRef<NearbySortMode | undefined>(sortMode);
   const [loading, setLoading] = useState(true);
@@ -277,6 +277,7 @@ export function NearbyScreen({
 
   const handleMapStationSelect = useCallback((stationCode: string) => {
     setSelectedCode(stationCode);
+    setSortMode(undefined);
     setSelectionDismissed(false);
     setSheetExpanded(false);
   }, []);

@@ -15,9 +15,11 @@ import { StationViewModel } from "../types";
 import {
   predictionDisciplineCue,
   stationAttentionCue,
+  stationEvidenceLine,
   stationTimestampLine,
 } from "../utils/decisionEvidence";
 import { tomorrowPriceView } from "../utils/pricing";
+import { BrandBadge } from "./BrandBadge";
 import { StationRow } from "./StationRow";
 
 export type NearbySortMode = "distance" | "price" | "value";
@@ -65,7 +67,7 @@ export function NearbyStationSheet({
   selectedCode?: string;
   sheetExpanded: boolean;
   sortedStations: StationViewModel[];
-  sortMode: NearbySortMode;
+  sortMode?: NearbySortMode;
   stationNotice: string;
   stations: StationViewModel[];
 }) {
@@ -288,42 +290,50 @@ function SelectedStationCard({
   const selectedTomorrow = tomorrowPriceView(selected);
   const selectedAttentionCue = stationAttentionCue(selected);
   const selectedPredictionCue = predictionDisciplineCue(selected);
-  const selectedMetaLine = [
-    selected.station.phone || selected.station.brand,
-    stationTimestampLine(selected.station),
-  ]
+  const selectedFuelLabel = selected.fuel || "fuel";
+  const selectedMetaLine = [stationTimestampLine(selected.station)]
     .filter(Boolean)
     .join(" | ");
 
   return (
     <View style={[styles.selectedCard, styles.selectedCardCollapsed]}>
-      <View style={styles.selectedHeader}>
-        <View style={styles.selectedCopy}>
-          <Text numberOfLines={1} style={styles.selectedTitle}>
-            {selected.station.name}
-          </Text>
+      <Pressable
+        accessibilityLabel="Close selected station"
+        accessibilityRole="button"
+        hitSlop={8}
+        onPress={onClose}
+        style={styles.closeButton}
+      >
+        <Text style={styles.closeButtonText}>X</Text>
+      </Pressable>
+      <View style={styles.selectedRow}>
+        <View style={styles.selectedPriceTile}>
+          <Text style={styles.selectedPriceValue}>{selected.adjustedCpl.toFixed(1)}</Text>
+          <Text style={styles.selectedFuelLabel}>{selectedFuelLabel}</Text>
+        </View>
+        <View style={styles.selectedMain}>
+          <View style={styles.selectedTitleRow}>
+            <BrandBadge station={selected.station} size={28} />
+            <Text numberOfLines={1} style={styles.selectedTitle}>
+              {selected.station.name}
+            </Text>
+          </View>
           {selected.station.address ? (
             <Text numberOfLines={1} style={styles.selectedDetail}>
               {selected.station.address}
             </Text>
           ) : null}
-          <View style={styles.selectedMetaRow}>
-            <View style={styles.selectedStatus}>
-              <Text numberOfLines={1} style={styles.muted}>
-                {stationOpenLabel(selected.station.openNow)}
-              </Text>
-              <View
-                style={[
-                  styles.statusDot,
-                  { backgroundColor: stationOpenDotColor(selected.station.openNow) },
-                ]}
-              />
-            </View>
-            {selectedMetaLine ? <Text style={styles.metaSeparator}>|</Text> : null}
-            <Text numberOfLines={1} style={styles.selectedMetaRest}>
-              {selectedMetaLine}
+          <Text numberOfLines={1} style={styles.selectedStatusLine}>
+            {stationOpenLabel(selected.station.openNow)}
+          </Text>
+          <Text numberOfLines={1} style={styles.selectedMetaRest}>
+            {selectedMetaLine || stationEvidenceLine(selected)}
+          </Text>
+          {selected.discountCpl ? (
+            <Text numberOfLines={1} style={styles.selectedDiscount}>
+              Confirmed: {selected.discountLabel}
             </Text>
-          </View>
+          ) : null}
           {selectedAttentionCue || selectedPredictionCue ? (
             <View style={styles.evidenceRow}>
               {selectedAttentionCue ? (
@@ -339,28 +349,17 @@ function SelectedStationCard({
             </View>
           ) : null}
         </View>
-        <Pressable
-          accessibilityLabel="Close selected station"
-          accessibilityRole="button"
-          hitSlop={8}
-          onPress={onClose}
-          style={styles.closeButton}
-        >
-          <Text style={styles.closeButtonText}>X</Text>
-        </Pressable>
-      </View>
-      <View style={styles.selectedActions}>
-        <View style={styles.selectedPrice}>
-          <Text style={styles.priceValue}>
-            {selected.adjustedCpl.toFixed(1)}
-            <Text style={styles.priceUnitInline}> c/L</Text>
-          </Text>
-          <Text numberOfLines={1} style={styles.selectedPumpPrice}>
-            Pump {selected.pumpCpl.toFixed(1)}
-            {selected.possibleLowerCpl !== undefined
-              ? ` | possible only ${selected.possibleLowerCpl.toFixed(1)}`
-              : ""}
-          </Text>
+        <View style={styles.selectedActionColumn}>
+          <Pressable
+            accessibilityLabel={`Navigate to ${selected.station.name}`}
+            onPress={onNavigate}
+            style={styles.navigateButton}
+          >
+            <Text style={styles.navigateButtonIcon}>↗</Text>
+          </Pressable>
+          <View style={styles.distanceBadge}>
+            <Text style={styles.distanceBadgeText}>{selected.distanceKm.toFixed(1)} km</Text>
+          </View>
           {selectedTomorrow ? (
             <Text
               numberOfLines={1}
@@ -374,16 +373,6 @@ function SelectedStationCard({
             </Text>
           ) : null}
         </View>
-        <View style={styles.distanceBadge}>
-          <Text style={styles.distanceBadgeText}>{selected.distanceKm.toFixed(1)} km</Text>
-        </View>
-        <Pressable
-          accessibilityLabel={`Navigate to ${selected.station.name}`}
-          onPress={onNavigate}
-          style={styles.navigateButton}
-        >
-          <Text style={styles.navigateButtonIcon}>↗</Text>
-        </Pressable>
       </View>
     </View>
   );
@@ -393,12 +382,6 @@ function stationOpenLabel(openNow?: boolean) {
   if (openNow === false) return "Closed";
   if (openNow === true) return "Open now";
   return "Hours unknown";
-}
-
-function stationOpenDotColor(openNow?: boolean) {
-  if (openNow === false) return colors.red;
-  if (openNow === true) return colors.green;
-  return colors.muted;
 }
 
 const styles = StyleSheet.create({
@@ -512,26 +495,57 @@ const styles = StyleSheet.create({
   },
   selectedCard: {
     backgroundColor: colors.panelStrong,
-    borderColor: colors.green,
-    borderRadius: radii.xl,
+    borderColor: colors.black,
+    borderRadius: radii.lg,
     borderWidth: 1,
-    gap: spacing.sm,
-    padding: spacing.md,
+    padding: spacing.sm,
+    position: "relative",
   },
   selectedCardCollapsed: {
     paddingVertical: spacing.sm,
   },
-  selectedHeader: {
-    alignItems: "flex-start",
+  selectedRow: {
+    alignItems: "center",
     flexDirection: "row",
-    gap: spacing.sm,
+    gap: spacing.md,
+    paddingRight: 30,
   },
-  selectedCopy: {
+  selectedPriceTile: {
+    alignItems: "center",
+    backgroundColor: colors.greenSoft,
+    borderRadius: radii.md,
+    flexShrink: 0,
+    justifyContent: "center",
+    minHeight: 66,
+    width: 76,
+  },
+  selectedPriceValue: {
+    color: colors.greenDark,
+    fontSize: typeScale.title,
+    fontWeight: "900",
+    lineHeight: 26,
+  },
+  selectedFuelLabel: {
+    color: colors.muted,
+    fontSize: typeScale.caption,
+    fontWeight: "800",
+    lineHeight: 16,
+    textTransform: "uppercase",
+  },
+  selectedMain: {
     flex: 1,
+    minWidth: 0,
+  },
+  selectedTitleRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: spacing.xs,
     minWidth: 0,
   },
   selectedTitle: {
     ...typography.bodyStrong,
+    flex: 1,
+    minWidth: 0,
   },
   selectedDetail: {
     color: colors.inkSoft,
@@ -539,34 +553,23 @@ const styles = StyleSheet.create({
     fontWeight: "400",
     lineHeight: 17,
   },
-  selectedMetaRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 6,
-    minWidth: 0,
-  },
-  selectedStatus: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 4,
-  },
-  statusDot: {
-    borderRadius: radii.pill,
-    height: 7,
-    width: 7,
-  },
-  metaSeparator: {
+  selectedStatusLine: {
     color: colors.muted,
     fontSize: typeScale.caption,
     fontWeight: "400",
+    marginTop: 2,
   },
   selectedMetaRest: {
     color: colors.muted,
-    flex: 1,
-    fontSize: typeScale.caption,
+    fontSize: 10,
     fontWeight: "400",
-    lineHeight: 17,
-    minWidth: 0,
+    marginTop: 2,
+  },
+  selectedDiscount: {
+    color: colors.greenDark,
+    fontSize: typeScale.caption,
+    fontWeight: "500",
+    marginTop: 2,
   },
   evidenceRow: {
     flexDirection: "row",
@@ -593,6 +596,10 @@ const styles = StyleSheet.create({
     borderRadius: radii.pill,
     height: 30,
     justifyContent: "center",
+    position: "absolute",
+    right: spacing.sm,
+    top: spacing.sm,
+    zIndex: 2,
     width: 30,
   },
   closeButtonText: {
@@ -600,38 +607,18 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "700",
   },
-  selectedActions: {
+  selectedActionColumn: {
     alignItems: "center",
-    flexDirection: "row",
-    gap: spacing.sm,
-    justifyContent: "space-between",
-  },
-  selectedPrice: {
-    alignItems: "flex-start",
-    flex: 1,
-    minWidth: 0,
-  },
-  priceValue: {
-    color: colors.greenDark,
-    fontSize: typeScale.section,
-    fontWeight: "900",
-  },
-  priceUnitInline: {
-    color: colors.muted,
-    fontSize: typeScale.caption,
-    fontWeight: "500",
-  },
-  selectedPumpPrice: {
-    color: colors.muted,
-    fontSize: typeScale.caption,
-    fontWeight: "400",
-    marginTop: 2,
+    flexShrink: 0,
+    gap: 4,
+    minWidth: 58,
   },
   selectedTomorrowPrice: {
     color: colors.muted,
-    fontSize: typeScale.caption,
-    fontWeight: "500",
+    fontSize: 10,
+    fontWeight: "700",
     marginTop: 2,
+    maxWidth: 76,
   },
   tomorrowPriceDown: {
     color: colors.greenDark,
@@ -645,14 +632,15 @@ const styles = StyleSheet.create({
     borderColor: colors.green,
     borderRadius: radii.pill,
     borderWidth: 1,
-    minHeight: 32,
     justifyContent: "center",
-    paddingHorizontal: spacing.md,
+    minHeight: 24,
+    paddingHorizontal: spacing.sm,
   },
   distanceBadgeText: {
     color: colors.white,
-    fontSize: typeScale.caption,
-    fontWeight: "700",
+    fontSize: 11,
+    fontWeight: "800",
+    lineHeight: 16,
   },
   navigateButton: {
     alignItems: "center",

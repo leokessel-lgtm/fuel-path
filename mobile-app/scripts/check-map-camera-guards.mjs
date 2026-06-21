@@ -235,9 +235,12 @@ const checks = [
       nearbyStationSheet.includes("<BrandBadge station={selected.station} size={28} />") &&
       nearbyStationSheet.includes("styles.selectedActionColumn") &&
       nearbyStationSheet.includes("styles.distanceBadge") &&
+      nearbyStationSheet.includes("styles.selectedCardShell") &&
+      nearbyStationSheet.includes('alignSelf: "flex-end"') &&
       nearbyStationSheet.includes("stationEvidenceLine(selected)") &&
       !nearbyStationSheet.includes("selectedActions") &&
-      !nearbyStationSheet.includes("selectedPumpPrice"),
+      !nearbyStationSheet.includes("selectedPumpPrice") &&
+      !nearbyStationSheet.includes("paddingRight: 30"),
   },
   {
     label: "official price timestamps use age-aware unchanged copy",

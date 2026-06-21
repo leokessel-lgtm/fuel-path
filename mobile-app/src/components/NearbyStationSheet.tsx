@@ -296,7 +296,7 @@ function SelectedStationCard({
     .join(" | ");
 
   return (
-    <View style={[styles.selectedCard, styles.selectedCardCollapsed]}>
+    <View style={styles.selectedCardShell}>
       <Pressable
         accessibilityLabel="Close selected station"
         accessibilityRole="button"
@@ -306,72 +306,74 @@ function SelectedStationCard({
       >
         <Text style={styles.closeButtonText}>X</Text>
       </Pressable>
-      <View style={styles.selectedRow}>
-        <View style={styles.selectedPriceTile}>
-          <Text style={styles.selectedPriceValue}>{selected.adjustedCpl.toFixed(1)}</Text>
-          <Text style={styles.selectedFuelLabel}>{selectedFuelLabel}</Text>
-        </View>
-        <View style={styles.selectedMain}>
-          <View style={styles.selectedTitleRow}>
-            <BrandBadge station={selected.station} size={28} />
-            <Text numberOfLines={1} style={styles.selectedTitle}>
-              {selected.station.name}
-            </Text>
+      <View style={[styles.selectedCard, styles.selectedCardCollapsed]}>
+        <View style={styles.selectedRow}>
+          <View style={styles.selectedPriceTile}>
+            <Text style={styles.selectedPriceValue}>{selected.adjustedCpl.toFixed(1)}</Text>
+            <Text style={styles.selectedFuelLabel}>{selectedFuelLabel}</Text>
           </View>
-          {selected.station.address ? (
-            <Text numberOfLines={1} style={styles.selectedDetail}>
-              {selected.station.address}
-            </Text>
-          ) : null}
-          <Text numberOfLines={1} style={styles.selectedStatusLine}>
-            {stationOpenLabel(selected.station.openNow)}
-          </Text>
-          <Text numberOfLines={1} style={styles.selectedMetaRest}>
-            {selectedMetaLine || stationEvidenceLine(selected)}
-          </Text>
-          {selected.discountCpl ? (
-            <Text numberOfLines={1} style={styles.selectedDiscount}>
-              Confirmed: {selected.discountLabel}
-            </Text>
-          ) : null}
-          {selectedAttentionCue || selectedPredictionCue ? (
-            <View style={styles.evidenceRow}>
-              {selectedAttentionCue ? (
-                <Text numberOfLines={1} style={styles.evidenceChip}>
-                  {selectedAttentionCue.label}
-                </Text>
-              ) : null}
-              {selectedPredictionCue ? (
-                <Text numberOfLines={1} style={styles.evidenceChip}>
-                  {selectedPredictionCue}
-                </Text>
-              ) : null}
+          <View style={styles.selectedMain}>
+            <View style={styles.selectedTitleRow}>
+              <BrandBadge station={selected.station} size={28} />
+              <Text numberOfLines={1} style={styles.selectedTitle}>
+                {selected.station.name}
+              </Text>
             </View>
-          ) : null}
-        </View>
-        <View style={styles.selectedActionColumn}>
-          <Pressable
-            accessibilityLabel={`Navigate to ${selected.station.name}`}
-            onPress={onNavigate}
-            style={styles.navigateButton}
-          >
-            <Text style={styles.navigateButtonIcon}>↗</Text>
-          </Pressable>
-          <View style={styles.distanceBadge}>
-            <Text style={styles.distanceBadgeText}>{selected.distanceKm.toFixed(1)} km</Text>
-          </View>
-          {selectedTomorrow ? (
-            <Text
-              numberOfLines={1}
-              style={[
-                styles.selectedTomorrowPrice,
-                selectedTomorrow.direction === "down" && styles.tomorrowPriceDown,
-                selectedTomorrow.direction === "up" && styles.tomorrowPriceUp,
-              ]}
-            >
-              {selectedTomorrow.detailLabel}
+            {selected.station.address ? (
+              <Text numberOfLines={1} style={styles.selectedDetail}>
+                {selected.station.address}
+              </Text>
+            ) : null}
+            <Text numberOfLines={1} style={styles.selectedStatusLine}>
+              {stationOpenLabel(selected.station.openNow)}
             </Text>
-          ) : null}
+            <Text numberOfLines={1} style={styles.selectedMetaRest}>
+              {selectedMetaLine || stationEvidenceLine(selected)}
+            </Text>
+            {selected.discountCpl ? (
+              <Text numberOfLines={1} style={styles.selectedDiscount}>
+                Confirmed: {selected.discountLabel}
+              </Text>
+            ) : null}
+            {selectedAttentionCue || selectedPredictionCue ? (
+              <View style={styles.evidenceRow}>
+                {selectedAttentionCue ? (
+                  <Text numberOfLines={1} style={styles.evidenceChip}>
+                    {selectedAttentionCue.label}
+                  </Text>
+                ) : null}
+                {selectedPredictionCue ? (
+                  <Text numberOfLines={1} style={styles.evidenceChip}>
+                    {selectedPredictionCue}
+                  </Text>
+                ) : null}
+              </View>
+            ) : null}
+          </View>
+          <View style={styles.selectedActionColumn}>
+            <Pressable
+              accessibilityLabel={`Navigate to ${selected.station.name}`}
+              onPress={onNavigate}
+              style={styles.navigateButton}
+            >
+              <Text style={styles.navigateButtonIcon}>↗</Text>
+            </Pressable>
+            <View style={styles.distanceBadge}>
+              <Text style={styles.distanceBadgeText}>{selected.distanceKm.toFixed(1)} km</Text>
+            </View>
+            {selectedTomorrow ? (
+              <Text
+                numberOfLines={1}
+                style={[
+                  styles.selectedTomorrowPrice,
+                  selectedTomorrow.direction === "down" && styles.tomorrowPriceDown,
+                  selectedTomorrow.direction === "up" && styles.tomorrowPriceUp,
+                ]}
+              >
+                {selectedTomorrow.detailLabel}
+              </Text>
+            ) : null}
+          </View>
         </View>
       </View>
     </View>
@@ -493,13 +495,15 @@ const styles = StyleSheet.create({
     fontWeight: "400",
     lineHeight: 17,
   },
+  selectedCardShell: {
+    gap: spacing.xs,
+  },
   selectedCard: {
     backgroundColor: colors.panelStrong,
     borderColor: colors.black,
     borderRadius: radii.lg,
     borderWidth: 1,
     padding: spacing.sm,
-    position: "relative",
   },
   selectedCardCollapsed: {
     paddingVertical: spacing.sm,
@@ -508,7 +512,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flexDirection: "row",
     gap: spacing.md,
-    paddingRight: 30,
   },
   selectedPriceTile: {
     alignItems: "center",
@@ -595,11 +598,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.black,
     borderRadius: radii.pill,
     height: 30,
+    alignSelf: "flex-end",
     justifyContent: "center",
-    position: "absolute",
-    right: spacing.sm,
-    top: spacing.sm,
-    zIndex: 2,
+    marginBottom: -2,
+    marginRight: spacing.xs,
     width: 30,
   },
   closeButtonText: {
@@ -610,7 +612,7 @@ const styles = StyleSheet.create({
   selectedActionColumn: {
     alignItems: "center",
     flexShrink: 0,
-    gap: 4,
+    gap: 2,
     minWidth: 58,
   },
   selectedTomorrowPrice: {
@@ -633,6 +635,7 @@ const styles = StyleSheet.create({
     borderRadius: radii.pill,
     borderWidth: 1,
     justifyContent: "center",
+    marginTop: 3,
     minHeight: 24,
     paddingHorizontal: spacing.sm,
   },

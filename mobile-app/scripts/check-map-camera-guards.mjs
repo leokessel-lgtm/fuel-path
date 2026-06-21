@@ -151,7 +151,11 @@ const checks = [
       stationRow.includes("styles.titleRow") &&
       stationRow.includes("<BrandBadge station={item.station} size={28} />") &&
       stationRow.includes("styles.mapAction") &&
-      stationRow.includes(">map<") &&
+      stationRow.includes("styles.mapActionCircle") &&
+      stationRow.includes("styles.mapActionIcon") &&
+      stationRow.includes(">↗<") &&
+      !stationRow.includes("mapActionText") &&
+      !stationRow.includes("styles.priceUnit") &&
       stationRow.indexOf("styles.priceTile") < stationRow.indexOf("styles.titleRow") &&
       stationRow.indexOf("styles.titleRow") < stationRow.indexOf("styles.mapAction") &&
       stationRow.includes("stationEvidenceLine(item)") &&
@@ -214,6 +218,14 @@ const checks = [
     ok:
       nearbyScreen.includes("NearbyStationSheet") &&
       nearbyStationSheet.includes("sheetExpanded && stationNotice && stations.length"),
+  },
+  {
+    label: "nearby expanded station list removes duplicate selected card and reaches higher",
+    ok:
+      nearbyStationSheet.includes("{selected && !sheetExpanded ? (") &&
+      nearbyStationSheet.includes('height: "78%"') &&
+      !nearbyStationSheet.includes("sheetExpanded={sheetExpanded}") &&
+      !nearbyStationSheet.includes("selected,\n  sheetExpanded,"),
   },
   {
     label: "nearby grabber is an accessible recovery control",

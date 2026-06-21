@@ -65,10 +65,9 @@ export function StationRow({
         ) : null}
       </View>
       <View style={styles.mapAction}>
-        <Text style={styles.mapActionText}>map</Text>
-        <Text numberOfLines={1} style={styles.priceUnit}>
-          {item.discountCpl ? "your price" : "pump price"}
-        </Text>
+        <View style={styles.mapActionCircle}>
+          <Text style={styles.mapActionIcon}>↗</Text>
+        </View>
         {attentionCue ? (
           <Text
             numberOfLines={1}
@@ -216,22 +215,21 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flexShrink: 0,
     gap: 2,
-    minWidth: 58,
+    minWidth: 42,
   },
-  priceUnit: {
-    color: colors.muted,
-    fontSize: 10,
-    fontWeight: "500",
+  mapActionCircle: {
+    alignItems: "center",
+    backgroundColor: colors.black,
+    borderRadius: radii.pill,
+    height: 38,
+    justifyContent: "center",
+    width: 38,
   },
-  mapActionText: {
-    backgroundColor: colors.panel,
-    borderRadius: radii.md,
-    color: colors.muted,
-    fontSize: typeScale.lead,
+  mapActionIcon: {
+    color: colors.white,
+    fontSize: 21,
     fontWeight: "800",
-    overflow: "hidden",
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
+    lineHeight: 22,
   },
   confidence: {
     backgroundColor: colors.greenSoft,

@@ -108,12 +108,11 @@ export function NearbyStationSheet({
               <Text style={styles.noticeText}>{stationNotice}</Text>
             </View>
           ) : null}
-          {selected ? (
+          {selected && !sheetExpanded ? (
             <SelectedStationCard
               onClose={onCloseSelectedStation}
               onNavigate={() => onNavigateToStation(selected)}
               selected={selected}
-              sheetExpanded={sheetExpanded}
             />
           ) : null}
           <View style={styles.sortRow}>
@@ -159,12 +158,10 @@ function SelectedStationCard({
   onClose,
   onNavigate,
   selected,
-  sheetExpanded,
 }: {
   onClose: () => void;
   onNavigate: () => void;
   selected: StationViewModel;
-  sheetExpanded: boolean;
 }) {
   const selectedTomorrow = tomorrowPriceView(selected);
   const selectedAttentionCue = stationAttentionCue(selected);
@@ -177,7 +174,7 @@ function SelectedStationCard({
     .join(" | ");
 
   return (
-    <View style={[styles.selectedCard, !sheetExpanded && styles.selectedCardCollapsed]}>
+    <View style={[styles.selectedCard, styles.selectedCardCollapsed]}>
       <View style={styles.selectedHeader}>
         <View style={styles.selectedCopy}>
           <Text numberOfLines={1} style={styles.selectedTitle}>
@@ -300,7 +297,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   sheetExpanded: {
-    height: "66%",
+    height: "78%",
   },
   sheetHeader: {
     alignItems: "center",

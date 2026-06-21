@@ -191,6 +191,16 @@ export function NearbyStationSheet({
           >
             <Text style={styles.mapButtonText}>Map</Text>
           </Pressable>
+        ) : selected ? (
+          <Pressable
+            accessibilityLabel="Close selected station"
+            accessibilityRole="button"
+            hitSlop={10}
+            onPress={onCloseSelectedStation}
+            style={styles.mapButton}
+          >
+            <Text style={styles.mapButtonText}>Close</Text>
+          </Pressable>
         ) : null}
       </View>
 
@@ -224,7 +234,6 @@ export function NearbyStationSheet({
           ) : null}
           {selected && !sheetExpanded ? (
             <SelectedStationCard
-              onClose={onCloseSelectedStation}
               onNavigate={() => onNavigateToStation(selected)}
               selected={selected}
             />
@@ -279,11 +288,9 @@ function clampSheetDrag(value: number, sheetExpanded: boolean) {
 }
 
 function SelectedStationCard({
-  onClose,
   onNavigate,
   selected,
 }: {
-  onClose: () => void;
   onNavigate: () => void;
   selected: StationViewModel;
 }) {
@@ -297,15 +304,6 @@ function SelectedStationCard({
 
   return (
     <View style={styles.selectedCardShell}>
-      <Pressable
-        accessibilityLabel="Close selected station"
-        accessibilityRole="button"
-        hitSlop={8}
-        onPress={onClose}
-        style={styles.closeButton}
-      >
-        <Text style={styles.closeButtonText}>X</Text>
-      </Pressable>
       <View style={[styles.selectedCard, styles.selectedCardCollapsed]}>
         <View style={styles.selectedRow}>
           <View style={styles.selectedPriceTile}>
@@ -592,22 +590,6 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     paddingHorizontal: spacing.sm,
     paddingVertical: 2,
-  },
-  closeButton: {
-    alignItems: "center",
-    backgroundColor: colors.black,
-    borderRadius: radii.pill,
-    height: 30,
-    alignSelf: "flex-end",
-    justifyContent: "center",
-    marginBottom: -2,
-    marginRight: spacing.xs,
-    width: 30,
-  },
-  closeButtonText: {
-    color: colors.white,
-    fontSize: 12,
-    fontWeight: "700",
   },
   selectedActionColumn: {
     alignItems: "center",

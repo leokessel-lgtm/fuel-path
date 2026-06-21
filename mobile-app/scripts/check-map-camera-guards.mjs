@@ -248,9 +248,12 @@ const checks = [
       nearbyStationSheet.includes("<BrandBadge station={selected.station} size={28} />") &&
       nearbyStationSheet.includes("styles.selectedActionColumn") &&
       nearbyStationSheet.includes("styles.distanceBadge") &&
+      nearbyStationSheet.includes('accessibilityLabel="Close selected station"') &&
+      nearbyStationSheet.includes("<Text style={styles.mapButtonText}>Close</Text>") &&
       nearbyStationSheet.includes("styles.selectedCardShell") &&
-      nearbyStationSheet.includes('alignSelf: "flex-end"') &&
       nearbyStationSheet.includes("stationEvidenceLine(selected)") &&
+      !nearbyStationSheet.includes("styles.closeButton") &&
+      !nearbyStationSheet.includes("closeButtonText") &&
       !nearbyStationSheet.includes("selectedActions") &&
       !nearbyStationSheet.includes("selectedPumpPrice") &&
       !nearbyStationSheet.includes("paddingRight: 30"),

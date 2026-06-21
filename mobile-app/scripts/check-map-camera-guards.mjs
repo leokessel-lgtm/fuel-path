@@ -27,6 +27,7 @@ const nearbyScreen = read("src/screens/NearbyScreen.tsx");
 const planScreen = read("src/screens/PlanScreen.tsx");
 const accountScreen = read("src/screens/AccountScreen.tsx");
 const stationRow = read("src/components/StationRow.tsx");
+const brandBadge = read("src/components/BrandBadge.tsx");
 const discountPrograms = read("src/data/discountPrograms.ts");
 const fuelPathApi = read("src/api/fuelPathApi.ts");
 const types = read("src/types.ts");
@@ -114,6 +115,17 @@ const checks = [
       webMap.includes("bottom: -7px;") &&
       webMap.includes("overflow: visible;") &&
       webMap.includes("border-bottom-left-radius: 12px;") &&
+      webMap.includes("min-height: 23px;") &&
+      webMap.includes("flex: 0 0 23px;") &&
+      webMap.includes("width: 100%;") &&
+      webMap.includes("height: 20px;") &&
+      webMap.includes("width: 36px;") &&
+      webMap.includes(".fuel-path-marker-logo {") &&
+      webMap.includes("flex-basis: 38px;") &&
+      webMap.includes("min-width: 38px;") &&
+      webMap.includes("max-width: 38px;") &&
+      webMap.includes(".fuel-path-marker-initials {") &&
+      webMap.includes("object-fit: contain;") &&
       webMap.includes(".filter((items) => items.length >= minClusterStationCount)") &&
       !webMap.includes("transform: scale(1.12)") &&
       !webMap.includes(".fuel-path-marker-cluster::after"),
@@ -144,6 +156,10 @@ const checks = [
       nativeMap.includes("borderTopWidth: 8") &&
       nativeMap.includes('borderLeftColor: "transparent"') &&
       nativeMap.includes("width: 54") &&
+      nativeMap.includes("height: 46") &&
+      nativeMap.includes("minHeight: 24") &&
+      nativeMap.includes("<BrandBadge station={item.station} size={22} />") &&
+      brandBadge.includes('resizeMode="contain"') &&
       !nativeMap.includes("scale: 1.05") &&
       nativeMap.includes("backgroundColor: colors.greenDark") &&
       nativeMap.indexOf("<Text style={[styles.pinPrice") <

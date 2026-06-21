@@ -705,9 +705,10 @@ function ensureLeafletStyles() {
         border-bottom-left-radius: 12px;
         border-bottom-right-radius: 12px;
         display: flex;
-        flex: 1 1 auto;
+        flex: 0 0 23px;
         justify-content: center;
-        min-height: 18px;
+        min-height: 23px;
+        width: 100%;
       }
       .fuel-path-marker-logo,
       .fuel-path-marker-initials {
@@ -716,13 +717,27 @@ function ensureLeafletStyles() {
         border-radius: 8px;
         color: ${colors.white};
         display: flex;
-        flex: 0 0 20px;
+        flex: 0 0 auto;
         font-size: 9px;
         font-weight: 900;
-        height: 16px;
+        height: 20px;
         justify-content: center;
+        object-fit: contain;
         overflow: hidden;
-        width: 28px;
+        width: 36px;
+      }
+      .fuel-path-marker-logo {
+        display: block;
+        flex-basis: 38px;
+        flex-shrink: 0;
+        max-width: 38px;
+        min-width: 38px;
+        object-fit: contain;
+        width: 38px;
+      }
+      .fuel-path-marker-initials {
+        border-radius: 999px;
+        width: 20px;
       }
       .fuel-path-marker-price {
         align-items: center;
@@ -731,8 +746,8 @@ function ensureLeafletStyles() {
         border-top-right-radius: 11px;
         color: ${colors.white};
         display: flex;
-        flex: 0 0 27px;
-        font-size: 13px;
+        flex: 0 0 23px;
+        font-size: 12px;
         font-weight: 900;
         justify-content: center;
         line-height: 1;

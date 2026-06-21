@@ -298,7 +298,7 @@ export function StationMap({
                     {item.adjustedCpl.toFixed(1)}
                   </Text>
                   <View style={styles.pinBrand}>
-                    <BrandBadge station={item.station} size={20} />
+                    <BrandBadge station={item.station} size={22} />
                   </View>
                 </View>
                 <View style={[styles.pinPointer, selected && styles.pinPointerSelected]} />
@@ -593,6 +593,7 @@ const styles = StyleSheet.create({
     borderColor: "rgba(7, 86, 66, 0.18)",
     borderRadius: radii.md,
     borderWidth: 1,
+    height: 46,
     minWidth: 54,
     overflow: "hidden",
     width: 54,
@@ -603,12 +604,12 @@ const styles = StyleSheet.create({
   pinPrice: {
     backgroundColor: colors.greenDark,
     color: colors.white,
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: "900",
-    lineHeight: 18,
+    lineHeight: 16,
     minWidth: 54,
     paddingHorizontal: spacing.xs,
-    paddingVertical: spacing.xs,
+    paddingVertical: 3,
     textAlign: "center",
   },
   pinPriceSelected: {
@@ -617,7 +618,7 @@ const styles = StyleSheet.create({
   pinBrand: {
     alignItems: "center",
     backgroundColor: colors.white,
-    minHeight: 22,
+    minHeight: 24,
     justifyContent: "center",
     width: "100%",
   },

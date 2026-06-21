@@ -524,24 +524,24 @@ const checks = [
       planFieldSmoke.includes("state-only address context is not enough") &&
       planFieldSmoke.includes("locality-qualified typed address still needs suggestion confirmation") &&
       planFieldSmoke.includes("validation address rows are ranked above POI-like rows") &&
-      planFieldSmoke.includes("validation rows show unconfirmed evidence") &&
-      planFieldSmoke.includes("street fallback rows show street-only evidence") &&
-      planFieldSmoke.includes("Street/area only") &&
-      planFieldSmoke.includes("Not an exact address. Use only if this street or area is enough.") &&
+      planFieldSmoke.includes("validation rows keep unconfirmed evidence hidden") &&
+      planFieldSmoke.includes("street fallback rows keep street-only evidence hidden") &&
+      planFieldSmoke.includes('assertHiddenText("Street/area only")') &&
+      planFieldSmoke.includes('assertHiddenText("Not an exact address. Use only if this street or area is enough.")') &&
       planFieldSmoke.includes("selecting confirmed From and To unlocks Plan route") &&
       planFieldSmoke.includes("selected broad capital pair can submit route") &&
       planFieldSmoke.includes("airport pair suggestions can submit route") &&
       planFieldSmoke.includes("editing after a planned route clears route results") &&
       planFieldSmoke.includes("Parramatta Childrens Court") &&
-      planFieldSmoke.includes("Needs confirmation") &&
-      planFieldSmoke.includes("Not an exact address match. Confirm this row before planning.") &&
+      planFieldSmoke.includes('assertHiddenText("Needs confirmation")') &&
+      planFieldSmoke.includes('assertHiddenText("Not an exact address match. Confirm this row before planning.")') &&
       planFieldSmoke.includes("Choose a destination suggestion to confirm this address.") &&
       planFieldSmoke.includes("Plan field smoke could not reach") &&
       planFieldSmoke.includes("npm run web -- --port 8081") &&
       planFieldSmoke.includes("Does not prove native iOS/Android behaviour or production provider precision."),
   },
   {
-    label: "location suggestions show honest confidence chips",
+    label: "location evidence stays available while route suggestions stay clean",
     ok:
       locationEvidence.includes("Exact address") &&
       locationEvidence.includes("Address match") &&
@@ -555,9 +555,12 @@ const checks = [
       locationEvidenceChip.includes("LocationEvidenceChip") &&
       locationEvidenceChip.includes("styles.chipStreet") &&
       locationEvidenceChip.includes("styles.chipUnconfirmed") &&
-      planRouteEditorCard.includes("selectedLocationEvidence") &&
-      routeAddressSuggestions.includes("<LocationEvidenceChip point={point}") &&
-      routeAddressSuggestions.includes("suggestionNeedsPrecisionDetail(point)") &&
+      !planRouteEditorCard.includes("LocationEvidenceChip") &&
+      !planRouteEditorCard.includes("selectedLocationEvidence") &&
+      !routeAddressSuggestions.includes("LocationEvidenceChip") &&
+      !routeAddressSuggestions.includes("suggestionNeedsPrecisionDetail") &&
+      routeAddressSuggestions.includes("titleConsumesStreetNumber(parts)") &&
+      routeAddressSuggestions.includes("isStreetNumberFragment") &&
       savedPlaceEditor.includes("<LocationEvidenceChip") &&
       savedPlaceEditor.includes("point={suggestion}") &&
       savedPlaceEditor.includes("suggestionNeedsPrecisionDetail(suggestion)") &&

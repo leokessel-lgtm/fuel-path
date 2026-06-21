@@ -443,7 +443,6 @@ export function PlanScreen({
             canPlanRoute={canPlanRoute}
             fuel={preferences.fuel}
             from={from}
-            fromPoint={fromPoint}
             fromSuggestions={fromSuggestions}
             loading={loading}
             locatingFrom={locatingFrom}
@@ -468,7 +467,6 @@ export function PlanScreen({
             suggestionsError={suggestionsError}
             suggestionsLoading={suggestionsLoading}
             to={to}
-            toPoint={toPoint}
             toSuggestions={toSuggestions}
           />
         )}

@@ -89,20 +89,21 @@ try {
     );
   });
 
-  await recordCase("validation rows show unconfirmed evidence", async () => {
+  await recordCase("validation rows keep unconfirmed evidence hidden", async () => {
     await resetApp();
     await fillField("To", "2 George Street Sydney NSW");
     await waitForSuggestion(/2, George Street, Sydney NSW 2000/);
-    await assertText("Needs confirmation");
-    await assertText("Not an exact address match. Confirm this row before planning.");
+    await assertHiddenText("Needs confirmation");
+    await assertHiddenText("Not an exact address match. Confirm this row before planning.");
+    await assertText("Choose a destination suggestion to confirm this address.");
   });
 
-  await recordCase("street fallback rows show street-only evidence", async () => {
+  await recordCase("street fallback rows keep street-only evidence hidden", async () => {
     await resetApp();
     await fillField("From", "22 Paterson Street Tennant Creek NT");
     await waitForSuggestion(/Paterson Street, Tennant Creek NT 0860/);
-    await assertText("Street/area only");
-    await assertText("Not an exact address. Use only if this street or area is enough.");
+    await assertHiddenText("Street/area only");
+    await assertHiddenText("Not an exact address. Use only if this street or area is enough.");
     await assertText("Choose a start suggestion to confirm this address.");
     await assertButtonDisabled("Plan route");
   });

@@ -2,7 +2,6 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { colors, radii, spacing, typeScale } from "../theme";
 import { MapPoint } from "../types";
-import { LocationEvidenceChip } from "./LocationEvidenceChip";
 
 export function AddressSuggestions({
   error,
@@ -43,9 +42,6 @@ export function AddressSuggestions({
               <Text numberOfLines={1} style={styles.suggestionMeta}>
                 {suggestionMeta(point)}
               </Text>
-              <View style={styles.suggestionEvidence}>
-                <LocationEvidenceChip point={point} showDetail={suggestionNeedsPrecisionDetail(point)} />
-              </View>
             </Pressable>
           ))
         : null}
@@ -64,10 +60,6 @@ export function routeInputPrecisionHint(kind: "destination" | "start", query: st
     return "Choose a start suggestion, or add suburb or postcode before planning.";
   }
   return "Choose a destination suggestion, or add suburb or postcode before planning.";
-}
-
-function suggestionNeedsPrecisionDetail(point: MapPoint) {
-  return point.sourceLabel === "Needs confirmation" || point.sourceLabel === "Street/area only";
 }
 
 function addressLocalityHint(query: string) {
@@ -107,12 +99,29 @@ function hasAddressLocalityContext(query: string) {
 }
 
 function suggestionTitle(point: MapPoint) {
-  return point.label.split(",")[0]?.trim() || point.label;
+  const parts = suggestionParts(point);
+  if (titleConsumesStreetNumber(parts)) {
+    return `${parts[0]} ${parts[1]}`;
+  }
+  return parts[0] || point.label;
 }
 
 function suggestionMeta(point: MapPoint) {
-  const parts = point.label.split(",").map((part) => part.trim()).filter(Boolean);
-  return parts.slice(1, 4).join(", ") || "Australia";
+  const parts = suggestionParts(point);
+  const startIndex = titleConsumesStreetNumber(parts) ? 2 : 1;
+  return parts.slice(startIndex, startIndex + 3).join(", ") || "Australia";
+}
+
+function suggestionParts(point: MapPoint) {
+  return point.label.split(",").map((part) => part.trim()).filter(Boolean);
+}
+
+function titleConsumesStreetNumber(parts: string[]) {
+  return Boolean(parts[1] && isStreetNumberFragment(parts[0]));
+}
+
+function isStreetNumberFragment(value: string) {
+  return /^\d+[a-z]?(?:[/-]\d+[a-z]?)?$/i.test(value.trim());
 }
 
 const styles = StyleSheet.create({
@@ -142,9 +151,6 @@ const styles = StyleSheet.create({
     fontSize: typeScale.caption,
     fontWeight: "400",
     marginTop: 2,
-  },
-  suggestionEvidence: {
-    marginTop: spacing.xs,
   },
   suggestionStatus: {
     color: colors.muted,

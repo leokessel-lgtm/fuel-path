@@ -3,7 +3,6 @@ import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { colors, radii, shadow, spacing, surfaces, typeScale, typography } from "../theme";
 import { FuelCode, MapPoint, SavedCommute } from "../types";
 import { FuelSelector } from "./FuelSelector";
-import { LocationEvidenceChip } from "./LocationEvidenceChip";
 import { QuickPlace, QuickPlaceShortcuts } from "./QuickPlaceShortcuts";
 import { AddressSuggestions } from "./RouteAddressSuggestions";
 import { SavedCommuteShortcuts } from "./SavedCommuteShortcuts";
@@ -13,7 +12,6 @@ export function PlanRouteEditorCard({
   canPlanRoute,
   fuel,
   from,
-  fromPoint,
   fromSuggestions,
   loading,
   locatingFrom,
@@ -38,14 +36,12 @@ export function PlanRouteEditorCard({
   suggestionsError,
   suggestionsLoading,
   to,
-  toPoint,
   toSuggestions,
 }: {
   activeAddressField: "from" | "to" | null;
   canPlanRoute: boolean;
   fuel: FuelCode;
   from: string;
-  fromPoint?: MapPoint;
   fromSuggestions: MapPoint[];
   loading: boolean;
   locatingFrom: boolean;
@@ -70,7 +66,6 @@ export function PlanRouteEditorCard({
   suggestionsError: string;
   suggestionsLoading: "from" | "to" | null;
   to: string;
-  toPoint?: MapPoint;
   toSuggestions: MapPoint[];
 }) {
   return (
@@ -118,11 +113,6 @@ export function PlanRouteEditorCard({
             </View>
           </Pressable>
         </View>
-        {fromPoint ? (
-          <View style={styles.selectedLocationEvidence}>
-            <LocationEvidenceChip point={fromPoint} showDetail />
-          </View>
-        ) : null}
         {activeAddressField === "from" ? (
           <AddressSuggestions
             error={suggestionsError}
@@ -142,11 +132,6 @@ export function PlanRouteEditorCard({
           returnKeyType="search"
           style={styles.input}
         />
-        {toPoint ? (
-          <View style={styles.selectedLocationEvidence}>
-            <LocationEvidenceChip point={toPoint} showDetail />
-          </View>
-        ) : null}
         {activeAddressField === "to" ? (
           <AddressSuggestions
             error={suggestionsError}
@@ -216,9 +201,6 @@ const styles = StyleSheet.create({
   },
   inputWithIcon: {
     paddingRight: 52,
-  },
-  selectedLocationEvidence: {
-    paddingHorizontal: spacing.xs,
   },
   routePrecisionHint: {
     color: colors.muted,

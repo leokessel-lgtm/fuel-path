@@ -81,15 +81,18 @@ export function StationMap({
       if (visibleRoutePoints.length >= 2) return visibleRoutePoints;
       return [routeEndpoints.from, routeEndpoints.to];
     }
+    const cameraStations = showCentreMarker
+      ? nearestStationsForCamera(stations, centre, 12)
+      : stations.slice(0, maxStationMarkers);
     return [
       centre,
-      ...stations.slice(0, maxStationMarkers).map((item) => ({
+      ...cameraStations.map((item) => ({
         lat: item.station.lat,
         lon: item.station.lon,
         label: item.station.name,
       })),
     ];
-  }, [centre, routeEndpoints, stations, visibleRoutePoints]);
+  }, [centre, routeEndpoints, showCentreMarker, stations, visibleRoutePoints]);
   const initialRegion = useMemo(() => regionForPoint(centre), [centre]);
   const markerGroups = useMemo(
     () => visibleMarkerGroups(stations.slice(0, maxStationMarkers), currentRegion, selectedStationCode),
@@ -427,6 +430,26 @@ function markerPriorityScore(item: StationViewModel) {
   return item.adjustedCpl + item.distanceKm * 0.85;
 }
 
+function nearestStationsForCamera(
+  stations: StationViewModel[],
+  centre: MapPoint,
+  maxStations: number,
+) {
+  return [...stations]
+    .sort((left, right) => {
+      const leftDistance = distanceKm(centre, {
+        lat: left.station.lat,
+        lon: left.station.lon,
+      });
+      const rightDistance = distanceKm(centre, {
+        lat: right.station.lat,
+        lon: right.station.lon,
+      });
+      return leftDistance - rightDistance;
+    })
+    .slice(0, maxStations);
+}
+
 function markerCell(item: StationViewModel, region: Region, gridSize: number) {
   const safeLatDelta = Math.max(region.latitudeDelta, 0.005);
   const safeLonDelta = Math.max(region.longitudeDelta, 0.005);
@@ -599,7 +622,7 @@ const styles = StyleSheet.create({
     width: 54,
   },
   pinSelected: {
-    borderColor: colors.green,
+    borderColor: colors.black,
   },
   pinPrice: {
     backgroundColor: colors.greenDark,
@@ -613,7 +636,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   pinPriceSelected: {
-    backgroundColor: colors.green,
+    backgroundColor: colors.black,
   },
   pinBrand: {
     alignItems: "center",

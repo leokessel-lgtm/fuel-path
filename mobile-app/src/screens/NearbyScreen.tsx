@@ -258,6 +258,7 @@ export function NearbyScreen({
     [listSourceStations, sortMode],
   );
   const selected = stations.find((item) => item.station.stationCode === selectedCode);
+  const selectedPlaceActive = locationQuery.trim().length > 0 && locationQuery.trim() === centre.label;
   const nearbyCameraInsets = useMemo(
     () => ({
       top: 170,
@@ -323,11 +324,7 @@ export function NearbyScreen({
     if (selectionDismissed && !selectedCode) return;
     const sortChanged = previousSortMode.current !== sortMode;
     previousSortMode.current = sortMode;
-    if (
-      sortChanged ||
-      !selectedCode ||
-      !selectedExists
-    ) {
+    if (sortChanged || !selectedCode || !selectedExists) {
       setSelectedCode(sortedStations[0].station.stationCode);
     }
   }, [selectedCode, selectionDismissed, sortMode, sortedStations, stations]);
@@ -343,7 +340,7 @@ export function NearbyScreen({
           onViewportStationsChange={handleViewportStationsChange}
           onMapSearchAreaChange={handleMapSearchAreaChange}
           cameraFocusKey={`nearby-${cameraFocusVersion}`}
-          showCentreMarker={false}
+          showCentreMarker={selectedPlaceActive}
           userLocation={currentLocation}
           cameraInsets={nearbyCameraInsets}
         />

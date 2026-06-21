@@ -269,7 +269,7 @@ const styles = StyleSheet.create({
     position: "absolute",
   },
   pinSelected: {
-    backgroundColor: colors.green,
+    backgroundColor: colors.black,
     transform: [{ scale: 1.05 }],
   },
   pinPrice: {

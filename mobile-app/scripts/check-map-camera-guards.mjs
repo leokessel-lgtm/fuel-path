@@ -126,6 +126,10 @@ const checks = [
       webMap.includes("max-width: 38px;") &&
       webMap.includes(".fuel-path-marker-initials {") &&
       webMap.includes("object-fit: contain;") &&
+      webMap.includes(".fuel-path-marker.is-selected .fuel-path-marker-price") &&
+      webMap.includes("background: ${colors.black};") &&
+      webMap.includes("nearestStationsForCamera(stations, centre, 12)") &&
+      webMap.includes("showCentreMarker ? 15 : 14") &&
       webMap.includes(".filter((items) => items.length >= minClusterStationCount)") &&
       !webMap.includes("transform: scale(1.12)") &&
       !webMap.includes(".fuel-path-marker-cluster::after"),
@@ -162,6 +166,9 @@ const checks = [
       brandBadge.includes('resizeMode="contain"') &&
       !nativeMap.includes("scale: 1.05") &&
       nativeMap.includes("backgroundColor: colors.greenDark") &&
+      nativeMap.includes("pinSelected: {\n    borderColor: colors.black") &&
+      nativeMap.includes("pinPriceSelected: {\n    backgroundColor: colors.black") &&
+      nativeMap.includes("nearestStationsForCamera(stations, centre, 12)") &&
       nativeMap.indexOf("<Text style={[styles.pinPrice") <
         nativeMap.indexOf("<View style={styles.pinBrand}>") &&
       nativeMap.includes("pinPointerSelected"),
@@ -479,8 +486,6 @@ const checks = [
       planRouteEditorCard.includes("selectedLocationEvidence") &&
       routeAddressSuggestions.includes("<LocationEvidenceChip point={point}") &&
       routeAddressSuggestions.includes("suggestionNeedsPrecisionDetail(point)") &&
-      nearbyLocationSearch.includes("<LocationEvidenceChip point={location}") &&
-      nearbyLocationSearch.includes("suggestionNeedsPrecisionDetail(location)") &&
       savedPlaceEditor.includes("<LocationEvidenceChip") &&
       savedPlaceEditor.includes("point={suggestion}") &&
       savedPlaceEditor.includes("suggestionNeedsPrecisionDetail(suggestion)") &&
@@ -492,6 +497,20 @@ const checks = [
       !routeAddressSuggestions.includes("${point.sourceLabel} | ${place}") &&
       !nearbyLocationSearch.includes("${point.sourceLabel} | ${place}") &&
       !savedPlaceEditor.includes("${point.sourceLabel} | ${place}"),
+  },
+  {
+    label: "nearby address search stays clean and pins selected places",
+    ok:
+      nearbyScreen.includes("const selectedPlaceActive = locationQuery.trim().length > 0 && locationQuery.trim() === centre.label;") &&
+      nearbyScreen.includes("showCentreMarker={selectedPlaceActive}") &&
+      nearbyLocationSearch.includes("styles.inputShell") &&
+      nearbyLocationSearch.includes("styles.currentLocationButton") &&
+      nearbyLocationSearch.includes("locationInputWithIcon") &&
+      nearbyLocationSearch.includes("titleConsumesStreetNumber(parts)") &&
+      nearbyLocationSearch.includes("isStreetNumberFragment") &&
+      !nearbyLocationSearch.includes("LocationEvidenceChip") &&
+      !nearbyLocationSearch.includes("lookupResultEvidence") &&
+      !nearbyLocationSearch.includes("suggestionNeedsPrecisionDetail"),
   },
   {
     label: "discount redemption state is normalised before persistence",

@@ -2,7 +2,6 @@ import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { colors, radii, shadow, spacing, surfaces, typeScale } from "../theme";
 import { MapPoint } from "../types";
-import { LocationEvidenceChip } from "./LocationEvidenceChip";
 
 export function NearbyLocationSearch({
   locationError,
@@ -32,9 +31,9 @@ export function NearbyLocationSearch({
   suggestionsLoading: boolean;
 }) {
   return (
-    <View style={styles.searchControlRow}>
-      <View style={styles.locationCard}>
-        <View style={styles.locationInputRow}>
+    <View style={styles.locationCard}>
+      <View style={styles.locationInputRow}>
+        <View style={styles.inputShell}>
           <TextInput
             accessibilityLabel="Nearby location"
             value={locationQuery}
@@ -44,67 +43,67 @@ export function NearbyLocationSearch({
             placeholder="Search address, suburb or place"
             placeholderTextColor={colors.muted}
             returnKeyType="search"
-            style={styles.locationInput}
+            style={[styles.locationInput, styles.locationInputWithIcon]}
           />
-          {locationQuery.trim() || resolvingLocation ? (
-            <Pressable
-              accessibilityLabel="Find nearby location"
-              onPress={onApplyLocationSearch}
-              disabled={resolvingLocation}
-              style={[styles.locationButton, resolvingLocation && styles.buttonDisabled]}
-            >
-              <Text style={styles.locationButtonText}>
-                {resolvingLocation ? "..." : "Find"}
-              </Text>
-            </Pressable>
-          ) : null}
+          <Pressable
+            accessibilityLabel="Use current location"
+            onPress={onUseCurrentLocation}
+            disabled={resolvingLocation}
+            hitSlop={8}
+            style={({ pressed }) => [
+              styles.currentLocationButton,
+              pressed && styles.currentLocationButtonPressed,
+              resolvingLocation && styles.buttonDisabled,
+            ]}
+          >
+            <View style={styles.currentLocationIcon}>
+              <View style={styles.currentLocationLineVertical} />
+              <View style={styles.currentLocationLineHorizontal} />
+              <View style={styles.currentLocationDot} />
+            </View>
+          </Pressable>
         </View>
-        {locationSearchActive && locationQuery.trim().length >= 3 ? (
-          <View style={styles.lookupResults}>
-            {suggestionsLoading ? (
-              <Text style={styles.lookupLoading}>Searching...</Text>
-            ) : null}
-            {locationSuggestions.map((location) => (
-              <LocationResultRow
-                key={`${location.lat}:${location.lon}:${location.label}`}
-                location={location}
-                onPress={() => onSelectSuggestion(location)}
-                recent={false}
-              />
-            ))}
-          </View>
+        {locationQuery.trim() || resolvingLocation ? (
+          <Pressable
+            accessibilityLabel="Find nearby location"
+            onPress={onApplyLocationSearch}
+            disabled={resolvingLocation}
+            style={[styles.locationButton, resolvingLocation && styles.buttonDisabled]}
+          >
+            <Text style={styles.locationButtonText}>
+              {resolvingLocation ? "..." : "Find"}
+            </Text>
+          </Pressable>
         ) : null}
-        {locationSearchActive && !locationQuery.trim() && recentLocations.length ? (
-          <View style={styles.lookupResults}>
-            {recentLocations.map((location) => (
-              <LocationResultRow
-                key={`${location.lat}:${location.lon}:${location.label}`}
-                location={location}
-                onPress={() => onSelectRecentLocation(location)}
-                recent
-              />
-            ))}
-          </View>
-        ) : null}
-        {locationError ? <Text style={styles.locationError}>{locationError}</Text> : null}
       </View>
-      <Pressable
-        accessibilityLabel="Use current location"
-        onPress={onUseCurrentLocation}
-        disabled={resolvingLocation}
-        style={({ pressed }) => [
-          styles.currentLocationPill,
-          pressed && styles.currentLocationPillPressed,
-          resolvingLocation && styles.buttonDisabled,
-        ]}
-      >
-        <View style={styles.currentLocationIcon}>
-          <View style={styles.currentLocationCrossVertical} />
-          <View style={styles.currentLocationCrossHorizontal} />
-          <View style={styles.currentLocationRing} />
-          <View style={styles.currentLocationDot} />
+      {locationSearchActive && locationQuery.trim().length >= 3 ? (
+        <View style={styles.lookupResults}>
+          {suggestionsLoading ? (
+            <Text style={styles.lookupLoading}>Searching...</Text>
+          ) : null}
+          {locationSuggestions.map((location) => (
+            <LocationResultRow
+              key={`${location.lat}:${location.lon}:${location.label}`}
+              location={location}
+              onPress={() => onSelectSuggestion(location)}
+              recent={false}
+            />
+          ))}
         </View>
-      </Pressable>
+      ) : null}
+      {locationSearchActive && !locationQuery.trim() && recentLocations.length ? (
+        <View style={styles.lookupResults}>
+          {recentLocations.map((location) => (
+            <LocationResultRow
+              key={`${location.lat}:${location.lon}:${location.label}`}
+              location={location}
+              onPress={() => onSelectRecentLocation(location)}
+              recent
+            />
+          ))}
+        </View>
+      ) : null}
+      {locationError ? <Text style={styles.locationError}>{locationError}</Text> : null}
     </View>
   );
 }
@@ -132,38 +131,42 @@ function LocationResultRow({
         <Text numberOfLines={1} style={styles.lookupResultMeta}>
           {suggestionMeta(location)}
         </Text>
-        <View style={styles.lookupResultEvidence}>
-          <LocationEvidenceChip point={location} showDetail={!recent && suggestionNeedsPrecisionDetail(location)} />
-        </View>
       </View>
     </Pressable>
   );
 }
 
 function suggestionTitle(point: MapPoint) {
-  return point.label.split(",")[0]?.trim() || point.label;
+  const parts = suggestionParts(point);
+  if (titleConsumesStreetNumber(parts)) {
+    return `${parts[0]} ${parts[1]}`;
+  }
+  return parts[0] || point.label;
 }
 
 function suggestionMeta(point: MapPoint) {
-  const parts = point.label.split(",").map((part) => part.trim()).filter(Boolean);
-  return parts.slice(1, 4).join(", ") || "Australia";
+  const parts = suggestionParts(point);
+  const startIndex = titleConsumesStreetNumber(parts) ? 2 : 1;
+  return parts.slice(startIndex, startIndex + 3).join(", ") || "Australia";
 }
 
-function suggestionNeedsPrecisionDetail(point: MapPoint) {
-  return point.sourceLabel === "Needs confirmation" || point.sourceLabel === "Street/area only";
+function suggestionParts(point: MapPoint) {
+  return point.label.split(",").map((part) => part.trim()).filter(Boolean);
+}
+
+function titleConsumesStreetNumber(parts: string[]) {
+  return Boolean(parts[1] && isStreetNumberFragment(parts[0]));
+}
+
+function isStreetNumberFragment(value: string) {
+  return /^\d+[a-z]?(?:[/-]\d+[a-z]?)?$/i.test(value.trim());
 }
 
 const styles = StyleSheet.create({
-  searchControlRow: {
-    alignItems: "flex-start",
-    flexDirection: "row",
-    gap: spacing.sm,
-  },
   locationCard: {
     ...shadow.float,
     ...surfaces.floating,
     borderRadius: radii.xxl,
-    flex: 1,
     gap: spacing.sm,
     padding: spacing.sm,
   },
@@ -171,6 +174,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flexDirection: "row",
     gap: spacing.sm,
+  },
+  inputShell: {
+    flex: 1,
+    justifyContent: "center",
+    minWidth: 0,
+    position: "relative",
   },
   locationInput: {
     backgroundColor: colors.white,
@@ -184,6 +193,9 @@ const styles = StyleSheet.create({
     minHeight: 42,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
+  },
+  locationInputWithIcon: {
+    paddingRight: 52,
   },
   locationButton: {
     alignItems: "center",
@@ -257,57 +269,52 @@ const styles = StyleSheet.create({
     fontWeight: "400",
     marginTop: 1,
   },
-  lookupResultEvidence: {
-    marginTop: spacing.xs,
-  },
-  currentLocationPill: {
-    ...shadow.float,
-    ...surfaces.floating,
+  currentLocationButton: {
     alignItems: "center",
+    backgroundColor: colors.white,
+    borderColor: colors.line,
     borderRadius: radii.pill,
-    height: 48,
+    borderWidth: 1,
+    bottom: 4,
+    height: 34,
     justifyContent: "center",
-    width: 50,
+    position: "absolute",
+    right: spacing.xs,
+    top: 4,
+    width: 34,
   },
-  currentLocationPillPressed: {
-    opacity: 0.82,
+  currentLocationButtonPressed: {
+    backgroundColor: colors.greenSoft,
+    borderColor: colors.green,
   },
   currentLocationIcon: {
     alignItems: "center",
-    height: 24,
+    borderColor: colors.green,
+    borderRadius: 9,
+    borderWidth: 2,
+    height: 18,
     justifyContent: "center",
-    position: "relative",
-    width: 24,
+    width: 18,
   },
-  currentLocationCrossVertical: {
+  currentLocationLineVertical: {
     backgroundColor: colors.green,
-    borderRadius: radii.pill,
     height: 24,
     position: "absolute",
     width: 2,
   },
-  currentLocationCrossHorizontal: {
+  currentLocationLineHorizontal: {
     backgroundColor: colors.green,
-    borderRadius: radii.pill,
     height: 2,
     position: "absolute",
     width: 24,
   },
-  currentLocationRing: {
-    backgroundColor: colors.white,
-    borderColor: colors.green,
-    borderRadius: radii.pill,
-    borderWidth: 2,
-    height: 16,
-    position: "absolute",
-    width: 16,
-  },
   currentLocationDot: {
     backgroundColor: colors.green,
-    borderRadius: radii.pill,
-    height: 6,
-    position: "absolute",
-    width: 6,
+    borderColor: colors.white,
+    borderRadius: 4,
+    borderWidth: 1,
+    height: 8,
+    width: 8,
   },
   locationError: {
     color: colors.red,

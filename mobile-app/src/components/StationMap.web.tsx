@@ -126,6 +126,9 @@ export function StationMap({
       .filter((point) => Number.isFinite(point.lat) && Number.isFinite(point.lon))
       .map((point) => [point.lat, point.lon] as [number, number]);
     const activeInsets = resolveCameraInsets(routeEndpoints ? "route" : "nearby", cameraInsets);
+    const cameraStations = showCentreMarker
+      ? nearestStationsForCamera(stations, centre, 12)
+      : stations.slice(0, maxStationMarkers);
     const cameraPoints = routeEndpoints
       ? routeLatLngs.length >= 2
         ? routeLatLngs
@@ -135,9 +138,7 @@ export function StationMap({
           ]
       : [
           [centre.lat, centre.lon] as [number, number],
-          ...stations
-            .slice(0, maxStationMarkers)
-            .map((item) => [item.station.lat, item.station.lon] as [number, number]),
+          ...cameraStations.map((item) => [item.station.lat, item.station.lon] as [number, number]),
         ];
     const cameraContextKey = routeEndpoints
       ? [
@@ -250,7 +251,7 @@ export function StationMap({
         map.invalidateSize();
         map.fitBounds(L.latLngBounds(cameraPoints), {
           ...leafletPadding(activeInsets),
-          maxZoom: routeEndpoints ? 15 : 14,
+          maxZoom: routeEndpoints ? 15 : showCentreMarker ? 15 : 14,
         });
       });
       lastFitKeyRef.current = fitKey;
@@ -512,6 +513,26 @@ function markerPriorityScore(item: StationViewModel) {
   return item.adjustedCpl + item.distanceKm * 0.85;
 }
 
+function nearestStationsForCamera(
+  stations: StationViewModel[],
+  centre: MapPoint,
+  maxStations: number,
+) {
+  return [...stations]
+    .sort((left, right) => {
+      const leftDistance = distanceKm(centre, {
+        lat: left.station.lat,
+        lon: left.station.lon,
+      });
+      const rightDistance = distanceKm(centre, {
+        lat: right.station.lat,
+        lon: right.station.lon,
+      });
+      return leftDistance - rightDistance;
+    })
+    .slice(0, maxStations);
+}
+
 function markerCell(item: StationViewModel, bounds: Leaflet.LatLngBounds, gridSize: number) {
   const west = bounds.getWest();
   const south = bounds.getSouth();
@@ -693,8 +714,8 @@ function ensureLeafletStyles() {
         width: 0;
       }
       .fuel-path-marker.is-selected {
-        border-color: ${colors.green};
-        box-shadow: 0 10px 22px rgba(8, 122, 99, 0.28);
+        border-color: ${colors.black};
+        box-shadow: 0 10px 22px rgba(17, 20, 18, 0.28);
       }
       .fuel-path-marker.is-selected::after {
         border-top-color: ${colors.white};
@@ -754,7 +775,7 @@ function ensureLeafletStyles() {
         width: 100%;
       }
       .fuel-path-marker.is-selected .fuel-path-marker-price {
-        background: ${colors.green};
+        background: ${colors.black};
       }
       .fuel-path-marker-cluster {
         align-items: center;

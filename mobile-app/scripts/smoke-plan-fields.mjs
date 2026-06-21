@@ -102,7 +102,7 @@ try {
     await resetApp();
     await fillField("From", "22 Paterson Street Tennant Creek NT");
     await waitForSuggestion(/Paterson Street, Tennant Creek NT 0860/);
-    await assertHiddenText("Street/area only");
+    await assertHiddenText("Street/road");
     await assertHiddenText("Not an exact address. Use only if this street or area is enough.");
     await assertText("Choose a start suggestion to confirm this address.");
     await assertButtonDisabled("Plan route");

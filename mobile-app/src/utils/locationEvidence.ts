@@ -40,23 +40,23 @@ export function locationEvidence(point: MapPoint): LocationEvidence {
   }
 
   if (point.provider === "fuel_path_hint" || point.provider === "fuel_path_regional_gazetteer") {
-    if (point.sourceLabel === "Street/area only") {
+    if (point.sourceLabel === "Street/road") {
       return {
         detail: "Not an exact address. Use only if this street or area is enough.",
-        label: "Street/area only",
+        label: "Street/road",
         level: "street",
       };
     }
-    if (["poi", "station", "airport"].includes(String(point.type || ""))) {
+    if (["poi", "regional_poi", "airport"].includes(String(point.type || ""))) {
       return {
         detail: "Matched a known place.",
-        label: "Place match",
+        label: "Place/landmark",
         level: "area",
       };
     }
     return {
       detail: "Matched a suburb, town or street area.",
-      label: "Approx. area",
+      label: "Suburb/area",
       level: "area",
     };
   }
@@ -64,7 +64,7 @@ export function locationEvidence(point: MapPoint): LocationEvidence {
   if (point.provider === "fuel_path") {
     return {
       detail: "Matched a known fuel station.",
-      label: "Station match",
+      label: "Fuel station",
       level: "area",
     };
   }

@@ -535,8 +535,8 @@ const checks = [
       fuelPathApi.includes("weakAutoRouteLocation(suggestions[0])") &&
       fuelPathApi.includes("Choose a suggestion to confirm this address, or add suburb or postcode.") &&
       fuelPathApi.includes('point.sourceLabel === "Needs confirmation"') &&
-      fuelPathApi.includes('point.sourceLabel === "Street/area only"') &&
-      fuelPathApi.includes('point.sourceLabel === "Approx. area"'),
+      fuelPathApi.includes('point.sourceLabel === "Street/road"') &&
+      fuelPathApi.includes('point.sourceLabel === "Suburb/area"'),
   },
   {
     label: "plan field browser smoke covers rendered precision states",
@@ -549,7 +549,7 @@ const checks = [
       planFieldSmoke.includes("validation address rows are ranked above POI-like rows") &&
       planFieldSmoke.includes("validation rows keep unconfirmed evidence hidden") &&
       planFieldSmoke.includes("street fallback rows keep street-only evidence hidden") &&
-      planFieldSmoke.includes('assertHiddenText("Street/area only")') &&
+      planFieldSmoke.includes('assertHiddenText("Street/road")') &&
       planFieldSmoke.includes('assertHiddenText("Not an exact address. Use only if this street or area is enough.")') &&
       planFieldSmoke.includes("selecting confirmed From and To unlocks Plan route") &&
       planFieldSmoke.includes("selected broad capital pair can submit route") &&
@@ -568,11 +568,13 @@ const checks = [
     ok:
       locationEvidence.includes("Exact address") &&
       locationEvidence.includes("Address match") &&
-      locationEvidence.includes("Approx. area") &&
+      locationEvidence.includes("Suburb/area") &&
       locationEvidence.includes("External lookup") &&
       locationEvidence.includes("Lookup limited") &&
       locationEvidence.includes("Needs confirmation") &&
-      locationEvidence.includes("Street/area only") &&
+      locationEvidence.includes("Street/road") &&
+      locationEvidence.includes("Place/landmark") &&
+      locationEvidence.includes("Fuel station") &&
       locationEvidence.includes("Not an exact address. Use only if this street or area is enough.") &&
       locationEvidence.includes("Not an exact address match. Confirm this row before planning.") &&
       locationEvidenceChip.includes("LocationEvidenceChip") &&
@@ -590,8 +592,8 @@ const checks = [
       fuelPathApi.includes("rankLocationSuggestions") &&
       fuelPathApi.includes("addressSuggestionScore") &&
       fuelPathApi.includes('return "Needs confirmation";') &&
-      fuelPathApi.includes('return "Street/area only";') &&
-      fuelPathApi.includes('return "Approx. area";') &&
+      fuelPathApi.includes('return "Street/road";') &&
+      fuelPathApi.includes('return "Suburb/area";') &&
       !routeAddressSuggestions.includes("${point.sourceLabel} | ${place}") &&
       !nearbyLocationSearch.includes("${point.sourceLabel} | ${place}") &&
       !savedPlaceEditor.includes("${point.sourceLabel} | ${place}"),

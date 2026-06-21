@@ -855,7 +855,7 @@ function createGeocoder({ fetchJson, loadStationData }) {
     const strongHintSuggestions = hintSuggestions.filter(isStrongLocalHintSuggestion);
     const weakHintSuggestions = hintSuggestions.filter((item) => !isStrongLocalHintSuggestion(item));
     const stationSuggestions =
-      selectedProvider === "nominatim" && looksLikeStationQuery(query)
+      !stationGeocodeDisabled() && selectedProvider === "nominatim" && looksLikeStationQuery(query)
         ? await localStationGeocode(query, limit)
         : [];
     const localSuggestions = rankLocalSuggestions(
@@ -918,6 +918,10 @@ function createGeocoder({ fetchJson, loadStationData }) {
     };
     writeGeocodeCache(cacheKey, payload, lookupStatus === "ok" || lookupStatus === "local_fallback");
     return payload;
+  }
+
+  function stationGeocodeDisabled() {
+    return process.env.FUEL_PATH_DISABLE_STATION_GEOCODE === "1";
   }
 
   function geocodeCacheKey({ provider, query, limit, addressIndex }) {

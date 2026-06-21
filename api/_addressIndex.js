@@ -34,24 +34,34 @@ async function searchAddressIndex(query, limit = 5) {
   const rawQuery = String(query || "");
   const needle = normaliseAddressText(query);
   if (needle.length < 4) return [];
+  const needles = addressSearchNeedles(rawQuery);
 
   if (configuredApiUrl()) {
-    const apiResults = await searchApiIndex(rawQuery, needle, limit);
+    const apiResults = mergeAddressSuggestions(
+      await Promise.all(needles.map((item) => searchApiIndex(item.rawQuery, item.needle, limit))),
+      limit,
+    );
     if (apiResults.length) return apiResults;
   }
 
   if (configuredPostgresUrl()) {
-    const postgresResults = await searchPostgresIndex(needle, limit);
+    const postgresResults = mergeAddressSuggestions(
+      await Promise.all(needles.map((item) => searchPostgresIndex(item.needle, limit))),
+      limit,
+    );
     if (postgresResults.length) return postgresResults;
   }
 
   const sqlitePath = configuredSqlitePath();
   if (sqlitePath) {
-    const sqliteResults = searchSqliteIndex(needle, limit);
+    const sqliteResults = mergeAddressSuggestions(
+      needles.map((item) => searchSqliteIndex(item.needle, limit)),
+      limit,
+    );
     if (sqliteResults.length) return sqliteResults;
   }
 
-  return searchSeedIndex(needle, limit);
+  return mergeAddressSuggestions(needles.map((item) => searchSeedIndex(item.needle, limit)), limit);
 }
 
 async function searchApiIndex(rawQuery, needle, limit) {
@@ -151,7 +161,7 @@ function searchSqliteIndex(needle, limit) {
     const ftsQuery = terms.map((term) => `${escapeFtsTerm(term)}*`).join(" ");
     const expandedLimit = Math.max(Math.min(Number(limit) || 5, 20) * 8, 40);
     const statement = database.prepare(`
-      SELECT id, label, lat, lon, state, postcode, accuracy, search_text
+      SELECT ${sqliteAddressSelect(database)}
       FROM address_fts
       WHERE address_fts MATCH ?
       ORDER BY rank
@@ -167,7 +177,7 @@ function searchSqliteIndex(needle, limit) {
   } catch {
     try {
       const statement = database.prepare(`
-        SELECT id, label, lat, lon, state, postcode, accuracy, search_text
+        SELECT ${sqliteAddressSelect(database)}
         FROM addresses
         WHERE search_text LIKE ?
         ORDER BY LENGTH(label)
@@ -216,20 +226,27 @@ function scoreRecord(record, needle) {
 }
 
 function addressRecordToSuggestion(record, matchType, score) {
+  const display = addressDisplayMetadata(record, matchType);
   return {
     label: String(record.label),
     lat: Number(record.lat),
     lon: Number(record.lon),
-    type: "address",
+    type: display.type,
     provider: "fuel_path_gnaf",
     providerId: String(record.id || record.provider_id || record.label),
-    confidence: matchType === "exact_address" ? "high" : "medium",
-    matchType,
+    confidence: display.confidence,
+    matchType: display.matchType,
     score,
     source: "gnaf_address_index",
     accuracy: String(record.accuracy || "address_index"),
     state: record.state ? String(record.state) : undefined,
     postcode: record.postcode ? String(record.postcode) : undefined,
+    displayTitle: display.title,
+    displaySubtitle: display.subtitle,
+    sourceLabel: display.sourceLabel,
+    suggestionType: display.suggestionType,
+    refineRequired: display.refineRequired,
+    refineHint: display.refineHint,
   };
 }
 
@@ -295,6 +312,40 @@ function openSqliteIndex() {
     sqliteCache = null;
     return null;
   }
+}
+
+function sqliteAddressSelect(database) {
+  const optional = [
+    "display_title",
+    "display_subtitle",
+    "suggestion_type",
+    "refine_required",
+    "refine_hint",
+    "base_key",
+    "search_key",
+  ];
+  const columns = sqliteSchemaColumns(database, "address_fts");
+  return [
+    "id",
+    "label",
+    "lat",
+    "lon",
+    "state",
+    "postcode",
+    "accuracy",
+    "search_text",
+    "locality",
+    ...optional.filter((column) => columns.has(column)),
+  ].join(", ");
+}
+
+function sqliteSchemaColumns(database, table) {
+  const cacheKey = `${configuredSqlitePath()}:${table}`;
+  if (sqliteSchemaColumns.cache?.key === cacheKey) return sqliteSchemaColumns.cache.columns;
+  const rows = database.prepare(`PRAGMA table_info(${table})`).all();
+  const columns = new Set(rows.map((row) => String(row.name)));
+  sqliteSchemaColumns.cache = { key: cacheKey, columns };
+  return columns;
 }
 
 function isLargeSqliteIndex(sqlitePath) {
@@ -392,8 +443,12 @@ function addressIndexRank(candidate, needle) {
   const { row, matchType } = candidate;
   const label = normaliseAddressText(row?.label);
   const text = normaliseAddressText(row?.search_text);
+  const key = normaliseAddressText(row?.search_key);
+  const base = normaliseAddressText(row?.base_key);
   if (matchType === "exact_address") return 1000;
   if (label.startsWith(needle)) return 960;
+  if (key && key.startsWith(needle)) return 950;
+  if (base && base.startsWith(needle)) return 940;
   if (text.startsWith(needle)) return 930;
   if (matchType === "address_contains") return 760;
   const queryTokens = significantAddressTokens(needle);
@@ -439,6 +494,42 @@ function apiMatchType(row, needle) {
   return sqliteMatchType({ label: row?.label, search_text: row?.search_text || row?.searchText }, needle);
 }
 
+function addressDisplayMetadata(record, matchType) {
+  const storedType = String(record.suggestion_type || "");
+  const storedRefineRequired = Boolean(Number(record.refine_required || 0));
+  const label = String(record.label || "");
+  const parts = label.split(",").map((part) => part.trim()).filter(Boolean);
+  const unitIndex = parts.findIndex((part) => /^(unit|flat|apartment|apt|suite|townhouse)\b/i.test(part));
+  const streetIndex = parts.findIndex((part) => /^\d+[a-z]?(?:-\d+[a-z]?)?\s+/i.test(part));
+  const hasBuildingName = unitIndex > 0;
+  const title =
+    record.display_title ||
+    (hasBuildingName ? `${parts[0]}, ${parts[unitIndex]}` : unitIndex === 0 ? parts[unitIndex] : parts[streetIndex] || parts[0] || label);
+  const subtitle =
+    record.display_subtitle ||
+    (unitIndex >= 0
+      ? [parts[streetIndex], parts[parts.length - 1]].filter(Boolean).join(", ")
+      : parts.slice(1).join(", "));
+  const refineRequired = storedRefineRequired || storedType === "building" || storedType === "base_address";
+  const suggestionType = storedType || "exact_address";
+  return {
+    confidence: matchType === "exact_address" && !refineRequired ? "high" : "medium",
+    matchType: refineRequired && matchType !== "exact_address" ? "building_refine" : matchType,
+    refineHint: record.refine_hint || (refineRequired ? "Type or choose the exact unit before routing." : ""),
+    refineRequired,
+    sourceLabel:
+      refineRequired || suggestionType === "building"
+        ? "Building"
+        : suggestionType === "exact_address" || matchType === "exact_address"
+          ? "Exact address"
+          : "Address match",
+    subtitle,
+    suggestionType,
+    title,
+    type: refineRequired ? "building" : "address",
+  };
+}
+
 function escapeFtsTerm(value) {
   return String(value).replace(/["']/g, " ").replace(/[^\p{L}\p{N}_-]+/gu, " ").trim();
 }
@@ -446,19 +537,80 @@ function escapeFtsTerm(value) {
 function normaliseAddressText(value) {
   const expanded = String(value || "")
     .toLowerCase()
+    .replace(/\bbvd\b/g, "boulevard")
+    .replace(/\bblvd\b/g, "boulevard")
+    .replace(/\bcct\b/g, "circuit")
+    .replace(/\bcnr\b/g, "corner")
+    .replace(/\bcr\b/g, "crescent")
+    .replace(/\bcres\b/g, "crescent")
+    .replace(/\bct\b/g, "court")
     .replace(/\bst\b/g, "street")
     .replace(/\brd\b/g, "road")
     .replace(/\bave\b/g, "avenue")
     .replace(/\bdr\b/g, "drive")
+    .replace(/\besp\b/g, "esplanade")
+    .replace(/\bhwy\b/g, "highway")
+    .replace(/\bmt\b/g, "mount")
+    .replace(/\bpkwy\b/g, "parkway")
+    .replace(/\bpwy\b/g, "parkway")
     .replace(/\bpde\b/g, "parade")
     .replace(/\bpl\b/g, "place")
-    .replace(/\bln\b/g, "lane");
+    .replace(/\bln\b/g, "lane")
+    .replace(/\bsq\b/g, "square")
+    .replace(/\btce\b/g, "terrace");
   return expanded.replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function addressSearchNeedles(rawQuery) {
+  const primary = normaliseAddressText(rawQuery);
+  const variants = [primary, ...complexAddressNeedles(primary)];
+  const seen = new Set();
+  return variants
+    .map((needle) => normaliseAddressText(needle))
+    .filter((needle) => {
+      if (needle.length < 4 || seen.has(needle)) return false;
+      seen.add(needle);
+      return true;
+    })
+    .map((needle) => ({ needle, rawQuery: needle === primary ? String(rawQuery || "") : needle }));
+}
+
+function complexAddressNeedles(needle) {
+  const variants = [];
+  const tokens = String(needle || "").split(/\s+/).filter(Boolean);
+  for (let index = 0; index < tokens.length; index += 1) {
+    if (!SQLITE_UNIT_TERMS.has(tokens[index])) continue;
+    const afterUnit = tokens.slice(index).join(" ");
+    if (shouldSearchLargeSqliteIndex(afterUnit)) variants.push(afterUnit);
+    const afterFlatNumber = tokens.slice(index + 2).join(" ");
+    if (shouldSearchLargeSqliteIndex(afterFlatNumber)) variants.push(afterFlatNumber);
+  }
+  for (let index = 0; index < tokens.length; index += 1) {
+    if (!/^\d+[a-z]?$/.test(tokens[index])) continue;
+    const candidate = tokens.slice(index).join(" ");
+    if (shouldSearchLargeSqliteIndex(candidate)) variants.push(candidate);
+  }
+  return variants;
+}
+
+function mergeAddressSuggestions(groups, limit) {
+  const rows = [];
+  const seen = new Set();
+  for (const group of groups) {
+    for (const item of group || []) {
+      const key = String(item.providerId || item.label);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      rows.push(item);
+    }
+  }
+  return rows.slice(0, limit);
 }
 
 module.exports = {
   addressIndexStatus,
   addressMatchQualityPass,
+  addressSearchNeedles,
   normaliseAddressText,
   searchAddressIndex,
   shouldSearchLargeSqliteIndex,

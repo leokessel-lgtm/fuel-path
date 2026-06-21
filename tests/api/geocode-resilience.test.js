@@ -79,6 +79,35 @@ test("strong local place hints do not call validation provider", async () => {
   });
 });
 
+test("station geocode can be disabled for lookup-only benchmarks", async () => {
+  await withGeocodeEnv(
+    {
+      FUEL_PATH_GEOCODE_PROVIDER: "nominatim",
+      FUEL_PATH_DISABLE_STATION_GEOCODE: "1",
+    },
+    async () => {
+      const mockFetch = installFetchMock(() =>
+        jsonResponse({ error: { message: "Too many requests" } }, 429),
+      );
+
+      const result = await geocode({
+        query: "fuel station karratha wa",
+        limit: 5,
+        sessionToken: "station-geocode-disabled-session",
+      });
+
+      assert.equal(result.lookupStatus, "local_fallback");
+      assert.equal(
+        mockFetch.calls.some((call) => String(call.input).includes("fuelwatch.wa.gov.au")),
+        false,
+      );
+      assert.equal(mockFetch.calls.length, 0);
+
+      mockFetch.restore();
+    },
+  );
+});
+
 test("local POI hints with street-name suffixes do not get filtered as fake localities", async () => {
   await withGeocodeEnv({ FUEL_PATH_GEOCODE_PROVIDER: "nominatim" }, async () => {
     const mockFetch = installFetchMock(() =>
@@ -377,6 +406,10 @@ test("regional POI names outrank their town fallback in benchmark-style queries"
       ["Sovereign Hill Ballarat near Ballarat", "Sovereign Hill Ballarat"],
       ["Bairnsdale Regional Health Service Australia", "Bairnsdale Regional Health Service"],
       ["Smithton District Hospital TAS", "Smithton District Hospital"],
+      ["Newcastle Airport Williamtown NSW", "Newcastle Airport Williamtown"],
+      ["Sunshine Coast University Hospital QLD", "Sunshine Coast University Hospital"],
+      ["Mandurah Forum WA", "Mandurah Forum"],
+      ["Alice Springs Airport NT", "Alice Springs Airport"],
     ];
 
     for (const [query, expectedLabel] of cases) {
@@ -389,6 +422,35 @@ test("regional POI names outrank their town fallback in benchmark-style queries"
       assert.equal(result.suggestions[0].label, expectedLabel);
       assert.equal(result.suggestions[0].provider, "fuel_path_regional_gazetteer");
       assert.equal(result.suggestions[0].type, "regional_poi");
+    }
+
+    mockFetch.restore();
+  });
+});
+
+test("regional street fallback understands Australian street abbreviations", async () => {
+  await withGeocodeEnv({ FUEL_PATH_GEOCODE_PROVIDER: "nominatim" }, async () => {
+    const mockFetch = installFetchMock(() =>
+      jsonResponse({ error: { message: "Too many requests" } }, 429),
+    );
+
+    const cases = [
+      ["Harbour Tce Wollongong NSW", "Harbour Terrace, Wollongong NSW 2500"],
+      ["Ocean Pkwy Geelong VIC", "Ocean Parkway, Geelong VIC 3220"],
+      ["Main Cct Belconnen ACT", "Main Circuit, Belconnen ACT 2617"],
+      ["Foreshore Esp Devonport TAS", "Foreshore Esplanade, Devonport TAS 7310"],
+    ];
+
+    for (const [query, expectedLabel] of cases) {
+      const result = await geocode({
+        query,
+        limit: 5,
+        sessionToken: `regional-street-abbrev-${query}`,
+      });
+
+      assert.equal(result.suggestions[0].label, expectedLabel, query);
+      assert.equal(result.suggestions[0].provider, "fuel_path_regional_gazetteer", query);
+      assert.equal(result.suggestions[0].type, "street", query);
     }
 
     mockFetch.restore();
@@ -782,12 +844,15 @@ async function withGeocodeEnv(overrides, callback) {
     "FUEL_PATH_GNAF_DATABASE_URL",
     "FUEL_PATH_GNAF_SQLITE_PATH",
     "FUEL_PATH_GEOCODE_CACHE_MAX_ENTRIES",
+    "FUEL_PATH_DISABLE_STATION_GEOCODE",
+    "FUEL_PATH_WA_FUELWATCH_ENABLED",
   ];
   const originalEnv = {};
   for (const key of keys) {
     originalEnv[key] = process.env[key];
     delete process.env[key];
   }
+  process.env.FUEL_PATH_WA_FUELWATCH_ENABLED = "0";
   for (const [key, value] of Object.entries(overrides)) {
     process.env[key] = value;
   }

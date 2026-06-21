@@ -123,6 +123,12 @@ async function handleSearch(url, response) {
       matchType: matchType(row, needle),
       score: score(row, needle),
       search_text: row.search_text,
+      displayTitle: row.display_title || undefined,
+      displaySubtitle: row.display_subtitle || undefined,
+      sourceLabel: row.suggestion_type === "building" ? "Building" : row._matchType === "exact_address" ? "Exact address" : undefined,
+      suggestionType: row.suggestion_type || undefined,
+      refineRequired: Boolean(Number(row.refine_required || 0)),
+      refineHint: row.refine_hint || undefined,
     })),
   });
 }
@@ -130,16 +136,39 @@ async function handleSearch(url, response) {
 async function searchAddresses(needle, limit) {
   const seen = new Set();
   const results = [];
+  const columns = await addressColumns();
+  const selectColumns = [
+    "id",
+    "label",
+    "lat",
+    "lon",
+    "state",
+    "postcode",
+    "accuracy",
+    "search_text",
+    ...[
+      "display_title",
+      "display_subtitle",
+      "suggestion_type",
+      "refine_required",
+      "refine_hint",
+      "base_key",
+      "search_key",
+    ].filter((column) => columns.has(column)),
+  ].join(", ");
+  const prefixSql = columns.has("search_key") ? "(search_key LIKE $1 OR search_text LIKE $1)" : "search_text LIKE $1";
+  const containsSql = columns.has("search_key") ? "(search_key LIKE $1 OR search_text LIKE $1)" : "search_text LIKE $1";
+  const fuzzySql = columns.has("search_key") ? "(search_key % $1 OR search_text % $1)" : "search_text % $1";
   const stages = [
-    { type: "address_prefix", sql: "search_text LIKE $1", params: [`${needle}%`], cap: Math.max(limit, 10), stopOnAny: true },
-    { type: "address_contains", sql: "search_text LIKE $1", params: [`% ${needle}%`], cap: Math.max(limit, 10) },
-    { type: "address_fuzzy", sql: "search_text % $1", params: [needle], cap: Math.max(limit, 10) },
+    { type: "address_prefix", sql: prefixSql, params: [`${needle}%`], cap: Math.max(limit, 10), stopOnAny: true },
+    { type: "address_contains", sql: containsSql, params: [`% ${needle}%`], cap: Math.max(limit, 10) },
+    { type: "address_fuzzy", sql: fuzzySql, params: [needle], cap: Math.max(limit, 10) },
   ];
 
   for (const stage of stages) {
     if (results.length >= limit) break;
     const query = `
-      SELECT id, label, lat, lon, state, postcode, accuracy, search_text
+      SELECT ${selectColumns}
       FROM fuel_path_gnaf_addresses
       WHERE ${stage.sql}
       LIMIT $${stage.params.length + 1}
@@ -167,6 +196,18 @@ async function searchAddresses(needle, limit) {
   });
 }
 
+async function addressColumns() {
+  if (addressColumns.cache) return addressColumns.cache;
+  const result = await pool.query(`
+    SELECT column_name
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'fuel_path_gnaf_addresses'
+  `);
+  addressColumns.cache = new Set(result.rows.map((row) => row.column_name));
+  return addressColumns.cache;
+}
+
 function isAuthorised(request) {
   if (allowUnauthenticated) return true;
   const expected = `Bearer ${apiToken}`;
@@ -192,13 +233,27 @@ function score(row, needle) {
 function normaliseAddressText(value) {
   return String(value || "")
     .toLowerCase()
+    .replace(/\bbvd\b/g, "boulevard")
+    .replace(/\bblvd\b/g, "boulevard")
+    .replace(/\bcct\b/g, "circuit")
+    .replace(/\bcnr\b/g, "corner")
+    .replace(/\bcr\b/g, "crescent")
+    .replace(/\bcres\b/g, "crescent")
+    .replace(/\bct\b/g, "court")
     .replace(/\bst\b/g, "street")
     .replace(/\brd\b/g, "road")
     .replace(/\bave\b/g, "avenue")
     .replace(/\bdr\b/g, "drive")
+    .replace(/\besp\b/g, "esplanade")
+    .replace(/\bhwy\b/g, "highway")
+    .replace(/\bmt\b/g, "mount")
+    .replace(/\bpkwy\b/g, "parkway")
+    .replace(/\bpwy\b/g, "parkway")
     .replace(/\bpde\b/g, "parade")
     .replace(/\bpl\b/g, "place")
     .replace(/\bln\b/g, "lane")
+    .replace(/\bsq\b/g, "square")
+    .replace(/\btce\b/g, "terrace")
     .replace(/[^a-z0-9]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();

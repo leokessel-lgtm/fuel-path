@@ -167,7 +167,9 @@ export async function searchLocations(label: string, limit = 5, sessionToken?: s
   const decoratedSuggestions = rankedSuggestions.map((suggestion) => ({
     ...suggestion,
     lookupStatus: payload.lookupStatus,
-    sourceLabel: lookupSourceLabel(suggestion.provider, suggestion.matchType, payload.lookupStatus, suggestion.type, label),
+    sourceLabel:
+      suggestion.sourceLabel ||
+      lookupSourceLabel(suggestion.provider, suggestion.matchType, payload.lookupStatus, suggestion.type, label),
   }));
   locationSearchCache.set(cacheKey, {
     expiresAt: Date.now() + LOCATION_SEARCH_CACHE_MS,
@@ -201,7 +203,7 @@ function rankLocationSuggestions(suggestions: MapPoint[], queryText: string) {
 function addressQueryParts(value: string) {
   const match = value
     .trim()
-    .match(/(?:unit|apt|apartment|flat|suite|townhouse)?\s*(?:\d+[a-z]?\/)?(\d+[a-z]?)\s+([a-z][a-z\s'-]*?)\s+\b(?:street|st|road|rd|avenue|ave|drive|dr|highway|hwy|terrace|circuit|way|lane|ln|place|pl|court|ct)\b/i);
+    .match(/(?:unit|apt|apartment|flat|suite|townhouse)?\s*(?:\d+[a-z]?\/)?(\d+[a-z]?)\s+([a-z][a-z\s'-]*?)\s+\b(?:street|st|road|rd|avenue|ave|drive|dr|highway|hwy|terrace|tce|circuit|cct|way|lane|ln|place|pl|court|ct|crescent|cres|boulevard|bvd|blvd|parade|pde|parkway|pkwy|pwy|esplanade|esp|square|sq)\b/i);
   if (!match) return null;
   return {
     houseNumber: match[1].toLowerCase(),
@@ -230,11 +232,11 @@ function lookupSourceLabel(provider?: string, matchType?: string, lookupStatus?:
     return "Address match";
   }
   if (provider === "fuel_path_hint" || provider === "fuel_path_regional_gazetteer") {
-    if (addressLike) return "Street/area only";
-    if (["poi", "station", "airport"].includes(String(type || ""))) return "Place match";
-    return "Approx. area";
+    if (type === "street" || addressLike) return "Street/road";
+    if (["poi", "regional_poi", "airport"].includes(String(type || ""))) return "Place/landmark";
+    return "Suburb/area";
   }
-  if (provider === "fuel_path") return "Station match";
+  if (provider === "fuel_path") return "Fuel station";
   if (provider === "google" || provider === "addressr") return "External lookup";
   if (provider === "nominatim") {
     if (addressLikeQuery(queryText)) return "Needs confirmation";
@@ -246,18 +248,19 @@ function lookupSourceLabel(provider?: string, matchType?: string, lookupStatus?:
 function addressLikeQuery(value: string) {
   const text = value.trim();
   if (text.length < 8) return false;
-  const hasStreetType = /\b(street|st|road|rd|avenue|ave|drive|dr|highway|hwy|terrace|circuit|way|lane|ln|place|pl|court|ct)\b/i.test(text);
+  const hasStreetType = /\b(street|st|road|rd|avenue|ave|drive|dr|highway|hwy|terrace|tce|circuit|cct|way|lane|ln|place|pl|court|ct|crescent|cres|boulevard|bvd|blvd|parade|pde|parkway|pkwy|pwy|esplanade|esp|square|sq)\b/i.test(text);
   const hasLeadingAddressToken = /^(?:unit|apt|apartment|flat|suite|townhouse)?\s*\d+[a-z]?(?:\/\d+[a-z]?)?\s+[a-z]/i.test(text);
   return hasStreetType || hasLeadingAddressToken;
 }
 
 function weakAutoRouteLocation(point: MapPoint) {
+  if (point.refineRequired || point.type === "building") return true;
   if (point.provider === "fuel_path_gnaf" && point.type === "address") return false;
   if (point.sourceLabel === "Needs confirmation") return true;
-  if (point.sourceLabel === "Street/area only") return true;
+  if (point.sourceLabel === "Street/road") return true;
   if (point.provider === "google" || point.provider === "addressr" || point.provider === "nominatim") return false;
   if (point.confidence === "low") return true;
-  return point.sourceLabel === "Approx. area";
+  return point.sourceLabel === "Suburb/area";
 }
 
 export async function getRoute(from: MapPoint, to: MapPoint) {

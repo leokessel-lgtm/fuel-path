@@ -22,8 +22,11 @@ The goal for v1 is live-enough product validation without building the later sav
   - Live-first station lookup when API.NSW credentials are configured.
   - Falls back to the public demo snapshot when live data is unavailable.
 - `/api/geocode`
-  - Uses the configured provider.
-  - Provider order in `auto`: Google Places, Mapbox, HERE, Geoapify, then Nominatim validation fallback.
+  - Uses G-NAF first for exact Australian addresses.
+  - Uses local/regional gazetteer hints for known places, towns, streets and landmarks.
+  - In `auto`, paid fallback stays disabled unless `FUEL_PATH_PAID_GEOCODE_FALLBACK_ENABLED` and a configured provider are present.
+  - Google Places is the recommended paid fallback, but it must stay behind session tokens, a tiny daily cap, durable quota storage, restricted API keys and budget-alert evidence.
+  - Nominatim remains validation fallback only.
 - `/api/route`
   - Uses Google Routes if configured.
   - Falls back to OSRM validation routing.
@@ -104,5 +107,5 @@ Until then, native local daily reminders remain the only alert feature.
 - Confirm API.NSW public/commercial app usage.
 - Confirm API.NSW caching and attribution terms.
 - Confirm whether ACT records in the feed have the same usage terms as NSW records.
-- Decide whether Google Places and Routes cost is acceptable for launch validation.
+- Decide whether Google Places and Routes cost is acceptable for launch validation, and keep Places fallback disabled until quota, cap, key restriction and budget-alert gates are proven.
 - Add persistent storage only when saved-route smart alerts are ready to leave the contract stage.

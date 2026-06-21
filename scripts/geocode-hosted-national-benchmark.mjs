@@ -52,6 +52,9 @@ if (
 ) {
   process.env.FUEL_PATH_GNAF_SQLITE_PATH = ADDRESS_SQLITE;
 }
+if (MODE === "module" && !process.env.FUEL_PATH_DISABLE_STATION_GEOCODE) {
+  process.env.FUEL_PATH_DISABLE_STATION_GEOCODE = "1";
+}
 
 installFetchObserver();
 
@@ -102,6 +105,7 @@ const payload = {
     pois: POI_COUNT,
   },
   fetchCalls,
+  index: indexEvidence(ADDRESS_SQLITE),
   summary,
   rows,
 };
@@ -119,11 +123,13 @@ async function runCase(testCase, index) {
   const prefixes = prefixesFor(testCase.query, testCase.kind);
   let firstAnyMatchChars = null;
   let firstTopMatchChars = null;
+  let firstResolvableTopChars = null;
   let firstSuggestionChars = null;
   let finalPayload = null;
   let finalSuggestions = [];
   let elapsedMs = 0;
   let probedFullQuery = false;
+  let wrongTopBeforeResolvable = false;
   const fullQuery = testCase.query.trim();
 
   for (const prefix of prefixes) {
@@ -139,11 +145,15 @@ async function runCase(testCase, index) {
     const suggestions = Array.isArray(payload?.suggestions) ? payload.suggestions : [];
     if (suggestions.length && firstSuggestionChars === null) firstSuggestionChars = prefix.length;
     const matchIndex = suggestions.findIndex((suggestion) => suggestionMatches(testCase, suggestion));
+    const top = suggestions[0] || null;
+    const resolvableTop = top ? suggestionResolvesCase(testCase, top) : false;
     if (matchIndex >= 0 && firstAnyMatchChars === null) firstAnyMatchChars = prefix.length;
     if (matchIndex === 0 && firstTopMatchChars === null) firstTopMatchChars = prefix.length;
+    if (resolvableTop && firstResolvableTopChars === null) firstResolvableTopChars = prefix.length;
+    if (top && !resolvableTop && firstResolvableTopChars === null) wrongTopBeforeResolvable = true;
     finalPayload = payload;
     finalSuggestions = suggestions;
-    if (matchIndex === 0) break;
+    if (matchIndex === 0 && resolvableTop) break;
   }
 
   if (finalPayload?.lookupStatus !== "request_timeout" && !probedFullQuery) {
@@ -156,6 +166,7 @@ async function runCase(testCase, index) {
   const finalTop = finalSuggestions[0] || null;
   const finalAnyMatch = finalSuggestions.some((suggestion) => suggestionMatches(testCase, suggestion));
   const finalTopMatch = finalTop ? suggestionMatches(testCase, finalTop) : false;
+  const finalResolvableTop = finalTop ? suggestionResolvesCase(testCase, finalTop) : false;
   return {
     ...testCase,
     index,
@@ -164,9 +175,12 @@ async function runCase(testCase, index) {
     firstSuggestionChars,
     firstAnyMatchChars,
     firstTopMatchChars,
+    firstResolvableTopChars,
+    wrongTopBeforeResolvable,
     finalSuggestionCount: finalSuggestions.length,
     finalAnyMatch,
     finalTopMatch,
+    finalResolvableTop,
     finalTopLabel: finalTop?.label || "",
     finalTopProvider: finalTop?.provider || "",
     finalTopType: finalTop?.type || "",
@@ -268,6 +282,7 @@ function addressCaseFromRow(row) {
   return {
     kind: "address",
     category: addressCategory(row.label),
+    addressFamily: addressFamily(row.label),
     state: row.state,
     query: queryFromAddressLabel(row.label),
     expectedLabel: row.label,
@@ -286,6 +301,14 @@ function addressCategory(label) {
   return "street_address";
 }
 
+function addressFamily(label) {
+  const normalised = normalise(label);
+  if (/^\b(unit|flat|apartment|apt|suite|townhouse)\b/.test(normalised)) return "unit_or_building_address";
+  if (/, (unit|flat|apartment|apt|suite|townhouse)\b/i.test(String(label || ""))) return "unit_or_building_address";
+  if (String(label || "").split(",").length >= 4) return "unit_or_building_address";
+  return "standard_address";
+}
+
 function queryFromAddressLabel(label) {
   return String(label || "").replace(/,/g, "").replace(/\s+/g, " ").trim();
 }
@@ -302,6 +325,7 @@ function buildPoiCases(records, total) {
       rows.push({
         kind: "poi",
         category: index >= stateRecords.length ? "poi_variant" : "poi_landmark",
+        addressFamily: "poi",
         state,
         query: variant,
         expectedLabel: record.label,
@@ -343,12 +367,55 @@ function suggestionMatches(testCase, suggestion) {
   return Boolean((stateMatch || localityMatch) && (localityMatch || termMatch));
 }
 
+function suggestionResolvesCase(testCase, suggestion) {
+  if (suggestionMatches(testCase, suggestion)) return true;
+  if (testCase.kind !== "address") return false;
+  const expected = addressParts(testCase.expectedLabel);
+  const actual = addressParts(suggestion?.label);
+  if (!expected || !actual) return false;
+  const sameBase =
+    expected.number === actual.number &&
+    expected.street === actual.street &&
+    expected.locality === actual.locality &&
+    expected.state === actual.state &&
+    expected.postcode === actual.postcode;
+  if (!sameBase) return false;
+  if (!expected.unit) return true;
+  return Boolean(
+    suggestion?.refineRequired ||
+      suggestion?.suggestionType === "building" ||
+      suggestion?.suggestionType === "base_address" ||
+      suggestion?.type === "building",
+  );
+}
+
+function addressParts(value) {
+  const text = String(value || "");
+  const normalised = normalise(text);
+  const unitMatch = normalised.match(/\b(?:unit|flat|apartment|apt|suite|townhouse)\s+([a-z0-9-]+)\b/);
+  const streetMatch = normalised.match(/\b(\d+[a-z]?(?:-\d+[a-z]?)?)\s+([a-z0-9 ]+?)\s+(street|road|avenue|drive|highway|terrace|circuit|way|lane|place|court|crescent|boulevard|parade|parkway|esplanade|square)\b/);
+  const stateMatch = normalised.match(/\b(nsw|act|qld|vic|wa|sa|tas|nt)\b/);
+  const postcodeMatch = normalised.match(/\b(\d{4})\b/);
+  if (!streetMatch || !stateMatch) return null;
+  const beforeState = normalised.slice(0, normalised.lastIndexOf(` ${stateMatch[1]}`)).trim();
+  const locality = beforeState.split(/\b(?:street|road|avenue|drive|highway|terrace|circuit|way|lane|place|court|crescent|boulevard|parade|parkway|esplanade|square)\b/).pop()?.trim() || "";
+  return {
+    unit: unitMatch?.[1] || "",
+    number: streetMatch[1],
+    street: `${streetMatch[2].trim()} ${streetMatch[3]}`,
+    locality,
+    state: stateMatch[1],
+    postcode: postcodeMatch?.[1] || "",
+  };
+}
+
 function summarise(rows) {
   return {
     overall: summariseGroup(rows),
     byKind: groupSummary(rows, "kind"),
     byState: groupSummary(rows, "state"),
     byCategory: groupSummary(rows, "category"),
+    byAddressFamily: groupSummary(rows, "addressFamily"),
     byProvider: groupSummary(rows, "finalTopProvider"),
   };
 }
@@ -356,21 +423,34 @@ function summarise(rows) {
 function summariseGroup(rows) {
   const topChars = rows.map((row) => row.firstTopMatchChars).filter(Number.isFinite);
   const anyChars = rows.map((row) => row.firstAnyMatchChars).filter(Number.isFinite);
+  const resolvableTopChars = rows.map((row) => row.firstResolvableTopChars).filter(Number.isFinite);
+  const elapsed = rows.map((row) => row.elapsedMs).filter(Number.isFinite);
   return {
     cases: rows.length,
     finalTopMatch: rows.filter((row) => row.finalTopMatch).length,
     finalAnyMatch: rows.filter((row) => row.finalAnyMatch).length,
+    finalResolvableTop: rows.filter((row) => row.finalResolvableTop).length,
     finalNoMatch: rows.filter((row) => !row.finalAnyMatch).length,
     suggestionsButNotExpected: rows.filter((row) => row.result === "suggestions_but_not_expected").length,
     noSuggestion: rows.filter((row) => row.result === "no_suggestion").length,
+    wrongTopBeforeResolvable: rows.filter((row) => row.wrongTopBeforeResolvable).length,
     finalTopRate: rate(rows.filter((row) => row.finalTopMatch).length, rows.length),
     finalAnyRate: rate(rows.filter((row) => row.finalAnyMatch).length, rows.length),
+    finalResolvableTopRate: rate(rows.filter((row) => row.finalResolvableTop).length, rows.length),
     avgTopChars: average(topChars),
     p50TopChars: percentile(topChars, 50),
     p90TopChars: percentile(topChars, 90),
+    p95TopChars: percentile(topChars, 95),
     avgAnyChars: average(anyChars),
     p50AnyChars: percentile(anyChars, 50),
     p90AnyChars: percentile(anyChars, 90),
+    p95AnyChars: percentile(anyChars, 95),
+    avgResolvableTopChars: average(resolvableTopChars),
+    p50ResolvableTopChars: percentile(resolvableTopChars, 50),
+    p90ResolvableTopChars: percentile(resolvableTopChars, 90),
+    p95ResolvableTopChars: percentile(resolvableTopChars, 95),
+    p50ElapsedMs: percentile(elapsed, 50),
+    p95ElapsedMs: percentile(elapsed, 95),
   };
 }
 
@@ -510,8 +590,11 @@ function toCsv(rows) {
     "firstSuggestionChars",
     "firstAnyMatchChars",
     "firstTopMatchChars",
+    "firstResolvableTopChars",
+    "wrongTopBeforeResolvable",
     "finalAnyMatch",
     "finalTopMatch",
+    "finalResolvableTop",
     "result",
     "finalSuggestionCount",
     "finalTopLabel",
@@ -521,6 +604,19 @@ function toCsv(rows) {
     "elapsedMs",
   ];
   return [headers.join(","), ...rows.map((row) => headers.map((header) => csvEscape(row[header])).join(","))].join("\n");
+}
+
+function indexEvidence(sqlitePath) {
+  try {
+    const stat = fs.statSync(sqlitePath);
+    return {
+      sqlitePath,
+      sizeBytes: stat.size,
+      sizeMb: Number((stat.size / 1024 / 1024).toFixed(1)),
+    };
+  } catch {
+    return { sqlitePath, sizeBytes: null, sizeMb: null };
+  }
 }
 
 function csvEscape(value) {

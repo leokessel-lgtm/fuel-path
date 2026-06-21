@@ -236,6 +236,11 @@ const REGIONAL_POIS = [
   poi("Moruya Airport", "NSW", "Moruya"),
   poi("Cowra Japanese Garden", "NSW", "Cowra"),
   poi("Armidale Airport", "NSW", "Armidale"),
+  poi("Newcastle Airport Williamtown", "NSW", "Newcastle", -32.795, 151.834),
+  poi("Wollongong Hospital", "NSW", "Wollongong"),
+  poi("Charles Sturt University Wagga Wagga", "NSW", "Wagga Wagga"),
+  poi("Stockland Green Hills Maitland", "NSW", "Newcastle", -32.762, 151.591),
+  poi("Narrabri District Hospital", "NSW", "Narrabri"),
 
   // ACT.
   poi("Tidbinbilla Nature Reserve", "ACT", "Tharwa"),
@@ -259,6 +264,10 @@ const REGIONAL_POIS = [
   poi("Tuggeranong Hyperdome", "ACT", "Greenway"),
   poi("EPIC Canberra", "ACT", "Lyneham"),
   poi("Australian Institute of Sport", "ACT", "Belconnen"),
+  poi("Canberra Hospital", "ACT", "Mawson", -35.345, 149.101),
+  poi("Westfield Belconnen", "ACT", "Belconnen"),
+  poi("Marketplace Gungahlin", "ACT", "Gungahlin"),
+  poi("Canberra Airport", "ACT", "Pialligo"),
 
   // QLD.
   poi("Australian Stockman's Hall of Fame Longreach", "QLD", "Longreach"),
@@ -281,6 +290,11 @@ const REGIONAL_POIS = [
   poi("Kingaroy Peanut Van", "QLD", "Kingaroy"),
   poi("Charters Towers Venus Gold Battery", "QLD", "Charters Towers"),
   poi("Bowen Big Mango", "QLD", "Bowen"),
+  poi("Sunshine Coast University Hospital", "QLD", "Sunshine Coast"),
+  poi("Gold Coast University Hospital", "QLD", "Gold Coast"),
+  poi("Townsville Airport", "QLD", "Townsville"),
+  poi("Cairns Airport", "QLD", "Cairns"),
+  poi("Stockland Rockhampton", "QLD", "Rockhampton"),
 
   // VIC.
   poi("Melbourne Cricket Ground", "VIC", "Melbourne", -37.8199, 144.9834),
@@ -298,6 +312,10 @@ const REGIONAL_POIS = [
   poi("Horsham Town Hall", "VIC", "Horsham"),
   poi("Swan Hill Pioneer Settlement", "VIC", "Swan Hill"),
   poi("Wilsons Promontory Visitor Centre", "VIC", "Wilsons Promontory"),
+  poi("Avalon Airport Geelong", "VIC", "Geelong", -38.039, 144.469),
+  poi("Bendigo Health", "VIC", "Bendigo"),
+  poi("Federation University Mount Helen", "VIC", "Ballarat", -37.627, 143.891),
+  poi("Westfield Geelong", "VIC", "Geelong"),
 
   // WA.
   poi("Wave Rock Hyden", "WA", "Hyden"),
@@ -320,6 +338,10 @@ const REGIONAL_POIS = [
   poi("Port Hedland International Airport", "WA", "Port Hedland"),
   poi("Karratha Health Campus", "WA", "Karratha"),
   poi("Denmark Visitor Centre", "WA", "Denmark"),
+  poi("Busselton Margaret River Airport", "WA", "Margaret River", -33.688, 115.402),
+  poi("Mandurah Forum", "WA", "Mandurah"),
+  poi("Fiona Stanley Hospital", "WA", "Fremantle", -32.07, 115.844),
+  poi("Northam Hospital", "WA", "Northam"),
 
   // SA.
   poi("Naracoorte Caves National Park", "SA", "Naracoorte"),
@@ -342,6 +364,10 @@ const REGIONAL_POIS = [
   poi("Berri Hospital", "SA", "Berri"),
   poi("Port Pirie Regional Health Service", "SA", "Port Pirie"),
   poi("Moonta Mines Museum", "SA", "Moonta"),
+  poi("Mount Gambier Airport", "SA", "Mount Gambier"),
+  poi("University of South Australia Whyalla Campus", "SA", "Whyalla"),
+  poi("Murray Bridge Marketplace", "SA", "Murray Bridge"),
+  poi("Port Lincoln Hospital", "SA", "Port Lincoln"),
 
   // TAS.
   poi("Cataract Gorge Reserve", "TAS", "Launceston"),
@@ -356,6 +382,10 @@ const REGIONAL_POIS = [
   poi("Smithton District Hospital", "TAS", "Smithton"),
   poi("Bruny Island Ferry Terminal", "TAS", "Bruny Island"),
   poi("Cradle Mountain Visitor Centre", "TAS", "Cradle Mountain"),
+  poi("Launceston General Hospital", "TAS", "Launceston"),
+  poi("Burnie Airport Wynyard", "TAS", "Burnie", -40.998, 145.731),
+  poi("Devonport Regional Gallery", "TAS", "Devonport"),
+  poi("Kingston Town Shopping Centre", "TAS", "Kingston"),
 
   // NT.
   poi("Alice Springs Hospital", "NT", "Alice Springs"),
@@ -370,6 +400,10 @@ const REGIONAL_POIS = [
   poi("Uluru-Kata Tjuta National Park", "NT", "Uluru"),
   poi("Kakadu Visitor Centre", "NT", "Kakadu Visitor Centre"),
   poi("Litchfield National Park", "NT", "Litchfield National Park"),
+  poi("Alice Springs Airport", "NT", "Alice Springs"),
+  poi("Katherine Hospital", "NT", "Katherine"),
+  poi("Yeperenye Shopping Centre", "NT", "Alice Springs"),
+  poi("Batchelor Butterfly Farm", "NT", "Batchelor"),
 ];
 
 const STATE_CODES = ["NSW", "ACT", "QLD", "WA", "VIC", "SA", "TAS", "NT"];
@@ -418,7 +452,7 @@ function regionalGeocodeHintStatus() {
 function streetFallback(query, state) {
   const text = String(query || "").trim().replace(/\s+/g, " ");
   const pattern = new RegExp(
-    `\\b(?:\\d+[a-z]?\\s+)?([a-z][a-z\\s'.-]+?\\b(?:street|st|road|rd|avenue|ave|drive|dr|parade|pde|place|pl|terrace|highway|mall|court|close|vista|circuit|way|lane|ln))\\b\\s+(.+?)(?:\\s+\\b(${STATE_CODE_PATTERN})\\b|\\s*$)`,
+    `\\b(?:\\d+[a-z]?\\s+)?([a-z][a-z\\s'.-]+?\\b(?:street|st|road|rd|avenue|ave|drive|dr|parade|pde|place|pl|terrace|tce|highway|hwy|mall|court|ct|close|vista|circuit|cct|way|lane|ln|crescent|cres|boulevard|bvd|blvd|parkway|pkwy|pwy|esplanade|esp|square|sq))\\b\\s+(.+?)(?:\\s+\\b(${STATE_CODE_PATTERN})\\b|\\s*$)`,
     "i",
   );
   const match = pattern.exec(text);
@@ -564,13 +598,25 @@ function stripGenericQuerySuffix(value) {
 
 function expandStreetType(value) {
   return String(value || "")
+    .replace(/\bbvd\b/gi, "Boulevard")
+    .replace(/\bblvd\b/gi, "Boulevard")
+    .replace(/\bcct\b/gi, "Circuit")
+    .replace(/\bcr\b/gi, "Crescent")
+    .replace(/\bcres\b/gi, "Crescent")
+    .replace(/\bct\b/gi, "Court")
     .replace(/\bst\b/gi, "Street")
     .replace(/\brd\b/gi, "Road")
     .replace(/\bave\b/gi, "Avenue")
     .replace(/\bdr\b/gi, "Drive")
+    .replace(/\besp\b/gi, "Esplanade")
+    .replace(/\bhwy\b/gi, "Highway")
+    .replace(/\bpkwy\b/gi, "Parkway")
+    .replace(/\bpwy\b/gi, "Parkway")
     .replace(/\bpde\b/gi, "Parade")
     .replace(/\bpl\b/gi, "Place")
-    .replace(/\bln\b/gi, "Lane");
+    .replace(/\bln\b/gi, "Lane")
+    .replace(/\bsq\b/gi, "Square")
+    .replace(/\btce\b/gi, "Terrace");
 }
 
 function titleCase(value) {

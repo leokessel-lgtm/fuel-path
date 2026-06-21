@@ -37,6 +37,13 @@ db.exec(`
     alias_principal TEXT,
     primary_secondary TEXT,
     geocode_type TEXT,
+    display_title TEXT,
+    display_subtitle TEXT,
+    suggestion_type TEXT,
+    refine_required INTEGER DEFAULT 0,
+    refine_hint TEXT,
+    base_key TEXT,
+    search_key TEXT NOT NULL,
     search_text TEXT NOT NULL
   );
   CREATE VIRTUAL TABLE address_fts USING fts5(
@@ -49,6 +56,13 @@ db.exec(`
     alias_principal UNINDEXED,
     primary_secondary UNINDEXED,
     geocode_type UNINDEXED,
+    display_title UNINDEXED,
+    display_subtitle UNINDEXED,
+    suggestion_type UNINDEXED,
+    refine_required UNINDEXED,
+    refine_hint UNINDEXED,
+    base_key UNINDEXED,
+    search_key,
     search_text,
     lat UNINDEXED,
     lon UNINDEXED
@@ -57,15 +71,17 @@ db.exec(`
 
 const insertAddress = db.prepare(`
   INSERT OR REPLACE INTO addresses (
-    id, label, lat, lon, state, postcode, accuracy, locality, alias_principal, primary_secondary, geocode_type, search_text
+    id, label, lat, lon, state, postcode, accuracy, locality, alias_principal, primary_secondary, geocode_type,
+    display_title, display_subtitle, suggestion_type, refine_required, refine_hint, base_key, search_key, search_text
   )
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `);
 const insertFts = db.prepare(`
   INSERT INTO address_fts (
-    id, label, state, postcode, accuracy, locality, alias_principal, primary_secondary, geocode_type, search_text, lat, lon
+    id, label, state, postcode, accuracy, locality, alias_principal, primary_secondary, geocode_type,
+    display_title, display_subtitle, suggestion_type, refine_required, refine_hint, base_key, search_key, search_text, lat, lon
   )
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `);
 
 let total = 0;
@@ -110,6 +126,13 @@ for (const state of states) {
       address.aliasPrincipal,
       address.primarySecondary,
       address.geocodeType,
+      address.displayTitle,
+      address.displaySubtitle,
+      address.suggestionType,
+      address.refineRequired ? 1 : 0,
+      address.refineHint,
+      address.baseKey,
+      address.searchKey,
       address.searchText,
     );
     insertFts.run(
@@ -122,6 +145,13 @@ for (const state of states) {
       address.aliasPrincipal,
       address.primarySecondary,
       address.geocodeType,
+      address.displayTitle,
+      address.displaySubtitle,
+      address.suggestionType,
+      address.refineRequired ? 1 : 0,
+      address.refineHint,
+      address.baseKey,
+      address.searchKey,
       address.searchText,
       address.lat,
       address.lon,
@@ -193,6 +223,19 @@ function normaliseRawRecord(row, state, locality, street, geocode) {
   const lot = lotNumber && !number ? `Lot ${lotNumber}` : "";
   const streetAddress = [number, street.name].filter(Boolean).join(" ");
   const localityPart = [locality.name, state, row.POSTCODE].filter(Boolean).join(" ");
+  const keySource = {
+    buildingName: titleCase(row.BUILDING_NAME),
+    flatNumber,
+    flatType,
+    levelNumber,
+    levelType,
+    label: "",
+    number,
+    streetName: street.name,
+    locality: locality.name,
+    state,
+    postcode: row.POSTCODE,
+  };
   const label = [
     titleCase(row.BUILDING_NAME),
     unit,
@@ -202,6 +245,7 @@ function normaliseRawRecord(row, state, locality, street, geocode) {
     localityPart,
   ].filter(Boolean).join(", ");
   if (!label || !streetAddress || !locality.name) return null;
+  const searchKeys = buildSearchKeys({ ...keySource, label });
   return {
     id: row.ADDRESS_DETAIL_PID,
     label,
@@ -214,24 +258,62 @@ function normaliseRawRecord(row, state, locality, street, geocode) {
     primarySecondary: row.PRIMARY_SECONDARY || "",
     geocodeType: geocode.geocodeType,
     accuracy: geocode.geocodeType,
-    searchText: buildSearchText({ label, flatNumber, flatType, number, streetName: street.name, locality: locality.name, state, postcode: row.POSTCODE }),
+    displayTitle: displayTitle({ buildingName: titleCase(row.BUILDING_NAME), unit, streetAddress, label }),
+    displaySubtitle: [unit ? streetAddress : "", localityPart].filter(Boolean).join(", "),
+    suggestionType: "exact_address",
+    refineRequired: false,
+    refineHint: "",
+    baseKey: searchKeys.baseKey,
+    searchKey: searchKeys.searchKey,
+    searchText: buildSearchText({ label, searchValues: searchKeys.values }),
   };
 }
 
-function buildSearchText({ label, flatNumber, flatType, number, streetName, locality, state, postcode }) {
+function buildSearchKeys(source) {
+  const unit = source.flatNumber ? `${source.flatType} ${source.flatNumber}` : "";
+  const slashUnit = source.flatNumber && source.number ? `${source.flatNumber}/${source.number}` : "";
+  const level = source.levelNumber ? `${source.levelType || "Level"} ${source.levelNumber}` : "";
+  const streetAddress = [source.number, source.streetName].filter(Boolean).join(" ");
+  const localityPart = [source.locality, source.state, source.postcode].filter(Boolean).join(" ");
   const values = [
-    label,
-    `${label} ${state} ${postcode}`,
-    [number, streetName, locality, state, postcode].filter(Boolean).join(" "),
+    source.label,
+    `${source.label} ${source.state} ${source.postcode}`,
+    [streetAddress, localityPart].filter(Boolean).join(" "),
+    [source.streetName, source.locality, source.state, source.postcode].filter(Boolean).join(" "),
+    [source.locality, source.postcode, source.state].filter(Boolean).join(" "),
   ];
-  if (flatNumber && number && streetName) {
+  if (source.buildingName) {
     values.push(
-      [`${flatNumber}/${number}`, streetName, locality, state, postcode].filter(Boolean).join(" "),
-      [flatType, flatNumber, number, streetName, locality, state, postcode].filter(Boolean).join(" "),
-      [flatNumber, number, streetName, locality, state, postcode].filter(Boolean).join(" "),
+      [source.buildingName, localityPart].filter(Boolean).join(" "),
+      [source.buildingName, streetAddress, localityPart].filter(Boolean).join(" "),
     );
   }
-  return [...new Set(values.map(normaliseAddressText).filter(Boolean))].join(" ");
+  if (unit && streetAddress) {
+    values.push(
+      [slashUnit, source.streetName, localityPart].filter(Boolean).join(" "),
+      [unit, streetAddress, localityPart].filter(Boolean).join(" "),
+      [source.flatNumber, streetAddress, localityPart].filter(Boolean).join(" "),
+      [streetAddress, unit, localityPart].filter(Boolean).join(" "),
+      [level, unit, streetAddress, localityPart].filter(Boolean).join(" "),
+    );
+  }
+  const normalised = [...new Set(values.map(normaliseAddressText).filter(Boolean))];
+  return {
+    baseKey: normaliseAddressText([streetAddress, localityPart].filter(Boolean).join(" ")),
+    searchKey: normalised.join(" "),
+    source,
+    values: normalised,
+  };
+}
+
+function buildSearchText({ label, searchValues }) {
+  return [...new Set([label, ...(searchValues || [])].map(normaliseAddressText).filter(Boolean))].join(" ");
+}
+
+function displayTitle({ buildingName, unit, streetAddress, label }) {
+  if (buildingName && unit) return `${buildingName}, ${unit}`;
+  if (unit) return unit;
+  return streetAddress || String(label || "").split(",")[0]?.trim() || "";
 }
 
 function joinParts(...parts) {
@@ -255,13 +337,27 @@ function titleCase(value) {
 function normaliseAddressText(value) {
   return String(value || "")
     .toLowerCase()
+    .replace(/\bbvd\b/g, "boulevard")
+    .replace(/\bblvd\b/g, "boulevard")
+    .replace(/\bcct\b/g, "circuit")
+    .replace(/\bcnr\b/g, "corner")
+    .replace(/\bcr\b/g, "crescent")
+    .replace(/\bcres\b/g, "crescent")
+    .replace(/\bct\b/g, "court")
     .replace(/\bst\b/g, "street")
     .replace(/\brd\b/g, "road")
     .replace(/\bave\b/g, "avenue")
     .replace(/\bdr\b/g, "drive")
+    .replace(/\besp\b/g, "esplanade")
+    .replace(/\bhwy\b/g, "highway")
+    .replace(/\bmt\b/g, "mount")
+    .replace(/\bpkwy\b/g, "parkway")
+    .replace(/\bpwy\b/g, "parkway")
     .replace(/\bpde\b/g, "parade")
     .replace(/\bpl\b/g, "place")
     .replace(/\bln\b/g, "lane")
+    .replace(/\bsq\b/g, "square")
+    .replace(/\btce\b/g, "terrace")
     .replace(/[^a-z0-9]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();

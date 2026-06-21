@@ -2,6 +2,7 @@ import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { colors, radii, shadow, spacing, surfaces, typeScale } from "../theme";
 import { MapPoint } from "../types";
+import { locationSuggestionDisplay } from "../utils/locationSuggestionDisplay";
 
 export function NearbyLocationSearch({
   locationError,
@@ -117,6 +118,7 @@ function LocationResultRow({
   onPress: () => void;
   recent: boolean;
 }) {
+  const display = locationSuggestionDisplay(location);
   return (
     <Pressable
       accessibilityLabel={recent ? `Use recent search ${location.label}` : `Use suggested location ${location.label}`}
@@ -126,40 +128,19 @@ function LocationResultRow({
       <View style={recent ? styles.recentSearchDot : styles.lookupResultPin} />
       <View style={styles.lookupResultCopy}>
         <Text numberOfLines={1} style={styles.lookupResultTitle}>
-          {suggestionTitle(location)}
+          {display.title}
         </Text>
+        {display.badge ? (
+          <Text numberOfLines={1} style={styles.lookupResultBadge}>
+            {display.badge}
+          </Text>
+        ) : null}
         <Text numberOfLines={1} style={styles.lookupResultMeta}>
-          {suggestionMeta(location)}
+          {display.subtitle}
         </Text>
       </View>
     </Pressable>
   );
-}
-
-function suggestionTitle(point: MapPoint) {
-  const parts = suggestionParts(point);
-  if (titleConsumesStreetNumber(parts)) {
-    return `${parts[0]} ${parts[1]}`;
-  }
-  return parts[0] || point.label;
-}
-
-function suggestionMeta(point: MapPoint) {
-  const parts = suggestionParts(point);
-  const startIndex = titleConsumesStreetNumber(parts) ? 2 : 1;
-  return parts.slice(startIndex, startIndex + 3).join(", ") || "Australia";
-}
-
-function suggestionParts(point: MapPoint) {
-  return point.label.split(",").map((part) => part.trim()).filter(Boolean);
-}
-
-function titleConsumesStreetNumber(parts: string[]) {
-  return Boolean(parts[1] && isStreetNumberFragment(parts[0]));
-}
-
-function isStreetNumberFragment(value: string) {
-  return /^\d+[a-z]?(?:[/-]\d+[a-z]?)?$/i.test(value.trim());
 }
 
 const styles = StyleSheet.create({
@@ -262,6 +243,19 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: typeScale.caption,
     fontWeight: "600",
+  },
+  lookupResultBadge: {
+    alignSelf: "flex-start",
+    backgroundColor: colors.greenSoft,
+    borderRadius: radii.sm,
+    color: colors.greenDark,
+    fontSize: typeScale.micro,
+    fontWeight: "700",
+    marginTop: 2,
+    maxWidth: 112,
+    overflow: "hidden",
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 2,
   },
   lookupResultMeta: {
     color: colors.muted,

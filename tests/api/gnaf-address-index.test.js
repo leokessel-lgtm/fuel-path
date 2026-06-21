@@ -6,7 +6,14 @@ const os = require("node:os");
 const path = require("node:path");
 const test = require("node:test");
 
-const { addressIndexStatus, searchAddressIndex, shouldSearchLargeSqliteIndex, sqliteFtsTermsForNeedle } = require("../../api/_addressIndex");
+const {
+  addressIndexStatus,
+  addressSearchNeedles,
+  normaliseAddressText,
+  searchAddressIndex,
+  shouldSearchLargeSqliteIndex,
+  sqliteFtsTermsForNeedle,
+} = require("../../api/_addressIndex");
 const { geocode } = require("../../api/_backend");
 
 test("seeded AU address index resolves full address before external geocoding", async () => {
@@ -122,6 +129,42 @@ test("G-NAF Core shaped rows index unit and slash address variants", async () =>
         "151.0997397",
         "-34.0153146",
       ].join("|"),
+      [
+        "GATEST0003",
+        "51 Princes Highway, Sylvania NSW 2224",
+        "",
+        "",
+        "51",
+        "",
+        "Princes",
+        "Highway",
+        "Sylvania",
+        "NSW",
+        "2224",
+        "PRINCIPAL",
+        "PRIMARY",
+        "PROPERTY CENTROID",
+        "151.11144796",
+        "-34.00692907",
+      ].join("|"),
+      [
+        "GATEST0004",
+        "Adina Serviced Apartments Canberra James Court, Unit 77, 74 Northbourne Avenue, Braddon ACT 2612",
+        "Unit",
+        "77",
+        "74",
+        "",
+        "Northbourne",
+        "Avenue",
+        "Braddon",
+        "ACT",
+        "2612",
+        "PRINCIPAL",
+        "SECONDARY",
+        "PROPERTY CENTROID",
+        "149.1323",
+        "-35.2749",
+      ].join("|"),
     ].join("\n"),
   );
 
@@ -140,11 +183,44 @@ test("G-NAF Core shaped rows index unit and slash address variants", async () =>
   await withEnv({ FUEL_PATH_GNAF_SQLITE_PATH: outputPath }, async () => {
     const unitSuggestions = await searchAddressIndex("5/34 south coast highway karratha", 3);
     const suffixSuggestions = await searchAddressIndex("87a corea street sylvania", 3);
+    const highwaySuggestions = await searchAddressIndex("51 Princes Hwy, Sylvania NSW 2224", 3);
+    const complexSuggestions = await searchAddressIndex(
+      "Adina Serviced Apartments Canberra James Court Unit 77 74 Northbourne Ave Braddon ACT",
+      3,
+    );
 
     assert.equal(unitSuggestions[0].label, "Unit 5, 34 South Coast Highway, Karratha WA 6714");
     assert.equal(unitSuggestions[0].provider, "fuel_path_gnaf");
+    assert.equal(unitSuggestions[0].displayTitle, "Unit 5");
+    assert.equal(unitSuggestions[0].displaySubtitle, "34 South Coast Highway, Karratha WA 6714");
+    assert.equal(unitSuggestions[0].sourceLabel, "Exact address");
     assert.equal(suffixSuggestions[0].label, "87A Corea Street, Sylvania NSW 2224");
+    assert.equal(highwaySuggestions[0].label, "51 Princes Highway, Sylvania NSW 2224");
+    assert.equal(highwaySuggestions[0].matchType, "exact_address");
+    assert.equal(
+      complexSuggestions[0].label,
+      "Adina Serviced Apartments Canberra James Court, Unit 77, 74 Northbourne Avenue, Braddon ACT 2612",
+    );
+    assert.equal(complexSuggestions[0].provider, "fuel_path_gnaf");
+    assert.equal(complexSuggestions[0].displayTitle, "Adina Serviced Apartments Canberra James Court, Unit 77");
+    assert.equal(complexSuggestions[0].displaySubtitle, "74 Northbourne Avenue, Braddon ACT 2612");
   });
+});
+
+test("address normalisation covers common Australian street abbreviations", () => {
+  assert.equal(normaliseAddressText("51 Princes Hwy, Sylvania NSW 2224"), "51 princes highway sylvania nsw 2224");
+  assert.equal(normaliseAddressText("10 Smith Cct, Bruce ACT"), "10 smith circuit bruce act");
+  assert.equal(normaliseAddressText("3 Harbour Tce & Cnr Bay Rd"), "3 harbour terrace corner bay road");
+  assert.equal(normaliseAddressText("8 Ocean Pkwy, Mt Martha VIC"), "8 ocean parkway mount martha vic");
+});
+
+test("complex unit queries produce address-core search needles", () => {
+  const needles = addressSearchNeedles(
+    "Adina Serviced Apartments Canberra James Court Unit 77 74 Northbourne Ave Braddon ACT",
+  ).map((item) => item.needle);
+
+  assert.ok(needles.includes("unit 77 74 northbourne avenue braddon act"));
+  assert.ok(needles.includes("74 northbourne avenue braddon act"));
 });
 
 test("large G-NAF SQLite searches skip broad prefixes and drop noisy address tokens", async () => {

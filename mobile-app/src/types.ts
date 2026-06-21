@@ -135,6 +135,11 @@ export type MapPoint = {
   type?: string;
   lookupStatus?: string;
   sourceLabel?: string;
+  displayTitle?: string;
+  displaySubtitle?: string;
+  suggestionType?: string;
+  refineRequired?: boolean;
+  refineHint?: string;
 };
 
 export type RegionCapabilityStatus =

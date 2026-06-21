@@ -123,7 +123,6 @@ function buildExperimentIndex(db, rows) {
       rank_weight INTEGER NOT NULL,
       PRIMARY KEY (prefix, entry_id)
     );
-    CREATE INDEX prefix_entries_prefix_idx ON prefix_entries(prefix);
     CREATE INDEX entries_base_idx ON entries(base_signature);
   `);
   const insertEntry = db.prepare(`
@@ -144,8 +143,14 @@ function buildExperimentIndex(db, rows) {
     VALUES (?, ?, ?)
   `);
   db.exec("BEGIN");
+  const seenBaseRefineEntryIds = new Set();
   for (const row of rows) {
     for (const entry of entriesForRow(row)) {
+      if (entry.entryType === "base_refine") {
+        const firstEntry = !seenBaseRefineEntryIds.has(entry.entryId);
+        seenBaseRefineEntryIds.add(entry.entryId);
+        if (!firstEntry) continue;
+      }
       insertEntry.run(
         entry.entryId,
         row.id,
@@ -173,8 +178,10 @@ function buildExperimentIndex(db, rows) {
         entry.refineRequired ? 1 : 0,
         entry.rankWeight,
       );
-      for (const prefix of compactPrefixes(entry.prefixKey)) {
-        insertPrefix.run(prefix, entry.entryId, entry.rankWeight);
+      if (shouldMaterialisePrefix(entry)) {
+        for (const prefix of compactPrefixes(entry.prefixKey)) {
+          insertPrefix.run(prefix, entry.entryId, entry.rankWeight);
+        }
       }
     }
   }
@@ -211,7 +218,7 @@ function entriesForRow(row) {
   }
   if (parsed?.baseKey && parsed.unit) {
     entries.push({
-      entryId: `${id}:base:refine`,
+      entryId: `${parsed.baseSignature}:base:refine`,
       keyText: [parsed.building, parsed.baseKey].filter(Boolean).join(" "),
       prefixKey: [parsed.building, parsed.baseKey].filter(Boolean).join(" "),
       baseSignature: parsed.baseSignature,
@@ -279,6 +286,7 @@ function searchPrefix(db, needle, limit) {
 
 function searchHybrid(db, needle, limit) {
   if (queryContainsUnitLikeToken(needle)) return searchTypeahead(db, needle, limit);
+  if (!/^\d/.test(needle)) return searchTypeahead(db, needle, limit);
   const prefixRows = searchPrefix(db, needle, limit);
   if (prefixRows.length && !prefixRowsAmbiguous(prefixRows)) return prefixRows;
   return searchTypeahead(db, needle, limit);
@@ -388,6 +396,10 @@ function compactPrefixes(value) {
     if (text[index] === " ") prefixes.add(text.slice(0, index + 1));
   }
   return [...prefixes].filter((prefix) => prefix.length >= 3);
+}
+
+function shouldMaterialisePrefix(entry) {
+  return entry.rankWeight >= 980 && (entry.entryType === "base_refine" || String(entry.entryId).endsWith(":exact:base"));
 }
 
 function prefixesFor(query) {

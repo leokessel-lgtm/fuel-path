@@ -70,12 +70,6 @@ db.exec(`
   CREATE TABLE address_typeahead_entries (
     entry_id TEXT PRIMARY KEY,
     address_id TEXT NOT NULL,
-    label TEXT NOT NULL,
-    lat REAL NOT NULL,
-    lon REAL NOT NULL,
-    state TEXT,
-    postcode TEXT,
-    locality TEXT,
     display_title TEXT,
     display_subtitle TEXT,
     key_text TEXT NOT NULL,
@@ -89,9 +83,6 @@ db.exec(`
   CREATE VIRTUAL TABLE address_typeahead_fts USING fts5(
     entry_id UNINDEXED,
     key_text,
-    label UNINDEXED,
-    state UNINDEXED,
-    postcode UNINDEXED,
     entry_type UNINDEXED,
     refine_required UNINDEXED,
     rank_weight UNINDEXED
@@ -102,7 +93,6 @@ db.exec(`
     rank_weight INTEGER NOT NULL,
     PRIMARY KEY (prefix, entry_id)
   );
-  CREATE INDEX address_prefix_entries_prefix_idx ON address_prefix_entries(prefix);
   CREATE INDEX address_typeahead_entries_base_idx ON address_typeahead_entries(base_signature);
 `);
 
@@ -121,17 +111,17 @@ const insertFts = db.prepare(`
   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `);
 const insertTypeaheadEntry = db.prepare(`
-  INSERT OR REPLACE INTO address_typeahead_entries (
-    entry_id, address_id, label, lat, lon, state, postcode, locality, display_title, display_subtitle,
+  INSERT OR IGNORE INTO address_typeahead_entries (
+    entry_id, address_id, display_title, display_subtitle,
     key_text, prefix_key, base_signature, entry_type, refine_required, unit, rank_weight
   )
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `);
 const insertTypeaheadFts = db.prepare(`
   INSERT INTO address_typeahead_fts (
-    entry_id, key_text, label, state, postcode, entry_type, refine_required, rank_weight
+    entry_id, key_text, entry_type, refine_required, rank_weight
   )
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  VALUES (?, ?, ?, ?, ?)
 `);
 const insertPrefixEntry = db.prepare(`
   INSERT OR IGNORE INTO address_prefix_entries (prefix, entry_id, rank_weight)
@@ -139,6 +129,7 @@ const insertPrefixEntry = db.prepare(`
 `);
 
 let total = 0;
+const seenBaseRefineEntryIds = new Set();
 for (const state of states) {
   console.log(`Loading ${state} lookup tables...`);
   const localities = await loadLookup(state, "LOCALITY", "LOCALITY_PID", (row) => ({
@@ -211,15 +202,14 @@ for (const state of states) {
       address.lon,
     );
     for (const entry of address.typeaheadEntries || []) {
+      if (entry.entryType === "base_refine") {
+        const firstEntry = !seenBaseRefineEntryIds.has(entry.entryId);
+        seenBaseRefineEntryIds.add(entry.entryId);
+        if (!firstEntry) continue;
+      }
       insertTypeaheadEntry.run(
         entry.entryId,
         address.id,
-        entry.label,
-        address.lat,
-        address.lon,
-        address.state,
-        address.postcode,
-        address.locality,
         entry.displayTitle,
         entry.displaySubtitle,
         entry.keyText,
@@ -233,15 +223,14 @@ for (const state of states) {
       insertTypeaheadFts.run(
         entry.entryId,
         entry.keyText,
-        entry.label,
-        address.state,
-        address.postcode,
         entry.entryType,
         entry.refineRequired ? 1 : 0,
         entry.rankWeight,
       );
-      for (const prefix of compactPrefixes(entry.prefixKey)) {
-        insertPrefixEntry.run(prefix, entry.entryId, entry.rankWeight);
+      if (shouldMaterialisePrefix(entry)) {
+        for (const prefix of compactPrefixes(entry.prefixKey)) {
+          insertPrefixEntry.run(prefix, entry.entryId, entry.rankWeight);
+        }
       }
     }
     stateCount += 1;
@@ -446,7 +435,7 @@ function buildTypeaheadEntries({ id, label, source, display, keys }) {
     const baseTitle = source.buildingName || [source.number, source.streetName].filter(Boolean).join(" ");
     const place = [source.locality, source.state, source.postcode].filter(Boolean).join(" ");
     entries.push({
-      entryId: `${id}:base:refine`,
+      entryId: `${baseSignature}:base:refine`,
       label: [baseTitle, place].filter(Boolean).join(", "),
       displayTitle: baseTitle,
       displaySubtitle: place,
@@ -472,6 +461,10 @@ function compactPrefixes(value) {
     if (text[index] === " ") prefixes.add(text.slice(0, index + 1));
   }
   return [...prefixes].filter((prefix) => prefix.length >= 3);
+}
+
+function shouldMaterialisePrefix(entry) {
+  return entry.rankWeight >= 980 && (entry.entryType === "base_refine" || String(entry.entryId).endsWith(":exact:base"));
 }
 
 function displayTitle({ buildingName, unit, streetAddress, label }) {

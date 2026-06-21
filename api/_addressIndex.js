@@ -204,6 +204,10 @@ function searchSqliteHybridIndex(database, needle, limit) {
     const typeaheadRows = searchSqliteTypeaheadEntries(database, needle, limit);
     return typeaheadRows.map((row) => addressRecordToSuggestion(hybridRowToAddressRecord(row), hybridMatchType(row, needle), Number(row.rank_weight || 900)));
   }
+  if (!/^\d/.test(needle)) {
+    const typeaheadRows = searchSqliteTypeaheadEntries(database, needle, limit);
+    return typeaheadRows.map((row) => addressRecordToSuggestion(hybridRowToAddressRecord(row), hybridMatchType(row, needle), Number(row.rank_weight || 900)));
+  }
   const prefixRows = searchSqlitePrefixEntries(database, needle, limit);
   if (prefixRows.length && !prefixRowsAmbiguous(prefixRows)) {
     return prefixRows.map((row) => addressRecordToSuggestion(hybridRowToAddressRecord(row), hybridMatchType(row, needle), Number(row.rank_weight || 950)));
@@ -216,11 +220,30 @@ function searchSqlitePrefixEntries(database, needle, limit) {
   const prefix = normaliseAddressText(needle).slice(0, 15);
   if (prefix.length < 3) return [];
   return database.prepare(`
-    SELECT e.*
+    SELECT
+      e.entry_id,
+      e.entry_type,
+      e.refine_required,
+      e.rank_weight,
+      e.key_text,
+      e.base_signature,
+      e.display_title AS entry_display_title,
+      e.display_subtitle AS entry_display_subtitle,
+      a.id AS address_id,
+      a.label AS address_label,
+      a.lat,
+      a.lon,
+      a.state,
+      a.postcode,
+      a.locality,
+      a.accuracy,
+      a.display_title AS address_display_title,
+      a.display_subtitle AS address_display_subtitle
     FROM address_prefix_entries p
     JOIN address_typeahead_entries e ON e.entry_id = p.entry_id
+    JOIN addresses a ON a.id = e.address_id
     WHERE p.prefix = ?
-    ORDER BY p.rank_weight DESC, LENGTH(e.label), e.label
+    ORDER BY p.rank_weight DESC, LENGTH(a.label), a.label
     LIMIT ?
   `).all(prefix, Math.max(1, Math.min(Number(limit) || 5, 20)));
 }
@@ -230,9 +253,28 @@ function searchSqliteTypeaheadEntries(database, needle, limit) {
   if (!terms.length) return [];
   const ftsQuery = terms.map((term) => `${escapeFtsTerm(term)}*`).join(" ");
   return database.prepare(`
-    SELECT e.*
+    SELECT
+      e.entry_id,
+      e.entry_type,
+      e.refine_required,
+      e.rank_weight,
+      e.key_text,
+      e.base_signature,
+      e.display_title AS entry_display_title,
+      e.display_subtitle AS entry_display_subtitle,
+      a.id AS address_id,
+      a.label AS address_label,
+      a.lat,
+      a.lon,
+      a.state,
+      a.postcode,
+      a.locality,
+      a.accuracy,
+      a.display_title AS address_display_title,
+      a.display_subtitle AS address_display_subtitle
     FROM address_typeahead_fts f
     JOIN address_typeahead_entries e ON e.entry_id = f.entry_id
+    JOIN addresses a ON a.id = e.address_id
     WHERE address_typeahead_fts MATCH ?
     ORDER BY
       CASE
@@ -243,8 +285,8 @@ function searchSqliteTypeaheadEntries(database, needle, limit) {
       END,
       e.rank_weight DESC,
       rank,
-      LENGTH(e.label),
-      e.label
+      LENGTH(a.label),
+      a.label
     LIMIT ?
   `).all(ftsQuery, needle, `${needle}%`, `% ${needle}%`, Math.max(1, Math.min(Number(limit) || 5, 20)));
 }
@@ -256,19 +298,21 @@ function prefixRowsAmbiguous(rows) {
 }
 
 function hybridRowToAddressRecord(row) {
+  const isRefine = row.entry_type === "base_refine";
+  const entryLabel = [row.entry_display_title, row.entry_display_subtitle].filter(Boolean).join(", ");
   return {
     id: row.entry_id,
-    label: row.label,
+    label: isRefine ? entryLabel || row.address_label : row.address_label,
     lat: row.lat,
     lon: row.lon,
     state: row.state,
     postcode: row.postcode,
     locality: row.locality,
-    accuracy: "address_typeahead",
+    accuracy: row.accuracy || "address_typeahead",
     search_text: row.key_text,
-    display_title: row.display_title,
-    display_subtitle: row.display_subtitle,
-    suggestion_type: row.entry_type === "base_refine" ? "base_address" : "exact_address",
+    display_title: isRefine ? row.entry_display_title : row.entry_display_title || row.address_display_title,
+    display_subtitle: isRefine ? row.entry_display_subtitle : row.entry_display_subtitle || row.address_display_subtitle,
+    suggestion_type: isRefine ? "base_address" : "exact_address",
     refine_required: row.refine_required,
     refine_hint: Number(row.refine_required || 0) ? "Choose or type the exact unit before routing." : "",
   };
@@ -277,7 +321,7 @@ function hybridRowToAddressRecord(row) {
 function hybridMatchType(row, needle) {
   if (Number(row.refine_required || 0)) return "building_refine";
   const key = normaliseAddressText(row.key_text);
-  const label = normaliseAddressText(row.label);
+  const label = normaliseAddressText(row.address_label);
   if (key === needle || label === needle) return "exact_address";
   if (key.startsWith(needle) || label.startsWith(needle)) return "address_prefix";
   return "address_token_overlap";

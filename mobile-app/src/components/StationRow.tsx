@@ -21,6 +21,7 @@ export function StationRow({
 }) {
   const tomorrow = tomorrowPriceView(item);
   const attentionCue = stationAttentionCue(item);
+  const fuelLabel = item.fuel || "fuel";
   return (
     <Pressable
       accessibilityLabel={stationRowAccessibilityLabel(item)}
@@ -29,19 +30,26 @@ export function StationRow({
       onPress={onPress}
       style={[styles.row, selected && styles.selected]}
     >
-      <BrandBadge station={item.station} size={34} />
+      <View style={styles.priceTile}>
+        <Text style={styles.priceValue}>{item.adjustedCpl.toFixed(1)}</Text>
+        <Text style={styles.fuelLabel}>{fuelLabel}</Text>
+      </View>
       <View style={styles.main}>
-        <Text numberOfLines={1} style={styles.name}>
-          {item.station.name}
-        </Text>
-        <View style={styles.metaRow}>
-          <View style={styles.distanceBadge}>
-            <Text style={styles.distanceBadgeText}>{item.distanceKm.toFixed(1)} km</Text>
-          </View>
-          <Text numberOfLines={1} style={styles.meta}>
-            {item.station.brand} | {stationOpenLabel(item.station.openNow)}
+        <View style={styles.titleRow}>
+          <BrandBadge station={item.station} size={28} />
+          <Text numberOfLines={1} style={styles.name}>
+            {item.station.name}
           </Text>
         </View>
+        <View style={styles.metaRow}>
+          <Text numberOfLines={1} style={styles.meta}>
+            {item.station.address || item.station.brand}
+          </Text>
+        </View>
+        <Text numberOfLines={1} style={styles.distanceText}>
+          {item.distanceKm.toFixed(1)} km
+          <Text style={styles.statusText}> | {stationOpenLabel(item.station.openNow)}</Text>
+        </Text>
         <Text numberOfLines={1} style={styles.evidence}>
           {stationEvidenceLine(item)}
         </Text>
@@ -52,20 +60,15 @@ export function StationRow({
         ) : null}
         {item.possibleLowerCpl !== undefined ? (
           <Text numberOfLines={1} style={styles.possibleDiscount}>
-            Possible, not guaranteed: {item.possibleLowerLabel}
+            Possible, not guaranteed: possible only {item.possibleLowerCpl.toFixed(1)}
           </Text>
         ) : null}
       </View>
-      <View style={styles.price}>
-        <Text style={styles.priceValue}>{item.adjustedCpl.toFixed(1)}</Text>
-        <Text style={styles.priceUnit}>
-          {item.discountCpl ? "your c/L" : "pump c/L"}
+      <View style={styles.mapAction}>
+        <Text style={styles.mapActionText}>map</Text>
+        <Text numberOfLines={1} style={styles.priceUnit}>
+          {item.discountCpl ? "your price" : "pump price"}
         </Text>
-        {item.possibleLowerCpl !== undefined ? (
-          <Text numberOfLines={1} style={styles.possiblePrice}>
-            possible only {item.possibleLowerCpl.toFixed(1)}
-          </Text>
-        ) : null}
         {attentionCue ? (
           <Text
             numberOfLines={1}
@@ -120,48 +123,46 @@ const styles = StyleSheet.create({
   row: {
     ...surfaces.floating,
     alignItems: "center",
-    borderRadius: radii.xl,
+    borderRadius: radii.lg,
     flexDirection: "row",
-    gap: spacing.sm,
-    minHeight: 84,
-    padding: spacing.md,
+    gap: spacing.md,
+    minHeight: 92,
+    padding: spacing.sm,
   },
   selected: {
     ...shadow.soft,
-    borderColor: colors.green,
+    borderColor: colors.black,
     backgroundColor: colors.panelStrong,
+  },
+  priceTile: {
+    alignItems: "center",
+    backgroundColor: colors.greenSoft,
+    borderRadius: radii.md,
+    flexShrink: 0,
+    justifyContent: "center",
+    minHeight: 66,
+    width: 76,
   },
   main: {
     flex: 1,
     minWidth: 0,
   },
+  titleRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: spacing.xs,
+    minWidth: 0,
+  },
   name: {
     ...typography.bodyStrong,
+    flex: 1,
+    minWidth: 0,
   },
   metaRow: {
     alignItems: "center",
     flexDirection: "row",
-    gap: spacing.xs,
-    marginTop: 3,
+    marginTop: 2,
     minWidth: 0,
-  },
-  distanceBadge: {
-    alignItems: "center",
-    backgroundColor: colors.black,
-    borderColor: colors.green,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    flexShrink: 0,
-    justifyContent: "center",
-    minHeight: 24,
-    minWidth: 58,
-    paddingHorizontal: spacing.sm,
-  },
-  distanceBadgeText: {
-    color: colors.white,
-    fontSize: 11,
-    fontWeight: "700",
-    lineHeight: 16,
   },
   meta: {
     color: colors.muted,
@@ -169,6 +170,16 @@ const styles = StyleSheet.create({
     fontSize: typeScale.caption,
     fontWeight: "400",
     minWidth: 0,
+  },
+  distanceText: {
+    color: colors.greenDark,
+    fontSize: typeScale.caption,
+    fontWeight: "700",
+    marginTop: 2,
+  },
+  statusText: {
+    color: colors.muted,
+    fontWeight: "400",
   },
   evidence: {
     color: colors.muted,
@@ -188,26 +199,39 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     marginTop: 2,
   },
-  price: {
-    alignItems: "flex-end",
-    minWidth: 86,
-  },
   priceValue: {
     color: colors.greenDark,
     fontSize: typeScale.title,
     fontWeight: "900",
+    lineHeight: 26,
+  },
+  fuelLabel: {
+    color: colors.muted,
+    fontSize: typeScale.caption,
+    fontWeight: "800",
+    lineHeight: 16,
+    textTransform: "uppercase",
+  },
+  mapAction: {
+    alignItems: "center",
+    flexShrink: 0,
+    gap: 2,
+    minWidth: 58,
   },
   priceUnit: {
     color: colors.muted,
     fontSize: 10,
     fontWeight: "500",
   },
-  possiblePrice: {
-    color: colors.amber,
-    fontSize: 10,
-    fontWeight: "700",
-    marginTop: 2,
-    maxWidth: 92,
+  mapActionText: {
+    backgroundColor: colors.panel,
+    borderRadius: radii.md,
+    color: colors.muted,
+    fontSize: typeScale.lead,
+    fontWeight: "800",
+    overflow: "hidden",
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
   },
   confidence: {
     backgroundColor: colors.greenSoft,

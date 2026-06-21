@@ -146,6 +146,14 @@ const checks = [
       stationRow.includes("stationRowAccessibilityLabel") &&
       stationRow.includes('accessibilityRole="button"') &&
       stationRow.includes("accessibilityState={{ selected }}") &&
+      stationRow.includes("styles.priceTile") &&
+      stationRow.includes("styles.fuelLabel") &&
+      stationRow.includes("styles.titleRow") &&
+      stationRow.includes("<BrandBadge station={item.station} size={28} />") &&
+      stationRow.includes("styles.mapAction") &&
+      stationRow.includes(">map<") &&
+      stationRow.indexOf("styles.priceTile") < stationRow.indexOf("styles.titleRow") &&
+      stationRow.indexOf("styles.titleRow") < stationRow.indexOf("styles.mapAction") &&
       stationRow.includes("stationEvidenceLine(item)") &&
       stationRow.includes("Possible lower price, not guaranteed"),
   },

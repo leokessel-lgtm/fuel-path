@@ -170,7 +170,7 @@ const csvPath = `tmp/geocode-hosted-national-benchmark-${RUN_ID}.csv`;
 await fsp.writeFile(path.join(ROOT, jsonPath), JSON.stringify(payload, null, 2));
 await fsp.writeFile(path.join(ROOT, csvPath), `${toCsv(rows)}\n`);
 
-console.log(JSON.stringify({ runId: RUN_ID, jsonPath, csvPath, fetchCalls, summary }, null, 2));
+console.log(JSON.stringify({ runId: RUN_ID, jsonPath, csvPath, fetchCalls, summary: consoleSummary(summary) }, null, 2));
 assertThresholds(summary, rows);
 
 async function runCase(testCase, index) {
@@ -183,6 +183,7 @@ async function runCase(testCase, index) {
   let finalSuggestions = [];
   let elapsedMs = 0;
   const requestElapsedMs = [];
+  const requestTraces = [];
   let probedFullQuery = false;
   let wrongTopBeforeResolvable = false;
   const fullQuery = testCase.query.trim();
@@ -194,16 +195,17 @@ async function runCase(testCase, index) {
     const requestMs = Date.now() - started;
     elapsedMs += requestMs;
     requestElapsedMs.push(requestMs);
+    const suggestions = Array.isArray(payload?.suggestions) ? payload.suggestions : [];
+    const top = suggestions[0] || null;
+    const matchIndex = suggestions.findIndex((suggestion) => suggestionMatches(testCase, suggestion));
+    const resolvableTop = top ? suggestionResolvesCase(testCase, top) : false;
+    requestTraces.push(requestTrace(testCase, prefix, requestMs, payload, top, matchIndex, resolvableTop));
     if (payload?.lookupStatus === "request_timeout") {
       finalPayload = payload;
       finalSuggestions = [];
       break;
     }
-    const suggestions = Array.isArray(payload?.suggestions) ? payload.suggestions : [];
     if (suggestions.length && firstSuggestionChars === null) firstSuggestionChars = prefix.length;
-    const matchIndex = suggestions.findIndex((suggestion) => suggestionMatches(testCase, suggestion));
-    const top = suggestions[0] || null;
-    const resolvableTop = top ? suggestionResolvesCase(testCase, top) : false;
     if (matchIndex >= 0 && firstAnyMatchChars === null) firstAnyMatchChars = prefix.length;
     if (matchIndex === 0 && firstTopMatchChars === null) firstTopMatchChars = prefix.length;
     if (resolvableTop && firstResolvableTopChars === null) firstResolvableTopChars = prefix.length;
@@ -220,6 +222,20 @@ async function runCase(testCase, index) {
     elapsedMs += requestMs;
     requestElapsedMs.push(requestMs);
     finalSuggestions = Array.isArray(finalPayload?.suggestions) ? finalPayload.suggestions : [];
+    const finalTop = finalSuggestions[0] || null;
+    const finalMatchIndex = finalSuggestions.findIndex((suggestion) => suggestionMatches(testCase, suggestion));
+    requestTraces.push(
+      requestTrace(
+        testCase,
+        fullQuery,
+        requestMs,
+        finalPayload,
+        finalTop,
+        finalMatchIndex,
+        finalTop ? suggestionResolvesCase(testCase, finalTop) : false,
+        true,
+      ),
+    );
   }
 
   const finalTop = finalSuggestions[0] || null;
@@ -249,11 +265,50 @@ async function runCase(testCase, index) {
     elapsedMs,
     requestCount: requestElapsedMs.length,
     requestElapsedMs,
+    slowRequests: slowRequestTraces(requestTraces),
+    slowRequestSummary: slowRequestSummary(requestTraces),
     p50RequestMs: percentile(requestElapsedMs, 50),
     p95RequestMs: percentile(requestElapsedMs, 95),
     maxRequestMs: requestElapsedMs.length ? Math.max(...requestElapsedMs) : null,
     result: finalTopMatch ? "top_match" : finalAnyMatch ? "ranked_match" : finalSuggestions.length ? "suggestions_but_not_expected" : "no_suggestion",
   };
+}
+
+function requestTrace(testCase, prefix, requestMs, payload, top, matchIndex, resolvableTop, fullQueryProbe = false) {
+  return {
+    id: testCase.id,
+    kind: testCase.kind,
+    category: testCase.category,
+    addressFamily: testCase.addressFamily,
+    geoSegment: testCase.geoSegment,
+    state: testCase.state,
+    chars: prefix.length,
+    prefix,
+    fullQueryProbe,
+    requestMs,
+    lookupStatus: payload?.lookupStatus || "",
+    warning: payload?.warning || "",
+    suggestionCount: Array.isArray(payload?.suggestions) ? payload.suggestions.length : 0,
+    topLabel: top?.label || "",
+    topProvider: top?.provider || "",
+    topType: top?.type || "",
+    topSuggestionType: top?.suggestionType || "",
+    topRefineRequired: Boolean(top?.refineRequired),
+    matchIndex,
+    resolvableTop,
+  };
+}
+
+function slowRequestTraces(traces) {
+  return [...traces]
+    .sort((left, right) => right.requestMs - left.requestMs || right.chars - left.chars)
+    .slice(0, 5);
+}
+
+function slowRequestSummary(traces) {
+  const slowest = slowRequestTraces(traces)[0];
+  if (!slowest) return "";
+  return `${slowest.requestMs}ms@${slowest.chars}:${slowest.prefix}`;
 }
 
 async function geocodeQuery(query, index, testCase = {}) {
@@ -627,6 +682,10 @@ function summariseGroup(rows) {
     .filter(Number.isFinite);
   const elapsed = rows.map((row) => row.elapsedMs).filter(Number.isFinite);
   const requestElapsed = rows.flatMap((row) => Array.isArray(row.requestElapsedMs) ? row.requestElapsedMs : []).filter(Number.isFinite);
+  const slowRequests = rows
+    .flatMap((row) => (Array.isArray(row.slowRequests) ? row.slowRequests : []).map((request) => ({ ...request, rowId: row.id, query: row.query })))
+    .sort((left, right) => right.requestMs - left.requestMs || right.chars - left.chars)
+    .slice(0, 10);
   return {
     cases: rows.length,
     finalTopMatch: rows.filter((row) => row.finalTopMatch).length,
@@ -666,7 +725,32 @@ function summariseGroup(rows) {
     p95RequestMs: percentile(requestElapsed, 95),
     maxRequestMs: requestElapsed.length ? Math.max(...requestElapsed) : null,
     requestLatencySamples: requestElapsed.length,
+    slowRequests,
   };
+}
+
+function consoleSummary(value) {
+  if (Array.isArray(value)) {
+    return value.map(consoleSummary);
+  }
+  if (!value || typeof value !== "object") return value;
+  const result = {};
+  for (const [key, child] of Object.entries(value)) {
+    if (key === "slowRequests") {
+      result.slowRequests = child.slice(0, 3).map((request) => ({
+        id: request.id,
+        state: request.state,
+        category: request.category,
+        chars: request.chars,
+        requestMs: request.requestMs,
+        prefix: request.prefix,
+        fullQueryProbe: request.fullQueryProbe,
+      }));
+      continue;
+    }
+    result[key] = consoleSummary(child);
+  }
+  return result;
 }
 
 function groupSummary(rows, field) {
@@ -849,6 +933,7 @@ function toCsv(rows) {
     "p50RequestMs",
     "p95RequestMs",
     "maxRequestMs",
+    "slowRequestSummary",
   ];
   return [headers.join(","), ...rows.map((row) => headers.map((header) => csvEscape(row[header])).join(","))].join("\n");
 }

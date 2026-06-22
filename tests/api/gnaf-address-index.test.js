@@ -535,6 +535,7 @@ test("geocode promotes base refine suggestion for ambiguous building prefixes", 
       "GAWA2001|Karratha City Plaza, Shop 9, 16 Sharpe Avenue, Karratha WA 6714|Karratha City Plaza|Shop|9|16|Sharpe|Avenue|Karratha|WA|6714|PROPERTY CENTROID|116.846|-20.736",
       "GAWA2002|Karratha City Plaza, Shop 11, 16 Sharpe Avenue, Karratha WA 6714|Karratha City Plaza|Shop|11|16|Sharpe|Avenue|Karratha|WA|6714|PROPERTY CENTROID|116.8461|-20.7361",
       "GAWA2003|Karratha City Plaza, Shop 14, 16 Sharpe Avenue, Karratha WA 6714|Karratha City Plaza|Shop|14|16|Sharpe|Avenue|Karratha|WA|6714|PROPERTY CENTROID|116.8462|-20.7362",
+      "GAACT2004|Australian Taxation Office, 40 Cameron Avenue, Belconnen ACT 2617|Australian Taxation Office|||40|Cameron|Avenue|Belconnen|ACT|2617|PROPERTY CENTROID|149.070|-35.240",
     ].join("\n"),
   );
 
@@ -563,12 +564,24 @@ test("geocode promotes base refine suggestion for ambiguous building prefixes", 
       limit: 3,
       sessionToken: "building-refine-shop",
     });
+    const officeBuilding = await geocode({
+      query: "Australian Taxation Of",
+      limit: 3,
+      sessionToken: "building-refine-office-word",
+      searchContext: {
+        nearLat: -35.240,
+        nearLon: 149.070,
+        nearRadiusKm: 80,
+      },
+    });
 
     assert.equal(buildingOnly.suggestions[0].label, "Karratha City Plaza, 16 Sharpe Avenue, Karratha WA 6714");
     assert.equal(buildingOnly.suggestions[0].refineRequired, true);
     assert.equal(buildingOnly.suggestions[0].matchType, "building_refine");
     assert.equal(exactShop.suggestions[0].label, "Karratha City Plaza, Shop 14, 16 Sharpe Avenue, Karratha WA 6714");
     assert.equal(exactShop.suggestions[0].refineRequired, false);
+    assert.equal(officeBuilding.suggestions[0].label, "Australian Taxation Office, 40 Cameron Avenue, Belconnen ACT 2617");
+    assert.equal(officeBuilding.suggestions[0].refineRequired, false);
   });
 });
 
@@ -698,6 +711,18 @@ test("building-first unit query can resolve exact unit from indexed base signatu
     sqlite.close();
 
     const indexResults = await searchAddressIndex("Tuggeranong Business Centre Unit 2 12 Kett Street Kambah ACT 2902", 3);
+    const partialUnitRefine = await searchAddressIndex("Tuggeranong Business Centre Un", 3, {
+      searchContext: {
+        nearLat: -35.379,
+        nearLon: 149.064,
+      },
+    });
+    const bareUnitRefine = await searchAddressIndex("Tuggeranong Business Centre Unit", 3, {
+      searchContext: {
+        nearLat: -35.379,
+        nearLon: 149.064,
+      },
+    });
     const buildingUnitOnly = await searchAddressIndex("Tuggeranong Business Centre Unit 2", 3, {
       searchContext: {
         nearLat: -35.379,
@@ -724,6 +749,10 @@ test("building-first unit query can resolve exact unit from indexed base signatu
     assert.match(indexSql, /WHERE entry_type = 'exact' AND unit <> ''/);
     assert.equal(indexResults[0].label, "Tuggeranong Business Centre, Unit 2, 12 Kett Street, Kambah ACT 2902");
     assert.equal(indexResults.length, 1);
+    assert.equal(partialUnitRefine[0].label, "Tuggeranong Business Centre, 12 Kett Street, Kambah ACT 2902");
+    assert.equal(partialUnitRefine[0].refineRequired, true);
+    assert.equal(bareUnitRefine[0].label, "Tuggeranong Business Centre, 12 Kett Street, Kambah ACT 2902");
+    assert.equal(bareUnitRefine[0].refineRequired, true);
     assert.equal(buildingUnitOnly[0].label, "Tuggeranong Business Centre, Unit 2, 12 Kett Street, Kambah ACT 2902");
     assert.equal(buildingUnitOnly[0].refineRequired, false);
     assert.equal(partialUnit[0].label, "Tuggeranong Business Centre, Unit 2, 12 Kett Street, Kambah ACT 2902");
@@ -798,6 +827,7 @@ test("lot and range exact labels materialise compact prefix rows", async () => {
       "GAQLD6001|Lot 2, Cassowary Street, Longreach QLD 4730|||||2|Cassowary|Street|Longreach|QLD|4730|PROPERTY CENTROID|144.250|-23.440",
       "GAQLD6002|112-120 Spoonbill Street, Longreach QLD 4730|||112|120||Spoonbill|Street|Longreach|QLD|4730|PROPERTY CENTROID|144.251|-23.441",
       "GASA6003|Unit 4, Lot 141, Elleway Drive, Coober Pedy SA 5723|Unit|4|||141|Elleway|Drive|Coober Pedy|SA|5723|PROPERTY CENTROID|134.749|-29.013",
+      "GAQLD6004|Unit 7, 267-269 Esplanade, Cairns North QLD 4870|Unit|7|267|269||Esplanade||Cairns North|QLD|4870|PROPERTY CENTROID|145.763|-16.906",
     ].join("\n"),
   );
 
@@ -820,19 +850,26 @@ test("lot and range exact labels materialise compact prefix rows", async () => {
     const lotPrefixRows = sqlite.prepare("SELECT COUNT(*) AS count FROM address_prefix_entries WHERE prefix = ?").get("lot 2 ca");
     const rangePrefixRows = sqlite.prepare("SELECT COUNT(*) AS count FROM address_prefix_entries WHERE prefix = ?").get("112 120 ");
     const unitLotPrefixRows = sqlite.prepare("SELECT COUNT(*) AS count FROM address_prefix_entries WHERE prefix = ?").get("unit 4 lot 141 ");
+    const unitRangePrefixRows = sqlite.prepare("SELECT COUNT(*) AS count FROM address_prefix_entries WHERE prefix = ?").get("unit 7 267 269 ");
     sqlite.close();
 
     const lotSuggestions = await searchAddressIndex("Lot 2 Ca", 3);
     const rangeSuggestions = await searchAddressIndex("112-120 Sp", 3);
     const unitLotSuggestions = await searchAddressIndex("Unit 4 Lot 141 Elleway", 3);
+    const prematureUnitRangeSuggestions = await searchAddressIndex("Unit 7 267", 3);
+    const unitRangeSuggestions = await searchAddressIndex("Unit 7 267-269", 3);
 
     assert.ok(lotPrefixRows.count >= 1);
     assert.ok(rangePrefixRows.count >= 1);
     assert.ok(unitLotPrefixRows.count >= 1);
+    assert.ok(unitRangePrefixRows.count >= 1);
     assert.equal(lotSuggestions[0].label, "Lot 2, Cassowary Street, Longreach QLD 4730");
     assert.equal(rangeSuggestions[0].label, "112-120 Spoonbill Street, Longreach QLD 4730");
     assert.equal(unitLotSuggestions[0].label, "Unit 4, Lot 141, Elleway Drive, Coober Pedy SA 5723");
     assert.equal(unitLotSuggestions[0].refineRequired, false);
+    assert.deepEqual(prematureUnitRangeSuggestions, []);
+    assert.equal(unitRangeSuggestions[0].label, "Unit 7, 267-269 Esplanade, Cairns North QLD 4870");
+    assert.equal(unitRangeSuggestions[0].refineRequired, false);
   });
 });
 

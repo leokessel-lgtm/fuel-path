@@ -22,6 +22,7 @@ The tested resolvable P90 target is now achieved in sampled stress runs and boun
 - after adding builder-level building/venue prefix rows, a rebuilt 400-case rural/unit sample reached exact P90 12, resolvable P90 12, wrong-top-before-resolvable 5 and request P95 1 ms, but this is rebuilt-sample evidence rather than a fresh full-national package
 - after bringing the raw ZIP builder into parity, a fresh 6-state 150k-row compact runtime built from real G-NAF source reached exact/resolvable P90 15 on a 300-case rural/unit benchmark with request P95 2 ms
 - after an 8-state 994,401-row raw rebuild, the first 800-case rural/unit run exposed three unit-like misses; after moving exact-unit lookup ahead of contextual prefix rows and including lot numbers in base keys, the rerun hit 800/800 final top/resolvable, exact P90 15, resolvable P90 15 and request P95 2 ms
+- after widening that staged raw run to 1,600 rural/unit cases, unit/building resolvable P90 initially slipped to 18; adding guarded unit-range token-boundary prefix lookup and building-name-plus-partial-unit base refinement restored 1,600/1,600 final top/resolvable, overall resolvable P90 15 and unit/building resolvable P90 15
 - unit/building resolvable P90 is still 15 in that 400-case run, and exact unit/building P90 is still 28
 - the broad exact-unit index raised the full national temp runtime from about 14 GB to about 16 GB; the partial-index temp file still occupies 16 GB until rebuilt/vacuumed, but currently reports about 1.97 GB free pages after dropping the broad index
 - compact prefix is only safe as a narrow house-number-first fast path
@@ -1527,6 +1528,57 @@ Brutal read on the staged 8-state rebuild:
 - The ACT and WA exact tails still need work. `Unit 78 L B 99 Eastern Valley Way...` now resolves exactly at the end, but still needs 52 typed characters in this benchmark.
 - The 919 MB staged file implies the full compact package may still be large enough to require sharding, compression or hosted-device split decisions before shipping.
 
+## Wider 8-State Unit-Range And Building-Refine Pass
+
+Problem found by widening the staged raw benchmark:
+
+- the 800-case staged run was not wide enough to prove the unit/building tail
+- the first 1,600-case run kept overall resolvable P90 at 15, but unit/building resolvable P90 slipped to 18
+- QLD ranged-unit addresses such as `Unit 7 267-269 Esplanade...` had a unique exact compact prefix once the full range number was typed, but the runtime waited for an alphabetic street token
+- ACT building-name-plus-unit prefixes such as `Central Park Un...` could return wrong exact sibling units before the user typed the exact unit, which was unsafe even when the final result eventually recovered
+
+Implementation:
+
+- unit-like range queries can now use a guarded token-boundary exact prefix once the query contains a unit token and two civic-number tokens
+- incomplete range input such as `Unit 7 267` still returns no suggestion; `Unit 7 267-269` can return the exact local row if the prefix is unique
+- building-name-plus-bare-unit or partial-unit text now prefers `base_refine` rows before exact sibling unit rows
+- `office` inside a building name is no longer treated as unit-like unless it starts the query or is followed by a unit number; this fixed an intermediate regression where `Australian Taxation Office...` matched unrelated `Australia...` base-refine rows
+
+Wide staged benchmark evidence:
+
+- artefact: `tmp/geocode-hosted-national-benchmark-2026-06-22-raw-unitrefine-prefix-8state-1600b.json`
+- source SQLite: `tmp/gnaf-raw-unitlot-prefix-8state-1m.sqlite`
+- cases: 1,600 rural/unit-weighted address cases, 200 per benchmark state
+- final top/resolvable: 1,600/1,600
+- exact top P50/P90/P95: 10 / 15 / 15
+- resolvable top P50/P90/P95: 10 / 15 / 15
+- wrong top before resolvable: 76
+- request latency P50/P95/max: 0 ms / 1 ms / 277 ms
+- elapsed latency P50/P95: 1 ms / 26 ms
+
+Wide staged segment notes:
+
+| Segment | Cases | Final top/resolvable | Exact P90 | Resolvable P90 | Resolvable P95 | Request P95 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Standard address | 1,120 | 1,120/1,120 | 10 | 10 | 10 | 1 ms |
+| Unit/building address | 480 | 480/480 | 20 | 15 | 15 | 17 ms |
+| ACT | 200 | 200/200 | 22 | 15 | 15 | 22 ms |
+| QLD | 200 | 200/200 | 15 | 15 | 15 | 8 ms |
+| WA | 200 | 200/200 | 15 | 15 | 15 | 1 ms |
+| Unit category | 478 | 478/478 | 20 | 15 | 15 | 9 ms |
+| Lot address | 174 | 174/174 | 10 | 10 | 10 | 1 ms |
+| Range address | 75 | 75/75 | 10 | 10 | 10 | 5 ms |
+
+Brutal read on the wide staged pass:
+
+- This is better evidence than the 800-case run. It caught both a real unit-range weakness and an unsafe building/unit ranking behaviour.
+- The combination approach is still the right one: compact prefix handles the fast exact range case, while typeahead/base-refine handles ambiguous building/unit text.
+- The result achieves the 15-character target on the honest resolvable-path metric across 1,600 rural/unit-weighted cases.
+- Exact unit/building selection still misses the target: unit/building exact P90 is 20 and exact P95 is 26.
+- `wrongTopBeforeResolvable` is unchanged at 76. Some of that is expected short-prefix ambiguity, but it remains a UI risk if exact sibling rows are visually over-promoted before refinement.
+- The benchmark exposed and the patch fixed an `office` false-positive. Keep this as a standing regression risk whenever broadening unit-token rules.
+- This is still a capped 994,401-row package. It does not replace a full-national raw rebuild.
+
 Brutal read on full national:
 
 - Full national build size is now proven, and it is large but locally possible.
@@ -1537,6 +1589,7 @@ Brutal read on full national:
 - The building/venue prefix builder pass has promising rebuilt-sample evidence, but still needs a fresh full-national rebuild before it can replace the exact-stop run as the best full-national read.
 - The raw builder parity pass proves the fresh-build path on 150k real G-NAF rows, but full-national rebuild evidence is still missing.
 - The staged 8-state unit-lot rebuild proves the fresh-build path on 994,401 real G-NAF rows across all benchmark states, but full-national rebuild evidence is still missing.
+- The wider 1,600-case staged pass proves the current runtime shape is stronger than the 800-case pass suggested, but it also confirms exact unit/building remains the hard tail.
 - SA remains the exact typed-character tail, ACT improved on resolvable P90, and range/unit/building rows remain the main latency tails.
 - The next improvement should target serving shape and packaging, not provider expansion.
 
@@ -1630,6 +1683,9 @@ What improved:
 - The raw builder parity pass built a fresh 6-state 150k-row compact runtime from the real raw ZIP and hit exact/resolvable P90 15 on a 300-case rural/unit benchmark with request P95 2 ms.
 - The staged 8-state unit-lot rebuild built a fresh 994,401-row compact runtime from the real raw ZIP and hit exact/resolvable P90 15 on an 800-case rural/unit benchmark with request P95 2 ms.
 - Unit-plus-lot addresses now have local exact prefix material instead of falling back to base lot suggestions.
+- The wider 1,600-case staged raw benchmark now hits 1,600/1,600 final top/resolvable, overall resolvable P90 15 and unit/building resolvable P90 15.
+- Unit-range addresses such as `Unit 7 267-269...` can resolve from compact prefix once the full range number is typed, without waiting for the street token.
+- Building-name-plus-partial-unit text such as `Central Park Un` now surfaces a refine-required base row instead of a wrong exact sibling unit.
 
 What remains weak:
 
@@ -1652,6 +1708,8 @@ What remains weak:
 - The staged 8-state raw rebuild is much better evidence than the 6-state run, but it is still a capped 994,401-row package rather than a full 16.9M-row national build.
 - Unit/building exact P90 remains 22 in the staged raw rebuild, even though unit/building resolvable P90 meets the 15-character target.
 - Long or unusual unit/building labels such as `Unit 78 L B 99 Eastern Valley Way...` can still require far more than 15 typed characters for exact-unit top match.
+- In the wider staged run, unit/building exact P90 is still 20 and exact P95 is 26, so the 15-character achievement is resolvable/refine-path rather than exact-unit-path.
+- `office`-style building names are a known edge case because `office` can be both a building-name word and a unit descriptor.
 - Context-aware ranking depends on Plan/Nearby having a meaningful route/current-map anchor. Cold start address search without context still lands at rural/unit P90 18 in the corrected hosted-contract run.
 - `wrongTopBeforeResolvable` is still high in the typed-prefix harness because many short prefixes are inherently ambiguous before enough context arrives. This is acceptable only if UI state treats those rows as suggestions, not route commitments.
 

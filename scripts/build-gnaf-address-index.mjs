@@ -199,7 +199,7 @@ for await (const record of readRecords(inputPath)) {
       entry.rankWeight,
     );
     if (shouldMaterialisePrefix(entry)) {
-      for (const prefix of compactPrefixes(entry.prefixKey)) {
+      for (const prefix of compactPrefixes(entry.prefixKey, compactPrefixMode(entry))) {
         insertPrefixEntry.run(prefix, entry.entryId, entry.rankWeight);
       }
     }
@@ -494,17 +494,23 @@ function unitText(structure) {
   return normaliseAddressText(`${structure.flatType || "Unit"} ${structure.flatNumber}`);
 }
 
-function compactPrefixes(value) {
+function compactPrefixes(value, mode = "default") {
   const text = normaliseAddressText(value);
   const prefixes = new Set();
-  for (const length of [4, 8, 12, 15]) {
+  const lengths = mode === "unit_exact" ? [12, 15] : [4, 8, 12, 15];
+  for (const length of lengths) {
     if (length <= text.length) prefixes.add(text.slice(0, length));
   }
   return [...prefixes].filter((prefix) => prefix.length >= 4);
 }
 
 function shouldMaterialisePrefix(entry) {
-  return entry.rankWeight >= 980 && (entry.entryType === "base_refine" || String(entry.entryId).endsWith(":exact:base"));
+  return entry.entryType === "base_refine" ||
+    (String(entry.entryId).endsWith(":exact:base") && (!entry.unit || entry.rankWeight >= 900));
+}
+
+function compactPrefixMode(entry) {
+  return entry.entryType === "exact" && entry.unit ? "unit_exact" : "default";
 }
 
 function firstLabelPart(label) {

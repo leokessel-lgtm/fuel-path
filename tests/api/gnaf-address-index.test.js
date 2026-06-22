@@ -4,6 +4,7 @@ const fs = require("node:fs");
 const http = require("node:http");
 const os = require("node:os");
 const path = require("node:path");
+const { DatabaseSync } = require("node:sqlite");
 const test = require("node:test");
 
 const {
@@ -590,8 +591,14 @@ test("unit-like SQLite queries wait for a meaningful street token before typeahe
     const shortStreetToken = await searchAddressIndex("Unit 3 5A Wo", 3);
     const exactUnit = await searchAddressIndex("Unit 2 2 Stott", 3);
     const baseRefine = await searchAddressIndex("2 Stott Court Wodonga", 3);
+    const sqlite = new DatabaseSync(outputPath, { readOnly: true });
+    const broadPrefixRows = sqlite.prepare("SELECT COUNT(*) AS count FROM address_prefix_entries WHERE prefix = ?").get("unit 2 2");
+    const unitPrefixRows = sqlite.prepare("SELECT COUNT(*) AS count FROM address_prefix_entries WHERE prefix = ?").get("unit 3 5a wo");
+    sqlite.close();
 
     assert.deepEqual(broadUnit, []);
+    assert.equal(broadPrefixRows.count, 0);
+    assert.equal(unitPrefixRows.count, 1);
     assert.equal(shortStreetToken[0].label, "Unit 3, 5A Woodland Street, Wodonga VIC 3690");
     assert.equal(exactUnit[0].label, "Unit 2, 2 Stott Court, Wodonga VIC 3690");
     assert.equal(baseRefine[0].label, "2 Stott Court, Wodonga VIC 3690");

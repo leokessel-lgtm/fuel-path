@@ -11,6 +11,7 @@ The tested P90 target is now achieved in sampled stress runs, but not yet proven
 - nearby route/current-map context is now used as a small local G-NAF boost, not as a replacement for text evidence
 - building-name, street-name and unit-like input must use typeahead fallback to avoid wrong base suggestions
 - a 994,401-row 8-state compact build now fits in 925 MB, but a full national rebuild is still not proven
+- a unit-prefix rebuild improves request latency and unit-first exact lookup, but raises the 994,401-row sample to 952 MB
 
 Compact prefix alone is not safe enough. It is fast and reaches low P90 on successful cases, but it can silently pick the wrong locality, sibling unit/shop or same-name building when the first 15 characters are ambiguous.
 
@@ -416,6 +417,74 @@ Guarded brutal read:
 - That still meets the stated 15-character target, but leaves no resolvable-top margin.
 - The guard is product-safe because it withholds broad unit suggestions rather than guessing between sibling units.
 - Next improvement should recover unit/building margin without reopening broad `unit + number` FTS scans, probably with compact unit prefix rows or a small exact-unit prefix table.
+
+## Unit Exact Prefix Rebuild
+
+Follow-up improvement:
+
+- exact unit/shop/office/level address rows now materialise compact prefix checkpoints only at 12 and 15 typed characters
+- those exact-unit prefix rows are used only for unit-first input such as `Unit 3 5A Wo`
+- building-first and street-first unit/building text still uses typeahead FTS so building/base suggestions can safely beat sibling exact shops when the typed text is not unit-specific
+- broad unit input remains blocked: `Unit 2 2` does not run a broad local FTS scan and does not return a guessed sibling address
+- ambiguous unit-first prefix rows still fall back to typeahead/context unless the prefix candidates share one base signature
+
+Runtime sample rebuild:
+
+- file: `tmp/gnaf-8state-hybrid-runtime-leanprefix-1m-unitprefix.sqlite`
+- command shape: `--states ACT,NSW,NT,QLD,SA,TAS,VIC,WA --limit-per-state 125000 --omit-legacy-fts --omit-search-backstop`
+- address rows: 994,401
+- SQLite size: 952 MB, up from 925 MB for the previous lean-prefix sample
+- `address_typeahead_entries`: 2,078,060 rows
+- `address_prefix_entries`: 3,808,284 rows, up from 3,281,932
+- storage cost: about +27 MB and +526k prefix rows on the 994k-row sample
+
+Direct probes:
+
+- `Unit 3 5A Wo` returns `Unit 3, 5A Woodland Street, ...` as an exact address
+- `Unit 2 2` returns no local suggestion
+- `Unit 1 17 He` remains ambiguous at the prefix layer and falls back to the safer FTS/context path
+
+Unit-prefix context-aware hosted-contract benchmark:
+
+- artefact: `tmp/geocode-hosted-national-benchmark-2026-06-22-compact-1m-hosted-rural-unit-context-unitprefix-800.json`
+- profile: `rural-unit`
+- flag: `--case-context --case-context-radius-km 80`
+- cases: 800 addresses
+- final top match: 800/800
+- final resolvable top: 800/800
+- exact top P50/P90/P95: 10 / 15 / 15
+- resolvable top P50/P90/P95: 10 / 15 / 15
+- any-useful-match P50/P90/P95: 10 / 12 / 15
+- wrong top before resolvable: 80
+- cumulative case latency P50/P95: 108 ms / 376 ms
+- request latency P50/P95/max: 6 ms / 171 ms / 465 ms
+
+Unit-prefix segment notes:
+
+| Category | Cases | Resolvable P90 | Resolvable P95 | Request P95 |
+| --- | ---: | ---: | ---: | ---: |
+| Lot | 123 | 10 | 10 | 135 ms |
+| Range | 25 | 12 | 12 | 212 ms |
+| Street | 430 | 12 | 18 | 128 ms |
+| Suffix | 12 | 10 | 10 | 51 ms |
+| Unit | 210 | 15 | 15 | 212 ms |
+
+Unit/building family:
+
+- cases: 211
+- exact top P50/P90/P95: 12 / 15 / 22
+- any-useful-match P50/P90/P95: 12 / 15 / 15
+- resolvable top P50/P90/P95: 12 / 15 / 15
+- request latency P95: 212 ms
+
+Brutal read on unit prefixes:
+
+- This is the best hosted-contract latency result so far on the 994k compact sample: request P95 improved from about 290 ms in the guarded run to 171 ms.
+- Unit request P95 improved from 384 ms to 212 ms.
+- `wrongTopBeforeResolvable` improved from 84 to 80, with the unit tail largely protected by the unit-first prefix gate.
+- The target is met, but not beaten: overall and unit/building resolvable P90 are still exactly 15.
+- Exact unit/building P95 is still 22 because the safe exact unit often needs the user to type the unit-specific part. That is acceptable only because the resolvable-path metric counts safe base/refine suggestions separately from exact routing.
+- The storage cost is not free. +27 MB on a 994k-row sample is likely material on a full national rebuild.
 
 Rejected storage experiment:
 

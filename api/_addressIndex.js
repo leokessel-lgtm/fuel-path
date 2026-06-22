@@ -202,6 +202,12 @@ function searchSqliteIndex(needle, limit) {
 function searchSqliteHybridIndex(database, needle, limit) {
   if (queryContainsUnitLikeToken(needle)) {
     if (!unitLikeQueryReadyForTypeahead(needle)) return [];
+    if (unitLikeQueryStartsWithUnitToken(needle)) {
+      const prefixRows = searchSqlitePrefixEntries(database, needle, limit);
+      if (prefixRows.length && !prefixRowsAmbiguous(prefixRows)) {
+        return hybridRowsToSuggestions(preferExactUnitPrefixRows(prefixRows), needle, 930);
+      }
+    }
     const typeaheadRows = searchSqliteTypeaheadEntries(database, needle, limit);
     return hybridRowsToSuggestions(typeaheadRows, needle);
   }
@@ -319,8 +325,18 @@ function searchSqliteTypeaheadEntries(database, needle, limit) {
 
 function prefixRowsAmbiguous(rows) {
   const strongRows = rows.filter((row) => Number(row.rank_weight || 0) >= 980);
-  const signatures = new Set(strongRows.map((row) => row.base_signature).filter(Boolean));
+  const candidateRows = strongRows.length ? strongRows : rows;
+  const signatures = new Set(candidateRows.map((row) => row.base_signature).filter(Boolean));
   return signatures.size > 1;
+}
+
+function preferExactUnitPrefixRows(rows) {
+  return [...rows].sort((left, right) =>
+    (left.entry_type === "exact" ? 0 : 1) - (right.entry_type === "exact" ? 0 : 1) ||
+    Number(right.rank_weight || 0) - Number(left.rank_weight || 0) ||
+    String(left.address_label || "").length - String(right.address_label || "").length ||
+    String(left.address_label || "").localeCompare(String(right.address_label || "")),
+  );
 }
 
 function hybridRowToAddressRecord(row) {
@@ -695,6 +711,11 @@ function unitLikeQueryReadyForTypeahead(needle) {
     !/^\d+[a-z]?$/.test(token) &&
     token.length >= 2,
   );
+}
+
+function unitLikeQueryStartsWithUnitToken(needle) {
+  const [firstToken] = normaliseAddressText(needle).split(/\s+/).filter(Boolean);
+  return SQLITE_UNIT_TERMS.has(firstToken);
 }
 
 function isStateCode(value) {

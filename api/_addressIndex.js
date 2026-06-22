@@ -202,18 +202,32 @@ function searchSqliteIndex(needle, limit) {
 function searchSqliteHybridIndex(database, needle, limit) {
   if (queryContainsUnitLikeToken(needle)) {
     const typeaheadRows = searchSqliteTypeaheadEntries(database, needle, limit);
-    return typeaheadRows.map((row) => addressRecordToSuggestion(hybridRowToAddressRecord(row), hybridMatchType(row, needle), Number(row.rank_weight || 900)));
+    return hybridRowsToSuggestions(typeaheadRows, needle);
   }
   if (!/^\d/.test(needle)) {
     const typeaheadRows = searchSqliteTypeaheadEntries(database, needle, limit);
-    return typeaheadRows.map((row) => addressRecordToSuggestion(hybridRowToAddressRecord(row), hybridMatchType(row, needle), Number(row.rank_weight || 900)));
+    return hybridRowsToSuggestions(typeaheadRows, needle);
   }
   const prefixRows = searchSqlitePrefixEntries(database, needle, limit);
   if (prefixRows.length && !prefixRowsAmbiguous(prefixRows)) {
-    return prefixRows.map((row) => addressRecordToSuggestion(hybridRowToAddressRecord(row), hybridMatchType(row, needle), Number(row.rank_weight || 950)));
+    return hybridRowsToSuggestions(prefixRows, needle, 950);
   }
   const typeaheadRows = searchSqliteTypeaheadEntries(database, needle, limit);
-  return typeaheadRows.map((row) => addressRecordToSuggestion(hybridRowToAddressRecord(row), hybridMatchType(row, needle), Number(row.rank_weight || 900)));
+  return hybridRowsToSuggestions(typeaheadRows, needle);
+}
+
+function hybridRowsToSuggestions(rows, needle, fallbackScore = 900) {
+  const suggestions = [];
+  const seen = new Set();
+  for (const row of rows) {
+    const record = hybridRowToAddressRecord(row);
+    const suggestion = addressRecordToSuggestion(record, hybridMatchType(row, needle), Number(row.rank_weight || fallbackScore));
+    const key = String(suggestion.providerId || suggestion.label);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    suggestions.push(suggestion);
+  }
+  return suggestions;
 }
 
 function searchSqlitePrefixEntries(database, needle, limit) {
@@ -301,7 +315,7 @@ function hybridRowToAddressRecord(row) {
   const isRefine = row.entry_type === "base_refine";
   const entryLabel = [row.entry_display_title, row.entry_display_subtitle].filter(Boolean).join(", ");
   return {
-    id: row.entry_id,
+    id: isRefine ? row.entry_id : row.address_id,
     label: isRefine ? entryLabel || row.address_label : row.address_label,
     lat: row.lat,
     lon: row.lon,

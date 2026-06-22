@@ -136,42 +136,49 @@ Regression coverage:
 
 Artefact:
 
-- `tmp/address-typeahead-experiment-2026-06-22-hybrid-compact-balanced-1000-rerank.json`
+- `tmp/address-typeahead-experiment-2026-06-22-hybrid-checkpoint-balanced-1000.json`
 
 Result:
 
 | Option | Final exact top | Final resolvable top | Resolvable P50 | Resolvable P90 | Resolvable P95 | Unit P90 | Latency P95 |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | Rebuilt typeahead FTS | 938/1000 | 1000/1000 | 4 | 10 | 10 | 10 | 12 ms |
-| Compact prefix table | 562/1000 | 625/1000 | 4 | 6 | 8 | 10 | 1 ms |
+| Compact prefix table | 550/1000 | 613/1000 | 4 | 6 | 8 | 8 | 1 ms |
 | Hybrid prefix + typeahead fallback | 938/1000 | 1000/1000 | 4 | 10 | 10 | 10 | 12 ms |
 
 Notes:
 
+- Prefix rows are now stored only at checkpoints: 4, 6, 8, 10, 12 and 15 typed characters.
 - Hybrid now uses materialised prefix only for house-number-first input.
 - Unit-like input goes straight to typeahead so exact unit intent is preserved.
 - Building-name and street-name input goes straight to typeahead after a wrong-base regression was found with `Islamic School Of Canberra`.
-- Prefix-only is no longer a candidate. Its low P90 is misleading because it only resolves 625/1000 cases.
+- Prefix-only is no longer a candidate. Its low P90 is misleading because it only resolves 613/1000 cases.
+- Experiment index size fell from 5.4 MB to 4.2 MB after checkpointing.
 
 ## Wide Stress - Rural and Unit Weighted 1000
 
 Artefact:
 
-- `tmp/address-typeahead-experiment-2026-06-22-hybrid-compact-rural-unit-1000-rerank.json`
+- `tmp/address-typeahead-experiment-2026-06-22-hybrid-checkpoint-rural-unit-1000.json`
 
 Result:
 
 | Option | Final exact top | Final resolvable top | Resolvable P50 | Resolvable P90 | Resolvable P95 | Unit P90 | Latency P95 |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Rebuilt typeahead FTS | 981/1000 | 1000/1000 | 5 | 10 | 12 | 12 | 7 ms |
-| Compact prefix table | 550/1000 | 569/1000 | 4 | 5 | 6 | 3 | 1 ms |
+| Rebuilt typeahead FTS | 981/1000 | 1000/1000 | 5 | 10 | 12 | 12 | 8 ms |
+| Compact prefix table | 550/1000 | 569/1000 | 4 | 6 | 6 | 6 | 1 ms |
 | Hybrid prefix + typeahead fallback | 981/1000 | 1000/1000 | 5 | 10 | 12 | 12 | 7 ms |
 
 Hybrid segment breakdown:
 
 | Segment | Cases | Final exact top | Final resolvable top | Resolvable P90 | Resolvable P95 | Latency P95 |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-Segment breakdown is captured in the JSON artefact. The headline is stable: rural and unit-weighted hybrid remains 1000/1000 final resolvable, with P90 10 and unit P90 12.
+| Rural/remote | 544 | 544 | 544 | 8 | 8 | 2 ms |
+| Rural/remote unit | 206 | 196 | 206 | 12 | 12 | 9 ms |
+| Standard | 183 | 183 | 183 | 6 | 15 | 2 ms |
+| Unit/building | 67 | 58 | 67 | 15 | 18 | 9 ms |
+
+The headline is stable: rural and unit-weighted hybrid remains 1000/1000 final resolvable, with P90 10 and unit P90 12. The small generic unit/building segment is still the tail: P90 15, P95 18.
 
 ## National Build Attempt And Size Check
 
@@ -187,25 +194,28 @@ Slim schema changes now applied:
 - `address_typeahead_entries` now stores key/display metadata and joins back to `addresses` for canonical label, coordinates and state fields
 - `address_typeahead_fts` no longer duplicates label/state/postcode payload columns
 - base/refine entries are grouped per base address instead of per unit
-- materialised prefix rows are limited to high-confidence exact-base and base/refine entries
+- materialised prefix rows are limited to high-confidence exact-base and base/refine entries at fixed checkpoints only
 - redundant prefix index removed because the primary key starts with `prefix`
 - hybrid runtime avoids materialised prefix for building-name and street-name input
+- exact address suggestions are deduped across multiple typeahead keys
+- raw and seed builders support `--omit-legacy-fts` for hybrid-only size testing
 
-Measured slim sample:
+Measured samples:
 
-- command: `node scripts/build-gnaf-raw-address-index.mjs --states ACT --limit-per-state 100000 --output tmp/gnaf-act-hybrid-slim-100k.sqlite`
-- rows: 100,000 addresses
-- size: 345 MB
-- typeahead entries: 205,068
-- prefix entries: 1,061,281
-- largest tables: `address_fts_content` 59 MB, `addresses` 58 MB, prefix autoindex 53 MB, prefix table 48 MB
+| Sample | Command shape | Size | Prefix entries | Legacy broad FTS |
+| --- | --- | ---: | ---: | --- |
+| Slim dense prefixes | `--states ACT --limit-per-state 100000` | 345 MB | 1,061,281 | yes |
+| Checkpoint prefixes | `--states ACT --limit-per-state 100000` | 290 MB | 489,822 | yes |
+| Checkpoint hybrid-only | `--states ACT --limit-per-state 100000 --omit-legacy-fts` | 215 MB | 489,822 | no |
+
+The hybrid-only sample was probed directly with `FUEL_PATH_GNAF_SQLITE_PATH=tmp/gnaf-act-hybrid-checkpoint-nolegacy-100k.sqlite`. It returned ACT address and unit/building suggestions without `address_fts`, including deduped exact unit results.
 
 Brutal read:
 
-- 345 MB per 100k ACT rows still extrapolates too high for a comfortable full national SQLite rebuild.
+- 215 MB per 100k ACT rows is a real improvement but still too high to treat as production-cleared.
 - ACT is not a perfect national proxy, but the size signal is strong enough to avoid another full build without more compression.
 - The current code is functionally better and safer, but the full national hybrid index is not production-proven yet.
-- The next storage win is to make the prefix table optional or replace it with a smaller fixed-checkpoint/range strategy.
+- The next storage win is to reduce duplicated address/typeahead strings or split the mobile/runtime index from the benchmark/sampling index.
 
 ## Brutal Critique
 
@@ -214,8 +224,10 @@ What improved:
 - The local SQLite builders now create production-shaped typeahead and optional prefix tables.
 - Hybrid/typeahead achieves the target on sampled stress: P90 10 overall, P90 10 balanced unit cases and P90 12 rural/unit-weighted unit cases.
 - The runtime no longer treats building/base suggestions as exact route targets; `refine_required` survives into suggestions.
+- Exact address duplicates from multiple typeahead keys are removed in the runtime.
 - The benchmark now reports exact top, resolvable top, wrong-top-before-resolvable, unit P90, latency and index size.
 - A wrong building-name prefix regression was found and fixed by routing non-number-first input through typeahead.
+- Checkpointing reduced the ACT 100k sample from 345 MB to 290 MB, and hybrid-only/no-legacy-FTS reduced it to 215 MB.
 
 What remains weak:
 
@@ -223,13 +235,13 @@ What remains weak:
 - Exact top and resolvable top are now deliberately different for unit/building cases. That is safer, but the UI must continue to prevent one-tap routing from `refine_required` rows.
 - The stress harness samples from the national SQLite but does not yet prove full 16.9M-row production size, build time or disk footprint.
 - Prefix-only continues to fail safety cases: wrong locality, wrong street number, sibling unit/shop and same-site building aliases.
-- The materialised prefix table is still too large in the ACT 100k sample. It should not be nationalised without another storage pass.
-- P95 is still 12 in the rural/unit-weighted run. P90 is inside target, but the tail is not fully solved.
+- The hybrid-only index is smaller, but removing legacy broad FTS means benchmark sampling needs the slower `addresses.search_text` fallback.
+- Generic unit/building P95 is still 18 in the rural/unit-weighted run. P90 is inside target, but the tail is not fully solved.
 
 Next:
 
-- Compress or gate the prefix table before another full national rebuild.
-- Rebuild the full national SQLite only after the 100k sample projects to an acceptable disk footprint.
+- Compress duplicated address/typeahead strings before another full national rebuild.
+- Rebuild the full national SQLite only after the 100k sample projects to an acceptable disk footprint, or deliberately accept the larger server-side index size.
 - Measure full-size index bytes, build time and lookup P50/P95 once rebuilt.
 - Run the hosted national benchmark against the rebuilt full index, not just the sampled experiment harness.
 - Add a Plan/Nearby UI smoke case for `refine_required` rows so route submission cannot regress.

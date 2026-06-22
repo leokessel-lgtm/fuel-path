@@ -389,13 +389,10 @@ function resolvableMatch(testCase, suggestion) {
 function compactPrefixes(value) {
   const text = normalise(value);
   const prefixes = new Set();
-  for (let length = 3; length <= Math.min(MAX_PREFIX, text.length); length += 1) {
-    prefixes.add(text.slice(0, length));
+  for (const length of [4, 6, 8, 10, 12, MAX_PREFIX]) {
+    if (length <= text.length) prefixes.add(text.slice(0, length));
   }
-  for (let index = 0; index < text.length && index < MAX_PREFIX; index += 1) {
-    if (text[index] === " ") prefixes.add(text.slice(0, index + 1));
-  }
-  return [...prefixes].filter((prefix) => prefix.length >= 3);
+  return [...prefixes].filter((prefix) => prefix.length >= 4);
 }
 
 function shouldMaterialisePrefix(entry) {

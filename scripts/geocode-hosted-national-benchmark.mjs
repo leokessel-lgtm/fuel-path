@@ -225,6 +225,7 @@ async function geocodeQuery(query, index) {
 function sampleAddressCases(sqlitePath, total) {
   const { DatabaseSync } = require("node:sqlite");
   const database = new DatabaseSync(sqlitePath, { readOnly: true });
+  const hasAddressFts = sqliteTableExists(database, "address_fts");
   const perState = distribute(total, STATE_ORDER);
   const rows = [];
   for (const state of STATE_ORDER) {
@@ -232,13 +233,21 @@ function sampleAddressCases(sqlitePath, total) {
     const seen = new Set();
     for (const seed of addressSeedsForState(state)) {
       if (rows.filter((row) => row.state === state).length >= target) break;
-      const statement = database.prepare(`
-        SELECT id, label, lat, lon, state, postcode, locality, search_text
-        FROM address_fts
-        WHERE address_fts MATCH ?
-        LIMIT 300
-      `);
-      for (const row of statement.all(ftsQuery(seed))) {
+      const statement = hasAddressFts
+        ? database.prepare(`
+          SELECT id, label, lat, lon, state, postcode, locality, search_text
+          FROM address_fts
+          WHERE address_fts MATCH ?
+          LIMIT 300
+        `)
+        : database.prepare(`
+          SELECT id, label, lat, lon, state, postcode, locality, search_text
+          FROM addresses
+          WHERE search_text LIKE ?
+          LIMIT 300
+        `);
+      const seedRows = hasAddressFts ? statement.all(ftsQuery(seed)) : statement.all(`%${normalise(seed)}%`);
+      for (const row of seedRows) {
         if (row.state !== state) continue;
         if (seen.has(row.id)) continue;
         if (!addressSampleQualityPass(row)) continue;
@@ -254,6 +263,11 @@ function sampleAddressCases(sqlitePath, total) {
   }
   database.close?.();
   return rows.slice(0, total);
+}
+
+function sqliteTableExists(database, table) {
+  const row = database.prepare("SELECT name FROM sqlite_master WHERE type IN ('table', 'view') AND name = ?").get(table);
+  return Boolean(row?.name);
 }
 
 function addressSeedsForState(state) {

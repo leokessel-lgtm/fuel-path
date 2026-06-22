@@ -8,6 +8,7 @@ const args = parseArgs(process.argv.slice(2));
 const inputPath = path.resolve(args.input || "prototype/data/gnaf-addresses.seed.json");
 const outputPath = path.resolve(args.output || "prototype/data/gnaf-addresses.sqlite");
 const limit = args.limit ? Number(args.limit) : 0;
+const includeLegacyFts = !args.omitLegacyFts;
 
 if (!fs.existsSync(inputPath)) {
   throw new Error(`Input file does not exist: ${inputPath}`);
@@ -41,7 +42,7 @@ db.exec(`
     search_key TEXT NOT NULL,
     search_text TEXT NOT NULL
   );
-  CREATE VIRTUAL TABLE address_fts USING fts5(
+  ${includeLegacyFts ? `CREATE VIRTUAL TABLE address_fts USING fts5(
     id UNINDEXED,
     label,
     state UNINDEXED,
@@ -61,7 +62,7 @@ db.exec(`
     search_text,
     lat UNINDEXED,
     lon UNINDEXED
-  );
+  );` : ""}
   CREATE TABLE address_typeahead_entries (
     entry_id TEXT PRIMARY KEY,
     address_id TEXT NOT NULL,
@@ -98,13 +99,13 @@ const insertAddress = db.prepare(`
   )
   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `);
-const insertFts = db.prepare(`
+const insertFts = includeLegacyFts ? db.prepare(`
   INSERT INTO address_fts (
     id, label, state, postcode, accuracy, locality, alias_principal, primary_secondary, geocode_type,
     display_title, display_subtitle, suggestion_type, refine_required, refine_hint, base_key, search_key, search_text, lat, lon
   )
   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-`);
+`) : null;
 const insertTypeaheadEntry = db.prepare(`
   INSERT OR IGNORE INTO address_typeahead_entries (
     entry_id, address_id, display_title, display_subtitle,
@@ -150,27 +151,29 @@ for await (const record of readRecords(inputPath)) {
     address.searchKey,
     address.searchText,
   );
-  insertFts.run(
-    address.id,
-    address.label,
-    address.state,
-    address.postcode,
-    address.accuracy,
-    address.locality,
-    address.aliasPrincipal,
-    address.primarySecondary,
-    address.geocodeType,
-    address.displayTitle,
-    address.displaySubtitle,
-    address.suggestionType,
-    address.refineRequired ? 1 : 0,
-    address.refineHint,
-    address.baseKey,
-    address.searchKey,
-    address.searchText,
-    address.lat,
-    address.lon,
-  );
+  if (insertFts) {
+    insertFts.run(
+      address.id,
+      address.label,
+      address.state,
+      address.postcode,
+      address.accuracy,
+      address.locality,
+      address.aliasPrincipal,
+      address.primarySecondary,
+      address.geocodeType,
+      address.displayTitle,
+      address.displaySubtitle,
+      address.suggestionType,
+      address.refineRequired ? 1 : 0,
+      address.refineHint,
+      address.baseKey,
+      address.searchKey,
+      address.searchText,
+      address.lat,
+      address.lon,
+    );
+  }
   for (const entry of address.typeaheadEntries || []) {
     if (entry.entryType === "base_refine") {
       const firstEntry = !seenBaseRefineEntryIds.has(entry.entryId);
@@ -494,13 +497,10 @@ function unitText(structure) {
 function compactPrefixes(value) {
   const text = normaliseAddressText(value);
   const prefixes = new Set();
-  for (let length = 3; length <= Math.min(15, text.length); length += 1) {
-    prefixes.add(text.slice(0, length));
+  for (const length of [4, 6, 8, 10, 12, 15]) {
+    if (length <= text.length) prefixes.add(text.slice(0, length));
   }
-  for (let index = 0; index < text.length && index < 15; index += 1) {
-    if (text[index] === " ") prefixes.add(text.slice(0, index + 1));
-  }
-  return [...prefixes].filter((prefix) => prefix.length >= 3);
+  return [...prefixes].filter((prefix) => prefix.length >= 4);
 }
 
 function shouldMaterialisePrefix(entry) {
@@ -586,6 +586,7 @@ function parseArgs(values) {
     if (value === "--input") parsed.input = values[++index];
     else if (value === "--output") parsed.output = values[++index];
     else if (value === "--limit") parsed.limit = values[++index];
+    else if (value === "--omit-legacy-fts") parsed.omitLegacyFts = true;
   }
   return parsed;
 }

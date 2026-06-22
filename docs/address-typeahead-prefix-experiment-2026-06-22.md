@@ -27,6 +27,7 @@ The tested resolvable P90 target is now achieved in sampled stress runs and boun
 - after profiling the 3,200-case latency tail, short under-specified unit-range prefixes such as `Unit 1 1-3` were held until a stored 12-character exact checkpoint was available; the rerun kept 3,200/3,200 final top/resolvable and cut max request latency from 1,328 ms to 497 ms
 - after adding level-aware exact-unit prefix keys and fixing benchmark parsing for ranged base-refine rows, a fresh 8-state 994,401-row rebuild kept 3,200/3,200 final top/resolvable, exact P90 15, resolvable P90 15, cut max request latency to 175 ms and reduced unit/building exact P90 from 22 to 21
 - after widening the same staged raw package to 6,400 rural/unit cases, one `Shop 2 Lg 2...` lower-ground row failed; adding `Lg` as a level marker and treating `Se` as a unit descriptor produced a passing 6,400/6,400 rerun with exact/resolvable P90 15, request P95 1 ms and max request 193 ms
+- after moving complete building-first unit queries through unit-number-filtered exact typeahead before broad base-refine fallback, the same 6,400-case run kept exact/resolvable P90 15 and cut max request latency from 193 ms to 167 ms, but unit/building exact P90 stayed 21
 - after adding a unit-plus-lot intent guard, the existing full-national compact runtime reran the 800-case rural/unit context benchmark at 800/800 final top/resolvable, exact P90 15, resolvable P90 15 and request P95 62 ms
 - unit/building resolvable P90 is still 15 in that 400-case run, and exact unit/building P90 is still 28
 - the broad exact-unit index raised the full national temp runtime from about 14 GB to about 16 GB; the partial-index temp file still occupies 16 GB until rebuilt/vacuumed, but currently reports about 1.97 GB free pages after dropping the broad index
@@ -45,6 +46,7 @@ The tested resolvable P90 target is now achieved in sampled stress runs and boun
 - contextual `L<number> ...` labels now use compact prefix before FTS once a street token is present, cutting the SA latency tail without treating bare `L41` as safe
 - unit-plus-lot queries now preserve typed unit and lot intent instead of degrading to broader lot/street variants, preventing stale or broad indexes from surfacing unrelated token-overlap rows
 - lower-ground `Lg` level rows and `Se` flat/unit rows now follow the same guarded unit-level path in the staged runtime and benchmark metrics
+- complete building-first unit queries now try unit-number-filtered exact typeahead before broad base-refine fallback, so rows like `Waterside Unit 52` are not hidden by nearby base suggestions
 
 Compact prefix alone is not safe enough. It is fast and reaches low P90 on successful cases, but it can silently pick the wrong locality, sibling unit/shop or same-name building when the first 15 characters are ambiguous.
 
@@ -1812,6 +1814,32 @@ Brutal read on the wider staged pass:
 - Latency P95 is excellent overall, but range rows still have request P95 39 ms and max request 193 ms. The tail is smaller, not gone.
 - This is still a capped 994,401-row staged package, not fresh full-national proof.
 
+Follow-up building-unit exact-before-refine pass:
+
+- issue: complete building-first unit queries such as `Waterside Unit 52` could still be hidden by a broad nearby base-refine row when base-signature exact lookup had no safe building prefix row
+- implementation: when a non-unit-first query contains a complete unit token, runtime now tries unit-number-filtered exact typeahead rows before broad base-refine fallback
+- incomplete building/unit text such as `Waterside Un` still returns a `refine_required` base row
+- regression coverage pins both sides: exact top for `Waterside Unit 52`, refine row for `Waterside Un`
+
+Rerun after exact-before-refine pass:
+
+- artefact: `tmp/geocode-hosted-national-benchmark-2026-06-22-raw-levelprefix-lg-se-buildingunit-typeahead-8state-6400.json`
+- source SQLite: `tmp/gnaf-raw-levelprefix-lg-8state-1m.sqlite`
+- final top/resolvable: 6,400/6,400
+- exact top P50/P90/P95: 10 / 15 / 15
+- resolvable top P50/P90/P95: 10 / 15 / 15
+- request latency P50/P95/max: 0 ms / 1 ms / 167 ms
+- unit/building exact P50/P90/P95: 15 / 21 / 26
+- unit/building resolvable P50/P90/P95: 12 / 15 / 15
+- unit/building request P95/max: 2 ms / 167 ms
+- range request P95/max: 38 ms / 151 ms
+
+Brutal read on exact-before-refine:
+
+- It is a safe ranking fix, not the exact-P90 breakthrough. The overall P90 target holds, but unit/building exact P90 remains 21.
+- It trims latency outliers and prevents a complete unit query from being masked by a less specific base suggestion.
+- It reinforces the product metric split: exact unit/building P90 15 is still not achieved, while resolvable/refine-path P90 15 is achieved.
+
 ## Full-National Unit-Lot Safety Rerun
 
 Problem found when testing the current runtime against the existing full-national compact artefact:
@@ -1976,6 +2004,7 @@ What improved:
 - The benchmark now counts safe ranged base-refine rows correctly when building names include words such as `Apartment`.
 - A wider 6,400-case staged rural/unit run found and fixed a lower-ground `Lg` miss, then passed 6,400/6,400 final top/resolvable with exact/resolvable P90 15.
 - `Se` flat/unit rows now count as unit/building cases and use the guarded unit-like runtime path, reducing the staged range latency tail without hiding those rows in easier categories.
+- Complete building-first unit queries now use unit-number-filtered exact typeahead before broad base-refine fallback, cutting the staged 6,400-case max request latency to 167 ms.
 
 What remains weak:
 
@@ -2002,7 +2031,8 @@ What remains weak:
 - In the heavier staged run, unit/building exact P90 is still 22 and exact P95 is 28. Wider sampling made the exact tail look worse, not better.
 - In the latest level-prefix staged run, unit/building exact P90 is still 21 and exact P95 is still 26. The exact-unit target is closer, but not met.
 - In the latest wider 6,400-case staged rerun, unit/building exact P90 is still 21 and exact P95 is still 26. Wider sampling did not solve the exact-unit tail.
-- The latest staged latency rerun still has a 193 ms max request spike despite a 1 ms request P95, so latency outliers still need investigation.
+- The latest staged latency rerun still has a 167 ms max request spike despite a 1 ms request P95, so latency outliers still need investigation.
+- The exact-before-refine pass did not move unit/building exact P90. The remaining exact tail is mostly long building-name-plus-unit labels where a safe base/refine result is available long before exact unit top.
 - `office`-style building names are a known edge case because `office` can be both a building-name word and a unit descriptor.
 - Context-aware ranking depends on Plan/Nearby having a meaningful route/current-map anchor. Cold start address search without context still lands at rural/unit P90 18 in the corrected hosted-contract run.
 - `wrongTopBeforeResolvable` is still high in the typed-prefix harness because many short prefixes are inherently ambiguous before enough context arrives. This is acceptable only if UI state treats those rows as suggestions, not route commitments.

@@ -265,6 +265,14 @@ function searchSqliteHybridIndex(database, needle, limit, searchContext = null) 
       const buildingUnitRows = searchSqliteBuildingUnitEntries(database, needle, limit, searchContext);
       const safeBuildingUnitRows = filterRowsForUnitLotIntent(buildingUnitRows, unitLotIntent);
       if (safeBuildingUnitRows.length) return hybridRowsToSuggestions(safeBuildingUnitRows, needle, 960);
+      const buildingUnitIntent = buildingUnitIntentFromNeedle(needle);
+      if (buildingUnitIntent) {
+        const exactTypeaheadRows = filterRowsForUnitIntent(
+          searchSqliteTypeaheadEntries(database, needle, limit, searchContext).filter((row) => row.entry_type === "exact"),
+          buildingUnitIntent,
+        );
+        if (exactTypeaheadRows.length) return hybridRowsToSuggestions(exactTypeaheadRows, needle, 950);
+      }
       const buildingUnitRefineRows = searchSqliteBuildingUnitRefineEntries(database, needle, limit, searchContext);
       if (buildingUnitRefineRows.length) return hybridRowsToSuggestions(buildingUnitRefineRows, needle, 940);
       const embeddedUnitNeedle = embeddedUnitAddressCoreNeedle(needle);
@@ -1219,9 +1227,31 @@ function queryUnitLotIntent(needle) {
   };
 }
 
+function buildingUnitIntentFromNeedle(needle) {
+  const tokens = normaliseAddressText(needle).split(/\s+/).filter(Boolean);
+  const unitIndex = tokens.findIndex((token, index) => index > 0 && SQLITE_UNIT_TERMS.has(token) && normalisedUnitNumberToken(tokens[index + 1]));
+  if (unitIndex < 0) return null;
+  const buildingNeedle = tokens.slice(0, unitIndex).join(" ");
+  if (buildingNeedle.length < 4) return null;
+  return {
+    unitNumber: normalisedUnitNumberToken(tokens[unitIndex + 1]),
+  };
+}
+
+function filterRowsForUnitIntent(rows, intent) {
+  if (!intent) return rows;
+  return rows.filter((row) => rowMatchesUnitIntent(row, intent));
+}
+
 function filterRowsForUnitLotIntent(rows, intent) {
   if (!intent) return rows;
   return rows.filter((row) => rowMatchesUnitLotIntent(row, intent));
+}
+
+function rowMatchesUnitIntent(row, intent) {
+  const label = normaliseAddressText(row?.address_label || row?.label || "");
+  const tokens = label.split(/\s+/).filter(Boolean);
+  return tokens.some((token, index) => SQLITE_UNIT_TERMS.has(token) && normalisedUnitNumberToken(tokens[index + 1]) === intent.unitNumber);
 }
 
 function rowMatchesUnitLotIntent(row, intent) {

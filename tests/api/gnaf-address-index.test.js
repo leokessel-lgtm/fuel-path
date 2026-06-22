@@ -688,6 +688,8 @@ test("building-first unit query can resolve exact unit from indexed base signatu
       "GAACT5001|Tuggeranong Business Centre, Unit 1, 12 Kett Street, Kambah ACT 2902|Tuggeranong Business Centre|Unit|1|12|Kett|Street|Kambah|ACT|2902|PROPERTY CENTROID|149.063|-35.378",
       "GAACT5002|Tuggeranong Business Centre, Unit 2, 12 Kett Street, Kambah ACT 2902|Tuggeranong Business Centre|Unit|2|12|Kett|Street|Kambah|ACT|2902|PROPERTY CENTROID|149.064|-35.379",
       "GAACT5003|Tuggeranong Business Centre, Unit 3, 12 Kett Street, Kambah ACT 2902|Tuggeranong Business Centre|Unit|3|12|Kett|Street|Kambah|ACT|2902|PROPERTY CENTROID|149.065|-35.380",
+      "GAACT5004|Waterside, Unit 52, 1 Beissel Street, Belconnen ACT 2617|Waterside|Unit|52|1|Beissel|Street|Belconnen|ACT|2617|PROPERTY CENTROID|149.065|-35.235",
+      "GAACT5005|Waterside Gardens, 23 Jondol Place, Isabella Plains ACT 2905|Waterside Gardens|||23|Jondol|Place|Isabella Plains|ACT|2905|PROPERTY CENTROID|149.094|-35.428",
     ].join("\n"),
   );
 
@@ -735,6 +737,18 @@ test("building-first unit query can resolve exact unit from indexed base signatu
         nearLon: 149.064,
       },
     });
+    const completeBuildingUnit = await searchAddressIndex("Waterside Unit 52", 3, {
+      searchContext: {
+        nearLat: -35.235,
+        nearLon: 149.065,
+      },
+    });
+    const partialBuildingUnit = await searchAddressIndex("Waterside Un", 3, {
+      searchContext: {
+        nearLat: -35.235,
+        nearLon: 149.065,
+      },
+    });
     const exactUnit = await geocode({
       query: "Tuggeranong Business Centre Unit 2 12 Kett Street Kambah ACT 2902",
       limit: 3,
@@ -757,6 +771,10 @@ test("building-first unit query can resolve exact unit from indexed base signatu
     assert.equal(buildingUnitOnly[0].refineRequired, false);
     assert.equal(partialUnit[0].label, "Tuggeranong Business Centre, Unit 2, 12 Kett Street, Kambah ACT 2902");
     assert.equal(partialUnit[0].refineRequired, false);
+    assert.equal(completeBuildingUnit[0].label, "Waterside, Unit 52, 1 Beissel Street, Belconnen ACT 2617");
+    assert.equal(completeBuildingUnit[0].refineRequired, false);
+    assert.equal(partialBuildingUnit[0].label, "Waterside, 1 Beissel Street, Belconnen ACT 2617");
+    assert.equal(partialBuildingUnit[0].refineRequired, true);
     assert.equal(exactUnit.suggestions[0].label, "Tuggeranong Business Centre, Unit 2, 12 Kett Street, Kambah ACT 2902");
     assert.equal(exactUnit.suggestions[0].refineRequired, false);
   });

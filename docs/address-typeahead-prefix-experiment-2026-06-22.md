@@ -15,6 +15,7 @@ The tested resolvable P90 target is now achieved in sampled stress runs and boun
 - after allowing nearby route/current-map context to break typeahead ties, the same 400-case run improved overall resolvable P90 from 15 to 12 and request P95 from 1.06 seconds to 917 ms
 - after routing contextual `Lot ...` queries through guarded compact prefix, the same 400-case run kept resolvable P90 12 and reduced request P95 to 762 ms
 - after extending the same guarded compact prefix path to `L<number> ...` address labels, the same 400-case run kept resolvable P90 12 and reduced request P95 to 469 ms
+- after routing building-first range queries through embedded address-core prefixes, the same 400-case run kept exact P90 15, resolvable P90 12 and improved request P95 to 437 ms on the backfilled temp DB
 - unit/building resolvable P90 is still 15 in that 400-case run, and exact unit/building P90 is still 28
 - the broad exact-unit index raised the full national temp runtime from about 14 GB to about 16 GB; the partial-index temp file still occupies 16 GB until rebuilt/vacuumed, but currently reports about 1.97 GB free pages after dropping the broad index
 - compact prefix is only safe as a narrow house-number-first fast path
@@ -1115,13 +1116,65 @@ Brutal read on the L-number pass:
 - It does not fix range latency. The current temp DB still lacks the fresh range exact-label prefix rebuild needed to prove that slice.
 - Unit/building exact P90 remains 28.
 
+## Embedded Range Prefix Pass
+
+Problem found after the L-number pass:
+
+- building-name-first range queries such as `Queenstown Police Station 2-6 Sticht Street...` and `Lil Possums Child Care Centre 8-10 Selby Street...` could spend seconds in typeahead FTS even though the compact base-address prefix key existed as `2 6 stic...` or `8 10 sel...`
+- the first attempted fix retrieved the right row quickly, but passed the embedded address core into match scoring, which let a shorter `10 Selby Street` exact-label row outrank the full `Lil Possums...` venue in geocode ranking
+
+Implementation:
+
+- non-number-first, non-unit queries now detect an embedded range-style address core
+- retrieval uses the embedded range core against `address_prefix_entries`
+- match scoring still uses the user's full typed query, so a complete building/range label can remain an exact address match
+- ambiguous prefix rows still require nearby context before they are allowed to short-circuit typeahead
+
+Direct national probes after runtime embedded-range prefix routing:
+
+| Query | Before | After | Top result |
+| --- | ---: | ---: | --- |
+| `Queenstown Police Station 2-6 Sticht Street Queenstown TAS 7467` | about 3.1 s | 1-2 ms | exact Queenstown Police Station |
+| `Lil Possums Child Care Centre 8-10 Selby Street Queenstown TAS 7467` | about 350 ms | 1-4 ms | exact Lil Possums Child Care Centre |
+
+Full-national 400-case embedded-range-prefix stress:
+
+- artefact: `tmp/geocode-hosted-national-benchmark-2026-06-22-fullnational-embedded-range-prefix-400b.json`
+- profile: `rural-unit`
+- flag: `--case-context --case-context-radius-km 80`
+- cases: 400 addresses
+- final top/resolvable: 400/400
+- exact top P50/P90/P95: 10 / 15 / 22
+- resolvable top P50/P90/P95: 10 / 12 / 15
+- wrong top before resolvable: 26
+- request latency P50/P95/max: 1 ms / 437 ms / 3182 ms
+
+400-case embedded-range-prefix segment notes:
+
+| Segment | Cases | Exact P90 | Resolvable P90 | Resolvable P95 | Latency P95 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Standard address | 336 | 10 | 10 | 12 | 171 ms request |
+| Unit/building address | 64 | 28 | 15 | 15 | 736 ms request |
+| Street address | 264 | 10 | 10 | 15 | 171 ms request |
+| Unit address | 63 | 28 | 15 | 15 | 741 ms request |
+| Lot address | 45 | 10 | 10 | 10 | 268 ms request |
+| Range address | 17 | 10 | 10 | 12 | 668 ms request, 3200 ms elapsed |
+
+Brutal read on the embedded-range pass:
+
+- This fixes the obvious building-first range outliers without making Google the default provider.
+- The exact P90 target is met exactly, not exceeded: overall exact P90 is 15 typed characters.
+- Resolvable P90 is stronger at 12, but that relies on safe grouped/base rows for unit/building cases.
+- Range final top recovered to 17/17 after the scoring fix, but range latency is still not product-clean because cold number-first range rows can still spike above 3 seconds elapsed.
+- This benchmark used the current full-national temp DB after range-prefix backfill, not a fresh packaged rebuild. A clean rebuild is still needed before claiming the shipped artefact has this range-prefix coverage.
+
 Brutal read on full national:
 
 - Full national build size is now proven, and it is large but locally possible.
 - The 120-case full-national stress now completes, where the previous equivalent run did not produce an artefact.
-- The wider 400-case L-number-prefix run is now the best read: final top/resolvable is 400/400, exact P90 is 15 and resolvable P90 is 12.
+- The wider 400-case embedded-range-prefix run is now the best read: final top/resolvable is 400/400, exact P90 is 15 and resolvable P90 is 12.
 - Unit/building resolvable P90 is 15, but exact unit/building P90 is still 28.
-- Latency is materially better than the earlier full-national run: the latest L-number-prefix 400-case run is request P95 469 ms overall, but unit/building P95 remains 758 ms and range P95 remains 3160 ms.
+- Latency is materially better than the earlier full-national run: the latest embedded-range-prefix 400-case run is request P95 437 ms overall, but unit/building request P95 remains 736 ms and range elapsed P95 remains 3200 ms.
 - SA remains the exact typed-character tail, ACT improved on resolvable P90, and range/unit/building rows remain the main latency tails.
 - The next improvement should target serving shape and packaging, not provider expansion.
 
@@ -1207,12 +1260,13 @@ What improved:
 - The latest context-typeahead rerun improved overall resolvable P90 to 12, reduced wrong-top-before-resolvable to 27, and reduced request P95 to 917 ms.
 - The latest lot-prefix rerun kept overall resolvable P90 at 12, reduced wrong-top-before-resolvable to 26, reduced request P95 to 762 ms, and cut lot-address request P95 to 281 ms.
 - The latest L-number-prefix rerun kept overall resolvable P90 at 12, kept wrong-top-before-resolvable at 26, reduced request P95 to 469 ms, and cut SA request P95 to 30 ms.
+- The latest embedded-range-prefix rerun kept overall resolvable P90 at 12, exact P90 at 15, final top/resolvable at 400/400, and reduced request P95 to 437 ms.
 
 What remains weak:
 
 - Exact top and resolvable top are now deliberately different for unit/building cases. That is safer, but the UI must continue to prevent one-tap routing from `refine_required` rows.
 - The latest full-national 400-case run hit overall exact P90 15 and resolvable P90 12, but exact unit/building P90 remained 28.
-- Full national request latency is improved but not fully product-ready: latest request P95 was 469 ms overall, 758 ms for unit/building rows and 3160 ms for range rows.
+- Full national request latency is improved but not fully product-ready: latest request P95 was 437 ms overall, 736 ms for unit/building rows, and range elapsed P95 still reached 3200 ms.
 - The broad exact-unit index raised the full-national temp runtime footprint from about 14 GB to about 16 GB; the partial-index temp file still needs rebuild/vacuum evidence before claiming a smaller packaged size.
 - The 800-case post-ranker full-national run still has not been rerun successfully after the sampler/prefix/exact-unit fixes.
 - Prefix-only continues to fail safety cases: wrong locality, wrong street number, sibling unit/shop and same-site building aliases.
@@ -1220,7 +1274,7 @@ What remains weak:
 - Guarded unit/building P90 is exactly 15. That meets the target, but leaves no margin.
 - Unit/building exact P95 remains weak at 30 because exact shop/unit selection may require typing the specific unit token.
 - SA exact/resolvable P90 and ACT exact P90 remain weak in the wider full-national run, even though ACT resolvable P90 improved with context-aware typeahead.
-- Range-address latency remains weak in the current full-national temp DB until range exact-label prefixes are proven in a fresh national rebuild.
+- Range-address latency remains weak until the current range-prefix backfill is replaced by a fresh national rebuild and the remaining cold number-first range spikes are profiled.
 - Context-aware ranking depends on Plan/Nearby having a meaningful route/current-map anchor. Cold start address search without context still lands at rural/unit P90 18 in the corrected hosted-contract run.
 - `wrongTopBeforeResolvable` is still high in the typed-prefix harness because many short prefixes are inherently ambiguous before enough context arrives. This is acceptable only if UI state treats those rows as suggestions, not route commitments.
 
@@ -1231,4 +1285,4 @@ Next:
 - Rerun the 800-case hosted national benchmark after another serving-shape pass, not before.
 - Add a Plan/Nearby UI smoke case for `refine_required` rows so route submission cannot regress.
 - Recover exact unit/building P90 margin without reopening broad `unit + number` FTS scans.
-- Rebuild the full national runtime with range exact-label prefixes and re-measure range request P95.
+- Rebuild the full national runtime with range exact-label/base prefixes and re-measure range request and elapsed P95 without manual backfill.

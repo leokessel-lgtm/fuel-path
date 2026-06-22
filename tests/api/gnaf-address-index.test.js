@@ -814,6 +814,53 @@ test("lot and range exact labels materialise compact prefix rows", async () => {
   });
 });
 
+test("building-first range queries use embedded address core prefixes", async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-gnaf-building-range-prefix-"));
+  const inputPath = path.join(tempDir, "GNAF_CORE.psv");
+  const outputPath = path.join(tempDir, "gnaf-building-range-prefix.sqlite");
+  fs.writeFileSync(
+    inputPath,
+    [
+      "ADDRESS_DETAIL_PID|ADDRESS_LABEL|BUILDING_NAME|NUMBER_FIRST|NUMBER_LAST|STREET_NAME|STREET_TYPE|LOCALITY_NAME|STATE|POSTCODE|GEOCODE_TYPE|LONGITUDE|LATITUDE",
+      "GATAS6201|Queenstown Police Station, 2-6 Sticht Street, Queenstown TAS 7467|Queenstown Police Station|2|6|Sticht|Street|Queenstown|TAS|7467|PROPERTY CENTROID|145.552|-42.080",
+      "GATAS6202|2-6 Sticht Street, Burnie TAS 7320||2|6|Sticht|Street|Burnie|TAS|7320|PROPERTY CENTROID|145.905|-41.052",
+    ].join("\n"),
+  );
+
+  execFileSync(
+    process.execPath,
+    [
+      "scripts/build-gnaf-address-index.mjs",
+      "--input",
+      inputPath,
+      "--output",
+      outputPath,
+      "--omit-legacy-fts",
+      "--omit-search-backstop",
+    ],
+    { cwd: path.resolve(__dirname, "../.."), stdio: "ignore" },
+  );
+
+  await withEnv({ FUEL_PATH_GNAF_SQLITE_PATH: outputPath }, async () => {
+    const sqlite = new DatabaseSync(outputPath, { readOnly: true });
+    const rangePrefixRows = sqlite.prepare("SELECT COUNT(*) AS count FROM address_prefix_entries WHERE prefix = ?").get("2 6 stic");
+    sqlite.close();
+
+    const suggestions = await searchAddressIndex("Queenstown Police Station 2-6 Sticht Street Queenstown TAS 7467", 3, {
+      searchContext: {
+        nearLat: -42.080,
+        nearLon: 145.552,
+      },
+    });
+
+    assert.ok(rangePrefixRows.count >= 1);
+    assert.equal(suggestions[0].label, "Queenstown Police Station, 2-6 Sticht Street, Queenstown TAS 7467");
+    assert.equal(suggestions[0].matchType, "exact_address");
+    assert.equal(suggestions[0].sourceLabel, "Exact address");
+    assert.equal(suggestions[0].refineRequired, false);
+  });
+});
+
 test("L-number address labels use contextual compact prefix rows", async () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-gnaf-l-number-prefix-"));
   const inputPath = path.join(tempDir, "GNAF_CORE.psv");

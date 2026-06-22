@@ -245,6 +245,13 @@ function searchSqliteHybridIndex(database, needle, limit, searchContext = null) 
         return hybridRowsToSuggestions(prefixRows, needle, 950);
       }
     }
+    const embeddedRangeNeedle = embeddedRangeAddressCoreNeedle(needle);
+    if (embeddedRangeNeedle) {
+      const prefixRows = searchSqlitePrefixEntries(database, embeddedRangeNeedle, limit, searchContext);
+      if (prefixRows.length && (!prefixRowsAmbiguous(prefixRows) || shouldUseContextualAmbiguousPrefixRows(embeddedRangeNeedle, searchContext))) {
+        return hybridRowsToSuggestions(prefixRows, needle, 950);
+      }
+    }
     const typeaheadRows = searchSqliteTypeaheadEntries(database, needle, limit, searchContext);
     return hybridRowsToSuggestions(typeaheadRows, needle);
   }
@@ -498,6 +505,16 @@ function normalisedAddressNumberToken(value) {
 function queryStartsWithLotLikeToken(needle) {
   const text = normaliseAddressText(needle);
   return /^lot\s+[a-z0-9-]+(?:\s|$)/.test(text) || /^l\d+[a-z]?(?:\s|$)/.test(text);
+}
+
+function embeddedRangeAddressCoreNeedle(needle) {
+  const tokens = normaliseAddressText(needle).split(/\s+/).filter(Boolean);
+  for (let index = 1; index < tokens.length - 2; index += 1) {
+    if (!/^\d+[a-z]?$/.test(tokens[index]) || !/^\d+[a-z]?$/.test(tokens[index + 1])) continue;
+    const candidate = tokens.slice(index).join(" ");
+    if (shouldSearchLargeSqliteIndex(candidate)) return candidate;
+  }
+  return "";
 }
 
 function prefixRowsAmbiguous(rows) {

@@ -226,6 +226,8 @@ function sampleAddressCases(sqlitePath, total) {
   const { DatabaseSync } = require("node:sqlite");
   const database = new DatabaseSync(sqlitePath, { readOnly: true });
   const hasAddressFts = sqliteTableExists(database, "address_fts");
+  const addressColumns = sqliteTableColumns(database, "addresses");
+  const hasSearchText = addressColumns.has("search_text");
   const perState = distribute(total, STATE_ORDER);
   const rows = [];
   for (const state of STATE_ORDER) {
@@ -240,13 +242,22 @@ function sampleAddressCases(sqlitePath, total) {
           WHERE address_fts MATCH ?
           LIMIT 300
         `)
-        : database.prepare(`
+        : hasSearchText ? database.prepare(`
           SELECT id, label, lat, lon, state, postcode, locality, search_text
           FROM addresses
           WHERE search_text LIKE ?
           LIMIT 300
+        `) : database.prepare(`
+          SELECT id, label, lat, lon, state, postcode, locality, '' AS search_text
+          FROM addresses
+          WHERE label LIKE ? OR locality LIKE ? OR postcode LIKE ? OR state = ?
+          LIMIT 300
         `);
-      const seedRows = hasAddressFts ? statement.all(ftsQuery(seed)) : statement.all(`%${normalise(seed)}%`);
+      const seedRows = hasAddressFts
+        ? statement.all(ftsQuery(seed))
+        : hasSearchText
+          ? statement.all(`%${normalise(seed)}%`)
+          : statement.all(...addressFallbackParams(seed));
       for (const row of seedRows) {
         if (row.state !== state) continue;
         if (seen.has(row.id)) continue;
@@ -268,6 +279,18 @@ function sampleAddressCases(sqlitePath, total) {
 function sqliteTableExists(database, table) {
   const row = database.prepare("SELECT name FROM sqlite_master WHERE type IN ('table', 'view') AND name = ?").get(table);
   return Boolean(row?.name);
+}
+
+function sqliteTableColumns(database, table) {
+  return new Set(database.prepare(`PRAGMA table_info(${table})`).all().map((row) => String(row.name)));
+}
+
+function addressFallbackParams(seed) {
+  const text = String(seed || "");
+  const state = text.match(/\b(NSW|ACT|VIC|QLD|WA|SA|TAS|NT)\b/i)?.[1]?.toUpperCase() || "";
+  const terms = text.replace(/\b(NSW|ACT|VIC|QLD|WA|SA|TAS|NT)\b/ig, "").trim();
+  const like = `%${terms || text}%`;
+  return [like, like, like, state];
 }
 
 function addressSeedsForState(state) {

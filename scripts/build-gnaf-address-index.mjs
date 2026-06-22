@@ -9,6 +9,7 @@ const inputPath = path.resolve(args.input || "prototype/data/gnaf-addresses.seed
 const outputPath = path.resolve(args.output || "prototype/data/gnaf-addresses.sqlite");
 const limit = args.limit ? Number(args.limit) : 0;
 const includeLegacyFts = !args.omitLegacyFts;
+const includeSearchBackstop = includeLegacyFts || !args.omitSearchBackstop;
 
 if (!fs.existsSync(inputPath)) {
   throw new Error(`Input file does not exist: ${inputPath}`);
@@ -38,9 +39,10 @@ db.exec(`
     suggestion_type TEXT,
     refine_required INTEGER DEFAULT 0,
     refine_hint TEXT,
-    base_key TEXT,
+    base_key TEXT
+    ${includeSearchBackstop ? `,
     search_key TEXT NOT NULL,
-    search_text TEXT NOT NULL
+    search_text TEXT NOT NULL` : ""}
   );
   ${includeLegacyFts ? `CREATE VIRTUAL TABLE address_fts USING fts5(
     id UNINDEXED,
@@ -69,7 +71,6 @@ db.exec(`
     display_title TEXT,
     display_subtitle TEXT,
     key_text TEXT NOT NULL,
-    prefix_key TEXT NOT NULL,
     base_signature TEXT NOT NULL,
     entry_type TEXT NOT NULL,
     refine_required INTEGER DEFAULT 0,
@@ -89,15 +90,15 @@ db.exec(`
     rank_weight INTEGER NOT NULL,
     PRIMARY KEY (prefix, entry_id)
   );
-  CREATE INDEX address_typeahead_entries_base_idx ON address_typeahead_entries(base_signature);
 `);
 
 const insertAddress = db.prepare(`
   INSERT OR REPLACE INTO addresses (
     id, label, lat, lon, state, postcode, accuracy, locality, alias_principal, primary_secondary, geocode_type,
-    display_title, display_subtitle, suggestion_type, refine_required, refine_hint, base_key, search_key, search_text
+    display_title, display_subtitle, suggestion_type, refine_required, refine_hint, base_key
+    ${includeSearchBackstop ? ", search_key, search_text" : ""}
   )
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  VALUES (${Array.from({ length: includeSearchBackstop ? 19 : 17 }, () => "?").join(", ")})
 `);
 const insertFts = includeLegacyFts ? db.prepare(`
   INSERT INTO address_fts (
@@ -109,9 +110,9 @@ const insertFts = includeLegacyFts ? db.prepare(`
 const insertTypeaheadEntry = db.prepare(`
   INSERT OR IGNORE INTO address_typeahead_entries (
     entry_id, address_id, display_title, display_subtitle,
-    key_text, prefix_key, base_signature, entry_type, refine_required, unit, rank_weight
+    key_text, base_signature, entry_type, refine_required, unit, rank_weight
   )
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `);
 const insertTypeaheadFts = db.prepare(`
   INSERT INTO address_typeahead_fts (
@@ -130,7 +131,7 @@ db.exec("BEGIN");
 for await (const record of readRecords(inputPath)) {
   const address = normaliseRecord(record, count);
   if (!address) continue;
-  insertAddress.run(
+  const addressValues = [
     address.id,
     address.label,
     address.lat,
@@ -148,9 +149,9 @@ for await (const record of readRecords(inputPath)) {
     address.refineRequired ? 1 : 0,
     address.refineHint,
     address.baseKey,
-    address.searchKey,
-    address.searchText,
-  );
+  ];
+  if (includeSearchBackstop) addressValues.push(address.searchKey, address.searchText);
+  insertAddress.run(...addressValues);
   if (insertFts) {
     insertFts.run(
       address.id,
@@ -186,7 +187,6 @@ for await (const record of readRecords(inputPath)) {
       entry.displayTitle,
       entry.displaySubtitle,
       entry.keyText,
-      entry.prefixKey,
       entry.baseSignature,
       entry.entryType,
       entry.refineRequired ? 1 : 0,
@@ -214,7 +214,7 @@ for await (const record of readRecords(inputPath)) {
   if (limit && count >= limit) break;
 }
 db.exec("COMMIT");
-db.exec("CREATE INDEX addresses_search_text_idx ON addresses(search_text)");
+if (includeSearchBackstop) db.exec("CREATE INDEX addresses_search_text_idx ON addresses(search_text)");
 db.close();
 
 console.log(`Built ${outputPath} with ${count.toLocaleString()} address records.`);
@@ -587,6 +587,7 @@ function parseArgs(values) {
     else if (value === "--output") parsed.output = values[++index];
     else if (value === "--limit") parsed.limit = values[++index];
     else if (value === "--omit-legacy-fts") parsed.omitLegacyFts = true;
+    else if (value === "--omit-search-backstop") parsed.omitSearchBackstop = true;
   }
   return parsed;
 }

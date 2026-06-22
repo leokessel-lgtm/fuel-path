@@ -100,7 +100,6 @@ function buildExperimentIndex(db, rows) {
       postcode TEXT,
       locality TEXT,
       key_text TEXT NOT NULL,
-      prefix_key TEXT NOT NULL,
       base_signature TEXT NOT NULL,
       entry_type TEXT NOT NULL,
       refine_required INTEGER DEFAULT 0,
@@ -123,14 +122,13 @@ function buildExperimentIndex(db, rows) {
       rank_weight INTEGER NOT NULL,
       PRIMARY KEY (prefix, entry_id)
     );
-    CREATE INDEX entries_base_idx ON entries(base_signature);
   `);
   const insertEntry = db.prepare(`
     INSERT OR REPLACE INTO entries (
-      entry_id, address_id, label, lat, lon, state, postcode, locality, key_text, prefix_key,
+      entry_id, address_id, label, lat, lon, state, postcode, locality, key_text,
       base_signature, entry_type, refine_required, unit, rank_weight
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   const insertFts = db.prepare(`
     INSERT INTO typeahead_fts (
@@ -161,7 +159,6 @@ function buildExperimentIndex(db, rows) {
         row.postcode,
         row.locality,
         entry.keyText,
-        entry.prefixKey,
         entry.baseSignature,
         entry.entryType,
         entry.refineRequired ? 1 : 0,

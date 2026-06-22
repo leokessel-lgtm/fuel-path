@@ -20,6 +20,7 @@ The tested resolvable P90 target is now achieved in sampled stress runs and boun
 - after resolving building-name plus unit/shop numbers through base-refine prefix rows and the exact-unit index, the same 400-case run kept exact P90 15 and resolvable P90 12, while reducing overall request P95 to 70 ms and unit/building request P95 to 169 ms
 - after short-circuiting secondary needle searches once the primary needle has an exact address top hit, the same 400-case run kept exact P90 15 and resolvable P90 12, reduced elapsed P95 from 455 ms to 218 ms, and cut range request P95 from 762 ms to 15 ms
 - after adding builder-level building/venue prefix rows, a rebuilt 400-case rural/unit sample reached exact P90 12, resolvable P90 12, wrong-top-before-resolvable 5 and request P95 1 ms, but this is rebuilt-sample evidence rather than a fresh full-national package
+- after bringing the raw ZIP builder into parity, a fresh 6-state 150k-row compact runtime built from real G-NAF source reached exact/resolvable P90 15 on a 300-case rural/unit benchmark with request P95 2 ms
 - unit/building resolvable P90 is still 15 in that 400-case run, and exact unit/building P90 is still 28
 - the broad exact-unit index raised the full national temp runtime from about 14 GB to about 16 GB; the partial-index temp file still occupies 16 GB until rebuilt/vacuumed, but currently reports about 1.97 GB free pages after dropping the broad index
 - compact prefix is only safe as a narrow house-number-first fast path
@@ -1403,6 +1404,63 @@ Brutal read on the building/venue prefix pass:
 - Production packaging should generate these entries in the builder's normal ordered write path. Do not rely on post-build backfills for the national artefact.
 - Exact unit/building P90 is still 26 to 28 depending on the benchmark shape. Building prefixes help early base/refine suggestions, not exact unit intent.
 
+## Raw Builder Parity Pass
+
+Problem found after the building/venue prefix builder pass:
+
+- the PSV builder had the new building/venue prefix shape, but the raw ZIP builder still generated the older building-plus-base prefix keys
+- that meant a fresh national package built from `data/gnaf/raw/g-naf_may26_allstates_gda2020_psv_1023.zip` would not actually contain the new venue-prefix material
+- the benchmark runner also assumed all eight states, which made partial raw rebuild stress impossible without NSW and VIC present
+
+Implementation:
+
+- `scripts/build-gnaf-raw-address-index.mjs` now mirrors the PSV builder:
+  - non-unit building/venue addresses get `exact:building` rows with building-name materialised prefixes
+  - unit-heavy buildings keep `base_refine` entries with building-name materialised prefixes
+- `scripts/geocode-hosted-national-benchmark.mjs` now accepts `--states`, while defaulting to the original eight-state benchmark when omitted
+- threshold checks now validate only the selected states for partial-state runs
+
+Fresh raw rebuild evidence:
+
+- command shape: `node scripts/build-gnaf-raw-address-index.mjs --input data/gnaf/raw/g-naf_may26_allstates_gda2020_psv_1023.zip --states ACT,NT,QLD,SA,TAS,WA --limit-per-state 25000 --output tmp/gnaf-raw-building-prefix-6state-150k.sqlite --omit-legacy-fts --omit-search-backstop`
+- built rows: 150,000
+- states: ACT, NT, QLD, SA, TAS, WA
+- build time: about 21 seconds
+- index size: 140 MB
+- exact building entries: 1,898
+- base refine entries: 16,103
+- prefix rows: 614,653
+
+Raw-built 6-state 300-case rural/unit benchmark:
+
+- artefact: `tmp/geocode-hosted-national-benchmark-2026-06-22-raw-building-prefix-6state-300b.json`
+- command flag: `--states ACT,NT,QLD,SA,TAS,WA`
+- final top/resolvable: 300/300
+- exact top P50/P90/P95: 10 / 15 / 18
+- resolvable top P50/P90/P95: 10 / 15 / 15
+- wrong top before resolvable: 10
+- request latency P50/P95/max: 0 ms / 2 ms / 17 ms
+- elapsed latency P50/P95: 1 ms / 5 ms
+
+Raw-built segment notes:
+
+| Segment | Cases | Exact P90 | Resolvable P90 | Resolvable P95 | Latency P95 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Standard address | 195 | 10 | 10 | 10 | 1 ms request |
+| Unit/building address | 105 | 22 | 15 | 18 | 4 ms request |
+| Street address | 153 | 10 | 10 | 10 | 1 ms request |
+| Unit address | 104 | 22 | 15 | 18 | 4 ms request |
+| Lot address | 14 | 10 | 10 | 10 | 1 ms request |
+| Range address | 18 | 10 | 10 | 10 | 1 ms request |
+
+Brutal read on raw builder parity:
+
+- This is stronger than the 400-row synthetic rebuild because it comes from the real raw G-NAF ZIP through the actual raw builder.
+- It is still not a full-national package. NSW and VIC were deliberately excluded from this partial build, so full-national state tails are unproven for this pass.
+- The 150k-row compact runtime is fast and small enough for iteration, but not representative of the final 16.9M-row footprint.
+- Unit/building exact P90 is still 22 in this partial raw run. Resolvable P90 is 15, but exact unit selection remains the hard tail.
+- The benchmark tooling improvement matters: partial-state stress can now be used honestly when validating state-specific rebuilds or storage-constrained samples.
+
 Brutal read on full national:
 
 - Full national build size is now proven, and it is large but locally possible.
@@ -1411,6 +1469,7 @@ Brutal read on full national:
 - Unit/building resolvable P90 is 15, but exact unit/building P90 is still 28.
 - Latency is materially better than the earlier full-national run: the latest exact-stop 400-case run is request P95 70 ms overall and elapsed P95 218 ms, but unit/building request P95 remains 196 ms and max request latency still reaches 2440 ms.
 - The building/venue prefix builder pass has promising rebuilt-sample evidence, but still needs a fresh full-national rebuild before it can replace the exact-stop run as the best full-national read.
+- The raw builder parity pass proves the fresh-build path on 150k real G-NAF rows, but full-national rebuild evidence is still missing.
 - SA remains the exact typed-character tail, ACT improved on resolvable P90, and range/unit/building rows remain the main latency tails.
 - The next improvement should target serving shape and packaging, not provider expansion.
 
@@ -1501,6 +1560,7 @@ What improved:
 - The latest building-unit-prefix rerun kept overall resolvable P90 at 12, exact P90 at 15, final top/resolvable at 400/400, reduced request P95 to 70 ms, and cut unit/building request P95 to 169 ms.
 - The latest exact-stop rerun kept overall resolvable P90 at 12, exact P90 at 15, final top/resolvable at 400/400, reduced elapsed P95 to 218 ms, cut range request P95 to 15 ms, and reduced wrong-top-before-resolvable to 25.
 - The building/venue prefix builder pass rebuilt a 400-case rural/unit sample with exact P90 12, resolvable P90 12, request P95 1 ms and wrong-top-before-resolvable 5.
+- The raw builder parity pass built a fresh 6-state 150k-row compact runtime from the real raw ZIP and hit exact/resolvable P90 15 on a 300-case rural/unit benchmark with request P95 2 ms.
 
 What remains weak:
 
@@ -1519,6 +1579,7 @@ What remains weak:
 - Short building/venue-name prefixes can still be slow before a civic number is typed, because the embedded-core fast path needs address-number evidence.
 - Building/venue prefixes now have local key material in the builder, but this has not yet been proven in a fresh full-national package.
 - The attempted national post-build backfill was too slow and left no valid full-national benchmark result for this pass.
+- Partial-state raw rebuilds are now benchmarkable via `--states`, but that cannot be used as full-national proof.
 - Context-aware ranking depends on Plan/Nearby having a meaningful route/current-map anchor. Cold start address search without context still lands at rural/unit P90 18 in the corrected hosted-contract run.
 - `wrongTopBeforeResolvable` is still high in the typed-prefix harness because many short prefixes are inherently ambiguous before enough context arrives. This is acceptable only if UI state treats those rows as suggestions, not route commitments.
 
@@ -1526,6 +1587,7 @@ Next:
 
 - Compress or shard FTS/typeahead duplication before treating the 16 GB SQLite as a shipping mobile/runtime asset.
 - Rebuild the full national runtime through the patched builder and rerun the 400-case and 800-case rural/unit benchmarks against that fresh package.
+- Consider a staged 8-state 1M-row raw rebuild before the full 16.9M-row build, to measure size and latency with NSW/VIC included.
 - Rerun the 800-case hosted national benchmark after another serving-shape pass, not before.
 - Add a Plan/Nearby UI smoke case for `refine_required` rows so route submission cannot regress.
 - Recover exact unit/building P90 margin without reopening broad `unit + number` FTS scans.

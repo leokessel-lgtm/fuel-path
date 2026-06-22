@@ -429,6 +429,23 @@ function buildTypeaheadEntries({ id, label, source, display, keys }) {
       rankWeight: unit ? 940 : 1000,
     });
   }
+  if (keys.baseKey && source.buildingName && !unit) {
+    const street = [source.number, source.streetName].filter(Boolean).join(" ");
+    const place = [source.locality, source.state, source.postcode].filter(Boolean).join(" ");
+    entries.push({
+      entryId: `${id}:exact:building`,
+      label,
+      displayTitle: null,
+      displaySubtitle: null,
+      keyText: [normaliseAddressText(source.buildingName), street, place].filter(Boolean).join(" "),
+      prefixKey: normaliseAddressText(source.buildingName),
+      baseSignature,
+      entryType: "exact",
+      refineRequired: false,
+      unit,
+      rankWeight: 970,
+    });
+  }
   if (keys.baseKey && unit) {
     const street = [source.number, source.streetName].filter(Boolean).join(" ");
     const baseTitle = source.buildingName || street;
@@ -440,7 +457,7 @@ function buildTypeaheadEntries({ id, label, source, display, keys }) {
       displayTitle: baseTitle,
       displaySubtitle: baseSubtitle,
       keyText: [normaliseAddressText(source.buildingName), keys.baseKey].filter(Boolean).join(" "),
-      prefixKey: [normaliseAddressText(source.buildingName), keys.baseKey].filter(Boolean).join(" "),
+      prefixKey: normaliseAddressText(source.buildingName) || keys.baseKey,
       baseSignature,
       entryType: "base_refine",
       refineRequired: true,
@@ -464,6 +481,7 @@ function compactPrefixes(value, mode = "default") {
 function shouldMaterialisePrefix(entry) {
   return entry.entryType === "base_refine" ||
     (String(entry.entryId).endsWith(":exact:base") && (!entry.unit || entry.rankWeight >= 900)) ||
+    (String(entry.entryId).endsWith(":exact:building") && !entry.unit) ||
     isLotOrRangeExactLabelEntry(entry);
 }
 

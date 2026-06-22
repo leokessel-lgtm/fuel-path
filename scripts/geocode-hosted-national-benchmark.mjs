@@ -10,6 +10,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const STATE_ORDER = ["NSW", "ACT", "VIC", "QLD", "WA", "SA", "TAS", "NT"];
 const DEFAULT_SQLITE_PATH = path.join(ROOT, "data", "gnaf", "build", "gnaf-addresses-national.sqlite");
 const args = parseArgs(process.argv.slice(2));
+const SELECTED_STATES = parseStateList(args.states || process.env.FUEL_PATH_HOSTED_BENCHMARK_STATES || STATE_ORDER.join(","));
 const RUN_ID = args.runId || process.env.FUEL_PATH_HOSTED_BENCHMARK_RUN_ID || new Date().toISOString().replace(/[:.]/g, "-");
 const MODE = args.mode || process.env.FUEL_PATH_HOSTED_BENCHMARK_MODE || "http";
 const API_BASE = args.apiBase || process.env.FUEL_PATH_API_BASE || "";
@@ -111,6 +112,7 @@ const payload = {
     addresses: ADDRESS_COUNT,
     pois: POI_COUNT,
     profile: PROFILE,
+    states: SELECTED_STATES,
     caseContext: CASE_CONTEXT,
     caseContextRadiusKm: CASE_CONTEXT ? CASE_CONTEXT_RADIUS_KM : null,
   },
@@ -270,9 +272,9 @@ function sampleAddressCases(sqlitePath, total) {
     sqliteTableExists(database, "address_typeahead_entries");
   const addressColumns = sqliteTableColumns(database, "addresses");
   const hasSearchText = addressColumns.has("search_text");
-  const perState = distribute(total, STATE_ORDER);
+  const perState = distribute(total, SELECTED_STATES);
   const rows = [];
-  for (const state of STATE_ORDER) {
+  for (const state of SELECTED_STATES) {
     const target = perState[state];
     const seen = new Set();
     for (const seed of addressSeedsForState(state)) {
@@ -421,9 +423,9 @@ function queryFromAddressLabel(label) {
 }
 
 function buildPoiCases(records, total) {
-  const perState = distribute(total, STATE_ORDER);
+  const perState = distribute(total, SELECTED_STATES);
   const rows = [];
-  for (const state of STATE_ORDER) {
+  for (const state of SELECTED_STATES) {
     const stateRecords = records.filter((record) => record.state === state);
     if (!stateRecords.length) throw new Error(`No POI records available for ${state}.`);
     for (let index = 0; index < perState[state]; index += 1) {
@@ -587,7 +589,7 @@ function assertThresholds(summary, rows) {
   if (poi.finalTopRate < MIN_POI_TOP_RATE) failures.push(`POI top-match rate ${rateText(poi.finalTopRate)} below ${rateText(MIN_POI_TOP_RATE)}.`);
   if (address.p90AnyChars > MAX_ADDRESS_P90_CHARS) failures.push(`Address p90 chars ${address.p90AnyChars} above ${MAX_ADDRESS_P90_CHARS}.`);
   if (poi.p90AnyChars > MAX_POI_P90_CHARS) failures.push(`POI p90 chars ${poi.p90AnyChars} above ${MAX_POI_P90_CHARS}.`);
-  for (const state of STATE_ORDER) {
+  for (const state of SELECTED_STATES) {
     const stateSummary = summary.byState[state];
     if (!stateSummary || stateSummary.finalAnyRate < 0.98) failures.push(`${state} any-match rate ${rateText(stateSummary?.finalAnyRate)} below 98%.`);
   }
@@ -659,6 +661,16 @@ function distribute(total, states) {
   const base = Math.floor(total / states.length);
   const remainder = total % states.length;
   return Object.fromEntries(states.map((state, index) => [state, base + (index < remainder ? 1 : 0)]));
+}
+
+function parseStateList(value) {
+  const states = String(value || "")
+    .split(",")
+    .map((state) => state.trim().toUpperCase())
+    .filter(Boolean);
+  const invalid = states.filter((state) => !STATE_ORDER.includes(state));
+  if (invalid.length) throw new Error(`Unsupported benchmark states: ${invalid.join(", ")}`);
+  return states.length ? [...new Set(states)] : STATE_ORDER;
 }
 
 function firstUsefulTokens(value) {

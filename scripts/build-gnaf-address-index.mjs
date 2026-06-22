@@ -78,7 +78,8 @@ db.exec(`
   ) WITHOUT ROWID;
   CREATE VIRTUAL TABLE address_typeahead_fts USING fts5(
     entry_id UNINDEXED,
-    key_text
+    key_text,
+    detail=column
   );
   CREATE TABLE address_prefix_entries (
     prefix TEXT NOT NULL,

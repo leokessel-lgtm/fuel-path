@@ -13,6 +13,7 @@ The tested P90 target is now achieved in sampled stress runs, but not yet proven
 - a 994,401-row 8-state compact build now fits in 925 MB, but a full national rebuild is still not proven
 - a unit-prefix rebuild improves request latency and unit-first exact lookup, but raises the 994,401-row sample to 952 MB
 - metadata trimming reduces the 8-state 200k compact sample from 191 MB to 182 MB while keeping the rural/unit hosted-contract benchmark at overall P90 15
+- FTS `detail=column` reduces the 8-state 200k compact sample again to 176 MB without hurting the rural/unit benchmark
 
 Compact prefix alone is not safe enough. It is fast and reaches low P90 on successful cases, but it can silently pick the wrong locality, sibling unit/shop or same-name building when the first 15 characters are ambiguous.
 
@@ -229,6 +230,8 @@ Measured samples:
 | 8-state lean-prefix runtime sample | `--states ACT,NSW,NT,QLD,SA,TAS,VIC,WA --limit-per-state 125000 --omit-legacy-fts --omit-search-backstop` | 925 MB | 3,281,932 | no |
 | Metadata-trim + unit-prefix runtime-only | `--states ACT --limit-per-state 100000 --omit-legacy-fts --omit-search-backstop` | 86 MB | 373,410 | no |
 | 8-state metadata-trim + unit-prefix runtime sample | `--states ACT,NSW,NT,QLD,SA,TAS,VIC,WA --limit-per-state 25000 --omit-legacy-fts --omit-search-backstop` | 182 MB | 787,938 | no |
+| 8-state FTS detail=none runtime sample | `--states ACT,NSW,NT,QLD,SA,TAS,VIC,WA --limit-per-state 25000 --omit-legacy-fts --omit-search-backstop` | 170 MB | 787,938 | no |
+| 8-state FTS detail=column runtime sample | `--states ACT,NSW,NT,QLD,SA,TAS,VIC,WA --limit-per-state 25000 --omit-legacy-fts --omit-search-backstop` | 176 MB | 787,938 | no |
 
 The lean-prefix runtime-only sample was probed directly with `FUEL_PATH_GNAF_SQLITE_PATH=tmp/gnaf-act-hybrid-runtime-leanprefix-100k.sqlite`. It returned ACT address and unit/building suggestions without `address_fts`, `search_key` or `search_text`, including deduped exact unit results, correct title/subtitle fallback and `address_prefix` evidence for checkpoint prefix hits.
 
@@ -538,6 +541,44 @@ Brutal read on metadata trimming:
 - The 200k sample is much faster than the 994k sample, but that latency number should not be used as a production claim.
 - Overall hosted-contract P90 still meets 15, but unit/building exact P90 is 18 and unit/building resolvable P95 is 18. Safe refinement remains essential.
 - The full-national footprint is still unproven. This lowers the likely projection, but does not remove the need for a full rebuild or a larger 994k metadata-trim rebuild.
+
+## FTS Detail Trade-Off
+
+Follow-up storage experiment:
+
+- default FTS detail is more than typeahead needs because the runtime does not use phrase proximity or snippets
+- `detail=none` was tested first and reduced the 8-state 200k compact sample to 170 MB
+- `detail=column` reduced the same sample to 176 MB and kept better observed request latency
+- retained choice: `detail=column`
+
+8-state `detail=column` hosted-contract benchmark:
+
+- artefact: `tmp/geocode-hosted-national-benchmark-2026-06-22-ftscolumn-200k-rural-unit-context-800.json`
+- profile: `rural-unit`
+- flag: `--case-context --case-context-radius-km 80`
+- cases: 800 addresses
+- final top match: 800/800
+- final resolvable top: 800/800
+- exact top P50/P90/P95: 10 / 15 / 15
+- resolvable top P50/P90/P95: 10 / 15 / 15
+- any-useful-match P50/P90/P95: 10 / 12 / 15
+- wrong top before resolvable: 52
+- cumulative case latency P50/P95: 13 ms / 58 ms
+- request latency P50/P95/max: 1 ms / 28 ms / 80 ms
+
+8-state `detail=none` rejection evidence:
+
+- artefact: `tmp/geocode-hosted-national-benchmark-2026-06-22-ftsdnone-200k-rural-unit-context-800.json`
+- size: 170 MB
+- final top/resolvable: 800/800
+- exact/resolvable P90: 15
+- request latency P50/P95/max: 1 ms / 50 ms / 149 ms
+
+Brutal read on FTS detail:
+
+- `detail=none` is smaller, but the observed latency trade-off is not worth the extra 6 MB saving on this sample.
+- `detail=column` is a better balanced default: smaller than metadata-trim default detail, same P90 metrics, and the best observed request P95 of the three 200k runs.
+- This still does not prove full-national performance. A larger 994k `detail=column` rebuild is the next evidence step before claiming the projection holds.
 
 Rejected storage experiment:
 

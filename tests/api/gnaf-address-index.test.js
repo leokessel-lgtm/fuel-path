@@ -594,6 +594,7 @@ test("unit-like SQLite queries wait for a meaningful street token before typeahe
     const sqlite = new DatabaseSync(outputPath, { readOnly: true });
     const broadPrefixRows = sqlite.prepare("SELECT COUNT(*) AS count FROM address_prefix_entries WHERE prefix = ?").get("unit 2 2");
     const unitPrefixRows = sqlite.prepare("SELECT COUNT(*) AS count FROM address_prefix_entries WHERE prefix = ?").get("unit 3 5a wo");
+    const typeaheadFtsSql = sqlite.prepare("SELECT sql FROM sqlite_master WHERE name = ?").get("address_typeahead_fts").sql;
     const typeaheadFtsColumns = sqlite.prepare("PRAGMA table_info(address_typeahead_fts)").all().map((row) => row.name);
     const prefixColumns = sqlite.prepare("PRAGMA table_info(address_prefix_entries)").all().map((row) => row.name);
     sqlite.close();
@@ -601,6 +602,7 @@ test("unit-like SQLite queries wait for a meaningful street token before typeahe
     assert.deepEqual(broadUnit, []);
     assert.equal(broadPrefixRows.count, 0);
     assert.equal(unitPrefixRows.count, 1);
+    assert.match(typeaheadFtsSql, /detail=column/);
     assert.deepEqual(typeaheadFtsColumns, ["entry_id", "key_text"]);
     assert.deepEqual(prefixColumns, ["prefix", "entry_id"]);
     assert.equal(shortStreetToken[0].label, "Unit 3, 5A Woodland Street, Wodonga VIC 3690");

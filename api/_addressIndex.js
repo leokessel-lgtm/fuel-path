@@ -227,6 +227,8 @@ function searchSqliteIndex(needle, limit, searchContext = null) {
 function searchSqliteHybridIndex(database, needle, limit, searchContext = null) {
   if (queryContainsUnitLikeToken(needle)) {
     if (!unitLikeQueryReadyForTypeahead(needle)) return [];
+    const exactUnitRows = searchSqliteExactUnitEntries(database, needle, limit);
+    if (exactUnitRows.length) return hybridRowsToSuggestions(exactUnitRows, needle, 960);
     if (unitLikeQueryStartsWithUnitToken(needle)) {
       const prefixRows = searchSqlitePrefixEntries(database, needle, limit, searchContext);
       const useContextualPrefixRows = shouldUseContextualAmbiguousPrefixRows(needle, searchContext);
@@ -247,8 +249,6 @@ function searchSqliteHybridIndex(database, needle, limit, searchContext = null) 
         }
       }
     }
-    const exactUnitRows = searchSqliteExactUnitEntries(database, needle, limit);
-    if (exactUnitRows.length) return hybridRowsToSuggestions(exactUnitRows, needle, 960);
     const typeaheadRows = searchSqliteTypeaheadEntries(database, needle, limit, searchContext);
     return hybridRowsToSuggestions(typeaheadRows, needle);
   }
@@ -527,7 +527,14 @@ function exactUnitRefinementNeedle(needle) {
   const unitIndex = tokens.findIndex((token, index) => SQLITE_UNIT_TERMS.has(token) && normalisedUnitNumberToken(tokens[index + 1]));
   if (unitIndex < 0) return null;
   const unitNumber = normalisedUnitNumberToken(tokens[unitIndex + 1]);
-  const houseIndex = tokens.findIndex((token, index) => index > unitIndex + 1 && normalisedAddressNumberToken(token));
+  const lotIndex = tokens.findIndex((token, index) =>
+    index > unitIndex + 1 &&
+    token === "lot" &&
+    normalisedUnitNumberToken(tokens[index + 1]),
+  );
+  const houseIndex = lotIndex >= 0
+    ? lotIndex
+    : tokens.findIndex((token, index) => index > unitIndex + 1 && normalisedAddressNumberToken(token));
   if (houseIndex < 0) return null;
   const baseSignature = tokens.slice(houseIndex).join(" ");
   if (significantAddressTokens(baseSignature).length < 3) return null;

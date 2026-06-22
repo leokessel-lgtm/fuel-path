@@ -794,9 +794,10 @@ test("lot and range exact labels materialise compact prefix rows", async () => {
   fs.writeFileSync(
     inputPath,
     [
-      "ADDRESS_DETAIL_PID|ADDRESS_LABEL|NUMBER_FIRST|NUMBER_LAST|LOT_NUMBER|STREET_NAME|STREET_TYPE|LOCALITY_NAME|STATE|POSTCODE|GEOCODE_TYPE|LONGITUDE|LATITUDE",
-      "GAQLD6001|Lot 2, Cassowary Street, Longreach QLD 4730|||2|Cassowary|Street|Longreach|QLD|4730|PROPERTY CENTROID|144.250|-23.440",
-      "GAQLD6002|112-120 Spoonbill Street, Longreach QLD 4730|112|120||Spoonbill|Street|Longreach|QLD|4730|PROPERTY CENTROID|144.251|-23.441",
+      "ADDRESS_DETAIL_PID|ADDRESS_LABEL|FLAT_TYPE|FLAT_NUMBER|NUMBER_FIRST|NUMBER_LAST|LOT_NUMBER|STREET_NAME|STREET_TYPE|LOCALITY_NAME|STATE|POSTCODE|GEOCODE_TYPE|LONGITUDE|LATITUDE",
+      "GAQLD6001|Lot 2, Cassowary Street, Longreach QLD 4730|||||2|Cassowary|Street|Longreach|QLD|4730|PROPERTY CENTROID|144.250|-23.440",
+      "GAQLD6002|112-120 Spoonbill Street, Longreach QLD 4730|||112|120||Spoonbill|Street|Longreach|QLD|4730|PROPERTY CENTROID|144.251|-23.441",
+      "GASA6003|Unit 4, Lot 141, Elleway Drive, Coober Pedy SA 5723|Unit|4|||141|Elleway|Drive|Coober Pedy|SA|5723|PROPERTY CENTROID|134.749|-29.013",
     ].join("\n"),
   );
 
@@ -818,15 +819,20 @@ test("lot and range exact labels materialise compact prefix rows", async () => {
     const sqlite = new DatabaseSync(outputPath, { readOnly: true });
     const lotPrefixRows = sqlite.prepare("SELECT COUNT(*) AS count FROM address_prefix_entries WHERE prefix = ?").get("lot 2 ca");
     const rangePrefixRows = sqlite.prepare("SELECT COUNT(*) AS count FROM address_prefix_entries WHERE prefix = ?").get("112 120 ");
+    const unitLotPrefixRows = sqlite.prepare("SELECT COUNT(*) AS count FROM address_prefix_entries WHERE prefix = ?").get("unit 4 lot 141 ");
     sqlite.close();
 
     const lotSuggestions = await searchAddressIndex("Lot 2 Ca", 3);
     const rangeSuggestions = await searchAddressIndex("112-120 Sp", 3);
+    const unitLotSuggestions = await searchAddressIndex("Unit 4 Lot 141 Elleway", 3);
 
     assert.ok(lotPrefixRows.count >= 1);
     assert.ok(rangePrefixRows.count >= 1);
+    assert.ok(unitLotPrefixRows.count >= 1);
     assert.equal(lotSuggestions[0].label, "Lot 2, Cassowary Street, Longreach QLD 4730");
     assert.equal(rangeSuggestions[0].label, "112-120 Spoonbill Street, Longreach QLD 4730");
+    assert.equal(unitLotSuggestions[0].label, "Unit 4, Lot 141, Elleway Drive, Coober Pedy SA 5723");
+    assert.equal(unitLotSuggestions[0].refineRequired, false);
   });
 });
 

@@ -21,6 +21,7 @@ The tested resolvable P90 target is now achieved in sampled stress runs and boun
 - after short-circuiting secondary needle searches once the primary needle has an exact address top hit, the same 400-case run kept exact P90 15 and resolvable P90 12, reduced elapsed P95 from 455 ms to 218 ms, and cut range request P95 from 762 ms to 15 ms
 - after adding builder-level building/venue prefix rows, a rebuilt 400-case rural/unit sample reached exact P90 12, resolvable P90 12, wrong-top-before-resolvable 5 and request P95 1 ms, but this is rebuilt-sample evidence rather than a fresh full-national package
 - after bringing the raw ZIP builder into parity, a fresh 6-state 150k-row compact runtime built from real G-NAF source reached exact/resolvable P90 15 on a 300-case rural/unit benchmark with request P95 2 ms
+- after an 8-state 994,401-row raw rebuild, the first 800-case rural/unit run exposed three unit-like misses; after moving exact-unit lookup ahead of contextual prefix rows and including lot numbers in base keys, the rerun hit 800/800 final top/resolvable, exact P90 15, resolvable P90 15 and request P95 2 ms
 - unit/building resolvable P90 is still 15 in that 400-case run, and exact unit/building P90 is still 28
 - the broad exact-unit index raised the full national temp runtime from about 14 GB to about 16 GB; the partial-index temp file still occupies 16 GB until rebuilt/vacuumed, but currently reports about 1.97 GB free pages after dropping the broad index
 - compact prefix is only safe as a narrow house-number-first fast path
@@ -1461,6 +1462,71 @@ Brutal read on raw builder parity:
 - Unit/building exact P90 is still 22 in this partial raw run. Resolvable P90 is 15, but exact unit selection remains the hard tail.
 - The benchmark tooling improvement matters: partial-state stress can now be used honestly when validating state-specific rebuilds or storage-constrained samples.
 
+## Staged 8-State Raw Rebuild And Unit-Lot Fix
+
+Problem found after the raw builder parity pass:
+
+- the 6-state raw rebuild deliberately excluded NSW and VIC, so it could not exercise the larger state mix
+- the first 8-state 994,401-row rural/unit run found three unit-like misses in an otherwise strong result
+- `Unit 78 L B 99 Eastern Valley Way Belconnen ACT 2617` was blocked by broader contextual prefix rows before the exact-unit lookup could run
+- `Unit 4 Lot 141 Elleway Drive Coober Pedy SA 5723` and `Unit 3 Lot 150 Van Brugge Street Coober Pedy SA 5723` fell back to the base lot because unit-plus-lot base keys omitted the `Lot ...` component
+
+Implementation:
+
+- unit-like queries now run the indexed exact-unit lookup before contextual prefix rows
+- exact-unit refinement treats `lot <number>` as the base signature start when a unit is followed by a lot number
+- the PSV and raw ZIP builders now include `Lot ...` as the base address when there is no street number
+- regression coverage now includes `Unit 4, Lot 141, Elleway Drive, Coober Pedy SA 5723`
+
+Fresh 8-state staged rebuild evidence:
+
+- command shape: `node scripts/build-gnaf-raw-address-index.mjs --input data/gnaf/raw/g-naf_may26_allstates_gda2020_psv_1023.zip --states ACT,NSW,NT,QLD,SA,TAS,VIC,WA --limit-per-state 125000 --output tmp/gnaf-raw-unitlot-prefix-8state-1m.sqlite --omit-legacy-fts --omit-search-backstop`
+- built rows: 994,401
+- states: ACT 125,000, NSW 125,000, NT 119,401, QLD 125,000, SA 125,000, TAS 125,000, VIC 125,000, WA 125,000
+- index size: 919 MB
+- exact building entries: 13,503
+- base refine entries: 89,258
+- typeahead entries: 2,091,563
+- prefix rows: 4,015,062
+- unit-lot checkpoint prefixes present: `unit 4 lot 141 ` and `unit 3 lot 150 `
+
+Raw-built 8-state 800-case rural/unit benchmark after the fix:
+
+- artefact: `tmp/geocode-hosted-national-benchmark-2026-06-22-raw-unitlot-prefix-8state-800.json`
+- final top/resolvable: 800/800
+- exact top P50/P90/P95: 10 / 15 / 18
+- resolvable top P50/P90/P95: 10 / 15 / 15
+- wrong top before resolvable: 39
+- request latency P50/P95/max: 0 ms / 2 ms / 142 ms
+- elapsed latency P50/P95: 1 ms / 27 ms
+
+Raw-built 8-state segment notes:
+
+| Segment | Cases | Final top/resolvable | Exact P90 | Resolvable P90 | Resolvable P95 | Request P95 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| ACT | 100 | 100/100 | 22 | 15 | 18 | 28 ms |
+| NSW | 100 | 100/100 | 12 | 12 | 15 | 1 ms |
+| NT | 100 | 100/100 | 12 | 12 | 15 | 1 ms |
+| QLD | 100 | 100/100 | 15 | 15 | 15 | 1 ms |
+| SA | 100 | 100/100 | 15 | 15 | 15 | 1 ms |
+| TAS | 100 | 100/100 | 10 | 10 | 15 | 1 ms |
+| VIC | 100 | 100/100 | 12 | 12 | 15 | 1 ms |
+| WA | 100 | 100/100 | 18 | 15 | 18 | 4 ms |
+| Unit/building family | 186 | 186/186 | 22 | 15 | 18 | 24 ms |
+| Lot address | 68 | 68/68 | 10 | 10 | 10 | 2 ms |
+| Range address | 42 | 42/42 | 10 | 10 | 10 | 7 ms |
+| Street address | 484 | 484/484 | 10 | 10 | 10 | 1 ms |
+
+Brutal read on the staged 8-state rebuild:
+
+- This is the strongest fresh raw-builder evidence so far because it includes all eight benchmark states and is large enough to catch NSW/VIC and unit-lot failures.
+- The fix closes the three observed 800-case misses without making Google the default provider or reopening broad unit FTS scans.
+- It still is not full national proof. The staged package contains 994,401 rows, not the full 16.9M-row national runtime.
+- The target was achieved honestly on the resolvable-path metric: overall resolvable P90 is 15 and unit/building resolvable P90 is 15.
+- Exact unit/building remains weak: unit/building exact P90 is 22 and exact P95 is 26.
+- The ACT and WA exact tails still need work. `Unit 78 L B 99 Eastern Valley Way...` now resolves exactly at the end, but still needs 52 typed characters in this benchmark.
+- The 919 MB staged file implies the full compact package may still be large enough to require sharding, compression or hosted-device split decisions before shipping.
+
 Brutal read on full national:
 
 - Full national build size is now proven, and it is large but locally possible.
@@ -1470,6 +1536,7 @@ Brutal read on full national:
 - Latency is materially better than the earlier full-national run: the latest exact-stop 400-case run is request P95 70 ms overall and elapsed P95 218 ms, but unit/building request P95 remains 196 ms and max request latency still reaches 2440 ms.
 - The building/venue prefix builder pass has promising rebuilt-sample evidence, but still needs a fresh full-national rebuild before it can replace the exact-stop run as the best full-national read.
 - The raw builder parity pass proves the fresh-build path on 150k real G-NAF rows, but full-national rebuild evidence is still missing.
+- The staged 8-state unit-lot rebuild proves the fresh-build path on 994,401 real G-NAF rows across all benchmark states, but full-national rebuild evidence is still missing.
 - SA remains the exact typed-character tail, ACT improved on resolvable P90, and range/unit/building rows remain the main latency tails.
 - The next improvement should target serving shape and packaging, not provider expansion.
 
@@ -1561,6 +1628,8 @@ What improved:
 - The latest exact-stop rerun kept overall resolvable P90 at 12, exact P90 at 15, final top/resolvable at 400/400, reduced elapsed P95 to 218 ms, cut range request P95 to 15 ms, and reduced wrong-top-before-resolvable to 25.
 - The building/venue prefix builder pass rebuilt a 400-case rural/unit sample with exact P90 12, resolvable P90 12, request P95 1 ms and wrong-top-before-resolvable 5.
 - The raw builder parity pass built a fresh 6-state 150k-row compact runtime from the real raw ZIP and hit exact/resolvable P90 15 on a 300-case rural/unit benchmark with request P95 2 ms.
+- The staged 8-state unit-lot rebuild built a fresh 994,401-row compact runtime from the real raw ZIP and hit exact/resolvable P90 15 on an 800-case rural/unit benchmark with request P95 2 ms.
+- Unit-plus-lot addresses now have local exact prefix material instead of falling back to base lot suggestions.
 
 What remains weak:
 
@@ -1580,6 +1649,9 @@ What remains weak:
 - Building/venue prefixes now have local key material in the builder, but this has not yet been proven in a fresh full-national package.
 - The attempted national post-build backfill was too slow and left no valid full-national benchmark result for this pass.
 - Partial-state raw rebuilds are now benchmarkable via `--states`, but that cannot be used as full-national proof.
+- The staged 8-state raw rebuild is much better evidence than the 6-state run, but it is still a capped 994,401-row package rather than a full 16.9M-row national build.
+- Unit/building exact P90 remains 22 in the staged raw rebuild, even though unit/building resolvable P90 meets the 15-character target.
+- Long or unusual unit/building labels such as `Unit 78 L B 99 Eastern Valley Way...` can still require far more than 15 typed characters for exact-unit top match.
 - Context-aware ranking depends on Plan/Nearby having a meaningful route/current-map anchor. Cold start address search without context still lands at rural/unit P90 18 in the corrected hosted-contract run.
 - `wrongTopBeforeResolvable` is still high in the typed-prefix harness because many short prefixes are inherently ambiguous before enough context arrives. This is acceptable only if UI state treats those rows as suggestions, not route commitments.
 
@@ -1587,7 +1659,7 @@ Next:
 
 - Compress or shard FTS/typeahead duplication before treating the 16 GB SQLite as a shipping mobile/runtime asset.
 - Rebuild the full national runtime through the patched builder and rerun the 400-case and 800-case rural/unit benchmarks against that fresh package.
-- Consider a staged 8-state 1M-row raw rebuild before the full 16.9M-row build, to measure size and latency with NSW/VIC included.
+- Use the 8-state 994,401-row staged rebuild as the current pre-national checkpoint, then move to a full national raw rebuild or explicit per-state shard build.
 - Rerun the 800-case hosted national benchmark after another serving-shape pass, not before.
 - Add a Plan/Nearby UI smoke case for `refine_required` rows so route submission cannot regress.
 - Recover exact unit/building P90 margin without reopening broad `unit + number` FTS scans.

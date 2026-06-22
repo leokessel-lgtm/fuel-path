@@ -297,6 +297,7 @@ function normaliseRawRecord(row, state, locality, street, geocode) {
   const level = levelNumber ? `${levelType || "Level"} ${levelNumber}` : "";
   const lot = lotNumber && !number ? `Lot ${lotNumber}` : "";
   const streetAddress = [number, street.name].filter(Boolean).join(" ");
+  const baseAddress = [number || lot, street.name].filter(Boolean).join(" ");
   const localityPart = [locality.name, state, row.POSTCODE].filter(Boolean).join(" ");
   const keySource = {
     buildingName: titleCase(row.BUILDING_NAME),
@@ -304,6 +305,7 @@ function normaliseRawRecord(row, state, locality, street, geocode) {
     flatType,
     levelNumber,
     levelType,
+    lot,
     label: "",
     number,
     streetName: street.name,
@@ -319,11 +321,11 @@ function normaliseRawRecord(row, state, locality, street, geocode) {
     streetAddress,
     localityPart,
   ].filter(Boolean).join(", ");
-  if (!label || !streetAddress || !locality.name) return null;
+  if (!label || !baseAddress || !locality.name) return null;
   const searchKeys = buildSearchKeys({ ...keySource, label });
   const display = {
-    title: displayTitle({ buildingName: titleCase(row.BUILDING_NAME), unit, streetAddress, label }),
-    subtitle: [unit ? streetAddress : "", localityPart].filter(Boolean).join(", "),
+    title: displayTitle({ buildingName: titleCase(row.BUILDING_NAME), unit, streetAddress: baseAddress, label }),
+    subtitle: [unit ? baseAddress : "", localityPart].filter(Boolean).join(", "),
   };
   return {
     id: row.ADDRESS_DETAIL_PID,
@@ -359,7 +361,7 @@ function buildSearchKeys(source) {
   const unit = source.flatNumber ? `${source.flatType} ${source.flatNumber}` : "";
   const slashUnit = source.flatNumber && source.number ? `${source.flatNumber}/${source.number}` : "";
   const level = source.levelNumber ? `${source.levelType || "Level"} ${source.levelNumber}` : "";
-  const streetAddress = [source.number, source.streetName].filter(Boolean).join(" ");
+  const streetAddress = [source.number || source.lot, source.streetName].filter(Boolean).join(" ");
   const localityPart = [source.locality, source.state, source.postcode].filter(Boolean).join(" ");
   const values = [
     source.label,
@@ -430,7 +432,7 @@ function buildTypeaheadEntries({ id, label, source, display, keys }) {
     });
   }
   if (keys.baseKey && source.buildingName && !unit) {
-    const street = [source.number, source.streetName].filter(Boolean).join(" ");
+    const street = [source.number || source.lot, source.streetName].filter(Boolean).join(" ");
     const place = [source.locality, source.state, source.postcode].filter(Boolean).join(" ");
     entries.push({
       entryId: `${id}:exact:building`,
@@ -447,7 +449,7 @@ function buildTypeaheadEntries({ id, label, source, display, keys }) {
     });
   }
   if (keys.baseKey && unit) {
-    const street = [source.number, source.streetName].filter(Boolean).join(" ");
+    const street = [source.number || source.lot, source.streetName].filter(Boolean).join(" ");
     const baseTitle = source.buildingName || street;
     const place = [source.locality, source.state, source.postcode].filter(Boolean).join(" ");
     const baseSubtitle = source.buildingName ? [street, place].filter(Boolean).join(", ") : place;

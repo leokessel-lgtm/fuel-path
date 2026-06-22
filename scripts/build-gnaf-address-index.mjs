@@ -352,6 +352,11 @@ function addressStructure(record, label) {
     firstValue(record, ["NUMBER_LAST_SUFFIX", "number_last_suffix"]),
   ].filter(Boolean).join("");
   const number = numberFirst && numberLast ? `${numberFirst}-${numberLast}` : numberFirst;
+  const lot = [
+    firstValue(record, ["LOT_NUMBER_PREFIX", "lot_number_prefix"]),
+    firstValue(record, ["LOT_NUMBER", "lot_number"]),
+    firstValue(record, ["LOT_NUMBER_SUFFIX", "lot_number_suffix"]),
+  ].filter(Boolean).join("");
   const street = [
     firstValue(record, ["STREET_NAME", "street_name"]),
     firstValue(record, ["STREET_TYPE", "STREET_TYPE_CODE", "street_type", "street_type_code"]),
@@ -360,12 +365,12 @@ function addressStructure(record, label) {
   const locality = firstValue(record, ["LOCALITY_NAME", "locality_name", "locality"]) || "";
   const state = firstValue(record, ["STATE_ABBREVIATION", "STATE", "state"]) || "";
   const postcode = firstValue(record, ["POSTCODE", "postcode"]) || "";
-  return { flatNumber, flatType, levelNumber, levelType, buildingName, number, street, locality, state, postcode };
+  return { flatNumber, flatType, levelNumber, levelType, buildingName, number, lot, street, locality, state, postcode };
 }
 
 function addressDisplayParts(structure, label) {
   const unit = structure.flatNumber ? `${structure.flatType} ${structure.flatNumber}` : "";
-  const street = [structure.number, structure.street].filter(Boolean).join(" ");
+  const street = [structure.number || (structure.lot ? `Lot ${structure.lot}` : ""), structure.street].filter(Boolean).join(" ");
   const place = [structure.locality, structure.state, structure.postcode].filter(Boolean).join(" ");
   if (structure.buildingName && unit) {
     return {
@@ -392,7 +397,7 @@ function buildAddressKeys(record, structure, label) {
   const unit = structure.flatNumber ? `${structure.flatType} ${structure.flatNumber}` : "";
   const slashUnit = structure.flatNumber && structure.number ? `${structure.flatNumber}/${structure.number}` : "";
   const level = structure.levelNumber ? `${structure.levelType} ${structure.levelNumber}` : "";
-  const street = [structure.number, structure.street].filter(Boolean).join(" ");
+  const street = [structure.number || (structure.lot ? `Lot ${structure.lot}` : ""), structure.street].filter(Boolean).join(" ");
   const place = [structure.locality, structure.state, structure.postcode].filter(Boolean).join(" ");
   const aliases = firstValue(record, ["aliases", "ALIASES"]);
   const values = [
@@ -465,7 +470,7 @@ function buildTypeaheadEntries({ id, label, structure, display, keys }) {
     });
   }
   if (keys.baseKey && structure.buildingName && !unit) {
-    const street = [structure.number, structure.street].filter(Boolean).join(" ");
+    const street = [structure.number || (structure.lot ? `Lot ${structure.lot}` : ""), structure.street].filter(Boolean).join(" ");
     const place = [structure.locality, structure.state, structure.postcode].filter(Boolean).join(" ");
     entries.push({
       entryId: `${id}:exact:building`,
@@ -482,7 +487,7 @@ function buildTypeaheadEntries({ id, label, structure, display, keys }) {
     });
   }
   if (keys.baseKey && unit) {
-    const street = [structure.number, structure.street].filter(Boolean).join(" ");
+    const street = [structure.number || (structure.lot ? `Lot ${structure.lot}` : ""), structure.street].filter(Boolean).join(" ");
     const baseTitle = structure.buildingName || street;
     const place = [structure.locality, structure.state, structure.postcode].filter(Boolean).join(" ");
     const baseSubtitle = structure.buildingName ? [street, place].filter(Boolean).join(", ") : place;

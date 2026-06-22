@@ -1121,9 +1121,9 @@ const SQLITE_FTS_STOP_TERMS = new Set([
   "unit",
 ]);
 
-const SQLITE_UNIT_TERMS = new Set(["apartment", "apt", "flat", "level", "lvl", "office", "offc", "shop", "site", "suite", "townhouse", "unit"]);
-const SQLITE_BARE_UNIT_REFINE_TERMS = new Set(["apartment", "apt", "flat", "level", "lvl", "shop", "suite", "townhouse", "unit"]);
-const SQLITE_LEVEL_MARKER_TERMS = new Set(["fl", "floor", "l", "level", "lvl"]);
+const SQLITE_UNIT_TERMS = new Set(["apartment", "apt", "flat", "level", "lvl", "office", "offc", "se", "shop", "site", "suite", "townhouse", "unit"]);
+const SQLITE_BARE_UNIT_REFINE_TERMS = new Set(["apartment", "apt", "flat", "level", "lvl", "se", "shop", "suite", "townhouse", "unit"]);
+const SQLITE_LEVEL_MARKER_TERMS = new Set(["fl", "floor", "l", "level", "lg", "lvl"]);
 const SQLITE_STREET_TYPE_TERMS = new Set([
   "avenue",
   "boulevard",
@@ -1329,7 +1329,7 @@ function addressDisplayMetadata(record, matchType) {
   const storedRefineRequired = Boolean(Number(record.refine_required || 0));
   const label = String(record.label || "");
   const parts = label.split(",").map((part) => part.trim()).filter(Boolean);
-  const unitIndex = parts.findIndex((part) => /^(unit|flat|apartment|apt|suite|townhouse)\b/i.test(part));
+  const unitIndex = parts.findIndex((part) => /^(unit|flat|apartment|apt|suite|se|townhouse)\b/i.test(part));
   const streetIndex = parts.findIndex((part) => /^\d+[a-z]?(?:-\d+[a-z]?)?\s+/i.test(part));
   const hasBuildingName = unitIndex > 0;
   const title =

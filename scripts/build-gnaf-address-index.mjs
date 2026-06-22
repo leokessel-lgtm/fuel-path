@@ -10,7 +10,7 @@ const outputPath = path.resolve(args.output || "prototype/data/gnaf-addresses.sq
 const limit = args.limit ? Number(args.limit) : 0;
 const includeLegacyFts = !args.omitLegacyFts;
 const includeSearchBackstop = includeLegacyFts || !args.omitSearchBackstop;
-const SQLITE_LEVEL_MARKER_TERMS = new Set(["fl", "floor", "l", "level", "lvl"]);
+const SQLITE_LEVEL_MARKER_TERMS = new Set(["fl", "floor", "l", "level", "lg", "lvl"]);
 
 if (!fs.existsSync(inputPath)) {
   throw new Error(`Input file does not exist: ${inputPath}`);

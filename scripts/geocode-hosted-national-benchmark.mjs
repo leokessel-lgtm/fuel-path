@@ -415,7 +415,7 @@ function addressFamily(label) {
 }
 
 function hasUnitOrBuildingToken(value) {
-  return /\b(unit|flat|apartment|apt|suite|townhouse|shop|office|offc|level|lvl|kiosk|ksk)\b/.test(String(value || ""));
+  return /\b(unit|flat|apartment|apt|suite|se|townhouse|shop|office|offc|level|lvl|kiosk|ksk)\b/.test(String(value || ""));
 }
 
 function queryFromAddressLabel(label) {
@@ -501,8 +501,8 @@ function suggestionResolvesCase(testCase, suggestion) {
 function addressParts(value) {
   const normalised = normalise(value);
   const labelParts = String(value || "").split(",").map((part) => normalise(part)).filter(Boolean);
-  const unitPart = labelParts.find((part) => /^(?:unit|flat|apartment|apt|suite|townhouse|shop|office|offc|level|lvl|kiosk|ksk)\s+[a-z0-9-]+\b/.test(part)) || "";
-  const unitMatch = unitPart.match(/^(?:unit|flat|apartment|apt|suite|townhouse|shop|office|offc|level|lvl|kiosk|ksk)\s+([a-z0-9-]+)\b/);
+  const unitPart = labelParts.find((part) => /^(?:unit|flat|apartment|apt|suite|se|townhouse|shop|office|offc|level|lvl|kiosk|ksk)\s+[a-z0-9-]+\b/.test(part)) || "";
+  const unitMatch = unitPart.match(/^(?:unit|flat|apartment|apt|suite|se|townhouse|shop|office|offc|level|lvl|kiosk|ksk)\s+([a-z0-9-]+)\b/);
   const statePostcodeMatch = normalised.match(/\b(nsw|act|qld|vic|wa|sa|tas|nt)\s+(\d{4})\b/);
   if (!statePostcodeMatch) return null;
   const streetSource = labelParts.filter((part) => part !== unitPart).join(" ");

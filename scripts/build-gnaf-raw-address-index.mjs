@@ -16,7 +16,7 @@ const releasePath = args.releasePath || "G-NAF/G-NAF MAY 2026/Standard";
 const limitPerState = args.limitPerState ? Number(args.limitPerState) : 0;
 const includeLegacyFts = !args.omitLegacyFts;
 const includeSearchBackstop = includeLegacyFts || !args.omitSearchBackstop;
-const SQLITE_LEVEL_MARKER_TERMS = new Set(["fl", "floor", "l", "level", "lvl"]);
+const SQLITE_LEVEL_MARKER_TERMS = new Set(["fl", "floor", "l", "level", "lg", "lvl"]);
 
 if (!fs.existsSync(inputPath)) throw new Error(`Input ZIP does not exist: ${inputPath}`);
 

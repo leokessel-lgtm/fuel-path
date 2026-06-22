@@ -827,6 +827,8 @@ test("exact unit refinement skips level markers before street number", async () 
       "GAACT7001|Shop 9001, L 2, 20 Benjamin Way, Belconnen ACT 2617|Shop|9001|L|2|20|Benjamin|Way|Belconnen|ACT|2617|PROPERTY CENTROID|149.070|-35.240",
       "GAWA7002|Unit 9, Fl 2, 118 Broome Street, Cottesloe WA 6011|Unit|9|Fl|2|118|Broome|Street|Cottesloe|WA|6011|PROPERTY CENTROID|115.754|-31.994",
       "GAVIC7003|Site V, 87 Airfield Road, Traralgon VIC 3844|Site|V|||87|Airfield|Road|Traralgon|VIC|3844|PROPERTY CENTROID|146.538|-38.207",
+      "GAQLD7004|Shop 2, Lg 2, 396 Flinders Street, Townsville City QLD 4810|Shop|2|Lg|2|396|Flinders|Street|Townsville City|QLD|4810|PROPERTY CENTROID|146.817|-19.258",
+      "GAQLD7005|Se 2, L 1, 79 Denham Street, Townsville City QLD 4810|Se|2|L|1|79|Denham|Street|Townsville City|QLD|4810|PROPERTY CENTROID|146.816|-19.259",
     ].join("\n"),
   );
 
@@ -848,26 +850,42 @@ test("exact unit refinement skips level markers before street number", async () 
     const sqlite = new DatabaseSync(outputPath, { readOnly: true });
     const shopLevelPrefixRows = sqlite.prepare("SELECT COUNT(*) AS count FROM address_prefix_entries WHERE prefix = ?").get("shop 9001 l ");
     const unitLevelPrefixRows = sqlite.prepare("SELECT COUNT(*) AS count FROM address_prefix_entries WHERE prefix = ?").get("unit 9 fl 2 ");
+    const lowerGroundPrefixRows = sqlite.prepare("SELECT COUNT(*) AS count FROM address_prefix_entries WHERE prefix = ?").get("shop 2 lg 2 ");
+    const suiteLevelPrefixRows = sqlite.prepare("SELECT COUNT(*) AS count FROM address_prefix_entries WHERE prefix = ?").get("se 2 l 1 79 ");
     sqlite.close();
 
     const earlyShopLevel = await searchAddressIndex("Shop 9001 L 2", 3);
     const earlyUnitLevel = await searchAddressIndex("Unit 9 Fl 2", 3);
+    const earlyLowerGroundLevel = await searchAddressIndex("Shop 2 Lg 2", 3);
+    const earlySuiteLevel = await searchAddressIndex("Se 2 L 1 79", 3);
     const incompleteUnitLevel = await searchAddressIndex("Unit 9 Fl", 3);
     const shopLevel = await searchAddressIndex("Shop 9001 L 2 20 Benjamin Way Belconnen ACT 2617", 3);
     const unitLevel = await searchAddressIndex("Unit 9 Fl 2 118 Broome Street Cottesloe WA 6011", 3);
+    const lowerGroundLevel = await searchAddressIndex("Shop 2 Lg 2 396 Flinders Street Townsville City QLD 4810", 3);
+    const suiteLevel = await searchAddressIndex("Se 2 L 1 79 Denham Street Townsville City QLD 4810", 3);
     const site = await searchAddressIndex("Site V 87 Airfield Road Traralgon VIC 3844", 3);
 
     assert.ok(shopLevelPrefixRows.count >= 1);
     assert.ok(unitLevelPrefixRows.count >= 1);
+    assert.ok(lowerGroundPrefixRows.count >= 1);
+    assert.ok(suiteLevelPrefixRows.count >= 1);
     assert.equal(earlyShopLevel[0].label, "Shop 9001, L 2, 20 Benjamin Way, Belconnen ACT 2617");
     assert.equal(earlyShopLevel[0].refineRequired, false);
     assert.equal(earlyUnitLevel[0].label, "Unit 9, Fl 2, 118 Broome Street, Cottesloe WA 6011");
     assert.equal(earlyUnitLevel[0].refineRequired, false);
+    assert.equal(earlyLowerGroundLevel[0].label, "Shop 2, Lg 2, 396 Flinders Street, Townsville City QLD 4810");
+    assert.equal(earlyLowerGroundLevel[0].refineRequired, false);
+    assert.equal(earlySuiteLevel[0].label, "Se 2, L 1, 79 Denham Street, Townsville City QLD 4810");
+    assert.equal(earlySuiteLevel[0].refineRequired, false);
     assert.deepEqual(incompleteUnitLevel, []);
     assert.equal(shopLevel[0].label, "Shop 9001, L 2, 20 Benjamin Way, Belconnen ACT 2617");
     assert.equal(shopLevel[0].refineRequired, false);
     assert.equal(unitLevel[0].label, "Unit 9, Fl 2, 118 Broome Street, Cottesloe WA 6011");
     assert.equal(unitLevel[0].refineRequired, false);
+    assert.equal(lowerGroundLevel[0].label, "Shop 2, Lg 2, 396 Flinders Street, Townsville City QLD 4810");
+    assert.equal(lowerGroundLevel[0].refineRequired, false);
+    assert.equal(suiteLevel[0].label, "Se 2, L 1, 79 Denham Street, Townsville City QLD 4810");
+    assert.equal(suiteLevel[0].refineRequired, false);
     assert.equal(site[0].label, "Site V, 87 Airfield Road, Traralgon VIC 3844");
     assert.equal(site[0].refineRequired, false);
   });

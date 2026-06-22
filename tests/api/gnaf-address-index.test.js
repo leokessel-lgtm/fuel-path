@@ -698,6 +698,18 @@ test("building-first unit query can resolve exact unit from indexed base signatu
     sqlite.close();
 
     const indexResults = await searchAddressIndex("Tuggeranong Business Centre Unit 2 12 Kett Street Kambah ACT 2902", 3);
+    const buildingUnitOnly = await searchAddressIndex("Tuggeranong Business Centre Unit 2", 3, {
+      searchContext: {
+        nearLat: -35.379,
+        nearLon: 149.064,
+      },
+    });
+    const partialUnit = await searchAddressIndex("Tuggeranong Business Centre Unit 2 12 Kett", 3, {
+      searchContext: {
+        nearLat: -35.379,
+        nearLon: 149.064,
+      },
+    });
     const exactUnit = await geocode({
       query: "Tuggeranong Business Centre Unit 2 12 Kett Street Kambah ACT 2902",
       limit: 3,
@@ -712,6 +724,10 @@ test("building-first unit query can resolve exact unit from indexed base signatu
     assert.match(indexSql, /WHERE entry_type = 'exact' AND unit <> ''/);
     assert.equal(indexResults[0].label, "Tuggeranong Business Centre, Unit 2, 12 Kett Street, Kambah ACT 2902");
     assert.equal(indexResults.length, 1);
+    assert.equal(buildingUnitOnly[0].label, "Tuggeranong Business Centre, Unit 2, 12 Kett Street, Kambah ACT 2902");
+    assert.equal(buildingUnitOnly[0].refineRequired, false);
+    assert.equal(partialUnit[0].label, "Tuggeranong Business Centre, Unit 2, 12 Kett Street, Kambah ACT 2902");
+    assert.equal(partialUnit[0].refineRequired, false);
     assert.equal(exactUnit.suggestions[0].label, "Tuggeranong Business Centre, Unit 2, 12 Kett Street, Kambah ACT 2902");
     assert.equal(exactUnit.suggestions[0].refineRequired, false);
   });

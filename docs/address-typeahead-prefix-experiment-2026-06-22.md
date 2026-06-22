@@ -50,6 +50,7 @@ The tested resolvable P90 target is now achieved in sampled stress runs and boun
 - complete building-first unit queries now try unit-number-filtered exact typeahead before broad base-refine fallback, so rows like `Waterside Unit 52` are not hidden by nearby base suggestions
 - hosted benchmark summaries now include `byGeoSegment` so rural, remote and metro/suburban performance can be read separately from unit/building performance
 - hosted benchmark summaries now also include geo-segment by address-family/category cross tables; the latest 6,400-case staged run shows remote unit/building exact/resolvable P90 15/15 and rural/regional unit/building 15/15, while metro/suburban unit/building remains exact P90 24 and exact P95 28 with resolvable P90 15
+- hosted benchmark rows now include `unitIntentCompleteChars`; the latest 6,400-case staged run shows metro/suburban unit/building exact P90 24 matches unit-intent-complete P90 24, so that exact tail is mostly structural rather than a simple ranking bug
 
 Compact prefix alone is not safe enough. It is fast and reaches low P90 on successful cases, but it can silently pick the wrong locality, sibling unit/shop or same-name building when the first 15 characters are ambiguous.
 
@@ -1898,12 +1899,48 @@ Geo-segment category tail notes:
 | Rural/regional range address | 62 | 10 | 10 | 10 | 10 | 83 ms | 143 ms |
 | Metro/suburban range address | 116 | 12 | 12 | 12 | 12 | 72 ms | 150 ms |
 
+Unit-intent diagnostic rerun:
+
+- artefact: `tmp/geocode-hosted-national-benchmark-2026-06-22-raw-levelprefix-lg-se-unitintent-8state-6400.json`
+- source SQLite: `tmp/gnaf-raw-levelprefix-lg-8state-1m.sqlite`
+- final top/resolvable: 6,400/6,400
+- exact top P50/P90/P95: 10 / 15 / 15
+- resolvable top P50/P90/P95: 10 / 15 / 15
+- wrong top before resolvable: 217
+- request latency P50/P95/max: 0 ms / 1 ms / 175 ms
+- unit intent cases: 1,912
+- unit-intent-complete P50/P90/P95: 6 / 20 / 26
+- exact top before unit intent complete: 37
+- exact top at or after unit intent complete: 1,875
+- exact-top-after-unit-intent delta P50/P90/P95: 6 / 9 / 9
+
+Unit-intent by address family:
+
+| Segment family | Unit intent cases | Unit intent P90 | Unit intent P95 | Exact P90 | Exact P95 | Resolvable P90 | Exact before intent | Top-after-intent delta P90 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| All unit/building | 1,912 | 20 | 26 | 21 | 26 | 15 | 37 | 9 |
+| Remote unit/building | 427 | 8 | 22 | 15 | 22 | 15 | 1 | 9 |
+| Rural/regional unit/building | 447 | 8 | 20 | 15 | 21 | 15 | 9 | 9 |
+| Metro/suburban unit/building | 1,038 | 24 | 27 | 24 | 28 | 15 | 27 | 9 |
+
+Unit-intent by notable state:
+
+| State | Unit intent cases | Unit intent P90 | Unit intent P95 | Exact P90 | Exact P95 | Resolvable P90 | Request P95 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| ACT | 397 | 24 | 26 | 18 | 25 | 15 | 20 ms |
+| QLD | 414 | 26 | 32 | 15 | 26 | 15 | 2 ms |
+| NSW | 171 | 23 | 29 | 15 | 15 | 12 | 1 ms |
+| WA | 286 | 20 | 27 | 15 | 21 | 15 | 1 ms |
+
 Brutal read on geo-segment metrics:
 
 - The rural/remote stress requirement is now visible in the benchmark output instead of inferred from seed names.
 - Remote and rural/regional rows are not the current P90 problem in the staged package. Remote resolvable P90 is 12 and rural/regional exact/resolvable P90 is 12.
 - The harder exact tail is concentrated in metro/suburban and unit/building labels, especially long building-name-plus-unit cases.
 - The cross tables make the same point more sharply: remote unit/building and rural/regional unit/building now both hit exact/resolvable P90 15/15, but metro/suburban unit/building exact P90 is still 24 and exact P95 is still 28.
+- The unit-intent diagnostic explains why: in metro/suburban unit/building rows, unit-intent-complete P90 is also 24. For labels such as `Cairns Central Shopping Centre Shop 22...` or `The Establishment Unit 1203...`, the system cannot safely choose the exact unit before the user has typed the unit term and number.
+- Rural and remote unit intent usually appears much earlier, with unit-intent-complete P90 8. Their exact P90 15 is therefore a smaller post-intent lookup/ranking gap, not the same structural long-building-label problem.
+- The 37 exact-before-intent cases are not a target to optimise aggressively. Some exact rows become safe through address/base evidence before the parsed unit token completes, but treating that as generally safe would re-open sibling-unit risk.
 - Range-address request latency is still visible in all geo segments, especially rural/regional range rows at request P95 83 ms, even though typed-character P90 is fine.
 - The classifier is intentionally simple and benchmark-local. It is evidence segmentation, not a national remoteness taxonomy.
 
@@ -2074,6 +2111,7 @@ What improved:
 - Complete building-first unit queries now use unit-number-filtered exact typeahead before broad base-refine fallback, cutting the staged 6,400-case max request latency to 167 ms.
 - Hosted benchmark output now reports `byGeoSegment`, and the latest 6,400-case staged run includes 1,656 remote and 1,902 rural/regional cases.
 - Hosted benchmark output now reports geo-segment cross tables by address family and category, proving rural/remote unit-building performance separately from metro/suburban unit-building performance.
+- Hosted benchmark output now reports `unitIntentCompleteChars`, making exact-unit P90 failures easier to separate into structurally-too-early versus ranking/index weaknesses.
 
 What remains weak:
 
@@ -2105,6 +2143,8 @@ What remains weak:
 - Rural/remote performance is not the current staged bottleneck: remote resolvable P90 is 12 and rural/regional exact/resolvable P90 is 12. Metro/suburban exact P95 is the uglier tail at 22.
 - The cross-segment rerun is more precise: remote unit/building exact/resolvable P90 is 15/15 and rural/regional unit/building is 15/15, but metro/suburban unit/building exact P90 is still 24 and exact P95 is 28 while only the resolvable path holds at 15.
 - Rural and remote unit/building exact P90 now meets the 15-character target in the staged package, but exact P95 still needs 21 to 22 typed characters. That means the result is good at P90, not a clean exact-unit guarantee.
+- The unit-intent diagnostic proves the metro/suburban exact-unit target is not honestly achievable for many building-first labels at 15 typed characters. Metro/suburban unit/building unit-intent-complete P90 is 24, matching exact P90 24.
+- There is still a post-intent gap: all unit/building rows have top-after-unit-intent delta P90 9. For unit-first rural/remote rows this is the more relevant optimisation target, but it should not be fixed by guessing exact units before the base address is clear.
 - `office`-style building names are a known edge case because `office` can be both a building-name word and a unit descriptor.
 - Context-aware ranking depends on Plan/Nearby having a meaningful route/current-map anchor. Cold start address search without context still lands at rural/unit P90 18 in the corrected hosted-contract run.
 - `wrongTopBeforeResolvable` is still high in the typed-prefix harness because many short prefixes are inherently ambiguous before enough context arrives. This is acceptable only if UI state treats those rows as suggestions, not route commitments.

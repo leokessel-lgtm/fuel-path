@@ -231,6 +231,7 @@ async function runCase(testCase, index) {
     index,
     queryLength: testCase.query.length,
     prefixesTested: prefixes.length,
+    unitIntentCompleteChars: unitIntentCompleteCharsForCase(testCase),
     firstSuggestionChars,
     firstAnyMatchChars,
     firstTopMatchChars,
@@ -574,6 +575,30 @@ function addressParts(value) {
   };
 }
 
+function unitIntentCompleteCharsForCase(testCase) {
+  if (testCase.kind !== "address") return null;
+  const intent = unitIntentFromAddressLabel(testCase.expectedLabel);
+  if (!intent) return null;
+  return unitIntentCompleteChars(testCase.query, intent);
+}
+
+function unitIntentFromAddressLabel(label) {
+  const labelParts = String(label || "").split(",").map((part) => normalise(part)).filter(Boolean);
+  const unitPart = labelParts.find((part) => /^(?:unit|flat|apartment|apt|suite|se|townhouse|shop|office|offc|level|lvl|kiosk|ksk)\s+[a-z0-9-]+\b/.test(part));
+  const unitMatch = unitPart?.match(/^(unit|flat|apartment|apt|suite|se|townhouse|shop|office|offc|level|lvl|kiosk|ksk)\s+([a-z0-9-]+)\b/);
+  if (!unitMatch) return null;
+  return {
+    term: unitMatch[1],
+    number: unitMatch[2],
+  };
+}
+
+function unitIntentCompleteChars(query, intent) {
+  const pattern = new RegExp(`(?:^|\\s)${escapeRegExp(intent.term)}\\s+${escapeRegExp(intent.number)}(?=\\s|$)`, "i");
+  const match = String(query || "").match(pattern);
+  return match ? match.index + match[0].length : null;
+}
+
 function summarise(rows) {
   return {
     overall: summariseGroup(rows),
@@ -592,6 +617,11 @@ function summariseGroup(rows) {
   const topChars = rows.map((row) => row.firstTopMatchChars).filter(Number.isFinite);
   const anyChars = rows.map((row) => row.firstAnyMatchChars).filter(Number.isFinite);
   const resolvableTopChars = rows.map((row) => row.firstResolvableTopChars).filter(Number.isFinite);
+  const unitIntentRows = rows.filter((row) => Number.isFinite(row.unitIntentCompleteChars));
+  const unitIntentCompleteChars = unitIntentRows.map((row) => row.unitIntentCompleteChars);
+  const topAfterUnitIntentDelta = unitIntentRows
+    .map((row) => Number.isFinite(row.firstTopMatchChars) ? row.firstTopMatchChars - row.unitIntentCompleteChars : null)
+    .filter(Number.isFinite);
   const elapsed = rows.map((row) => row.elapsedMs).filter(Number.isFinite);
   const requestElapsed = rows.flatMap((row) => Array.isArray(row.requestElapsedMs) ? row.requestElapsedMs : []).filter(Number.isFinite);
   return {
@@ -618,6 +648,15 @@ function summariseGroup(rows) {
     p50ResolvableTopChars: percentile(resolvableTopChars, 50),
     p90ResolvableTopChars: percentile(resolvableTopChars, 90),
     p95ResolvableTopChars: percentile(resolvableTopChars, 95),
+    unitIntentCases: unitIntentRows.length,
+    exactTopBeforeUnitIntent: unitIntentRows.filter((row) => Number.isFinite(row.firstTopMatchChars) && row.firstTopMatchChars < row.unitIntentCompleteChars).length,
+    exactTopAtOrAfterUnitIntent: unitIntentRows.filter((row) => Number.isFinite(row.firstTopMatchChars) && row.firstTopMatchChars >= row.unitIntentCompleteChars).length,
+    p50UnitIntentCompleteChars: percentile(unitIntentCompleteChars, 50),
+    p90UnitIntentCompleteChars: percentile(unitIntentCompleteChars, 90),
+    p95UnitIntentCompleteChars: percentile(unitIntentCompleteChars, 95),
+    p50TopAfterUnitIntentDeltaChars: percentile(topAfterUnitIntentDelta, 50),
+    p90TopAfterUnitIntentDeltaChars: percentile(topAfterUnitIntentDelta, 90),
+    p95TopAfterUnitIntentDeltaChars: percentile(topAfterUnitIntentDelta, 95),
     p50ElapsedMs: percentile(elapsed, 50),
     p95ElapsedMs: percentile(elapsed, 95),
     p50RequestMs: percentile(requestElapsed, 50),
@@ -724,6 +763,10 @@ function escapeFtsTerm(value) {
   return String(value).replace(/["']/g, " ").replace(/[^\p{L}\p{N}_-]+/gu, " ").trim();
 }
 
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function distribute(total, states) {
   const base = Math.floor(total / states.length);
   const remainder = total % states.length;
@@ -785,6 +828,7 @@ function toCsv(rows) {
     "firstAnyMatchChars",
     "firstTopMatchChars",
     "firstResolvableTopChars",
+    "unitIntentCompleteChars",
     "wrongTopBeforeResolvable",
     "finalAnyMatch",
     "finalTopMatch",

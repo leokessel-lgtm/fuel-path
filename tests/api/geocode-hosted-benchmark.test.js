@@ -175,7 +175,12 @@ test("hosted national benchmark counts ranged base-refine rows as resolvable", a
     const result = JSON.parse(fs.readFileSync(path.join(ROOT, jsonPath), "utf8"));
 
     assert.equal(result.rows[0].firstResolvableTopChars, 10);
+    assert.equal(result.rows[0].unitIntentCompleteChars, 28);
     assert.equal(result.rows[0].wrongTopBeforeResolvable, false);
+    assert.equal(result.summary.byCategory.unit_address.unitIntentCases, 1);
+    assert.equal(result.summary.byCategory.unit_address.p90UnitIntentCompleteChars, 28);
+    assert.equal(result.summary.byCategory.unit_address.exactTopBeforeUnitIntent, 0);
+    assert.equal(result.summary.byCategory.unit_address.exactTopAtOrAfterUnitIntent, 1);
   } finally {
     await api.close();
     fs.rmSync(dir, { recursive: true, force: true });

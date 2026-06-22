@@ -858,7 +858,7 @@ function createGeocoder({ fetchJson, loadStationData }) {
       };
     }
     const addressLookupLimit = safeSearchContext ? Math.max(limit * 4, 20) : limit;
-    const addressSuggestions = await searchAddressIndex(query, addressLookupLimit);
+    const addressSuggestions = await searchAddressIndex(query, addressLookupLimit, { searchContext: safeSearchContext });
     const hintSuggestions = localHintGeocode(query, limit);
     const strongHintSuggestions = hintSuggestions.filter(isStrongLocalHintSuggestion);
     const weakHintSuggestions = hintSuggestions.filter((item) => !isStrongLocalHintSuggestion(item));

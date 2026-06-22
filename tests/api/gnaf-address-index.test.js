@@ -598,12 +598,55 @@ test("number-first context keeps nearby exact address ahead of remote base refin
         nearRadiusKm: 80,
       },
     });
-    const buildingRefine = contextualised.suggestions.find((suggestion) => suggestion.matchType === "building_refine");
 
     assert.equal(contextualised.suggestions[0].label, "93 Tamworth Street, Abermain NSW 2326");
     assert.equal(contextualised.suggestions[0].refineRequired, false);
-    assert.ok(buildingRefine);
-    assert.notEqual(buildingRefine.label, contextualised.suggestions[0].label);
+    assert.ok(contextualised.suggestions.every((suggestion) => suggestion.label !== "Tamworth Shops, 93 Tamworth Street, Dubbo NSW 2830"));
+  });
+});
+
+test("contextual unit prefixes use nearby prefix rows instead of broad typeahead", async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-gnaf-context-prefix-unit-"));
+  const inputPath = path.join(tempDir, "GNAF_CORE.psv");
+  const outputPath = path.join(tempDir, "gnaf-context-prefix-unit.sqlite");
+  fs.writeFileSync(
+    inputPath,
+    [
+      "ADDRESS_DETAIL_PID|ADDRESS_LABEL|FLAT_TYPE|FLAT_NUMBER|NUMBER_FIRST|STREET_NAME|STREET_TYPE|LOCALITY_NAME|STATE|POSTCODE|GEOCODE_TYPE|LONGITUDE|LATITUDE",
+      "GAWA4001|Unit 1, 10 Roy Road, Coodanup WA 6210|Unit|1|10|Roy|Road|Coodanup|WA|6210|PROPERTY CENTROID|115.750|-32.550",
+      "GAVIC4002|Unit 1, 10 Roseland Road, Wodonga VIC 3690|Unit|1|10|Roseland|Road|Wodonga|VIC|3690|PROPERTY CENTROID|146.887|-36.123",
+      "GANSW4003|Unit 1, 10 Rocca Street, Ryde NSW 2112|Unit|1|10|Rocca|Street|Ryde|NSW|2112|PROPERTY CENTROID|151.105|-33.810",
+    ].join("\n"),
+  );
+
+  execFileSync(
+    process.execPath,
+    [
+      "scripts/build-gnaf-address-index.mjs",
+      "--input",
+      inputPath,
+      "--output",
+      outputPath,
+      "--omit-legacy-fts",
+      "--omit-search-backstop",
+    ],
+    { cwd: path.resolve(__dirname, "../.."), stdio: "ignore" },
+  );
+
+  await withEnv({ FUEL_PATH_GNAF_SQLITE_PATH: outputPath, FUEL_PATH_GEOCODE_PROVIDER: "nominatim" }, async () => {
+    const contextualised = await geocode({
+      query: "Unit 1 10 Ro",
+      limit: 3,
+      sessionToken: "context-prefix-unit",
+      searchContext: {
+        nearLat: -36.123,
+        nearLon: 146.887,
+        nearRadiusKm: 80,
+      },
+    });
+
+    assert.equal(contextualised.suggestions[0].label, "Unit 1, 10 Roseland Road, Wodonga VIC 3690");
+    assert.equal(contextualised.suggestions[0].refineRequired, false);
   });
 });
 

@@ -30,6 +30,7 @@ const MIN_POI_TOP_RATE = Number(args.minPoiTopRate || process.env.FUEL_PATH_HOST
 const MAX_ADDRESS_P90_CHARS = Number(args.maxAddressP90Chars || process.env.FUEL_PATH_HOSTED_BENCHMARK_MAX_ADDRESS_P90_CHARS || 42);
 const MAX_POI_P90_CHARS = Number(args.maxPoiP90Chars || process.env.FUEL_PATH_HOSTED_BENCHMARK_MAX_POI_P90_CHARS || 12);
 const REQUEST_TIMEOUT_MS = Number(args.requestTimeoutMs || process.env.FUEL_PATH_HOSTED_BENCHMARK_REQUEST_TIMEOUT_MS || 8000);
+const PROGRESS_EVERY = Number(args.progressEvery || process.env.FUEL_PATH_HOSTED_BENCHMARK_PROGRESS_EVERY || 50);
 const fetchCalls = {
   total: 0,
   gnafApi: 0,
@@ -83,6 +84,9 @@ console.log(`Starting hosted national geocode benchmark: ${addressCases.length} 
 
 const rows = [];
 for (let index = 0; index < cases.length; index += 1) {
+  if (PROGRESS_EVERY === 1 || (PROGRESS_EVERY > 1 && (index + 1) % PROGRESS_EVERY === 0)) {
+    console.log(`case ${index + 1}/${cases.length} ${cases[index].kind} ${cases[index].state || ""} ${cases[index].query}`);
+  }
   rows.push(await runCase(cases[index], index + 1));
   if ((index + 1) % 50 === 0 || index === cases.length - 1) {
     const partial = summarise(rows);
@@ -261,6 +265,9 @@ function sampleAddressCases(sqlitePath, total) {
   const { DatabaseSync } = require("node:sqlite");
   const database = new DatabaseSync(sqlitePath, { readOnly: true });
   const hasAddressFts = sqliteTableExists(database, "address_fts");
+  const hasHybridTypeaheadFts =
+    sqliteTableExists(database, "address_typeahead_fts") &&
+    sqliteTableExists(database, "address_typeahead_entries");
   const addressColumns = sqliteTableColumns(database, "addresses");
   const hasSearchText = addressColumns.has("search_text");
   const perState = distribute(total, STATE_ORDER);
@@ -277,6 +284,15 @@ function sampleAddressCases(sqlitePath, total) {
           WHERE address_fts MATCH ?
           LIMIT 300
         `)
+        : hasHybridTypeaheadFts ? database.prepare(`
+          SELECT a.id, a.label, a.lat, a.lon, a.state, a.postcode, a.locality, '' AS search_text
+          FROM address_typeahead_fts f
+          JOIN address_typeahead_entries e ON e.entry_id = f.entry_id
+          JOIN addresses a ON a.id = e.address_id
+          WHERE address_typeahead_fts MATCH ?
+            AND e.entry_type = 'exact'
+          LIMIT 800
+        `)
         : hasSearchText ? database.prepare(`
           SELECT id, label, lat, lon, state, postcode, locality, search_text
           FROM addresses
@@ -290,6 +306,8 @@ function sampleAddressCases(sqlitePath, total) {
         `);
       const seedRows = hasAddressFts
         ? statement.all(ftsQuery(seed))
+        : hasHybridTypeaheadFts
+          ? statement.all(ftsQuery(seed))
         : hasSearchText
           ? statement.all(`%${normalise(seed)}%`)
           : statement.all(...addressFallbackParams(seed));

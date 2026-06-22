@@ -816,6 +816,48 @@ test("unit-like SQLite queries wait for a meaningful street token before typeahe
   });
 });
 
+test("exact unit refinement skips level markers before street number", async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-gnaf-level-unit-refine-"));
+  const inputPath = path.join(tempDir, "GNAF_CORE.psv");
+  const outputPath = path.join(tempDir, "gnaf-level-unit-refine.sqlite");
+  fs.writeFileSync(
+    inputPath,
+    [
+      "ADDRESS_DETAIL_PID|ADDRESS_LABEL|FLAT_TYPE|FLAT_NUMBER|LEVEL_TYPE|LEVEL_NUMBER|NUMBER_FIRST|STREET_NAME|STREET_TYPE|LOCALITY_NAME|STATE|POSTCODE|GEOCODE_TYPE|LONGITUDE|LATITUDE",
+      "GAACT7001|Shop 9001, L 2, 20 Benjamin Way, Belconnen ACT 2617|Shop|9001|L|2|20|Benjamin|Way|Belconnen|ACT|2617|PROPERTY CENTROID|149.070|-35.240",
+      "GAWA7002|Unit 9, Fl 2, 118 Broome Street, Cottesloe WA 6011|Unit|9|Fl|2|118|Broome|Street|Cottesloe|WA|6011|PROPERTY CENTROID|115.754|-31.994",
+      "GAVIC7003|Site V, 87 Airfield Road, Traralgon VIC 3844|Site|V|||87|Airfield|Road|Traralgon|VIC|3844|PROPERTY CENTROID|146.538|-38.207",
+    ].join("\n"),
+  );
+
+  execFileSync(
+    process.execPath,
+    [
+      "scripts/build-gnaf-address-index.mjs",
+      "--input",
+      inputPath,
+      "--output",
+      outputPath,
+      "--omit-legacy-fts",
+      "--omit-search-backstop",
+    ],
+    { cwd: path.resolve(__dirname, "../.."), stdio: "ignore" },
+  );
+
+  await withEnv({ FUEL_PATH_GNAF_SQLITE_PATH: outputPath }, async () => {
+    const shopLevel = await searchAddressIndex("Shop 9001 L 2 20 Benjamin Way Belconnen ACT 2617", 3);
+    const unitLevel = await searchAddressIndex("Unit 9 Fl 2 118 Broome Street Cottesloe WA 6011", 3);
+    const site = await searchAddressIndex("Site V 87 Airfield Road Traralgon VIC 3844", 3);
+
+    assert.equal(shopLevel[0].label, "Shop 9001, L 2, 20 Benjamin Way, Belconnen ACT 2617");
+    assert.equal(shopLevel[0].refineRequired, false);
+    assert.equal(unitLevel[0].label, "Unit 9, Fl 2, 118 Broome Street, Cottesloe WA 6011");
+    assert.equal(unitLevel[0].refineRequired, false);
+    assert.equal(site[0].label, "Site V, 87 Airfield Road, Traralgon VIC 3844");
+    assert.equal(site[0].refineRequired, false);
+  });
+});
+
 test("lot and range exact labels materialise compact prefix rows", async () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-gnaf-lot-range-prefix-"));
   const inputPath = path.join(tempDir, "GNAF_CORE.psv");

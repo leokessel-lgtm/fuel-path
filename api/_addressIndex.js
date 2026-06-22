@@ -644,7 +644,7 @@ function exactUnitRefinementNeedle(needle) {
   );
   const houseIndex = lotIndex >= 0
     ? lotIndex
-    : tokens.findIndex((token, index) => index > unitIndex + 1 && normalisedAddressNumberToken(token));
+    : firstStreetNumberIndexAfterUnit(tokens, unitIndex + 2);
   if (houseIndex < 0) return null;
   const baseSignature = tokens.slice(houseIndex).join(" ");
   if (significantAddressTokens(baseSignature).length < 3) return null;
@@ -673,6 +673,17 @@ function buildingUnitBareRefinementNeedle(needle) {
   const buildingNeedle = tokens.slice(0, unitIndex).join(" ");
   if (buildingNeedle.length < 8) return null;
   return { buildingNeedle };
+}
+
+function firstStreetNumberIndexAfterUnit(tokens, startIndex) {
+  for (let index = startIndex; index < tokens.length; index += 1) {
+    if (SQLITE_LEVEL_MARKER_TERMS.has(tokens[index]) && normalisedUnitNumberToken(tokens[index + 1])) {
+      index += 1;
+      continue;
+    }
+    if (normalisedAddressNumberToken(tokens[index])) return index;
+  }
+  return -1;
 }
 
 function normalisedUnitNumberToken(value) {
@@ -1088,8 +1099,9 @@ const SQLITE_FTS_STOP_TERMS = new Set([
   "unit",
 ]);
 
-const SQLITE_UNIT_TERMS = new Set(["apartment", "apt", "flat", "level", "lvl", "office", "offc", "shop", "suite", "townhouse", "unit"]);
+const SQLITE_UNIT_TERMS = new Set(["apartment", "apt", "flat", "level", "lvl", "office", "offc", "shop", "site", "suite", "townhouse", "unit"]);
 const SQLITE_BARE_UNIT_REFINE_TERMS = new Set(["apartment", "apt", "flat", "level", "lvl", "shop", "suite", "townhouse", "unit"]);
+const SQLITE_LEVEL_MARKER_TERMS = new Set(["fl", "floor", "l", "level", "lvl"]);
 const SQLITE_STREET_TYPE_TERMS = new Set([
   "avenue",
   "boulevard",

@@ -187,6 +187,63 @@ test("hosted national benchmark counts ranged base-refine rows as resolvable", a
   }
 });
 
+test("hosted national benchmark counts lot-style base-refine rows as resolvable", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-hosted-benchmark-lot-refine-"));
+  const inputPath = path.join(dir, "GNAF_CORE.psv");
+  const sqlitePath = path.join(dir, "gnaf-hosted-benchmark-lot-refine.sqlite");
+  fs.writeFileSync(
+    inputPath,
+    [
+      "ADDRESS_DETAIL_PID|ADDRESS_LABEL|NUMBER_FIRST|STREET_NAME|STREET_TYPE|LOCALITY_NAME|STATE|POSTCODE|GEOCODE_TYPE|LONGITUDE|LATITUDE",
+      "GASA9001|L1911 Comacchio Close, Coober Pedy SA 5723|L1911|Comacchio|Close|Coober Pedy|SA|5723|PROPERTY CENTROID|134.754|-29.014",
+    ].join("\n"),
+  );
+  execFileSync(
+    process.execPath,
+    ["scripts/build-gnaf-address-index.mjs", "--input", inputPath, "--output", sqlitePath, "--omit-legacy-fts", "--omit-search-backstop"],
+    { cwd: ROOT, stdio: "ignore" },
+  );
+  const api = await startLotRefineApi();
+  try {
+    const { stdout } = await execFileAsync(
+      process.execPath,
+      [
+        "scripts/geocode-hosted-national-benchmark.mjs",
+        "--mode",
+        "http",
+        "--api-base",
+        api.url,
+        "--address-sqlite",
+        sqlitePath,
+        "--address-count",
+        "1",
+        "--poi-count",
+        "0",
+        "--states",
+        "SA",
+        "--min-poi-top-rate",
+        "0",
+        "--max-address-p90-chars",
+        "80",
+        "--delay-ms",
+        "0",
+      ],
+      { cwd: ROOT, timeout: 30_000 },
+    );
+    const jsonPath = stdout.match(/"jsonPath": "([^"]+)"/)?.[1];
+    assert.ok(jsonPath, stdout);
+    const result = JSON.parse(fs.readFileSync(path.join(ROOT, jsonPath), "utf8"));
+
+    assert.equal(result.rows[0].firstResolvableTopChars, 10);
+    assert.equal(result.rows[0].firstTopMatchChars, 41);
+    assert.equal(result.rows[0].wrongTopBeforeResolvable, false);
+    assert.equal(result.summary.byState.SA.p90ResolvableTopChars, 10);
+  } finally {
+    await api.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 function buildAddressFixture(rows = ADDRESS_ROWS, extraArgs = []) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-hosted-benchmark-"));
   const inputPath = path.join(dir, "GNAF_CORE.psv");
@@ -204,6 +261,53 @@ function buildAddressFixture(rows = ADDRESS_ROWS, extraArgs = []) {
     { cwd: ROOT, stdio: "ignore" },
   );
   return { dir, inputPath, sqlitePath };
+}
+
+async function startLotRefineApi() {
+  const exact = {
+    label: "L1911 Comacchio Close, Coober Pedy SA 5723",
+    state: "SA",
+    postcode: "5723",
+    lat: -29.014,
+    lon: 134.754,
+    provider: "fuel_path_gnaf",
+    type: "address",
+    matchType: "exact_address",
+    suggestionType: "exact_address",
+  };
+  const refine = {
+    label: "L1911 Comacchio Close, L1911 Comacchio Close, Coober Pedy SA 5723",
+    state: "SA",
+    postcode: "5723",
+    lat: -29.014,
+    lon: 134.754,
+    provider: "fuel_path_gnaf",
+    type: "address",
+    matchType: "building_refine",
+    suggestionType: "base_address",
+    refineRequired: true,
+  };
+  const server = http.createServer((request, response) => {
+    const url = new URL(request.url, "http://127.0.0.1");
+    if (url.pathname !== "/api/geocode") {
+      sendJson(response, 404, { error: "not_found" });
+      return;
+    }
+    const query = url.searchParams.get("q") || "";
+    const suggestions = query.includes("5723") ? [exact] : [refine, exact];
+    sendJson(response, 200, {
+      provider: "test",
+      lookupStatus: "ok",
+      location: suggestions[0],
+      suggestions,
+    });
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  return {
+    url: `http://127.0.0.1:${address.port}`,
+    close: () => new Promise((resolve) => server.close(resolve)),
+  };
 }
 
 async function startRangedRefineApi() {

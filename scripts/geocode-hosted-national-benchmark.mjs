@@ -557,8 +557,11 @@ function addressParts(value) {
   const unitMatch = unitPart.match(/^(?:unit|flat|apartment|apt|suite|se|townhouse|shop|office|offc|level|lvl|kiosk|ksk)\s+([a-z0-9-]+)\b/);
   const statePostcodeMatch = normalised.match(/\b(nsw|act|qld|vic|wa|sa|tas|nt)\s+(\d{4})\b/);
   if (!statePostcodeMatch) return null;
-  const streetSource = labelParts.filter((part) => part !== unitPart).join(" ");
-  const streetPattern = /\b(\d+[a-z]?(?:(?:-|\s+)\d+[a-z]?)?)\s+([a-z0-9 ]+?)\s+(street|road|avenue|drive|highway|terrace|circuit|way|lane|place|court|crescent|boulevard|parade|parkway|esplanade|square)\b/g;
+  const streetSource = labelParts
+    .filter((part) => part !== unitPart)
+    .join(" ")
+    .replace(/\bl(\d+[a-z]?)\b/g, "lot $1");
+  const streetPattern = /\b(?:lot\s+)?(\d+[a-z]?(?:(?:-|\s+)\d+[a-z]?)?)\s+([a-z0-9 ]+?)\s+(street|road|avenue|drive|highway|terrace|circuit|way|lane|place|court|close|crescent|boulevard|parade|parkway|esplanade|square)\b/g;
   const stateIndex = streetSource.lastIndexOf(` ${statePostcodeMatch[1]}`);
   const streetMatches = [...streetSource.matchAll(streetPattern)].filter((match) => stateIndex < 0 || match.index < stateIndex);
   const streetMatch = streetMatches.at(-1);

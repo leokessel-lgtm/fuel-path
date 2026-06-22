@@ -31,6 +31,7 @@ The tested resolvable P90 target is now achieved in sampled stress runs and boun
 - after adding explicit rural/remote geo-segment metrics, the same 6,400-case run shows remote address P90 15 exact / 12 resolvable and rural/regional P90 12 exact / 12 resolvable; the harder remaining exact tail is metro/suburban unit-heavy rows
 - after adding a unit-plus-lot intent guard, the existing full-national compact runtime reran the 800-case rural/unit context benchmark at 800/800 final top/resolvable, exact P90 15, resolvable P90 15 and request P95 62 ms
 - after rerunning the existing full-national compact runtime with unit-intent diagnostics, the 800-case rural/unit context benchmark again hit 800/800 final top/resolvable and exact/resolvable P90 15, but SA exact/resolvable P90 was still 36 and unit/building exact P90 was still 22
+- after fixing the benchmark matcher to recognise `L123`/`Lot 123` lot-style bases and `Close` street types, the same 800-case full-national diagnostic still hit exact P90 15 but improved overall resolvable P90 to 12 and SA resolvable P90 from 36 to 15
 - unit/building resolvable P90 is still 15 in that 400-case run, and exact unit/building P90 is still 28
 - the broad exact-unit index raised the full national temp runtime from about 14 GB to about 16 GB; the partial-index temp file still occupies 16 GB until rebuilt/vacuumed, but currently reports about 1.97 GB free pages after dropping the broad index
 - compact prefix is only safe as a narrow house-number-first fast path
@@ -2083,6 +2084,68 @@ Brutal read on the unit-intent rerun:
 - Latency is acceptable at P95 but still has outliers. Max request latency is 3,268 ms, so the runtime still needs serving-shape work before it is product-comfortable.
 - The next iteration should profile SA wrong-top-before-resolvable rows and remote unit/building rows before another broad rebuild. Rebuilding without knowing that tail risks preserving the same weakness at national scale.
 
+## Full-National Lot-Base Matcher Rerun
+
+The unit-intent diagnostic exposed a measurement bug, not just a ranker problem. The local runtime was already surfacing safe `base_address/refineRequired` rows for Coober Pedy `L<number>` lot-style labels, but the benchmark parser did not recognise `L123` as a lot number or `Close` as a street type. That meant safe base/refine suggestions were not counted as resolvable for labels such as `L1911 Comacchio Close`.
+
+Implementation:
+
+- `scripts/geocode-hosted-national-benchmark.mjs` now normalises `L123` to `Lot 123` inside `addressParts`.
+- The benchmark street parser now recognises `Close`.
+- Regression coverage proves that a safe base/refine row for `L1911 Comacchio Close` counts as resolvable while the exact top match still waits for the full exact label.
+
+Corrected full-national 800-case rerun:
+
+- artefact: `tmp/geocode-hosted-national-benchmark-2026-06-22-national-ftscolumn-lotparts-800.json`
+- source SQLite: `tmp/gnaf-national-hybrid-runtime-ftscolumn.sqlite`
+- profile: `rural-unit`
+- flag: `--case-context`
+- cases: 800 addresses, 100 per benchmark state
+- final top/resolvable: 800/800
+- exact top P50/P90/P95: 10 / 15 / 20
+- resolvable top P50/P90/P95: 10 / 12 / 15
+- unit-intent-complete P50/P90/P95: 6 / 22 / 28
+- wrong top before resolvable: 32
+- request latency P50/P95/max: 1 ms / 56 ms / 3,229 ms
+- elapsed latency P50/P95: 4 ms / 293 ms
+
+Corrected family notes:
+
+| Segment | Cases | Final top/resolvable | Exact P90 | Exact P95 | Resolvable P90 | Resolvable P95 | Request P95 | Wrong top before resolvable |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Standard address | 643 | 643/643 | 10 | 10 | 10 | 10 | 52 ms | 12 |
+| Unit/building address | 157 | 157/157 | 22 | 28 | 15 | 15 | 64 ms | 20 |
+
+Corrected geo-segment unit/building notes:
+
+| Geo segment | Cases | Final top/resolvable | Exact P90 | Exact P95 | Resolvable P90 | Unit-intent P90 | Request P95 | Wrong top before resolvable |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Metro/suburban unit/building | 65 | 65/65 | 29 | 34 | 15 | 29 | 111 ms | 8 |
+| Remote unit/building | 67 | 67/67 | 24 | 28 | 15 | 23 | 64 ms | 12 |
+| Rural/regional unit/building | 25 | 25/25 | 15 | 15 | 15 | 7 | 17 ms | 0 |
+
+Corrected state notes:
+
+| State | Cases | Exact P90 | Exact P95 | Resolvable P90 | Resolvable P95 | Unit-intent P90 | Request P95 | Wrong top before resolvable |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| ACT | 100 | 22 | 30 | 15 | 15 | 34 | 400 ms | 15 |
+| NSW | 100 | 12 | 12 | 12 | 12 | 6 | 20 ms | 0 |
+| NT | 100 | 12 | 15 | 12 | 15 | 7 | 45 ms | 0 |
+| QLD | 100 | 12 | 15 | 12 | 15 | 6 | 89 ms | 2 |
+| SA | 100 | 36 | 39 | 15 | 15 | 7 | 47 ms | 13 |
+| TAS | 100 | 10 | 10 | 10 | 10 | 8 | 46 ms | 0 |
+| VIC | 100 | 12 | 12 | 12 | 12 | 7 | 29 ms | 1 |
+| WA | 100 | 22 | 26 | 15 | 15 | 27 | 25 ms | 1 |
+
+Brutal read on the lot-base matcher rerun:
+
+- The resolvable target is stronger than the previous full-national diagnostic showed: overall resolvable P90 is now 12, not 15, and SA resolvable P90 is now 15, not 36.
+- This was a measurement correction, not a runtime ranking win. Exact top P90 is still 15 overall, SA exact P90 is still 36, and unit/building exact P90 is still 22.
+- The safer product story holds: `L<number>` Coober Pedy rows can surface a useful base/refine result early, but the app still must not treat that as an exact route endpoint.
+- Remote unit/building remains a real exactness tail: exact P90 is 24 and unit-intent P90 is 23, even though resolvable P90 is 15.
+- The latency story did not get clean. Request P95 improved to 56 ms, but elapsed P95 is 293 ms and max request latency is still 3,229 ms.
+- The next ranker work should target exact-unit/building tails and latency outliers. The SA resolvable-path panic was mostly a benchmark parser bug.
+
 ## Safety Rerun After Civic-Number Guard
 
 The manual 994k-row probe found a real safety issue: number-first queries could fall back to token-overlap rows with a different civic street number when the exact address was absent from the sample.
@@ -2197,15 +2260,15 @@ What remains weak:
 - The latest full-national 400-case run hit overall exact P90 15 and resolvable P90 12, but exact unit/building P90 remained 28.
 - Full national request latency is improved but not fully product-ready: latest request P95 was 70 ms overall, 196 ms for unit/building rows, and max request latency still reached 2440 ms.
 - The broad exact-unit index raised the full-national temp runtime footprint from about 14 GB to about 16 GB; the partial-index temp file still needs rebuild/vacuum evidence before claiming a smaller packaged size.
-- The 800-case full-national unit-intent rerun now passes the headline gate, but it exposes SA and remote unit/building tails that the staged sample understated.
+- The corrected 800-case full-national unit-intent rerun now passes the headline gate with more margin on the resolvable path, but it still exposes exact SA and remote unit/building tails that the staged sample understated.
 - Prefix-only continues to fail safety cases: wrong locality, wrong street number, sibling unit/shop and same-site building aliases.
 - The compact runtime-only index is smaller, but it requires benchmark and tooling paths to use typeahead FTS rather than legacy `search_text`.
 - Guarded unit/building P90 is exactly 15. That meets the target, but leaves no margin.
 - Unit/building exact P95 remains weak at 30 because exact shop/unit selection may require typing the specific unit token.
 - Overall exact P95 drifted to 24 in the latest 400-case run, so exact typed-character performance still has a tail even while exact P90 holds at 15.
-- SA exact/resolvable P90 and ACT exact P90 remain weak in the wider full-national run, even though ACT resolvable P90 improved with context-aware typeahead.
-- SA is now the worst current full-national state tail: exact/resolvable P90 is 36, exact/resolvable P95 is 39 and wrong-top-before-resolvable is 26 in the latest 800-case diagnostic rerun.
-- Remote unit/building is weaker in the full-national diagnostic rerun than in the staged package: exact P90 is 24, unit-intent P90 is 23 and wrong-top-before-resolvable is 13.
+- SA exact P90 and ACT exact P90 remain weak in the wider full-national run, even though the corrected resolvable path now meets the 15-character target.
+- SA is still the worst exact full-national state tail: exact P90 is 36 and exact P95 is 39, but the corrected lot-base matcher brings SA resolvable P90/P95 down to 15/15.
+- Remote unit/building is weaker in the full-national diagnostic rerun than in the staged package: exact P90 is 24, unit-intent P90 is 23 and wrong-top-before-resolvable is 12 after the lot-base matcher correction.
 - Range-address latency remains weak until the current range-prefix backfill is replaced by a fresh national rebuild and the remaining cold number-first range spikes are profiled.
 - Short building/venue-name prefixes can still be slow before a civic number is typed, because the embedded-core fast path needs address-number evidence.
 - Building/venue prefixes now have local key material in the builder, but this has not yet been proven in a fresh full-national package.
@@ -2236,7 +2299,7 @@ Next:
 - Rebuild the full national runtime through the patched builder and rerun the 400-case and 800-case rural/unit benchmarks against that fresh package.
 - Use the 8-state 994,401-row staged rebuild as the current pre-national checkpoint, then move to a full national raw rebuild or explicit per-state shard build.
 - Carry the level-aware `Lg`/`Se` exact-prefix changes into the next full-national raw rebuild before claiming national unit-level latency gains.
-- Profile the latest 800-case SA wrong-top-before-resolvable rows and separate locality/state ambiguity from missing prefix/rank evidence.
+- Treat the latest 800-case SA tail as an exactness problem, not a resolvable-path failure; profile the remaining SA wrong-top-before-resolvable rows only where they are not safe base/refine rows.
 - Profile remote unit/building wrong-top-before-resolvable rows before treating rural/remote unit-building as solved nationally.
 - Rerun the 800-case hosted national benchmark after the SA/remote serving-shape pass, not before.
 - Recover exact unit/building P90 margin without reopening broad `unit + number` FTS scans.

@@ -650,6 +650,51 @@ test("contextual unit prefixes use nearby prefix rows instead of broad typeahead
   });
 });
 
+test("building-first unit query can resolve exact unit from indexed base signature", async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-gnaf-exact-unit-refine-"));
+  const inputPath = path.join(tempDir, "GNAF_CORE.psv");
+  const outputPath = path.join(tempDir, "gnaf-exact-unit-refine.sqlite");
+  fs.writeFileSync(
+    inputPath,
+    [
+      "ADDRESS_DETAIL_PID|ADDRESS_LABEL|BUILDING_NAME|FLAT_TYPE|FLAT_NUMBER|NUMBER_FIRST|STREET_NAME|STREET_TYPE|LOCALITY_NAME|STATE|POSTCODE|GEOCODE_TYPE|LONGITUDE|LATITUDE",
+      "GAACT5001|Tuggeranong Business Centre, Unit 1, 12 Kett Street, Kambah ACT 2902|Tuggeranong Business Centre|Unit|1|12|Kett|Street|Kambah|ACT|2902|PROPERTY CENTROID|149.063|-35.378",
+      "GAACT5002|Tuggeranong Business Centre, Unit 2, 12 Kett Street, Kambah ACT 2902|Tuggeranong Business Centre|Unit|2|12|Kett|Street|Kambah|ACT|2902|PROPERTY CENTROID|149.064|-35.379",
+      "GAACT5003|Tuggeranong Business Centre, Unit 3, 12 Kett Street, Kambah ACT 2902|Tuggeranong Business Centre|Unit|3|12|Kett|Street|Kambah|ACT|2902|PROPERTY CENTROID|149.065|-35.380",
+    ].join("\n"),
+  );
+
+  execFileSync(
+    process.execPath,
+    [
+      "scripts/build-gnaf-address-index.mjs",
+      "--input",
+      inputPath,
+      "--output",
+      outputPath,
+      "--omit-legacy-fts",
+      "--omit-search-backstop",
+    ],
+    { cwd: path.resolve(__dirname, "../.."), stdio: "ignore" },
+  );
+
+  await withEnv({ FUEL_PATH_GNAF_SQLITE_PATH: outputPath, FUEL_PATH_GEOCODE_PROVIDER: "nominatim" }, async () => {
+    const exactUnit = await geocode({
+      query: "Tuggeranong Business Centre Unit 2 12 Kett Street Kambah ACT 2902",
+      limit: 3,
+      sessionToken: "exact-unit-refine",
+      searchContext: {
+        nearLat: -35.379,
+        nearLon: 149.064,
+        nearRadiusKm: 80,
+      },
+    });
+
+    assert.equal(exactUnit.suggestions[0].label, "Tuggeranong Business Centre, Unit 2, 12 Kett Street, Kambah ACT 2902");
+    assert.equal(exactUnit.suggestions[0].refineRequired, false);
+  });
+});
+
 test("unit-like SQLite queries wait for a meaningful street token before typeahead", async () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-gnaf-unit-readiness-"));
   const inputPath = path.join(tempDir, "GNAF_CORE.psv");

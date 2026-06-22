@@ -218,6 +218,8 @@ function searchSqliteHybridIndex(database, needle, limit, searchContext = null) 
         return hybridRowsToSuggestions(useContextualPrefixRows ? prefixRows : preferExactUnitPrefixRows(prefixRows), needle, 930);
       }
     }
+    const exactUnitRows = searchSqliteExactUnitEntries(database, needle, limit);
+    if (exactUnitRows.length) return hybridRowsToSuggestions(exactUnitRows, needle, 960);
     const typeaheadRows = searchSqliteTypeaheadEntries(database, needle, limit);
     return hybridRowsToSuggestions(typeaheadRows, needle);
   }
@@ -387,6 +389,65 @@ function searchSqliteTypeaheadEntries(database, needle, limit) {
       a.label
     LIMIT ?
   `).all(ftsQuery, needle, `${needle}%`, `% ${needle}%`, Math.max(1, Math.min(Number(limit) || 5, 20)));
+}
+
+function searchSqliteExactUnitEntries(database, needle, limit) {
+  if (!sqliteIndexExists(database, "address_typeahead_base_unit_idx")) return [];
+  const refinement = exactUnitRefinementNeedle(needle);
+  if (!refinement) return [];
+  return database.prepare(`
+    SELECT
+      e.entry_id,
+      e.entry_type,
+      e.refine_required,
+      e.rank_weight,
+      e.base_signature AS key_text,
+      e.base_signature,
+      e.display_title AS entry_display_title,
+      e.display_subtitle AS entry_display_subtitle,
+      a.id AS address_id,
+      a.label AS address_label,
+      a.lat,
+      a.lon,
+      a.state,
+      a.postcode,
+      a.locality,
+      a.accuracy,
+      a.display_title AS address_display_title,
+      a.display_subtitle AS address_display_subtitle
+    FROM address_typeahead_entries e
+    JOIN addresses a ON a.id = e.address_id
+    WHERE e.base_signature = ?
+      AND e.unit = ?
+      AND e.entry_type = 'exact'
+    ORDER BY e.rank_weight DESC, LENGTH(a.label), a.label
+    LIMIT ?
+  `).all(refinement.baseSignature, refinement.unit, Math.max(1, Math.min(Number(limit) || 5, 20)));
+}
+
+function exactUnitRefinementNeedle(needle) {
+  const tokens = normaliseAddressText(needle).split(/\s+/).filter(Boolean);
+  const unitIndex = tokens.findIndex((token, index) => SQLITE_UNIT_TERMS.has(token) && normalisedUnitNumberToken(tokens[index + 1]));
+  if (unitIndex < 0) return null;
+  const unitNumber = normalisedUnitNumberToken(tokens[unitIndex + 1]);
+  const houseIndex = tokens.findIndex((token, index) => index > unitIndex + 1 && normalisedAddressNumberToken(token));
+  if (houseIndex < 0) return null;
+  const baseSignature = tokens.slice(houseIndex).join(" ");
+  if (significantAddressTokens(baseSignature).length < 3) return null;
+  return {
+    unit: `${tokens[unitIndex]} ${unitNumber}`,
+    baseSignature,
+  };
+}
+
+function normalisedUnitNumberToken(value) {
+  const match = String(value || "").toLowerCase().match(/^[a-z0-9-]+$/);
+  return match ? match[0] : "";
+}
+
+function normalisedAddressNumberToken(value) {
+  const match = String(value || "").toLowerCase().match(/^(?:lot\s*)?[a-z]?\d+[a-z]?(?:-\d+[a-z]?)?$/);
+  return match ? match[0] : "";
 }
 
 function prefixRowsAmbiguous(rows) {
@@ -697,6 +758,16 @@ function sqliteTableExists(database, table) {
   return exists;
 }
 
+function sqliteIndexExists(database, indexName) {
+  const cacheKey = `${configuredSqlitePath()}:${indexName}`;
+  if (!sqliteIndexExists.cache) sqliteIndexExists.cache = new Map();
+  if (sqliteIndexExists.cache.has(cacheKey)) return sqliteIndexExists.cache.get(cacheKey);
+  const row = database.prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND name = ?").get(indexName);
+  const exists = Boolean(row?.name);
+  sqliteIndexExists.cache.set(cacheKey, exists);
+  return exists;
+}
+
 function isLargeSqliteIndex(sqlitePath) {
   if (!sqlitePath) return false;
   const threshold = Number(process.env.FUEL_PATH_GNAF_LARGE_SQLITE_BYTES || 1_000_000_000);
@@ -755,7 +826,7 @@ const SQLITE_FTS_STOP_TERMS = new Set([
   "unit",
 ]);
 
-const SQLITE_UNIT_TERMS = new Set(["apartment", "apt", "flat", "level", "lvl", "office", "shop", "suite", "townhouse", "unit"]);
+const SQLITE_UNIT_TERMS = new Set(["apartment", "apt", "flat", "level", "lvl", "office", "offc", "shop", "suite", "townhouse", "unit"]);
 const SQLITE_STREET_TYPE_TERMS = new Set([
   "avenue",
   "boulevard",

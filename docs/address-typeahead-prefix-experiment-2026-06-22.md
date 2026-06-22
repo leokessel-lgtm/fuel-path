@@ -14,6 +14,7 @@ The tested P90 target is now achieved in sampled stress runs, but not yet proven
 - a unit-prefix rebuild improves request latency and unit-first exact lookup, but raises the 994,401-row sample to 952 MB
 - metadata trimming reduces the 8-state 200k compact sample from 191 MB to 182 MB while keeping the rural/unit hosted-contract benchmark at overall P90 15
 - FTS `detail=column` reduces the 8-state 200k compact sample again to 176 MB without hurting the rural/unit benchmark
+- the larger 994,401-row `detail=column` sample is now 858 MB and keeps rural/unit hosted-contract resolvable P90 at 15
 
 Compact prefix alone is not safe enough. It is fast and reaches low P90 on successful cases, but it can silently pick the wrong locality, sibling unit/shop or same-name building when the first 15 characters are ambiguous.
 
@@ -232,6 +233,7 @@ Measured samples:
 | 8-state metadata-trim + unit-prefix runtime sample | `--states ACT,NSW,NT,QLD,SA,TAS,VIC,WA --limit-per-state 25000 --omit-legacy-fts --omit-search-backstop` | 182 MB | 787,938 | no |
 | 8-state FTS detail=none runtime sample | `--states ACT,NSW,NT,QLD,SA,TAS,VIC,WA --limit-per-state 25000 --omit-legacy-fts --omit-search-backstop` | 170 MB | 787,938 | no |
 | 8-state FTS detail=column runtime sample | `--states ACT,NSW,NT,QLD,SA,TAS,VIC,WA --limit-per-state 25000 --omit-legacy-fts --omit-search-backstop` | 176 MB | 787,938 | no |
+| 8-state FTS detail=column runtime sample | `--states ACT,NSW,NT,QLD,SA,TAS,VIC,WA --limit-per-state 125000 --omit-legacy-fts --omit-search-backstop` | 858 MB | 3,808,284 | no |
 
 The lean-prefix runtime-only sample was probed directly with `FUEL_PATH_GNAF_SQLITE_PATH=tmp/gnaf-act-hybrid-runtime-leanprefix-100k.sqlite`. It returned ACT address and unit/building suggestions without `address_fts`, `search_key` or `search_text`, including deduped exact unit results, correct title/subtitle fallback and `address_prefix` evidence for checkpoint prefix hits.
 
@@ -579,6 +581,60 @@ Brutal read on FTS detail:
 - `detail=none` is smaller, but the observed latency trade-off is not worth the extra 6 MB saving on this sample.
 - `detail=column` is a better balanced default: smaller than metadata-trim default detail, same P90 metrics, and the best observed request P95 of the three 200k runs.
 - This still does not prove full-national performance. A larger 994k `detail=column` rebuild is the next evidence step before claiming the projection holds.
+
+## Larger FTS Detail=Column Rebuild
+
+Follow-up proof point:
+
+- file: `tmp/gnaf-8state-hybrid-runtime-ftscolumn-1m.sqlite`
+- command shape: `--states ACT,NSW,NT,QLD,SA,TAS,VIC,WA --limit-per-state 125000 --omit-legacy-fts --omit-search-backstop`
+- address rows: 994,401
+- SQLite size: 858 MB, down from 952 MB for the previous 994k unit-prefix sample
+- `address_typeahead_entries`: 2,078,060 rows
+- `address_prefix_entries`: 3,808,284 rows
+- `address_typeahead_fts_data`: about 46 MB
+- `address_typeahead_fts_docsize`: about 22 MB
+
+8-state 994k `detail=column` hosted-contract benchmark:
+
+- artefact: `tmp/geocode-hosted-national-benchmark-2026-06-22-ftscolumn-1m-rural-unit-context-800.json`
+- profile: `rural-unit`
+- flag: `--case-context --case-context-radius-km 80`
+- cases: 800 addresses
+- final top match: 800/800
+- final resolvable top: 800/800
+- exact top P50/P90/P95: 10 / 15 / 15
+- resolvable top P50/P90/P95: 10 / 15 / 15
+- any-useful-match P50/P90/P95: 10 / 12 / 15
+- wrong top before resolvable: 80
+- cumulative case latency P50/P95: 99 ms / 330 ms
+- request latency P50/P95/max: 5 ms / 154 ms / 443 ms
+
+994k `detail=column` segment notes:
+
+| Category | Cases | Resolvable P90 | Resolvable P95 | Request P95 |
+| --- | ---: | ---: | ---: | ---: |
+| Lot | 123 | 10 | 10 | 116 ms |
+| Range | 25 | 12 | 12 | 193 ms |
+| Street | 430 | 12 | 18 | 116 ms |
+| Suffix | 12 | 10 | 10 | 47 ms |
+| Unit | 210 | 15 | 15 | 193 ms |
+
+994k unit/building family:
+
+- cases: 211
+- exact top P50/P90/P95: 12 / 15 / 22
+- any-useful-match P50/P90/P95: 12 / 15 / 15
+- resolvable top P50/P90/P95: 12 / 15 / 15
+- request latency P95: 193 ms
+
+Brutal read on the larger `detail=column` rebuild:
+
+- This is the strongest storage evidence so far: the 994k sample is 94 MB smaller than the previous unit-prefix sample with the same address and prefix row counts.
+- It keeps the core target: overall and unit/building resolvable P90 are still 15.
+- It slightly improves request P95 versus the previous 994k unit-prefix run: 154 ms overall instead of 171 ms, and 193 ms unit request P95 instead of 212 ms.
+- It still does not create margin. P90 is exactly 15, and unit/building exact P95 remains 22.
+- Full national size is still unproven. The 994k sample is a much better proxy than the 200k sample, but not a substitute for a full 16.9M-row rebuild.
 
 Rejected storage experiment:
 

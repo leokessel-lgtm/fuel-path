@@ -32,6 +32,48 @@ const MAX_ADDRESS_P90_CHARS = Number(args.maxAddressP90Chars || process.env.FUEL
 const MAX_POI_P90_CHARS = Number(args.maxPoiP90Chars || process.env.FUEL_PATH_HOSTED_BENCHMARK_MAX_POI_P90_CHARS || 12);
 const REQUEST_TIMEOUT_MS = Number(args.requestTimeoutMs || process.env.FUEL_PATH_HOSTED_BENCHMARK_REQUEST_TIMEOUT_MS || 8000);
 const PROGRESS_EVERY = Number(args.progressEvery || process.env.FUEL_PATH_HOSTED_BENCHMARK_PROGRESS_EVERY || 50);
+const REMOTE_LOCALITY_KEYS = new Set([
+  "alice springs nt",
+  "broome wa",
+  "coober pedy sa",
+  "humpty doo nt",
+  "karratha wa",
+  "katherine nt",
+  "katherine south nt",
+  "longreach qld",
+  "nhulunbuy nt",
+  "queenstown tas",
+  "tennant creek nt",
+  "yulara nt",
+]);
+const RURAL_REGIONAL_LOCALITY_KEYS = new Set([
+  "albany wa",
+  "ballarat vic",
+  "bendigo vic",
+  "burnie tas",
+  "cairns qld",
+  "devonport tas",
+  "east tamworth nsw",
+  "geraldton wa",
+  "isabella plains act",
+  "kalgoorlie wa",
+  "mackay qld",
+  "mount gambier sa",
+  "orange nsw",
+  "port lincoln sa",
+  "renmark sa",
+  "rockhampton qld",
+  "shepparton vic",
+  "smithton tas",
+  "tamworth nsw",
+  "townsville qld",
+  "traralgon vic",
+  "tuggeranong act",
+  "ulverstone tas",
+  "wagga wagga nsw",
+  "whyalla sa",
+  "wodonga vic",
+]);
 const fetchCalls = {
   total: 0,
   gnafApi: 0,
@@ -387,6 +429,7 @@ function addressCaseFromRow(row) {
     kind: "address",
     category: addressCategory(row.label),
     addressFamily: addressFamily(row.label),
+    geoSegment: addressGeoSegment(row.locality, row.state, row.label),
     state: row.state,
     query: queryFromAddressLabel(row.label),
     expectedLabel: row.label,
@@ -416,6 +459,14 @@ function addressFamily(label) {
 
 function hasUnitOrBuildingToken(value) {
   return /\b(unit|flat|apartment|apt|suite|se|townhouse|shop|office|offc|level|lvl|kiosk|ksk)\b/.test(String(value || ""));
+}
+
+function addressGeoSegment(locality, state, label = "") {
+  const key = `${normalise(locality)} ${String(state || "").toLowerCase()}`.trim();
+  if (REMOTE_LOCALITY_KEYS.has(key)) return "remote_address";
+  if (RURAL_REGIONAL_LOCALITY_KEYS.has(key)) return "rural_regional_address";
+  if (REMOTE_LOCALITY_KEYS.has(`${normalise(label)} ${String(state || "").toLowerCase()}`.trim())) return "remote_address";
+  return "metro_suburban_address";
 }
 
 function queryFromAddressLabel(label) {
@@ -530,6 +581,7 @@ function summarise(rows) {
     byState: groupSummary(rows, "state"),
     byCategory: groupSummary(rows, "category"),
     byAddressFamily: groupSummary(rows, "addressFamily"),
+    byGeoSegment: groupSummary(rows, "geoSegment"),
     byProvider: groupSummary(rows, "finalTopProvider"),
   };
 }

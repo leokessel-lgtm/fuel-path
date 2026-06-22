@@ -28,6 +28,7 @@ The tested resolvable P90 target is now achieved in sampled stress runs and boun
 - after adding level-aware exact-unit prefix keys and fixing benchmark parsing for ranged base-refine rows, a fresh 8-state 994,401-row rebuild kept 3,200/3,200 final top/resolvable, exact P90 15, resolvable P90 15, cut max request latency to 175 ms and reduced unit/building exact P90 from 22 to 21
 - after widening the same staged raw package to 6,400 rural/unit cases, one `Shop 2 Lg 2...` lower-ground row failed; adding `Lg` as a level marker and treating `Se` as a unit descriptor produced a passing 6,400/6,400 rerun with exact/resolvable P90 15, request P95 1 ms and max request 193 ms
 - after moving complete building-first unit queries through unit-number-filtered exact typeahead before broad base-refine fallback, the same 6,400-case run kept exact/resolvable P90 15 and cut max request latency from 193 ms to 167 ms, but unit/building exact P90 stayed 21
+- after adding explicit rural/remote geo-segment metrics, the same 6,400-case run shows remote address P90 15 exact / 12 resolvable and rural/regional P90 12 exact / 12 resolvable; the harder remaining exact tail is metro/suburban unit-heavy rows
 - after adding a unit-plus-lot intent guard, the existing full-national compact runtime reran the 800-case rural/unit context benchmark at 800/800 final top/resolvable, exact P90 15, resolvable P90 15 and request P95 62 ms
 - unit/building resolvable P90 is still 15 in that 400-case run, and exact unit/building P90 is still 28
 - the broad exact-unit index raised the full national temp runtime from about 14 GB to about 16 GB; the partial-index temp file still occupies 16 GB until rebuilt/vacuumed, but currently reports about 1.97 GB free pages after dropping the broad index
@@ -47,6 +48,7 @@ The tested resolvable P90 target is now achieved in sampled stress runs and boun
 - unit-plus-lot queries now preserve typed unit and lot intent instead of degrading to broader lot/street variants, preventing stale or broad indexes from surfacing unrelated token-overlap rows
 - lower-ground `Lg` level rows and `Se` flat/unit rows now follow the same guarded unit-level path in the staged runtime and benchmark metrics
 - complete building-first unit queries now try unit-number-filtered exact typeahead before broad base-refine fallback, so rows like `Waterside Unit 52` are not hidden by nearby base suggestions
+- hosted benchmark summaries now include `byGeoSegment` so rural, remote and metro/suburban performance can be read separately from unit/building performance
 
 Compact prefix alone is not safe enough. It is fast and reaches low P90 on successful cases, but it can silently pick the wrong locality, sibling unit/shop or same-name building when the first 15 characters are ambiguous.
 
@@ -1840,6 +1842,36 @@ Brutal read on exact-before-refine:
 - It trims latency outliers and prevents a complete unit query from being masked by a less specific base suggestion.
 - It reinforces the product metric split: exact unit/building P90 15 is still not achieved, while resolvable/refine-path P90 15 is achieved.
 
+Geo-segment reporting pass:
+
+- benchmark rows now include `geoSegment`
+- summary now includes `byGeoSegment`
+- regression coverage proves the rural/unit compact fixture reports both `remote_address` and `rural_regional_address`
+
+Rerun with geo-segment summaries:
+
+- artefact: `tmp/geocode-hosted-national-benchmark-2026-06-22-raw-levelprefix-lg-se-buildingunit-geosegment-8state-6400.json`
+- source SQLite: `tmp/gnaf-raw-levelprefix-lg-8state-1m.sqlite`
+- final top/resolvable: 6,400/6,400
+- exact top P50/P90/P95: 10 / 15 / 15
+- resolvable top P50/P90/P95: 10 / 15 / 15
+- request latency P50/P95/max: 0 ms / 1 ms / 163 ms
+
+Geo-segment notes:
+
+| Geo segment | Cases | Final top/resolvable | Exact P90 | Exact P95 | Resolvable P90 | Resolvable P95 | Request P95 | Max request |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Remote address | 1,656 | 1,656/1,656 | 15 | 15 | 12 | 15 | 1 ms | 160 ms |
+| Rural/regional address | 1,902 | 1,902/1,902 | 12 | 15 | 12 | 15 | 1 ms | 163 ms |
+| Metro/suburban address | 2,842 | 2,842/2,842 | 15 | 22 | 15 | 15 | 2 ms | 163 ms |
+
+Brutal read on geo-segment metrics:
+
+- The rural/remote stress requirement is now visible in the benchmark output instead of inferred from seed names.
+- Remote and rural/regional rows are not the current P90 problem in the staged package. Remote resolvable P90 is 12 and rural/regional exact/resolvable P90 is 12.
+- The harder exact tail is concentrated in metro/suburban and unit/building labels, especially long building-name-plus-unit cases.
+- The classifier is intentionally simple and benchmark-local. It is evidence segmentation, not a national remoteness taxonomy.
+
 ## Full-National Unit-Lot Safety Rerun
 
 Problem found when testing the current runtime against the existing full-national compact artefact:
@@ -2005,6 +2037,7 @@ What improved:
 - A wider 6,400-case staged rural/unit run found and fixed a lower-ground `Lg` miss, then passed 6,400/6,400 final top/resolvable with exact/resolvable P90 15.
 - `Se` flat/unit rows now count as unit/building cases and use the guarded unit-like runtime path, reducing the staged range latency tail without hiding those rows in easier categories.
 - Complete building-first unit queries now use unit-number-filtered exact typeahead before broad base-refine fallback, cutting the staged 6,400-case max request latency to 167 ms.
+- Hosted benchmark output now reports `byGeoSegment`, and the latest 6,400-case staged run includes 1,656 remote and 1,902 rural/regional cases.
 
 What remains weak:
 
@@ -2033,6 +2066,7 @@ What remains weak:
 - In the latest wider 6,400-case staged rerun, unit/building exact P90 is still 21 and exact P95 is still 26. Wider sampling did not solve the exact-unit tail.
 - The latest staged latency rerun still has a 167 ms max request spike despite a 1 ms request P95, so latency outliers still need investigation.
 - The exact-before-refine pass did not move unit/building exact P90. The remaining exact tail is mostly long building-name-plus-unit labels where a safe base/refine result is available long before exact unit top.
+- Rural/remote performance is not the current staged bottleneck: remote resolvable P90 is 12 and rural/regional exact/resolvable P90 is 12. Metro/suburban exact P95 is the uglier tail at 22.
 - `office`-style building names are a known edge case because `office` can be both a building-name word and a unit descriptor.
 - Context-aware ranking depends on Plan/Nearby having a meaningful route/current-map anchor. Cold start address search without context still lands at rural/unit P90 18 in the corrected hosted-contract run.
 - `wrongTopBeforeResolvable` is still high in the typed-prefix harness because many short prefixes are inherently ambiguous before enough context arrives. This is acceptable only if UI state treats those rows as suggestions, not route commitments.

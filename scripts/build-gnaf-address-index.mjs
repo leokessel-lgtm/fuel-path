@@ -495,7 +495,7 @@ function unitText(structure) {
 function compactPrefixes(value) {
   const text = normaliseAddressText(value);
   const prefixes = new Set();
-  for (const length of [4, 6, 8, 10, 12, 15]) {
+  for (const length of [4, 8, 12, 15]) {
     if (length <= text.length) prefixes.add(text.slice(0, length));
   }
   return [...prefixes].filter((prefix) => prefix.length >= 4);

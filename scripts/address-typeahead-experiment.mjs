@@ -384,7 +384,7 @@ function resolvableMatch(testCase, suggestion) {
 function compactPrefixes(value) {
   const text = normalise(value);
   const prefixes = new Set();
-  for (const length of [4, 6, 8, 10, 12, MAX_PREFIX]) {
+  for (const length of [4, 8, 12, MAX_PREFIX]) {
     if (length <= text.length) prefixes.add(text.slice(0, length));
   }
   return [...prefixes].filter((prefix) => prefix.length >= 4);

@@ -24,6 +24,7 @@ The tested resolvable P90 target is now achieved in sampled stress runs and boun
 - after an 8-state 994,401-row raw rebuild, the first 800-case rural/unit run exposed three unit-like misses; after moving exact-unit lookup ahead of contextual prefix rows and including lot numbers in base keys, the rerun hit 800/800 final top/resolvable, exact P90 15, resolvable P90 15 and request P95 2 ms
 - after widening that staged raw run to 1,600 rural/unit cases, unit/building resolvable P90 initially slipped to 18; adding guarded unit-range token-boundary prefix lookup and building-name-plus-partial-unit base refinement restored 1,600/1,600 final top/resolvable, overall resolvable P90 15 and unit/building resolvable P90 15
 - after widening again to 3,200 rural/unit cases, three final top failures appeared around level/site parsing; after skipping `L/Fl/Floor` level markers during exact-unit refinement and treating leading `Site` as a flat/unit type, the rerun hit 3,200/3,200 final top/resolvable, overall resolvable P90 15 and unit/building resolvable P90 15
+- after profiling the 3,200-case latency tail, short under-specified unit-range prefixes such as `Unit 1 1-3` were held until a stored 12-character exact checkpoint was available; the rerun kept 3,200/3,200 final top/resolvable and cut max request latency from 1,328 ms to 497 ms
 - unit/building resolvable P90 is still 15 in that 400-case run, and exact unit/building P90 is still 28
 - the broad exact-unit index raised the full national temp runtime from about 14 GB to about 16 GB; the partial-index temp file still occupies 16 GB until rebuilt/vacuumed, but currently reports about 1.97 GB free pages after dropping the broad index
 - compact prefix is only safe as a narrow house-number-first fast path
@@ -1635,6 +1636,46 @@ Brutal read on the heavier staged pass:
 - The max request latency spike of 1,328 ms needs profiling before claiming production latency is solved, even though P95 request latency is only 2 ms.
 - This is still capped staged evidence, not a full-national rebuild.
 
+## Unit-Range Latency Guard Pass
+
+Problem found after the 3,200-case level/site pass:
+
+- the heaviest request spike was `Unit 1 1-3 Gilmore Close Mount Gambier SA 5290`
+- at the 10-character prefix `Unit 1 1-3`, the runtime had enough numbers to enter the unit-range path but not enough characters to hit a stored compact checkpoint
+- that under-specific prefix could trigger broad work before the useful 12-character checkpoint `Unit 1 1-3 G`
+
+Implementation:
+
+- unit-range inputs that are not otherwise typeahead-ready now use only guarded exact token-boundary prefix lookup
+- if the stored 12-character checkpoint is not available yet, the runtime returns no suggestion rather than doing broad typeahead work
+- the prefix query now selects the stored unit field so exact-unit prefix filters can distinguish exact unit rows from non-unit rows
+
+Latency rerun evidence:
+
+- artefact: `tmp/geocode-hosted-national-benchmark-2026-06-22-raw-unitrange-latency-8state-3200.json`
+- source SQLite: `tmp/gnaf-raw-unitlot-prefix-8state-1m.sqlite`
+- cases: 3,200 rural/unit-weighted address cases, 400 per benchmark state
+- final top/resolvable: 3,200/3,200
+- exact top P50/P90/P95: 10 / 15 / 18
+- resolvable top P50/P90/P95: 10 / 15 / 15
+- wrong top before resolvable: 124
+- request latency P50/P95/max: 1 ms / 3 ms / 497 ms
+- elapsed latency P50/P95: 2 ms / 11 ms
+
+Latency comparison:
+
+| Run | Final top/resolvable | Overall exact P90 | Overall resolvable P90 | Unit/building exact P90 | Unit/building resolvable P90 | Request P95 | Max request | Elapsed P95 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Level/site 3,200 | 3,200/3,200 | 15 | 15 | 22 | 15 | 2 ms | 1,328 ms | 27 ms |
+| Unit-range latency 3,200 | 3,200/3,200 | 15 | 15 | 22 | 15 | 3 ms | 497 ms | 11 ms |
+
+Brutal read on the latency guard:
+
+- This fixed a real outlier without weakening the 15-character resolvable result.
+- It did not improve exact unit/building P90. That remains 22.
+- Request P95 moved from 2 ms to 3 ms, so the win is mostly in avoiding pathological max spikes and reducing elapsed P95.
+- There are still max-latency outliers around level/floor unit labels and building-first exact tails. This is better, not finished.
+
 Brutal read on full national:
 
 - Full national build size is now proven, and it is large but locally possible.
@@ -1647,6 +1688,7 @@ Brutal read on full national:
 - The staged 8-state unit-lot rebuild proves the fresh-build path on 994,401 real G-NAF rows across all benchmark states, but full-national rebuild evidence is still missing.
 - The wider 1,600-case staged pass proves the current runtime shape is stronger than the 800-case pass suggested, but it also confirms exact unit/building remains the hard tail.
 - The heavier 3,200-case staged pass proves the current runtime shape under wider rural/unit sampling, but full-national rebuild evidence and exact unit/building P90 remain open.
+- The unit-range latency pass reduces the staged max-latency spike, but full-national latency remains unproven.
 - SA remains the exact typed-character tail, ACT improved on resolvable P90, and range/unit/building rows remain the main latency tails.
 - The next improvement should target serving shape and packaging, not provider expansion.
 
@@ -1746,6 +1788,7 @@ What improved:
 - The heavier 3,200-case staged raw benchmark now hits 3,200/3,200 final top/resolvable, overall resolvable P90 15 and unit/building resolvable P90 15.
 - Level-marker addresses such as `Shop 9001 L 2 20...` and `Unit 9 Fl 2 118...` now resolve the exact unit instead of treating the level number as the street number.
 - `Site` flat types now participate in exact-unit refinement.
+- Short under-specified unit-range prefixes now fail quiet until a useful checkpoint exists, cutting the 3,200-case max request latency from 1,328 ms to 497 ms.
 
 What remains weak:
 
@@ -1770,7 +1813,7 @@ What remains weak:
 - Long or unusual unit/building labels such as `Unit 78 L B 99 Eastern Valley Way...` can still require far more than 15 typed characters for exact-unit top match.
 - In the wider staged run, unit/building exact P90 is still 20 and exact P95 is 26, so the 15-character achievement is resolvable/refine-path rather than exact-unit-path.
 - In the heavier staged run, unit/building exact P90 is still 22 and exact P95 is 28. Wider sampling made the exact tail look worse, not better.
-- The heavier staged run had a 1,328 ms max request spike despite a 2 ms request P95, so latency outliers still need investigation.
+- The latest staged latency rerun still has a 497 ms max request spike despite a 3 ms request P95, so latency outliers still need investigation.
 - `office`-style building names are a known edge case because `office` can be both a building-name word and a unit descriptor.
 - Context-aware ranking depends on Plan/Nearby having a meaningful route/current-map anchor. Cold start address search without context still lands at rural/unit P90 18 in the corrected hosted-contract run.
 - `wrongTopBeforeResolvable` is still high in the typed-prefix harness because many short prefixes are inherently ambiguous before enough context arrives. This is acceptable only if UI state treats those rows as suggestions, not route commitments.

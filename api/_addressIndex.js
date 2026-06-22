@@ -231,6 +231,16 @@ function searchSqliteHybridIndex(database, needle, limit, searchContext = null) 
     const exactUnitRows = searchSqliteExactUnitEntries(database, needle, limit);
     if (exactUnitRows.length) return hybridRowsToSuggestions(exactUnitRows, needle, 960);
     if (unitLikeQueryStartsWithUnitToken(needle)) {
+      if (unitRangePrefixReady && !unitLikeQueryReadyForTypeahead(needle)) {
+        const exactPrefixRows = searchSqlitePrefixEntries(database, needle, limit, searchContext, {
+          includeTokenBoundaryPrefix: true,
+          minPrefixLength: 12,
+        }).filter((row) => row.entry_type === "exact" && row.unit);
+        if (exactPrefixRows.length && !prefixRowsAmbiguous(exactPrefixRows)) {
+          return hybridRowsToSuggestions(preferExactUnitPrefixRows(exactPrefixRows), needle, 940);
+        }
+        return [];
+      }
       const prefixRows = searchSqlitePrefixEntries(database, needle, limit, searchContext);
       const useContextualPrefixRows = shouldUseContextualAmbiguousPrefixRows(needle, searchContext);
       if (prefixRows.length && (!prefixRowsAmbiguous(prefixRows) || useContextualPrefixRows)) {
@@ -332,6 +342,7 @@ function searchSqlitePrefixEntries(database, needle, limit, searchContext = null
           e.entry_type,
           e.refine_required,
           e.rank_weight,
+          e.unit,
           p.prefix AS key_text,
           e.base_signature,
           e.display_title AS entry_display_title,
@@ -371,6 +382,7 @@ function searchSqlitePrefixEntries(database, needle, limit, searchContext = null
         e.entry_type,
         e.refine_required,
         e.rank_weight,
+        e.unit,
         p.prefix AS key_text,
         e.base_signature,
         e.display_title AS entry_display_title,

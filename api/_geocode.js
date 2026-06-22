@@ -1103,12 +1103,17 @@ function createGeocoder({ fetchJson, loadStationData }) {
     const needle = normaliseSearchText(query);
     const label = normaliseSearchText(item?.label || "");
     const queryStateCode = detectStateCode(query);
+    const refineRequired = Boolean(item?.refineRequired || item?.matchType === "building_refine");
+    const unitIntent = unitIntentConfidence(query);
     let score = localMatchTypeRank(item?.matchType);
     if (item?.provider === "fuel_path_gnaf") score -= item.matchType === "exact_address" ? 80 : 50;
     if (queryStateCode && detectStateCode(item?.label || "") !== queryStateCode) score += 12;
     if (label === needle) score -= 36;
     else if (label.startsWith(needle)) score -= 18;
     else if (label.includes(needle)) score -= 4;
+    if (!refineRequired && unitIntent === "specific" && labelMatchesUnitIntent(query, item?.label)) score -= 35;
+    if (refineRequired && unitIntent !== "specific") score -= 55;
+    if (refineRequired && unitIntent === "specific") score += 45;
     if (item?.provider === "fuel_path_regional_gazetteer" && item?.type === "regional_town" && !hasPlaceIntent(needle)) {
       score -= 10;
     }
@@ -1162,11 +1167,32 @@ function createGeocoder({ fetchJson, loadStationData }) {
 
   function localMatchTypeRank(matchType) {
     if (["exact_address", "exact_hint", "regional_exact"].includes(matchType)) return 0;
+    if (matchType === "building_refine") return 18;
     if (["address_prefix", "hint_prefix", "regional_prefix"].includes(matchType)) return 20;
     if (matchType === "regional_street_locality") return 12;
     if (["hint_contains", "regional_contains"].includes(matchType)) return 40;
     if (["fallback_area", "regional_area_fallback"].includes(matchType)) return 70;
     return 55;
+  }
+
+  function unitIntentConfidence(query) {
+    const text = normaliseSearchText(query);
+    if (/^\d+\s+\d+\b/.test(text)) return "specific";
+    const match = text.match(/\b(?:apartment|apt|flat|level|lvl|office|offc|shop|suite|townhouse|unit)\s+([a-z0-9-]+)\b/);
+    if (!match) return "none";
+    return match[1].length >= 2 ? "specific" : "partial";
+  }
+
+  function labelMatchesUnitIntent(query, label) {
+    const queryText = normaliseSearchText(query);
+    const labelText = normaliseSearchText(label);
+    const slashMatch = queryText.match(/^(\d+)\s+\d+\b/);
+    if (slashMatch && new RegExp(`\\b(?:apartment|apt|flat|office|offc|shop|suite|townhouse|unit)\\s+${slashMatch[1]}\\b`).test(labelText)) {
+      return true;
+    }
+    const unitMatch = queryText.match(/\b(apartment|apt|flat|office|offc|shop|suite|townhouse|unit)\s+([a-z0-9-]+)\b/);
+    if (!unitMatch) return false;
+    return new RegExp(`\\b${unitMatch[1]}\\s+${unitMatch[2]}\\b`).test(labelText);
   }
 
   function regionalPoiNameMatches(needle, item) {

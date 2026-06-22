@@ -324,7 +324,8 @@ function prefixRowsAmbiguous(rows) {
 
 function hybridRowToAddressRecord(row) {
   const isRefine = row.entry_type === "base_refine";
-  const entryLabel = [row.entry_display_title, row.entry_display_subtitle].filter(Boolean).join(", ");
+  const refineSubtitle = refineDisplaySubtitle(row);
+  const entryLabel = [row.entry_display_title, refineSubtitle].filter(Boolean).join(", ");
   return {
     id: isRefine ? row.entry_id : row.address_id,
     label: isRefine ? entryLabel || row.address_label : row.address_label,
@@ -336,11 +337,21 @@ function hybridRowToAddressRecord(row) {
     accuracy: row.accuracy || "address_typeahead",
     search_text: row.key_text,
     display_title: isRefine ? row.entry_display_title : row.entry_display_title || row.address_display_title,
-    display_subtitle: isRefine ? row.entry_display_subtitle : row.entry_display_subtitle || row.address_display_subtitle,
+    display_subtitle: isRefine ? refineSubtitle : row.entry_display_subtitle || row.address_display_subtitle,
     suggestion_type: isRefine ? "base_address" : "exact_address",
     refine_required: row.refine_required,
     refine_hint: Number(row.refine_required || 0) ? "Choose or type the exact unit before routing." : "",
   };
+}
+
+function refineDisplaySubtitle(row) {
+  const entrySubtitle = String(row?.entry_display_subtitle || "");
+  if (hasStreetLikeText(entrySubtitle)) return entrySubtitle;
+  return String(row?.address_display_subtitle || entrySubtitle);
+}
+
+function hasStreetLikeText(value) {
+  return /\b\d+[a-z]?(?:-\d+[a-z]?)?\s+.+\b(street|road|avenue|drive|highway|terrace|circuit|way|lane|place|court|crescent|boulevard|parade|parkway|esplanade|square)\b/i.test(String(value || ""));
 }
 
 function hybridMatchType(row, needle) {

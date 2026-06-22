@@ -313,9 +313,58 @@ Brutal read on context:
 
 - The P90 15 goal is achieved on the rural/unit hosted-contract run when the product has a legitimate nearby context.
 - This is a product-ranker improvement, not a full-text index miracle: it fixes same-number/same-street regional ambiguity by using route/current-map evidence.
-- Range addresses remain the weak tail at P90 26 and P95 28 inside the context run. That tail is small in this sample, but it is real.
+- This run also exposed a benchmark classification bug: shop/office labels such as `Shop 14, 16 Sharpe Avenue` were being counted as `range_address` rather than unit/building cases.
 - Context must stay a bounded boost. If it becomes a hard override, it can route users to the wrong same-name address near them.
 - Google remains benchmark/fallback only; this change improves the local-first path.
+
+## Base Refine And Metric Correction
+
+Follow-up issue found:
+
+- building/base suggestions were correctly marked `refine_required`, but building-name rows could display only the building and suburb, for example `Karratha City Plaza, Karratha WA 6714`
+- that was not enough context to safely refine or choose the exact shop/unit
+- the final geocoder also ranked sibling exact shops above the base/refine row for building-only prefixes
+- the benchmark parser undercounted safe refinement for `shop`, `office`, `offc`, `level`, `kiosk` and similar unit/building terms
+
+Fixes:
+
+- base/refine suggestions now keep street context in the title/subtitle path, for example `Karratha City Plaza` with `16 Sharpe Avenue, Karratha WA 6714`
+- final local ranking promotes `building_refine` for building-only or partial-unit prefixes, but still lets a specific typed unit/shop win
+- slash shorthand such as `8/21` is treated as specific unit intent
+- both compact and raw G-NAF builders now write richer base/refine labels for future rebuilds
+- the hosted benchmark now classifies shop/office/level/kiosk rows as unit/building and counts `refine_required` base rows as resolvable when they share the same base address
+
+Corrected context-aware hosted-contract benchmark:
+
+- artefact: `tmp/geocode-hosted-national-benchmark-2026-06-22-compact-1m-hosted-rural-unit-context-refine-metrics-800.json`
+- profile: `rural-unit`
+- flag: `--case-context --case-context-radius-km 80`
+- cases: 800 addresses
+- final top match: 800/800
+- final resolvable top: 800/800
+- exact top P50/P90/P95: 10 / 12 / 18
+- resolvable top P50/P90/P95: 10 / 12 / 15
+- any-useful-match P50/P90/P95: 10 / 12 / 12
+- wrong top before resolvable: 180
+- latency P50/P95: 122 ms / 893 ms
+
+Corrected segment notes:
+
+| Category | Cases | Exact P90 | Exact P95 | Resolvable P90 | Resolvable P95 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Lot | 123 | 10 | 10 | 10 | 10 |
+| Range | 25 | 12 | 12 | 12 | 12 |
+| Street | 430 | 12 | 18 | 12 | 18 |
+| Suffix | 12 | 10 | 40 | 10 | 10 |
+| Unit | 210 | 12 | 22 | 12 | 22 |
+
+Corrected brutal read:
+
+- The earlier range P90 26 was mostly a metric bug, not a true range-address failure.
+- True range addresses are now P90 12 and P95 12 in this sample.
+- Unit/building is still the tail: P90 12 meets the target, but P95 22 shows exact shop/unit selection can still require more typing.
+- Resolvable P95 is better than exact P95 because safe base/refine rows can appear before the exact unit/shop. That is acceptable only if the UI continues to prevent direct routing from `refine_required` rows.
+- Latency remains too high for a final product claim: P95 893 ms in the 994k local compact sample, with NT/VIC/unit-heavy segments dragging.
 
 Rejected storage experiment:
 
@@ -391,9 +440,11 @@ What improved:
 - Hybrid/typeahead achieves the target on sampled stress: P90 10 overall, P90 10 balanced unit cases and P90 12 rural/unit-weighted unit cases.
 - The hosted-contract path now hits P90 12 on the 994k rural/unit sample when valid nearby context is supplied.
 - The runtime no longer treats building/base suggestions as exact route targets; `refine_required` survives into suggestions.
+- Base/refine rows now carry street context instead of vague building-plus-suburb labels.
 - Exact address duplicates from multiple typeahead keys are removed in the runtime.
 - The benchmark now reports exact top, resolvable top, wrong-top-before-resolvable, unit P90, latency and index size.
 - The benchmark can now replay case-local context so route/current-map ranking can be measured separately from pure text lookup.
+- The benchmark now classifies shop/office/level/kiosk rows as unit/building rather than accidental range addresses.
 - A wrong building-name prefix regression was found and fixed by routing non-number-first input through typeahead.
 - A wrong civic-number fallback regression was found and fixed for number-first token-overlap matches.
 - Checkpointing reduced the ACT 100k sample from 345 MB to 290 MB, hybrid-only/no-legacy-FTS reduced it to 215 MB, compact runtime-only reduced it to 141 MB, display/rowid trimming reduced it to 107 MB, key trimming reduced it to 98 MB, and lean prefix checkpoints reduced it to 90 MB.
@@ -407,7 +458,8 @@ What remains weak:
 - Prefix-only continues to fail safety cases: wrong locality, wrong street number, sibling unit/shop and same-site building aliases.
 - The compact runtime-only index is smaller, but removing search backstop columns means benchmark sampling needs a slower label/locality/postcode fallback.
 - Generic unit/building P90 is exactly 15 in the rural/unit-weighted safety rerun. That meets the target, but leaves little margin and the tail is not fully solved.
-- Range addresses remain weak even with context: the hosted rural/unit context run shows range P90 26 and P95 28.
+- Unit/building P95 remains weak in the corrected hosted-context run: exact/resolvable P95 is 22 even though P90 is 12.
+- Latency remains weak in the corrected hosted-context run: overall P95 is 893 ms, with unit/building P95 at 1743 ms.
 - Context-aware ranking depends on Plan/Nearby having a meaningful route/current-map anchor. Cold start address search without context still lands at rural/unit P90 18 in the corrected hosted-contract run.
 - `wrongTopBeforeResolvable` is still high in the typed-prefix harness because many short prefixes are inherently ambiguous before enough context arrives. This is acceptable only if UI state treats those rows as suggestions, not route commitments.
 
@@ -418,4 +470,4 @@ Next:
 - Measure full-size index bytes, build time and lookup P50/P95 once rebuilt.
 - Run the hosted national benchmark against the rebuilt full index, not just the sampled experiment harness.
 - Add a Plan/Nearby UI smoke case for `refine_required` rows so route submission cannot regress.
-- Add explicit range-address search keys or range-aware rank bonuses if range addresses matter for the next launch slice.
+- Attack unit/building P95 and lookup latency before claiming the experience is consistently fast.

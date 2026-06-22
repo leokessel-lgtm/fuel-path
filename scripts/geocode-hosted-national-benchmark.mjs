@@ -370,7 +370,7 @@ function addressCaseFromRow(row) {
 
 function addressCategory(label) {
   const normalised = normalise(label);
-  if (normalised.startsWith("unit ") || normalised.includes(" unit ")) return "unit_address";
+  if (hasUnitOrBuildingToken(normalised)) return "unit_address";
   if (normalised.startsWith("lot ")) return "lot_address";
   if (/\b\d+[a-z]\b/.test(normalised)) return "suffix_address";
   if (/\b\d+\s+\d+\b/.test(normalised)) return "range_address";
@@ -379,10 +379,13 @@ function addressCategory(label) {
 
 function addressFamily(label) {
   const normalised = normalise(label);
-  if (/^\b(unit|flat|apartment|apt|suite|townhouse)\b/.test(normalised)) return "unit_or_building_address";
-  if (/, (unit|flat|apartment|apt|suite|townhouse)\b/i.test(String(label || ""))) return "unit_or_building_address";
+  if (hasUnitOrBuildingToken(normalised)) return "unit_or_building_address";
   if (String(label || "").split(",").length >= 4) return "unit_or_building_address";
   return "standard_address";
+}
+
+function hasUnitOrBuildingToken(value) {
+  return /\b(unit|flat|apartment|apt|suite|townhouse|shop|office|offc|level|lvl|kiosk|ksk)\b/.test(String(value || ""));
 }
 
 function queryFromAddressLabel(label) {
@@ -468,7 +471,7 @@ function suggestionResolvesCase(testCase, suggestion) {
 function addressParts(value) {
   const text = String(value || "");
   const normalised = normalise(text);
-  const unitMatch = normalised.match(/\b(?:unit|flat|apartment|apt|suite|townhouse)\s+([a-z0-9-]+)\b/);
+  const unitMatch = normalised.match(/\b(?:unit|flat|apartment|apt|suite|townhouse|shop|office|offc|level|lvl|kiosk|ksk)\s+([a-z0-9-]+)\b/);
   const streetMatch = normalised.match(/\b(\d+[a-z]?(?:-\d+[a-z]?)?)\s+([a-z0-9 ]+?)\s+(street|road|avenue|drive|highway|terrace|circuit|way|lane|place|court|crescent|boulevard|parade|parkway|esplanade|square)\b/);
   const stateMatch = normalised.match(/\b(nsw|act|qld|vic|wa|sa|tas|nt)\b/);
   const postcodeMatch = normalised.match(/\b(\d{4})\b/);

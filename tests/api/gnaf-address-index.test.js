@@ -509,6 +509,54 @@ test("geocode search context promotes nearby ambiguous G-NAF address", async () 
   });
 });
 
+test("geocode promotes base refine suggestion for ambiguous building prefixes", async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-gnaf-building-refine-"));
+  const inputPath = path.join(tempDir, "GNAF_CORE.psv");
+  const outputPath = path.join(tempDir, "gnaf-building-refine.sqlite");
+  fs.writeFileSync(
+    inputPath,
+    [
+      "ADDRESS_DETAIL_PID|ADDRESS_LABEL|BUILDING_NAME|FLAT_TYPE|FLAT_NUMBER|NUMBER_FIRST|STREET_NAME|STREET_TYPE|LOCALITY_NAME|STATE|POSTCODE|GEOCODE_TYPE|LONGITUDE|LATITUDE",
+      "GAWA2001|Karratha City Plaza, Shop 9, 16 Sharpe Avenue, Karratha WA 6714|Karratha City Plaza|Shop|9|16|Sharpe|Avenue|Karratha|WA|6714|PROPERTY CENTROID|116.846|-20.736",
+      "GAWA2002|Karratha City Plaza, Shop 11, 16 Sharpe Avenue, Karratha WA 6714|Karratha City Plaza|Shop|11|16|Sharpe|Avenue|Karratha|WA|6714|PROPERTY CENTROID|116.8461|-20.7361",
+      "GAWA2003|Karratha City Plaza, Shop 14, 16 Sharpe Avenue, Karratha WA 6714|Karratha City Plaza|Shop|14|16|Sharpe|Avenue|Karratha|WA|6714|PROPERTY CENTROID|116.8462|-20.7362",
+    ].join("\n"),
+  );
+
+  execFileSync(
+    process.execPath,
+    [
+      "scripts/build-gnaf-address-index.mjs",
+      "--input",
+      inputPath,
+      "--output",
+      outputPath,
+      "--omit-legacy-fts",
+      "--omit-search-backstop",
+    ],
+    { cwd: path.resolve(__dirname, "../.."), stdio: "ignore" },
+  );
+
+  await withEnv({ FUEL_PATH_GNAF_SQLITE_PATH: outputPath, FUEL_PATH_GEOCODE_PROVIDER: "nominatim" }, async () => {
+    const buildingOnly = await geocode({
+      query: "Karratha City Plaza",
+      limit: 3,
+      sessionToken: "building-refine-only",
+    });
+    const exactShop = await geocode({
+      query: "Karratha City Plaza Shop 14",
+      limit: 3,
+      sessionToken: "building-refine-shop",
+    });
+
+    assert.equal(buildingOnly.suggestions[0].label, "Karratha City Plaza, 16 Sharpe Avenue, Karratha WA 6714");
+    assert.equal(buildingOnly.suggestions[0].refineRequired, true);
+    assert.equal(buildingOnly.suggestions[0].matchType, "building_refine");
+    assert.equal(exactShop.suggestions[0].label, "Karratha City Plaza, Shop 14, 16 Sharpe Avenue, Karratha WA 6714");
+    assert.equal(exactShop.suggestions[0].refineRequired, false);
+  });
+});
+
 test("geocode cache separates seed-only and configured G-NAF index results", async () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-gnaf-cache-mode-"));
   const inputPath = path.join(tempDir, "GNAF_CORE.psv");

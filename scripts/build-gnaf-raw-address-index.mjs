@@ -433,13 +433,15 @@ function buildTypeaheadEntries({ id, label, source, display, keys }) {
     });
   }
   if (keys.baseKey && unit) {
-    const baseTitle = source.buildingName || [source.number, source.streetName].filter(Boolean).join(" ");
+    const street = [source.number, source.streetName].filter(Boolean).join(" ");
+    const baseTitle = source.buildingName || street;
     const place = [source.locality, source.state, source.postcode].filter(Boolean).join(" ");
+    const baseSubtitle = source.buildingName ? [street, place].filter(Boolean).join(", ") : place;
     entries.push({
       entryId: `${baseSignature}:base:refine`,
-      label: [baseTitle, place].filter(Boolean).join(", "),
+      label: [baseTitle, baseSubtitle].filter(Boolean).join(", "),
       displayTitle: baseTitle,
-      displaySubtitle: place,
+      displaySubtitle: baseSubtitle,
       keyText: [normaliseAddressText(source.buildingName), keys.baseKey].filter(Boolean).join(" "),
       prefixKey: [normaliseAddressText(source.buildingName), keys.baseKey].filter(Boolean).join(" "),
       baseSignature,

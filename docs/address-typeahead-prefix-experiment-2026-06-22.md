@@ -136,7 +136,7 @@ Regression coverage:
 
 Artefact:
 
-- `tmp/address-typeahead-experiment-2026-06-22-hybrid-rowidtrim-balanced-1000.json`
+- `tmp/address-typeahead-experiment-2026-06-22-hybrid-keytrim-balanced-1000.json`
 
 Result:
 
@@ -153,13 +153,13 @@ Notes:
 - Unit-like input goes straight to typeahead so exact unit intent is preserved.
 - Building-name and street-name input goes straight to typeahead after a wrong-base regression was found with `Islamic School Of Canberra`.
 - Prefix-only is no longer a candidate. Its low P90 is misleading because it only resolves 613/1000 cases.
-- Experiment index size fell from 5.4 MB to 3.2 MB after checkpointing, removing builder-only persisted fields and switching compact tables to `WITHOUT ROWID`.
+- Experiment index size fell from 5.4 MB to 2.9 MB after checkpointing, removing builder-only persisted fields, switching compact tables to `WITHOUT ROWID` and storing `key_text` only in FTS.
 
 ## Wide Stress - Rural and Unit Weighted 1000
 
 Artefact:
 
-- `tmp/address-typeahead-experiment-2026-06-22-hybrid-rowidtrim-rural-unit-1000.json`
+- `tmp/address-typeahead-experiment-2026-06-22-hybrid-keytrim-rural-unit-1000.json`
 
 Result:
 
@@ -203,6 +203,8 @@ Slim schema changes now applied:
 - persisted `prefix_key`, the unused base-signature index and optional search backstop columns are removed in compact modes
 - exact typeahead entries no longer duplicate display title/subtitle already held on the canonical address row
 - compact key tables now use `WITHOUT ROWID`
+- `key_text` is stored only in the FTS table, not duplicated in `address_typeahead_entries`
+- checkpoint prefix hits still report `address_prefix` when the typed query extends beyond the stored checkpoint
 
 Measured samples:
 
@@ -214,12 +216,14 @@ Measured samples:
 | Compact runtime-only | `--states ACT --limit-per-state 100000 --omit-legacy-fts --omit-search-backstop` | 141 MB | 489,822 | no |
 | Display/rowid trimmed runtime-only | `--states ACT --limit-per-state 100000 --omit-legacy-fts --omit-search-backstop` | 107 MB | 489,822 | no |
 | 8-state compact runtime sample | `--states ACT,NSW,NT,QLD,SA,TAS,VIC,WA --limit-per-state 25000 --omit-legacy-fts --omit-search-backstop` | 227 MB | 1,028,058 | no |
+| Key-trim runtime-only | `--states ACT --limit-per-state 100000 --omit-legacy-fts --omit-search-backstop` | 98 MB | 489,822 | no |
+| 8-state key-trim runtime sample | `--states ACT,NSW,NT,QLD,SA,TAS,VIC,WA --limit-per-state 25000 --omit-legacy-fts --omit-search-backstop` | 208 MB | 1,028,058 | no |
 
-The display/rowid trimmed runtime-only sample was probed directly with `FUEL_PATH_GNAF_SQLITE_PATH=tmp/gnaf-act-hybrid-runtime-rowidtrim-100k.sqlite`. It returned ACT address and unit/building suggestions without `address_fts`, `search_key` or `search_text`, including deduped exact unit results and correct title/subtitle fallback.
+The key-trim runtime-only sample was probed directly with `FUEL_PATH_GNAF_SQLITE_PATH=tmp/gnaf-act-hybrid-runtime-keytrim-100k.sqlite`. It returned ACT address and unit/building suggestions without `address_fts`, `search_key` or `search_text`, including deduped exact unit results, correct title/subtitle fallback and `address_prefix` evidence for checkpoint prefix hits.
 
 Brutal read:
 
-- 107 MB per 100k ACT rows and 227 MB per 200k across 8 states is a real improvement, but still projects to a large national runtime SQLite.
+- 98 MB per 100k ACT rows and 208 MB per 200k across 8 states is a real improvement, but still projects to a large national runtime SQLite.
 - The 8-state sample reduces the risk that the size estimate is ACT-only, but it is still a sample rather than a full 16.9M-row build.
 - The current code is functionally better and safer, but the full national hybrid index is not production-proven yet.
 - The next storage win is to reduce FTS/typeahead duplication or split the mobile/runtime index from the benchmark/sampling index.
@@ -234,7 +238,7 @@ What improved:
 - Exact address duplicates from multiple typeahead keys are removed in the runtime.
 - The benchmark now reports exact top, resolvable top, wrong-top-before-resolvable, unit P90, latency and index size.
 - A wrong building-name prefix regression was found and fixed by routing non-number-first input through typeahead.
-- Checkpointing reduced the ACT 100k sample from 345 MB to 290 MB, hybrid-only/no-legacy-FTS reduced it to 215 MB, compact runtime-only reduced it to 141 MB, and display/rowid trimming reduced it to 107 MB.
+- Checkpointing reduced the ACT 100k sample from 345 MB to 290 MB, hybrid-only/no-legacy-FTS reduced it to 215 MB, compact runtime-only reduced it to 141 MB, display/rowid trimming reduced it to 107 MB, and key trimming reduced it to 98 MB.
 
 What remains weak:
 

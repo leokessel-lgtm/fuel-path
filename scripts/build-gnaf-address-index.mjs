@@ -70,7 +70,6 @@ db.exec(`
     address_id TEXT NOT NULL,
     display_title TEXT,
     display_subtitle TEXT,
-    key_text TEXT NOT NULL,
     base_signature TEXT NOT NULL,
     entry_type TEXT NOT NULL,
     refine_required INTEGER DEFAULT 0,
@@ -110,9 +109,9 @@ const insertFts = includeLegacyFts ? db.prepare(`
 const insertTypeaheadEntry = db.prepare(`
   INSERT OR IGNORE INTO address_typeahead_entries (
     entry_id, address_id, display_title, display_subtitle,
-    key_text, base_signature, entry_type, refine_required, unit, rank_weight
+    base_signature, entry_type, refine_required, unit, rank_weight
   )
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 `);
 const insertTypeaheadFts = db.prepare(`
   INSERT INTO address_typeahead_fts (
@@ -186,7 +185,6 @@ for await (const record of readRecords(inputPath)) {
       address.id,
       entry.displayTitle,
       entry.displaySubtitle,
-      entry.keyText,
       entry.baseSignature,
       entry.entryType,
       entry.refineRequired ? 1 : 0,

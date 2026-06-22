@@ -239,7 +239,7 @@ function searchSqlitePrefixEntries(database, needle, limit) {
       e.entry_type,
       e.refine_required,
       e.rank_weight,
-      e.key_text,
+      p.prefix AS key_text,
       e.base_signature,
       e.display_title AS entry_display_title,
       e.display_subtitle AS entry_display_subtitle,
@@ -272,7 +272,7 @@ function searchSqliteTypeaheadEntries(database, needle, limit) {
       e.entry_type,
       e.refine_required,
       e.rank_weight,
-      e.key_text,
+      f.key_text,
       e.base_signature,
       e.display_title AS entry_display_title,
       e.display_subtitle AS entry_display_subtitle,
@@ -292,9 +292,9 @@ function searchSqliteTypeaheadEntries(database, needle, limit) {
     WHERE address_typeahead_fts MATCH ?
     ORDER BY
       CASE
-        WHEN e.key_text = ? THEN 0
-        WHEN e.key_text LIKE ? THEN 1
-        WHEN e.key_text LIKE ? THEN 2
+        WHEN f.key_text = ? THEN 0
+        WHEN f.key_text LIKE ? THEN 1
+        WHEN f.key_text LIKE ? THEN 2
         ELSE 3
       END,
       e.rank_weight DESC,
@@ -337,7 +337,7 @@ function hybridMatchType(row, needle) {
   const key = normaliseAddressText(row.key_text);
   const label = normaliseAddressText(row.address_label);
   if (key === needle || label === needle) return "exact_address";
-  if (key.startsWith(needle) || label.startsWith(needle)) return "address_prefix";
+  if (key.startsWith(needle) || needle.startsWith(key) || label.startsWith(needle)) return "address_prefix";
   return "address_token_overlap";
 }
 

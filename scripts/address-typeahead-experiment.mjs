@@ -99,7 +99,6 @@ function buildExperimentIndex(db, rows) {
       state TEXT,
       postcode TEXT,
       locality TEXT,
-      key_text TEXT NOT NULL,
       base_signature TEXT NOT NULL,
       entry_type TEXT NOT NULL,
       refine_required INTEGER DEFAULT 0,
@@ -125,10 +124,10 @@ function buildExperimentIndex(db, rows) {
   `);
   const insertEntry = db.prepare(`
     INSERT OR REPLACE INTO entries (
-      entry_id, address_id, label, lat, lon, state, postcode, locality, key_text,
+      entry_id, address_id, label, lat, lon, state, postcode, locality,
       base_signature, entry_type, refine_required, unit, rank_weight
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   const insertFts = db.prepare(`
     INSERT INTO typeahead_fts (
@@ -158,7 +157,6 @@ function buildExperimentIndex(db, rows) {
         row.state,
         row.postcode,
         row.locality,
-        entry.keyText,
         entry.baseSignature,
         entry.entryType,
         entry.refineRequired ? 1 : 0,
@@ -272,7 +270,7 @@ function searchExperiment(db, mode, rawQuery, limit) {
 
 function searchPrefix(db, needle, limit) {
   return db.prepare(`
-    SELECT e.*
+    SELECT e.*, p.prefix AS key_text
     FROM prefix_entries p
     JOIN entries e ON e.entry_id = p.entry_id
     WHERE p.prefix = ?
@@ -294,15 +292,15 @@ function searchTypeahead(db, needle, limit) {
   if (!terms.length) return [];
   const ftsQuery = terms.map((term) => `${escapeFtsTerm(term)}*`).join(" ");
   return db.prepare(`
-    SELECT e.*
+    SELECT e.*, f.key_text
     FROM typeahead_fts f
     JOIN entries e ON e.entry_id = f.entry_id
     WHERE typeahead_fts MATCH ?
     ORDER BY
       CASE
-        WHEN e.key_text = ? THEN 0
-        WHEN e.key_text LIKE ? THEN 1
-        WHEN e.key_text LIKE ? THEN 2
+        WHEN f.key_text = ? THEN 0
+        WHEN f.key_text LIKE ? THEN 1
+        WHEN f.key_text LIKE ? THEN 2
         ELSE 3
       END,
       e.rank_weight DESC,

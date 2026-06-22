@@ -587,9 +587,12 @@ test("unit-like SQLite queries wait for a meaningful street token before typeahe
   await withEnv({ FUEL_PATH_GNAF_SQLITE_PATH: outputPath }, async () => {
     const broadUnit = await searchAddressIndex("Unit 2 2", 3);
     const exactUnit = await searchAddressIndex("Unit 2 2 Stott", 3);
+    const baseRefine = await searchAddressIndex("2 Stott Court Wodonga", 3);
 
     assert.deepEqual(broadUnit, []);
     assert.equal(exactUnit[0].label, "Unit 2, 2 Stott Court, Wodonga VIC 3690");
+    assert.equal(baseRefine[0].label, "2 Stott Court, Wodonga VIC 3690");
+    assert.equal(baseRefine[0].refineRequired, true);
   });
 });
 

@@ -373,6 +373,7 @@ Follow-up issue found:
 - early unit prefixes such as `Unit 2 2` woke the rebuilt FTS path with very broad tokens like `unit` and `2`
 - the worst rows were genuine unit cases such as `Unit 2, 2 Stott Court, Wodonga VIC 3690`
 - the benchmark's previous latency number was cumulative per case; it did not separate individual request latency from the total cost of probing many prefixes
+- street-address base/refine rows could duplicate the street in their label, for example `17 Heckendorf Road, 17 Heckendorf Road, Wodonga VIC 3690`
 
 Fixes:
 
@@ -380,10 +381,11 @@ Fixes:
 - broad `Unit 2 2` returns no local suggestion rather than doing an expensive broad FTS scan
 - `Unit 2 2 Stott` still resolves once the street/building token is present
 - hosted benchmark rows now store per-request timing samples and summary output reports actual request P50/P95
+- base/refine rows whose title is already a street address now keep the place-only subtitle, while building-name rows still borrow street context
 
 Guarded context-aware hosted-contract benchmark:
 
-- artefact: `tmp/geocode-hosted-national-benchmark-2026-06-22-compact-1m-hosted-rural-unit-context-unitguard-latency-800.json`
+- artefact: `tmp/geocode-hosted-national-benchmark-2026-06-22-compact-1m-hosted-rural-unit-context-refinelabel-800.json`
 - profile: `rural-unit`
 - flag: `--case-context --case-context-radius-km 80`
 - cases: 800 addresses
@@ -393,15 +395,15 @@ Guarded context-aware hosted-contract benchmark:
 - resolvable top P50/P90/P95: 10 / 15 / 15
 - any-useful-match P50/P90/P95: 10 / 15 / 15
 - wrong top before resolvable: 85
-- cumulative case latency P50/P95: 123 ms / 566 ms
-- request latency P50/P95/max: 9 ms / 289 ms / 546 ms
+- cumulative case latency P50/P95: 123 ms / 555 ms
+- request latency P50/P95/max: 11 ms / 285 ms / 544 ms
 
 Guarded segment notes:
 
 | Category | Cases | Resolvable P90 | Resolvable P95 | Request P95 |
 | --- | ---: | ---: | ---: | ---: |
 | Lot | 123 | 10 | 10 | 128 ms |
-| Range | 25 | 12 | 12 | 216 ms |
+| Range | 25 | 12 | 12 | 231 ms |
 | Street | 430 | 12 | 18 | 132 ms |
 | Suffix | 12 | 10 | 10 | 50 ms |
 | Unit | 210 | 15 | 15 | 371 ms |

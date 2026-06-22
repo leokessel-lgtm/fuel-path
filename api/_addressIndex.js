@@ -347,6 +347,7 @@ function hybridRowToAddressRecord(row) {
 
 function refineDisplaySubtitle(row) {
   const entrySubtitle = String(row?.entry_display_subtitle || "");
+  if (hasStreetLikeText(row?.entry_display_title)) return entrySubtitle;
   if (hasStreetLikeText(entrySubtitle)) return entrySubtitle;
   return String(row?.address_display_subtitle || entrySubtitle);
 }

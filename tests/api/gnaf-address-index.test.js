@@ -567,6 +567,7 @@ test("unit-like SQLite queries wait for a meaningful street token before typeahe
       "ADDRESS_DETAIL_PID|ADDRESS_LABEL|FLAT_TYPE|FLAT_NUMBER|NUMBER_FIRST|STREET_NAME|STREET_TYPE|LOCALITY_NAME|STATE|POSTCODE|GEOCODE_TYPE|LONGITUDE|LATITUDE",
       "GAVIC3001|Unit 1, 1 Stott Court, Wodonga VIC 3690|Unit|1|1|Stott|Court|Wodonga|VIC|3690|PROPERTY CENTROID|146.886|-36.123",
       "GAVIC3002|Unit 2, 2 Stott Court, Wodonga VIC 3690|Unit|2|2|Stott|Court|Wodonga|VIC|3690|PROPERTY CENTROID|146.887|-36.124",
+      "GAVIC3003|Unit 3, 5A Woodland Street, Wodonga VIC 3690|Unit|3|5A|Woodland|Street|Wodonga|VIC|3690|PROPERTY CENTROID|146.888|-36.125",
     ].join("\n"),
   );
 
@@ -586,10 +587,12 @@ test("unit-like SQLite queries wait for a meaningful street token before typeahe
 
   await withEnv({ FUEL_PATH_GNAF_SQLITE_PATH: outputPath }, async () => {
     const broadUnit = await searchAddressIndex("Unit 2 2", 3);
+    const shortStreetToken = await searchAddressIndex("Unit 3 5A Wo", 3);
     const exactUnit = await searchAddressIndex("Unit 2 2 Stott", 3);
     const baseRefine = await searchAddressIndex("2 Stott Court Wodonga", 3);
 
     assert.deepEqual(broadUnit, []);
+    assert.equal(shortStreetToken[0].label, "Unit 3, 5A Woodland Street, Wodonga VIC 3690");
     assert.equal(exactUnit[0].label, "Unit 2, 2 Stott Court, Wodonga VIC 3690");
     assert.equal(baseRefine[0].label, "2 Stott Court, Wodonga VIC 3690");
     assert.equal(baseRefine[0].refineRequired, true);

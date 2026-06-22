@@ -379,13 +379,13 @@ Fixes:
 
 - unit-like SQLite queries now wait for a meaningful non-numeric, non-street-type token before running typeahead FTS
 - broad `Unit 2 2` returns no local suggestion rather than doing an expensive broad FTS scan
-- `Unit 2 2 Stott` still resolves once the street/building token is present
+- `Unit 3 5A Wo` resolves once a two-letter street/building name token is present, while `Unit 2 2` remains blocked
 - hosted benchmark rows now store per-request timing samples and summary output reports actual request P50/P95
 - base/refine rows whose title is already a street address now keep the place-only subtitle, while building-name rows still borrow street context
 
 Guarded context-aware hosted-contract benchmark:
 
-- artefact: `tmp/geocode-hosted-national-benchmark-2026-06-22-compact-1m-hosted-rural-unit-context-refinelabel-800.json`
+- artefact: `tmp/geocode-hosted-national-benchmark-2026-06-22-compact-1m-hosted-rural-unit-context-unitguard-2char-800.json`
 - profile: `rural-unit`
 - flag: `--case-context --case-context-radius-km 80`
 - cases: 800 addresses
@@ -393,26 +393,27 @@ Guarded context-aware hosted-contract benchmark:
 - final resolvable top: 800/800
 - exact top P50/P90/P95: 10 / 15 / 18
 - resolvable top P50/P90/P95: 10 / 15 / 15
-- any-useful-match P50/P90/P95: 10 / 15 / 15
-- wrong top before resolvable: 85
-- cumulative case latency P50/P95: 123 ms / 555 ms
-- request latency P50/P95/max: 11 ms / 285 ms / 544 ms
+- any-useful-match P50/P90/P95: 10 / 12 / 15
+- wrong top before resolvable: 84
+- cumulative case latency P50/P95: 123 ms / 564 ms
+- request latency P50/P95/max: 12 ms / 290 ms / 529 ms
 
 Guarded segment notes:
 
 | Category | Cases | Resolvable P90 | Resolvable P95 | Request P95 |
 | --- | ---: | ---: | ---: | ---: |
-| Lot | 123 | 10 | 10 | 128 ms |
-| Range | 25 | 12 | 12 | 231 ms |
-| Street | 430 | 12 | 18 | 132 ms |
+| Lot | 123 | 10 | 10 | 129 ms |
+| Range | 25 | 12 | 12 | 208 ms |
+| Street | 430 | 12 | 18 | 133 ms |
 | Suffix | 12 | 10 | 10 | 50 ms |
-| Unit | 210 | 15 | 15 | 371 ms |
+| Unit | 210 | 15 | 15 | 384 ms |
 
 Guarded brutal read:
 
-- This is a real latency improvement: unit request P95 dropped from about 1021 ms in the prior run to 371 ms.
-- The cost is also real: overall and unit/building resolvable P90 moved from 12 to exactly 15.
-- That still meets the stated 15-character target, but leaves no margin.
+- This is a real latency improvement: unit request P95 dropped from about 1021 ms in the prior run to 384 ms.
+- Allowing two-letter street/building tokens recovers useful-match margin: overall any-useful P90 is back to 12.
+- The cost is also real: overall and unit/building resolvable P90 remains exactly 15, and unit request P95 is 384 ms.
+- That still meets the stated 15-character target, but leaves no resolvable-top margin.
 - The guard is product-safe because it withholds broad unit suggestions rather than guessing between sibling units.
 - Next improvement should recover unit/building margin without reopening broad `unit + number` FTS scans, probably with compact unit prefix rows or a small exact-unit prefix table.
 

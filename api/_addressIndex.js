@@ -693,7 +693,7 @@ function unitLikeQueryReadyForTypeahead(needle) {
     !SQLITE_UNIT_TERMS.has(token) &&
     !SQLITE_STREET_TYPE_TERMS.has(token) &&
     !/^\d+[a-z]?$/.test(token) &&
-    token.length >= 3,
+    token.length >= 2,
   );
 }
 

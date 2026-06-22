@@ -19,6 +19,7 @@ The tested resolvable P90 target is now achieved in sampled stress runs and boun
 - after generalising embedded address-core prefixes to ordinary venue/building-first civic addresses, the same 400-case run kept exact P90 15, resolvable P90 12 and improved request P95 to 125 ms after adding an 8-character minimum prefix guard
 - after resolving building-name plus unit/shop numbers through base-refine prefix rows and the exact-unit index, the same 400-case run kept exact P90 15 and resolvable P90 12, while reducing overall request P95 to 70 ms and unit/building request P95 to 169 ms
 - after short-circuiting secondary needle searches once the primary needle has an exact address top hit, the same 400-case run kept exact P90 15 and resolvable P90 12, reduced elapsed P95 from 455 ms to 218 ms, and cut range request P95 from 762 ms to 15 ms
+- after adding builder-level building/venue prefix rows, a rebuilt 400-case rural/unit sample reached exact P90 12, resolvable P90 12, wrong-top-before-resolvable 5 and request P95 1 ms, but this is rebuilt-sample evidence rather than a fresh full-national package
 - unit/building resolvable P90 is still 15 in that 400-case run, and exact unit/building P90 is still 28
 - the broad exact-unit index raised the full national temp runtime from about 14 GB to about 16 GB; the partial-index temp file still occupies 16 GB until rebuilt/vacuumed, but currently reports about 1.97 GB free pages after dropping the broad index
 - compact prefix is only safe as a narrow house-number-first fast path
@@ -1344,6 +1345,64 @@ Brutal read on the exact-stop pass:
 - The remaining max request is still 2440 ms on `Apt 2 9 Maluka...`, and venue prefixes such as `Albert Par` and `Tarcombe 2002...` still hit multi-second cold FTS paths before compact prefix evidence is available.
 - The next structural improvement needs building/venue-name prefix coverage or a cheaper exact-name prefix table. The current index cannot make `Queenstown Police Station 2-6` fast before the street token without more local key material.
 
+## Building/Venue Prefix Builder Pass
+
+Problem found after the exact-stop pass:
+
+- the runtime could serve compact prefixes once address-core evidence appeared, but short venue prefixes still depended on broad typeahead FTS
+- examples from the full-national run included `Albert Par`, `Queenstown P`, `Tarcombe 2002...`, `Lake Tuggeranong...` and similar building-name-led labels
+- the existing `base_refine` entries were keyed as building plus base address, so short building prefixes existed only accidentally when the building name was long enough
+
+Implementation:
+
+- non-unit building/venue addresses now get an `exact:building` typeahead entry whose materialised prefix key is the building name
+- unit-heavy buildings keep using `base_refine` entries, but their materialised prefix key is now the building name alone
+- exact building rows remain exact only for non-unit addresses; unit/shop/office/kiosk buildings still surface grouped/refine suggestions
+- the builder test now proves `Queenstown P` and `Albert Par` are compact-prefix hits, while `Karratha City Plaza` and `Tuggeranong Business Centre` remain refine-safe building suggestions
+
+Direct rebuilt-sample probes:
+
+| Query | Result |
+| --- | --- |
+| `Albert Par` | 6 ms, exact Albert Park Motor Inn top |
+| `Queenstown P` | 1 ms, exact Queenstown Police Station top |
+| `Karratha City Plaza` | 0 ms, building refine suggestion for 16 Sharpe Avenue |
+| `Tuggeranong Business Centre` | 1 ms, building refine suggestion for 12 Kett Street |
+| `Lake Tuggeranong` | 0 ms, exact Lake Tuggeranong College top |
+
+Rebuilt 400-case rural/unit sample:
+
+- source cases: latest full-national 400-case benchmark rows exported to `tmp/gnaf-building-prefix-benchmark-400.psv`
+- rebuilt index: `tmp/gnaf-building-prefix-benchmark-400.sqlite`
+- rebuilt index size: 436 KB
+- benchmark artefact: `tmp/geocode-hosted-national-benchmark-2026-06-22-building-prefix-rebuilt-sample-400.json`
+- final top/resolvable: 400/400
+- exact top P50/P90/P95: 10 / 12 / 15
+- resolvable top P50/P90/P95: 10 / 12 / 12
+- wrong top before resolvable: 5
+- request latency P50/P95/max: 0 ms / 1 ms / 5 ms
+- elapsed latency P50/P95: 1 ms / 2 ms
+
+Rebuilt-sample segment notes:
+
+| Segment | Cases | Exact P90 | Resolvable P90 | Resolvable P95 | Latency P95 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Standard address | 336 | 10 | 10 | 10 | 1 ms request |
+| Unit/building address | 64 | 26 | 15 | 15 | 1 ms request |
+| Street address | 264 | 10 | 10 | 10 | 1 ms request |
+| Unit address | 63 | 26 | 15 | 15 | 1 ms request |
+| Lot address | 45 | 10 | 10 | 10 | 1 ms request |
+| Range address | 17 | 10 | 10 | 10 | 1 ms request |
+
+Brutal read on the building/venue prefix pass:
+
+- The builder shape is correct: early venue prefixes can now be served locally from compact prefix rows instead of broad FTS.
+- Unit-heavy buildings stay safe: building-only queries return refine-required base suggestions rather than silently routing to a shop/unit.
+- The rebuilt sample result is deliberately not a full-national claim. It proves the new generated key shape on the same 400-case rural/unit mix, not the final 16 GB package.
+- A full-national ad hoc backfill was attempted and stopped after about 3.5M scanned comma-labelled rows, 2.4M exact building entries and 9.1M prefix inserts because indexed post-build mutation was taking too long. The WAL was checkpointed and truncated afterwards.
+- Production packaging should generate these entries in the builder's normal ordered write path. Do not rely on post-build backfills for the national artefact.
+- Exact unit/building P90 is still 26 to 28 depending on the benchmark shape. Building prefixes help early base/refine suggestions, not exact unit intent.
+
 Brutal read on full national:
 
 - Full national build size is now proven, and it is large but locally possible.
@@ -1351,6 +1410,7 @@ Brutal read on full national:
 - The wider 400-case exact-stop run is now the best read: final top/resolvable is 400/400, exact P90 is 15 and resolvable P90 is 12.
 - Unit/building resolvable P90 is 15, but exact unit/building P90 is still 28.
 - Latency is materially better than the earlier full-national run: the latest exact-stop 400-case run is request P95 70 ms overall and elapsed P95 218 ms, but unit/building request P95 remains 196 ms and max request latency still reaches 2440 ms.
+- The building/venue prefix builder pass has promising rebuilt-sample evidence, but still needs a fresh full-national rebuild before it can replace the exact-stop run as the best full-national read.
 - SA remains the exact typed-character tail, ACT improved on resolvable P90, and range/unit/building rows remain the main latency tails.
 - The next improvement should target serving shape and packaging, not provider expansion.
 
@@ -1440,6 +1500,7 @@ What improved:
 - The latest embedded-civic-prefix rerun kept overall resolvable P90 at 12, exact P90 at 15, final top/resolvable at 400/400, and reduced request P95 to 125 ms after the Shell lot safety regression was fixed.
 - The latest building-unit-prefix rerun kept overall resolvable P90 at 12, exact P90 at 15, final top/resolvable at 400/400, reduced request P95 to 70 ms, and cut unit/building request P95 to 169 ms.
 - The latest exact-stop rerun kept overall resolvable P90 at 12, exact P90 at 15, final top/resolvable at 400/400, reduced elapsed P95 to 218 ms, cut range request P95 to 15 ms, and reduced wrong-top-before-resolvable to 25.
+- The building/venue prefix builder pass rebuilt a 400-case rural/unit sample with exact P90 12, resolvable P90 12, request P95 1 ms and wrong-top-before-resolvable 5.
 
 What remains weak:
 
@@ -1456,14 +1517,15 @@ What remains weak:
 - SA exact/resolvable P90 and ACT exact P90 remain weak in the wider full-national run, even though ACT resolvable P90 improved with context-aware typeahead.
 - Range-address latency remains weak until the current range-prefix backfill is replaced by a fresh national rebuild and the remaining cold number-first range spikes are profiled.
 - Short building/venue-name prefixes can still be slow before a civic number is typed, because the embedded-core fast path needs address-number evidence.
-- Building/venue prefixes still need local key material. Without it, `Albert Par`, `Queenstown P` and similar prefixes depend on broad typeahead FTS.
+- Building/venue prefixes now have local key material in the builder, but this has not yet been proven in a fresh full-national package.
+- The attempted national post-build backfill was too slow and left no valid full-national benchmark result for this pass.
 - Context-aware ranking depends on Plan/Nearby having a meaningful route/current-map anchor. Cold start address search without context still lands at rural/unit P90 18 in the corrected hosted-contract run.
 - `wrongTopBeforeResolvable` is still high in the typed-prefix harness because many short prefixes are inherently ambiguous before enough context arrives. This is acceptable only if UI state treats those rows as suggestions, not route commitments.
 
 Next:
 
 - Compress or shard FTS/typeahead duplication before treating the 16 GB SQLite as a shipping mobile/runtime asset.
-- Add or test a compact building/venue-name prefix layer that can serve early venue prefixes without broad FTS, while keeping building-only rows refine-safe.
+- Rebuild the full national runtime through the patched builder and rerun the 400-case and 800-case rural/unit benchmarks against that fresh package.
 - Rerun the 800-case hosted national benchmark after another serving-shape pass, not before.
 - Add a Plan/Nearby UI smoke case for `refine_required` rows so route submission cannot regress.
 - Recover exact unit/building P90 margin without reopening broad `unit + number` FTS scans.

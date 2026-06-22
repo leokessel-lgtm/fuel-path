@@ -865,12 +865,26 @@ test("building-first address queries use embedded address core prefixes", async 
     const sqlite = new DatabaseSync(outputPath, { readOnly: true });
     const rangePrefixRows = sqlite.prepare("SELECT COUNT(*) AS count FROM address_prefix_entries WHERE prefix = ?").get("2 6 stic");
     const civicPrefixRows = sqlite.prepare("SELECT COUNT(*) AS count FROM address_prefix_entries WHERE prefix = ?").get("55 ilfra");
+    const buildingRangePrefixRows = sqlite.prepare("SELECT COUNT(*) AS count FROM address_prefix_entries WHERE prefix = ?").get("queenstown p");
+    const buildingCivicPrefixRows = sqlite.prepare("SELECT COUNT(*) AS count FROM address_prefix_entries WHERE prefix = ?").get("albert p");
     sqlite.close();
 
+    const rangeBuildingPrefixSuggestions = await searchAddressIndex("Queenstown P", 3, {
+      searchContext: {
+        nearLat: -42.080,
+        nearLon: 145.552,
+      },
+    });
     const rangeSuggestions = await searchAddressIndex("Queenstown Police Station 2-6 Sticht Street Queenstown TAS 7467", 3, {
       searchContext: {
         nearLat: -42.080,
         nearLon: 145.552,
+      },
+    });
+    const civicBuildingPrefixSuggestions = await searchAddressIndex("Albert Par", 3, {
+      searchContext: {
+        nearLat: -23.440,
+        nearLon: 144.250,
       },
     });
     const civicSuggestions = await searchAddressIndex("Albert Park Motor Inn 55 Ilfracombe Road Longreach QLD 4730", 3, {
@@ -888,10 +902,20 @@ test("building-first address queries use embedded address core prefixes", async 
 
     assert.ok(rangePrefixRows.count >= 1);
     assert.ok(civicPrefixRows.count >= 1);
+    assert.ok(buildingRangePrefixRows.count >= 1);
+    assert.ok(buildingCivicPrefixRows.count >= 1);
+    assert.equal(rangeBuildingPrefixSuggestions[0].label, "Queenstown Police Station, 2-6 Sticht Street, Queenstown TAS 7467");
+    assert.equal(rangeBuildingPrefixSuggestions[0].matchType, "address_prefix");
+    assert.equal(rangeBuildingPrefixSuggestions[0].sourceLabel, "Exact address");
+    assert.equal(rangeBuildingPrefixSuggestions[0].refineRequired, false);
     assert.equal(rangeSuggestions[0].label, "Queenstown Police Station, 2-6 Sticht Street, Queenstown TAS 7467");
     assert.equal(rangeSuggestions[0].matchType, "exact_address");
     assert.equal(rangeSuggestions[0].sourceLabel, "Exact address");
     assert.equal(rangeSuggestions[0].refineRequired, false);
+    assert.equal(civicBuildingPrefixSuggestions[0].label, "Albert Park Motor Inn, 55 Ilfracombe Road, Longreach QLD 4730");
+    assert.equal(civicBuildingPrefixSuggestions[0].matchType, "address_prefix");
+    assert.equal(civicBuildingPrefixSuggestions[0].sourceLabel, "Exact address");
+    assert.equal(civicBuildingPrefixSuggestions[0].refineRequired, false);
     assert.equal(civicSuggestions[0].label, "Albert Park Motor Inn, 55 Ilfracombe Road, Longreach QLD 4730");
     assert.equal(civicSuggestions[0].matchType, "exact_address");
     assert.equal(civicSuggestions[0].sourceLabel, "Exact address");

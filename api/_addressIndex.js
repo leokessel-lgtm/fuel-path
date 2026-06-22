@@ -7,6 +7,37 @@ const DEFAULT_SEED_PATH = path.join(ROOT, "prototype", "data", "gnaf-addresses.s
 let seedRecordsCache = null;
 let sqliteCache = null;
 
+function addressLookupDebugEnabled() {
+  return process.env.FUEL_PATH_ADDRESS_LOOKUP_DEBUG === "1";
+}
+
+function createAddressLookupTrace(needle) {
+  return addressLookupDebugEnabled() ? { needle, stages: [] } : null;
+}
+
+function timeAddressLookupStage(trace, stage, fn) {
+  if (!trace) return fn();
+  const started = Date.now();
+  const result = fn();
+  const rows = Array.isArray(result) ? result.length : null;
+  trace.stages.push({ stage, ms: Date.now() - started, rows });
+  return result;
+}
+
+function attachAddressLookupDebug(suggestions, trace, path) {
+  if (!trace) return suggestions;
+  const totalMs = trace.stages.reduce((sum, stage) => sum + Number(stage.ms || 0), 0);
+  return suggestions.map((suggestion) => ({
+    ...suggestion,
+    addressLookupDebug: {
+      path,
+      needle: trace.needle,
+      totalMs,
+      stages: trace.stages,
+    },
+  }));
+}
+
 function addressIndexStatus() {
   const sqlitePath = configuredSqlitePath();
   const apiConfigured = Boolean(configuredApiUrl());
@@ -177,8 +208,9 @@ function searchSqliteIndex(needle, limit, searchContext = null) {
   const database = openSqliteIndex();
   if (!database) return [];
   const sqlitePath = configuredSqlitePath();
+  const trace = createAddressLookupTrace(needle);
   if (sqliteHybridIndexAvailable(database)) {
-    const hybridResults = searchSqliteHybridIndex(database, needle, limit, searchContext);
+    const hybridResults = searchSqliteHybridIndex(database, needle, limit, searchContext, trace);
     if (hybridResults.length) return hybridResults;
     if (queryContainsUnitLikeToken(needle)) return [];
   }
@@ -197,13 +229,14 @@ function searchSqliteIndex(needle, limit, searchContext = null) {
       ORDER BY rank
       LIMIT ?
     `);
-    return statement
+    const suggestions = statement
       .all(ftsQuery, expandedLimit)
       .map((row) => ({ row, matchType: sqliteMatchType(row, needle) }))
       .filter(({ row, matchType }) => addressMatchQualityPass(row, needle, matchType))
       .sort((left, right) => addressIndexRank(right, needle) - addressIndexRank(left, needle) || left.row.label.length - right.row.label.length)
       .slice(0, limit)
       .map(({ row, matchType }) => addressRecordToSuggestion(row, matchType, addressIndexRank({ row, matchType }, needle)));
+    return attachAddressLookupDebug(suggestions, trace, "legacy_fts");
   } catch {
     try {
       const statement = database.prepare(`
@@ -213,108 +246,127 @@ function searchSqliteIndex(needle, limit, searchContext = null) {
         ORDER BY LENGTH(label)
         LIMIT ?
       `);
-      return statement
+      const suggestions = statement
         .all(`%${needle}%`, limit)
         .map((row) => ({ row, matchType: sqliteMatchType(row, needle) }))
         .filter(({ row, matchType }) => addressMatchQualityPass(row, needle, matchType))
         .sort((left, right) => addressIndexRank(right, needle) - addressIndexRank(left, needle) || left.row.label.length - right.row.label.length)
         .map(({ row, matchType }) => addressRecordToSuggestion(row, matchType, addressIndexRank({ row, matchType }, needle)));
+      return attachAddressLookupDebug(suggestions, trace, "legacy_like");
     } catch {
       return [];
     }
   }
 }
 
-function searchSqliteHybridIndex(database, needle, limit, searchContext = null) {
+function searchSqliteHybridIndex(database, needle, limit, searchContext = null, trace = null) {
   if (queryContainsUnitLikeToken(needle)) {
     const unitLotIntent = queryUnitLotIntent(needle);
     const unitRangePrefixReady = unitLikeRangeQueryReadyForExactPrefix(needle);
     const unitLevelPrefixReady = unitLikeLevelQueryReadyForExactPrefix(needle);
     if (!unitLikeQueryReadyForTypeahead(needle) && !unitRangePrefixReady && !unitLevelPrefixReady) return [];
-    const exactUnitRows = searchSqliteExactUnitEntries(database, needle, limit);
+    const exactUnitRows = timeAddressLookupStage(trace, "exact_unit", () => searchSqliteExactUnitEntries(database, needle, limit));
     const safeExactUnitRows = filterRowsForUnitLotIntent(exactUnitRows, unitLotIntent);
-    if (safeExactUnitRows.length) return hybridRowsToSuggestions(safeExactUnitRows, needle, 960);
+    if (safeExactUnitRows.length) return attachAddressLookupDebug(hybridRowsToSuggestions(safeExactUnitRows, needle, 960), trace, "exact_unit");
     if (unitLikeQueryStartsWithUnitToken(needle)) {
       if ((unitRangePrefixReady || unitLevelPrefixReady) && !unitLikeQueryReadyForTypeahead(needle)) {
-        const exactPrefixRows = searchSqlitePrefixEntries(database, needle, limit, searchContext, {
-          includeTokenBoundaryPrefix: true,
-          minPrefixLength: 12,
-        }).filter((row) => row.entry_type === "exact" && row.unit);
+        const exactPrefixRows = timeAddressLookupStage(trace, "unit_exact_prefix_not_typeahead_ready", () =>
+          searchSqlitePrefixEntries(database, needle, limit, searchContext, {
+            includeTokenBoundaryPrefix: true,
+            minPrefixLength: 12,
+          }).filter((row) => row.entry_type === "exact" && row.unit),
+        );
         const safeExactPrefixRows = filterRowsForUnitLotIntent(exactPrefixRows, unitLotIntent);
         if (safeExactPrefixRows.length && !prefixRowsAmbiguous(safeExactPrefixRows)) {
-          return hybridRowsToSuggestions(preferExactUnitPrefixRows(safeExactPrefixRows), needle, 940);
+          return attachAddressLookupDebug(hybridRowsToSuggestions(preferExactUnitPrefixRows(safeExactPrefixRows), needle, 940), trace, "unit_exact_prefix_not_typeahead_ready");
         }
         return [];
       }
-      const prefixRows = searchSqlitePrefixEntries(database, needle, limit, searchContext);
+      const prefixRows = timeAddressLookupStage(trace, "unit_prefix", () => searchSqlitePrefixEntries(database, needle, limit, searchContext));
       const useContextualPrefixRows = shouldUseContextualAmbiguousPrefixRows(needle, searchContext);
       const safePrefixRows = filterRowsForUnitLotIntent(prefixRows, unitLotIntent);
       if (safePrefixRows.length && (!prefixRowsAmbiguous(safePrefixRows) || useContextualPrefixRows)) {
-        return hybridRowsToSuggestions(useContextualPrefixRows ? safePrefixRows : preferExactUnitPrefixRows(safePrefixRows), needle, 930);
+        return attachAddressLookupDebug(
+          hybridRowsToSuggestions(useContextualPrefixRows ? safePrefixRows : preferExactUnitPrefixRows(safePrefixRows), needle, 930),
+          trace,
+          "unit_prefix",
+        );
       }
       if (unitRangePrefixReady) {
-        const exactPrefixRows = searchSqlitePrefixEntries(database, needle, limit, searchContext, {
-          includeTokenBoundaryPrefix: true,
-        }).filter((row) => row.entry_type === "exact" && row.unit);
+        const exactPrefixRows = timeAddressLookupStage(trace, "unit_range_exact_prefix", () =>
+          searchSqlitePrefixEntries(database, needle, limit, searchContext, {
+            includeTokenBoundaryPrefix: true,
+          }).filter((row) => row.entry_type === "exact" && row.unit),
+        );
         const safeExactPrefixRows = filterRowsForUnitLotIntent(exactPrefixRows, unitLotIntent);
         if (safeExactPrefixRows.length && !prefixRowsAmbiguous(safeExactPrefixRows)) {
-          return hybridRowsToSuggestions(preferExactUnitPrefixRows(safeExactPrefixRows), needle, 940);
+          return attachAddressLookupDebug(hybridRowsToSuggestions(preferExactUnitPrefixRows(safeExactPrefixRows), needle, 940), trace, "unit_range_exact_prefix");
         }
       }
     } else {
-      const buildingUnitRows = searchSqliteBuildingUnitEntries(database, needle, limit, searchContext);
+      const buildingUnitRows = timeAddressLookupStage(trace, "building_unit_exact", () => searchSqliteBuildingUnitEntries(database, needle, limit, searchContext));
       const safeBuildingUnitRows = filterRowsForUnitLotIntent(buildingUnitRows, unitLotIntent);
-      if (safeBuildingUnitRows.length) return hybridRowsToSuggestions(safeBuildingUnitRows, needle, 960);
+      if (safeBuildingUnitRows.length) return attachAddressLookupDebug(hybridRowsToSuggestions(safeBuildingUnitRows, needle, 960), trace, "building_unit_exact");
       const buildingUnitIntent = buildingUnitIntentFromNeedle(needle);
       if (buildingUnitIntent) {
         const exactTypeaheadRows = filterRowsForUnitIntent(
-          searchSqliteTypeaheadEntries(database, needle, limit, searchContext).filter((row) => row.entry_type === "exact"),
+          timeAddressLookupStage(trace, "building_unit_exact_typeahead", () =>
+            searchSqliteTypeaheadEntries(database, needle, limit, searchContext).filter((row) => row.entry_type === "exact"),
+          ),
           buildingUnitIntent,
         );
-        if (exactTypeaheadRows.length) return hybridRowsToSuggestions(exactTypeaheadRows, needle, 950);
+        if (exactTypeaheadRows.length) return attachAddressLookupDebug(hybridRowsToSuggestions(exactTypeaheadRows, needle, 950), trace, "building_unit_exact_typeahead");
       }
-      const buildingUnitRefineRows = searchSqliteBuildingUnitRefineEntries(database, needle, limit, searchContext);
-      if (buildingUnitRefineRows.length) return hybridRowsToSuggestions(buildingUnitRefineRows, needle, 940);
+      const buildingUnitRefineRows = timeAddressLookupStage(trace, "building_unit_refine", () => searchSqliteBuildingUnitRefineEntries(database, needle, limit, searchContext));
+      if (buildingUnitRefineRows.length) return attachAddressLookupDebug(hybridRowsToSuggestions(buildingUnitRefineRows, needle, 940), trace, "building_unit_refine");
       const embeddedUnitNeedle = embeddedUnitAddressCoreNeedle(needle);
       if (embeddedUnitNeedle) {
-        const prefixRows = searchSqlitePrefixEntries(database, embeddedUnitNeedle, limit, searchContext, {
-          minPrefixLength: 12,
-        });
+        const prefixRows = timeAddressLookupStage(trace, "embedded_unit_prefix", () =>
+          searchSqlitePrefixEntries(database, embeddedUnitNeedle, limit, searchContext, {
+            minPrefixLength: 12,
+          }),
+        );
         const useContextualPrefixRows = shouldUseContextualAmbiguousPrefixRows(embeddedUnitNeedle, searchContext);
         const safePrefixRows = filterRowsForUnitLotIntent(prefixRows, unitLotIntent);
         if (safePrefixRows.length && (!prefixRowsAmbiguous(safePrefixRows) || useContextualPrefixRows)) {
-          return hybridRowsToSuggestions(useContextualPrefixRows ? safePrefixRows : preferExactUnitPrefixRows(safePrefixRows), needle, 930);
+          return attachAddressLookupDebug(
+            hybridRowsToSuggestions(useContextualPrefixRows ? safePrefixRows : preferExactUnitPrefixRows(safePrefixRows), needle, 930),
+            trace,
+            "embedded_unit_prefix",
+          );
         }
       }
     }
-    const typeaheadRows = searchSqliteTypeaheadEntries(database, needle, limit, searchContext);
-    return hybridRowsToSuggestions(filterRowsForUnitLotIntent(typeaheadRows, unitLotIntent), needle);
+    const typeaheadRows = timeAddressLookupStage(trace, "unit_typeahead", () => searchSqliteTypeaheadEntries(database, needle, limit, searchContext));
+    return attachAddressLookupDebug(hybridRowsToSuggestions(filterRowsForUnitLotIntent(typeaheadRows, unitLotIntent), needle), trace, "unit_typeahead");
   }
   if (!/^\d/.test(needle)) {
     if (queryStartsWithLotLikeToken(needle)) {
-      const prefixRows = searchSqlitePrefixEntries(database, needle, limit, searchContext);
+      const prefixRows = timeAddressLookupStage(trace, "lot_prefix", () => searchSqlitePrefixEntries(database, needle, limit, searchContext));
       if (prefixRows.length && (!prefixRowsAmbiguous(prefixRows) || shouldUseContextualAmbiguousPrefixRows(needle, searchContext))) {
-        return hybridRowsToSuggestions(prefixRows, needle, 950);
+        return attachAddressLookupDebug(hybridRowsToSuggestions(prefixRows, needle, 950), trace, "lot_prefix");
       }
     }
     const embeddedAddressCoreNeedle = embeddedNumberFirstAddressCoreNeedle(needle);
     if (embeddedAddressCoreNeedle) {
-      const prefixRows = searchSqlitePrefixEntries(database, embeddedAddressCoreNeedle, limit, searchContext, {
-        minPrefixLength: 8,
-      });
+      const prefixRows = timeAddressLookupStage(trace, "embedded_number_prefix", () =>
+        searchSqlitePrefixEntries(database, embeddedAddressCoreNeedle, limit, searchContext, {
+          minPrefixLength: 8,
+        }),
+      );
       if (prefixRows.length && (!prefixRowsAmbiguous(prefixRows) || shouldUseContextualAmbiguousPrefixRows(embeddedAddressCoreNeedle, searchContext))) {
-        return hybridRowsToSuggestions(prefixRows, needle, 950);
+        return attachAddressLookupDebug(hybridRowsToSuggestions(prefixRows, needle, 950), trace, "embedded_number_prefix");
       }
     }
-    const typeaheadRows = searchSqliteTypeaheadEntries(database, needle, limit, searchContext);
-    return hybridRowsToSuggestions(typeaheadRows, needle);
+    const typeaheadRows = timeAddressLookupStage(trace, "text_typeahead", () => searchSqliteTypeaheadEntries(database, needle, limit, searchContext));
+    return attachAddressLookupDebug(hybridRowsToSuggestions(typeaheadRows, needle), trace, "text_typeahead");
   }
-  const prefixRows = searchSqlitePrefixEntries(database, needle, limit, searchContext);
+  const prefixRows = timeAddressLookupStage(trace, "number_prefix", () => searchSqlitePrefixEntries(database, needle, limit, searchContext));
   if (prefixRows.length && (!prefixRowsAmbiguous(prefixRows) || shouldUseContextualAmbiguousPrefixRows(needle, searchContext))) {
-    return hybridRowsToSuggestions(prefixRows, needle, 950);
+    return attachAddressLookupDebug(hybridRowsToSuggestions(prefixRows, needle, 950), trace, "number_prefix");
   }
-  const typeaheadRows = searchSqliteTypeaheadEntries(database, needle, limit, searchContext);
-  return hybridRowsToSuggestions(typeaheadRows, needle);
+  const typeaheadRows = timeAddressLookupStage(trace, "number_typeahead", () => searchSqliteTypeaheadEntries(database, needle, limit, searchContext));
+  return attachAddressLookupDebug(hybridRowsToSuggestions(typeaheadRows, needle), trace, "number_typeahead");
 }
 
 function hybridRowsToSuggestions(rows, needle, fallbackScore = 900) {

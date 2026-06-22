@@ -102,6 +102,9 @@ if (
 if (MODE === "module" && !process.env.FUEL_PATH_DISABLE_STATION_GEOCODE) {
   process.env.FUEL_PATH_DISABLE_STATION_GEOCODE = "1";
 }
+if (MODE === "module" && !process.env.FUEL_PATH_ADDRESS_LOOKUP_DEBUG) {
+  process.env.FUEL_PATH_ADDRESS_LOOKUP_DEBUG = "1";
+}
 
 installFetchObserver();
 
@@ -294,6 +297,9 @@ function requestTrace(testCase, prefix, requestMs, payload, top, matchIndex, res
     topType: top?.type || "",
     topSuggestionType: top?.suggestionType || "",
     topRefineRequired: Boolean(top?.refineRequired),
+    addressLookupPath: top?.addressLookupDebug?.path || "",
+    addressLookupMs: top?.addressLookupDebug?.totalMs ?? null,
+    addressLookupStages: Array.isArray(top?.addressLookupDebug?.stages) ? top.addressLookupDebug.stages : [],
     matchIndex,
     resolvableTop,
   };
@@ -308,7 +314,8 @@ function slowRequestTraces(traces) {
 function slowRequestSummary(traces) {
   const slowest = slowRequestTraces(traces)[0];
   if (!slowest) return "";
-  return `${slowest.requestMs}ms@${slowest.chars}:${slowest.prefix}`;
+  const path = slowest.addressLookupPath ? ` ${slowest.addressLookupPath}` : "";
+  return `${slowest.requestMs}ms@${slowest.chars}${path}:${slowest.prefix}`;
 }
 
 async function geocodeQuery(query, index, testCase = {}) {
@@ -745,6 +752,8 @@ function consoleSummary(value) {
         requestMs: request.requestMs,
         prefix: request.prefix,
         fullQueryProbe: request.fullQueryProbe,
+        addressLookupPath: request.addressLookupPath,
+        addressLookupMs: request.addressLookupMs,
       }));
       continue;
     }

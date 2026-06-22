@@ -2224,6 +2224,42 @@ Brutal read on slow-prefix diagnostics:
 - The new diagnostic still does not identify the internal SQLite path. It tells us the problematic prefix and top result, but not whether the time was spent in exact-unit lookup, materialised prefix lookup, typeahead FTS or fallback matching.
 - The next useful build change is runtime path-level timing inside `_addressIndex.js`, gated for benchmark/dev use, so the slow prefixes can be tied to the actual query path before tuning indexes or guards.
 
+## Full-National Path-Debug Diagnostic Rerun
+
+Runtime path-level timing is now available behind `FUEL_PATH_ADDRESS_LOOKUP_DEBUG=1`; module-mode benchmark runs enable it by default. The console summary keeps only the slow request path and total local lookup time, while the JSON artefact stores the full stage trace.
+
+- artefact: `tmp/geocode-hosted-national-benchmark-2026-06-22-national-ftscolumn-pathdebug-800.json`
+- CSV: `tmp/geocode-hosted-national-benchmark-2026-06-22-national-ftscolumn-pathdebug-800.csv`
+- source SQLite: `tmp/gnaf-national-hybrid-runtime-ftscolumn.sqlite`
+- profile: `rural-unit`
+- flag: `--case-context`
+- cases: 800 addresses, 100 per benchmark state
+- final top/resolvable: 800/800
+- exact top P50/P90/P95: 10 / 15 / 19
+- resolvable top P50/P90/P95: 10 / 12 / 15
+- request latency P50/P95/max: 1 ms / 57 ms / 3,227 ms
+- elapsed latency P50/P95: 4 ms / 279 ms
+
+Slowest path-debug request prefixes:
+
+| Request | Case | Prefix | Local path | Stage read | Notes |
+| ---: | --- | --- | --- | --- | --- |
+| 3,227 ms | `hosted-0483` | `Unit 3 Lot 1` | `unit_typeahead` | `unit_prefix` 1 ms / `unit_typeahead` 3,226 ms | prefix table has no exact `unit 3 lot 150` material |
+| 3,003 ms | `hosted-0479` | `Unit 4 Lot 1` | `unit_typeahead` | `unit_prefix` 0 ms / `unit_typeahead` 3,002 ms | prefix table has no exact `unit 4 lot 141` material |
+| 2,716 ms | `hosted-0798` | `Unit 4 27 Wa` | `unit_typeahead` | `unit_prefix` 12 ms / `unit_typeahead` 2,703 ms | exact unit+civic+street-prefix rows exist but current ambiguity guard falls through |
+| 2,632 ms | `hosted-0664` | `Common 2 P` | `text_typeahead` | `text_typeahead` 2,631 ms | venue/name-first text path is the cost centre |
+| 2,474 ms | `hosted-0581` | full query | `unit_typeahead` | `unit_typeahead` 2,474 ms | quoted venue/range row |
+| 2,258 ms | `hosted-0320` | `Albert Par` | `text_typeahead` | `text_typeahead` 2,258 ms | venue/name-first text path is the cost centre |
+
+Brutal read on path-debug diagnostics:
+
+- The character target is now met on this 800-case rural/unit benchmark: exact P90 is 15 and resolvable P90 is 12.
+- Latency still has unacceptable local spikes. The max request is still over 3 seconds, and the bad rows are local lookup paths, not external fallback.
+- Unit-lot prefixes are not merely ranked badly; key prefix material is missing. Exact rows like `unit 3 lot 150` and `unit 4 lot 141` are not present in `address_prefix_entries`, forcing the expensive `unit_typeahead` fallback.
+- `Unit 4 27 Wa` is a different failure shape: exact prefix rows exist, but the current guard treats the short street token as too ambiguous and falls through to typeahead. A narrower contextual unit-prefix acceptance rule can probably remove this spike without weakening exact text evidence.
+- Venue/name-first rows such as `Common 2 P` and `Albert Par` need a separate text-path optimisation. Tuning unit lookup will not fix those.
+- Next best build steps: materialise unit-lot prefix keys in the builder or add a safe unit-lot lookup table; add a guarded contextual exact-prefix fast path for `unit + civic number + street prefix` rows; then rerun the same 800-case benchmark and compare request P95/max, not just character metrics.
+
 ## Safety Rerun After Civic-Number Guard
 
 The manual 994k-row probe found a real safety issue: number-first queries could fall back to token-overlap rows with a different civic street number when the exact address was absent from the sample.

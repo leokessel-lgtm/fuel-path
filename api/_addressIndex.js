@@ -63,14 +63,29 @@ async function searchAddressIndex(query, limit = 5, options = {}) {
 
   const sqlitePath = configuredSqlitePath();
   if (sqlitePath) {
-    const sqliteResults = mergeAddressSuggestions(
-      needles.map((item) => searchSqliteIndex(item.needle, limit, searchContext)),
-      limit,
-    );
+    const sqliteResults = searchSqliteNeedles(needles, limit, searchContext);
     if (sqliteResults.length) return sqliteResults;
   }
 
   return mergeAddressSuggestions(needles.map((item) => searchSeedIndex(item.needle, limit)), limit);
+}
+
+function searchSqliteNeedles(needles, limit, searchContext) {
+  const groups = [];
+  for (const item of needles) {
+    const rows = searchSqliteIndex(item.needle, limit, searchContext);
+    groups.push(rows);
+    const merged = mergeAddressSuggestions(groups, limit);
+    if (shouldStopSqliteNeedleSearch(merged, item.needle, limit)) return merged;
+  }
+  return mergeAddressSuggestions(groups, limit);
+}
+
+function shouldStopSqliteNeedleSearch(results, needle, limit) {
+  if (results.length >= limit) return true;
+  if (!queryContainsUnitLikeToken(needle)) return false;
+  const top = results[0];
+  return Boolean(top && top.suggestionType === "exact_address" && top.refineRequired !== true);
 }
 
 async function searchApiIndex(rawQuery, needle, limit) {
@@ -420,6 +435,7 @@ function searchSqliteExactUnitEntries(database, needle, limit) {
     WHERE e.base_signature = ?
       AND e.unit = ?
       AND e.entry_type = 'exact'
+      AND e.unit <> ''
     ORDER BY e.rank_weight DESC, LENGTH(a.label), a.label
     LIMIT ?
   `).all(refinement.baseSignature, refinement.unit, Math.max(1, Math.min(Number(limit) || 5, 20)));

@@ -11,8 +11,9 @@ The tested resolvable P90 target is now achieved in sampled stress runs and boun
 - the earlier full national rural/unit context benchmark hit exact/resolvable P90 15, but request P95 was 3.5 seconds and one request reached 31.5 seconds
 - after sampler and contextual-prefix fixes, a bounded 120-case full-national rural/unit run completed with exact/resolvable P90 15 and request P95 1.16 seconds
 - after adding the indexed exact-unit path, a wider 400-case full-national rural/unit run completed with exact/resolvable P90 15 and request P95 1.45 seconds
+- after slimming that exact-unit index to a partial exact-unit-only index and short-circuiting SQLite variant searches after a safe exact unit hit, the same 400-case full-national run kept exact/resolvable P90 15 and reduced request P95 to 1.06 seconds
 - unit/building resolvable P90 is 15 in that 400-case run, but exact unit/building P90 is still 28
-- the exact-unit index raises the full national temp runtime from about 14 GB to about 16 GB
+- the broad exact-unit index raised the full national temp runtime from about 14 GB to about 16 GB; the partial-index temp file still occupies 16 GB until rebuilt/vacuumed, but currently reports about 1.97 GB free pages after dropping the broad index
 - compact prefix is only safe as a narrow house-number-first fast path
 - nearby route/current-map context is now used as a small local G-NAF boost, not as a replacement for text evidence
 - building-name, street-name and unit-like input must use typeahead fallback to avoid wrong base suggestions
@@ -872,13 +873,69 @@ Brutal read on the exact-unit index:
 - The 400-case run is more honest than the 120-case run: overall request P95 is still 1.45 seconds, and unit/building request P95 is 1.88 seconds.
 - The next cheap win is unlikely to be another rank tweak. The remaining work is either a slimmer exact-unit serving structure or a state/locality-sharded runtime index.
 
+Partial exact-unit index and SQLite short-circuit rerun:
+
+- source change: `address_typeahead_base_unit_idx` is now partial: `(base_signature, unit, rank_weight DESC) WHERE entry_type = 'exact' AND unit <> ''`
+- runtime change: SQLite search now stops evaluating broader generated needles once a unit-like query has a safe non-refine exact-address top result
+- temp DB note: the modified temp file still reports 16 GB on disk, because SQLite keeps freed pages until rebuild/vacuum
+- free-page evidence after dropping the broad index: `freelist_count=481394`, about 1.97 GB free pages
+- query-plan evidence: exact-unit lookup uses `SEARCH e USING INDEX address_typeahead_base_unit_idx (base_signature=? AND unit=?)`
+- direct probes after short-circuit:
+  - `Tuggeranong Business Centre Unit 2 12 Kett Street Kambah ACT 2902`: 5 ms, exact Unit 2 top
+  - `Lake Tuggeranong College Offc 1 123 Cowlishaw Street Greenway ACT 2900`: 1 ms, exact Offc 1 top
+  - `Unit 1 L123 Ante Street Coober Pedy SA 5723`: 2 ms, exact Unit 1 top
+
+Full-national 120-case partial-index rerun:
+
+- artefact: `tmp/geocode-hosted-national-benchmark-2026-06-22-fullnational-partial-exactunit-index-120.json`
+- profile: `rural-unit`
+- flag: `--case-context --case-context-radius-km 80`
+- cases: 120 addresses
+- final top/resolvable: 120/120
+- exact top P50/P90/P95: 10 / 15 / 26
+- resolvable top P50/P90/P95: 10 / 15 / 15
+- any-useful-match P50/P90/P95: 10 / 12 / 15
+- wrong top before resolvable: 8
+- request latency P50/P95/max: 1 ms / 807 ms / 2809 ms
+- unit/building request P95: 1101 ms
+
+Full-national 400-case partial-index stress:
+
+- artefact: `tmp/geocode-hosted-national-benchmark-2026-06-22-fullnational-partial-exactunit-index-400.json`
+- profile: `rural-unit`
+- flag: `--case-context --case-context-radius-km 80`
+- cases: 400 addresses
+- final top/resolvable: 400/400
+- exact top P50/P90/P95: 10 / 15 / 28
+- resolvable top P50/P90/P95: 10 / 15 / 18
+- any-useful-match P50/P90/P95: 10 / 12 / 15
+- wrong top before resolvable: 45
+- request latency P50/P95/max: 2 ms / 1062 ms / 4619 ms
+
+400-case partial-index segment notes:
+
+| Segment | Cases | Exact P90 | Resolvable P90 | Resolvable P95 | Request P95 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Standard address | 336 | 12 | 12 | 22 | 1082 ms |
+| Unit/building address | 64 | 28 | 15 | 15 | 752 ms |
+| Street address | 264 | 15 | 15 | 29 | 811 ms |
+| Unit address | 63 | 28 | 15 | 15 | 752 ms |
+
+Brutal read on the partial index:
+
+- This is a better serving shape than the broad exact-unit index. It keeps the exact/resolvable P90 result and cuts the unit/building request P95 from 1878 ms to 752 ms in the 400-case run.
+- It does not make the national SQLite package small. The current temp file still occupies 16 GB, and the correct next proof is a fresh rebuild or vacuumed copy before claiming a smaller packaged asset.
+- It does not fix exact unit/building P90. That remains 28 typed characters because some units still need the explicit unit token before a safe exact-address top result.
+- Overall request P95 improved from 1450 ms to 1062 ms versus the broad-index run, but that is still too slow for a consistently polished typeahead experience.
+- The slowest remaining rows are no longer the building-name exact-unit probes; the tail has moved to rural/range/lot and broad FTS lookups.
+
 Brutal read on full national:
 
 - Full national build size is now proven, and it is large but locally possible.
 - The 120-case full-national stress now completes, where the previous equivalent run did not produce an artefact.
 - The wider 400-case run is now the best read: final top/resolvable is 400/400 and overall exact/resolvable P90 is 15.
 - Unit/building resolvable P90 is 15, but exact unit/building P90 is still 28.
-- Latency is materially better than the earlier full-national run, but still not product-ready: request P95 is 1450 ms overall and 1878 ms for unit/building rows on the 400-case run.
+- Latency is materially better than the earlier full-national run, but still not product-ready: the latest partial-index 400-case run is request P95 1062 ms overall and 752 ms for unit/building rows.
 - ACT and SA remain the state tails for typed-character P90, and QLD/SA/WA remain latency tails.
 - The next improvement should target serving shape and packaging, not provider expansion.
 
@@ -960,13 +1017,14 @@ What improved:
 - The 994,401-row 8-state compact runtime sample came in at 925 MB and passed direct fail-safe probes for missing exact number-first addresses.
 - The full national compact runtime build completed at 16,900,638 addresses and 14,150.8 MB.
 - The latest wider full-national 400-case rural/unit stress completed and met overall and unit/building resolvable P90 15.
+- The latest partial-index rerun kept overall and unit/building resolvable P90 15 while improving request P95 versus the broad exact-unit index.
 
 What remains weak:
 
 - Exact top and resolvable top are now deliberately different for unit/building cases. That is safer, but the UI must continue to prevent one-tap routing from `refine_required` rows.
 - The latest full-national 400-case run hit overall exact/resolvable P90 15, but exact unit/building P90 remained 28.
-- Full national request latency is improved but not product-ready: latest request P95 was 1450 ms overall and 1878 ms for unit/building rows.
-- The exact-unit index raises the full-national temp runtime footprint from about 14 GB to about 16 GB.
+- Full national request latency is improved but not product-ready: latest request P95 was 1062 ms overall and 752 ms for unit/building rows.
+- The broad exact-unit index raised the full-national temp runtime footprint from about 14 GB to about 16 GB; the partial-index temp file still needs rebuild/vacuum evidence before claiming a smaller packaged size.
 - The 800-case post-ranker full-national run still has not been rerun successfully after the sampler/prefix/exact-unit fixes.
 - Prefix-only continues to fail safety cases: wrong locality, wrong street number, sibling unit/shop and same-site building aliases.
 - The compact runtime-only index is smaller, but it requires benchmark and tooling paths to use typeahead FTS rather than legacy `search_text`.

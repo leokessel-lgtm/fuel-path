@@ -77,7 +77,8 @@ db.exec(`
     rank_weight INTEGER NOT NULL
   ) WITHOUT ROWID;
   CREATE INDEX address_typeahead_base_unit_idx
-    ON address_typeahead_entries(base_signature, unit, entry_type, rank_weight DESC);
+    ON address_typeahead_entries(base_signature, unit, rank_weight DESC)
+    WHERE entry_type = 'exact' AND unit <> '';
   CREATE VIRTUAL TABLE address_typeahead_fts USING fts5(
     entry_id UNINDEXED,
     key_text,

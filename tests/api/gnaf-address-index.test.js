@@ -679,6 +679,11 @@ test("building-first unit query can resolve exact unit from indexed base signatu
   );
 
   await withEnv({ FUEL_PATH_GNAF_SQLITE_PATH: outputPath, FUEL_PATH_GEOCODE_PROVIDER: "nominatim" }, async () => {
+    const sqlite = new DatabaseSync(outputPath, { readOnly: true });
+    const indexSql = sqlite.prepare("SELECT sql FROM sqlite_master WHERE name = ?").get("address_typeahead_base_unit_idx").sql;
+    sqlite.close();
+
+    const indexResults = await searchAddressIndex("Tuggeranong Business Centre Unit 2 12 Kett Street Kambah ACT 2902", 3);
     const exactUnit = await geocode({
       query: "Tuggeranong Business Centre Unit 2 12 Kett Street Kambah ACT 2902",
       limit: 3,
@@ -690,6 +695,9 @@ test("building-first unit query can resolve exact unit from indexed base signatu
       },
     });
 
+    assert.match(indexSql, /WHERE entry_type = 'exact' AND unit <> ''/);
+    assert.equal(indexResults[0].label, "Tuggeranong Business Centre, Unit 2, 12 Kett Street, Kambah ACT 2902");
+    assert.equal(indexResults.length, 1);
     assert.equal(exactUnit.suggestions[0].label, "Tuggeranong Business Centre, Unit 2, 12 Kett Street, Kambah ACT 2902");
     assert.equal(exactUnit.suggestions[0].refineRequired, false);
   });

@@ -235,18 +235,18 @@ function searchSqliteHybridIndex(database, needle, limit, searchContext = null) 
     }
     const exactUnitRows = searchSqliteExactUnitEntries(database, needle, limit);
     if (exactUnitRows.length) return hybridRowsToSuggestions(exactUnitRows, needle, 960);
-    const typeaheadRows = searchSqliteTypeaheadEntries(database, needle, limit);
+    const typeaheadRows = searchSqliteTypeaheadEntries(database, needle, limit, searchContext);
     return hybridRowsToSuggestions(typeaheadRows, needle);
   }
   if (!/^\d/.test(needle)) {
-    const typeaheadRows = searchSqliteTypeaheadEntries(database, needle, limit);
+    const typeaheadRows = searchSqliteTypeaheadEntries(database, needle, limit, searchContext);
     return hybridRowsToSuggestions(typeaheadRows, needle);
   }
   const prefixRows = searchSqlitePrefixEntries(database, needle, limit, searchContext);
   if (prefixRows.length && (!prefixRowsAmbiguous(prefixRows) || shouldUseContextualAmbiguousPrefixRows(needle, searchContext))) {
     return hybridRowsToSuggestions(prefixRows, needle, 950);
   }
-  const typeaheadRows = searchSqliteTypeaheadEntries(database, needle, limit);
+  const typeaheadRows = searchSqliteTypeaheadEntries(database, needle, limit, searchContext);
   return hybridRowsToSuggestions(typeaheadRows, needle);
 }
 
@@ -363,10 +363,32 @@ function materialisedPrefixesForNeedle(needle) {
     .filter((prefix) => prefix.length >= 4);
 }
 
-function searchSqliteTypeaheadEntries(database, needle, limit) {
+function searchSqliteTypeaheadEntries(database, needle, limit, searchContext = null) {
   const terms = normaliseAddressText(needle).split(/\s+/).filter(Boolean).slice(0, 8);
   if (!terms.length) return [];
   const ftsQuery = terms.map((term) => `${escapeFtsTerm(term)}*`).join(" ");
+  const contextOrder = searchContext
+    ? `((a.lat - ?) * (a.lat - ?) + (a.lon - ?) * (a.lon - ?)),`
+    : "";
+  const params = searchContext
+    ? [
+        ftsQuery,
+        needle,
+        `${needle}%`,
+        `% ${needle}%`,
+        searchContext.nearLat,
+        searchContext.nearLat,
+        searchContext.nearLon,
+        searchContext.nearLon,
+        Math.max(1, Math.min(Number(limit) || 5, 20)),
+      ]
+    : [
+        ftsQuery,
+        needle,
+        `${needle}%`,
+        `% ${needle}%`,
+        Math.max(1, Math.min(Number(limit) || 5, 20)),
+      ];
   return database.prepare(`
     SELECT
       e.entry_id,
@@ -399,11 +421,12 @@ function searchSqliteTypeaheadEntries(database, needle, limit) {
         ELSE 3
       END,
       e.rank_weight DESC,
+      ${contextOrder}
       rank,
       LENGTH(a.label),
       a.label
     LIMIT ?
-  `).all(ftsQuery, needle, `${needle}%`, `% ${needle}%`, Math.max(1, Math.min(Number(limit) || 5, 20)));
+  `).all(...params);
 }
 
 function searchSqliteExactUnitEntries(database, needle, limit) {

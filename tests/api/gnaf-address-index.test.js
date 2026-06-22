@@ -470,6 +470,8 @@ test("geocode search context promotes nearby ambiguous G-NAF address", async () 
       "ADDRESS_DETAIL_PID|ADDRESS_LABEL|NUMBER_FIRST|STREET_NAME|STREET_TYPE|LOCALITY_NAME|STATE|POSTCODE|GEOCODE_TYPE|LONGITUDE|LATITUDE",
       "GAWA1001|8 Chamberlain Place, Augusta WA 6290|8|Chamberlain|Place|Augusta|WA|6290|PROPERTY CENTROID|115.159|-34.315",
       "GAWA1002|8 Chamberlain Place, Heathridge WA 6027|8|Chamberlain|Place|Heathridge|WA|6027|PROPERTY CENTROID|115.763|-31.760",
+      "GAACT1003|Rose Cottage Inn, 1 Isabella Drive, Tuggeranong ACT 2900|1|Isabella|Drive|Tuggeranong|ACT|2900|PROPERTY CENTROID|149.144|-35.405",
+      "GAACT1004|Rose Cottage Inn, 1 Isabella Drive, Gilmore ACT 2905|1|Isabella|Drive|Gilmore|ACT|2905|PROPERTY CENTROID|149.142|-35.406",
     ].join("\n"),
   );
 
@@ -503,10 +505,22 @@ test("geocode search context promotes nearby ambiguous G-NAF address", async () 
         nearRadiusKm: 40,
       },
     });
+    const buildingNameContextualised = await geocode({
+      query: "Rose Cottage Inn",
+      limit: 2,
+      sessionToken: "context-rank-building-name",
+      searchContext: {
+        nearLat: -35.405,
+        nearLon: 149.144,
+        nearRadiusKm: 40,
+      },
+    });
 
     assert.equal(uncontextualised.suggestions[0].label, "8 Chamberlain Place, Augusta WA 6290");
     assert.equal(contextualised.suggestions[0].label, "8 Chamberlain Place, Heathridge WA 6027");
     assert.equal(contextualised.suggestions[0].provider, "fuel_path_gnaf");
+    assert.equal(buildingNameContextualised.suggestions[0].label, "Rose Cottage Inn, 1 Isabella Drive, Tuggeranong ACT 2900");
+    assert.equal(buildingNameContextualised.suggestions[0].provider, "fuel_path_gnaf");
   });
 });
 

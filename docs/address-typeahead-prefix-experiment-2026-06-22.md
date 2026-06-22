@@ -12,7 +12,8 @@ The tested resolvable P90 target is now achieved in sampled stress runs and boun
 - after sampler and contextual-prefix fixes, a bounded 120-case full-national rural/unit run completed with exact/resolvable P90 15 and request P95 1.16 seconds
 - after adding the indexed exact-unit path, a wider 400-case full-national rural/unit run completed with exact/resolvable P90 15 and request P95 1.45 seconds
 - after slimming that exact-unit index to a partial exact-unit-only index and short-circuiting SQLite variant searches after a safe exact unit hit, the same 400-case full-national run kept exact/resolvable P90 15 and reduced request P95 to 1.06 seconds
-- unit/building resolvable P90 is 15 in that 400-case run, but exact unit/building P90 is still 28
+- after allowing nearby route/current-map context to break typeahead ties, the same 400-case run improved overall resolvable P90 from 15 to 12 and request P95 from 1.06 seconds to 917 ms
+- unit/building resolvable P90 is still 15 in that 400-case run, and exact unit/building P90 is still 28
 - the broad exact-unit index raised the full national temp runtime from about 14 GB to about 16 GB; the partial-index temp file still occupies 16 GB until rebuilt/vacuumed, but currently reports about 1.97 GB free pages after dropping the broad index
 - compact prefix is only safe as a narrow house-number-first fast path
 - nearby route/current-map context is now used as a small local G-NAF boost, not as a replacement for text evidence
@@ -24,6 +25,7 @@ The tested resolvable P90 target is now achieved in sampled stress runs and boun
 - the larger 994,401-row `detail=column` sample is now 858 MB and keeps rural/unit hosted-contract resolvable P90 at 15
 - number-first address queries no longer give building/base refine rows a broad boost, so nearby exact addresses can beat remote ambiguous complexes
 - compact-runtime benchmark sampling now uses typeahead FTS rather than broad label scans
+- typeahead FTS now uses nearby context as a tie-breaker after text class and stored rank, which helps same-name building/address rows without making Google or broad region bias the default
 
 Compact prefix alone is not safe enough. It is fast and reaches low P90 on successful cases, but it can silently pick the wrong locality, sibling unit/shop or same-name building when the first 15 characters are ambiguous.
 
@@ -929,14 +931,77 @@ Brutal read on the partial index:
 - Overall request P95 improved from 1450 ms to 1062 ms versus the broad-index run, but that is still too slow for a consistently polished typeahead experience.
 - The slowest remaining rows are no longer the building-name exact-unit probes; the tail has moved to rural/range/lot and broad FTS lookups.
 
+## Context-Aware Typeahead Tie-Breaker
+
+The next tail was same-name or same-site building rows where typeahead had enough text to return useful candidates, but the app-level ranker still preferred the shorter or FTS-favoured sibling until the user typed the full locality/postcode.
+
+Direct probe fixed:
+
+| Query prefix | Before | After | Notes |
+| --- | --- | --- | --- |
+| `Rose Cottage Inn` near Tuggeranong | `Rose Cottage Inn, 1 Isabella Drive, Gilmore ACT 2905` | `Rose Cottage Inn, 1 Isabella Drive, Tuggeranong ACT 2900` | same building/street text, context breaks the tie |
+
+Implementation:
+
+- `searchSqliteTypeaheadEntries` now accepts `searchContext`
+- nearby distance is ordered after exact/prefix class and stored `rank_weight`, but before FTS rank and label length
+- backend `searchContextBoost` is now continuous inside the configured radius instead of bucketed, so exact-near rows can beat very-near siblings without a broad arbitrary boost
+- regression coverage extends `geocode search context promotes nearby ambiguous G-NAF address` with the `Rose Cottage Inn` same-name building case
+
+Full-national 120-case context-typeahead rerun:
+
+- artefact: `tmp/geocode-hosted-national-benchmark-2026-06-22-fullnational-context-typeahead-120.json`
+- profile: `rural-unit`
+- flag: `--case-context --case-context-radius-km 80`
+- cases: 120 addresses
+- final top/resolvable: 120/120
+- exact top P50/P90/P95: 10 / 15 / 20
+- resolvable top P50/P90/P95: 10 / 10 / 15
+- any-useful-match P50/P90/P95: 10 / 10 / 15
+- wrong top before resolvable: 2
+- request latency P50/P95/max: 1 ms / 800 ms / 2857 ms
+- unit/building request P95: 1142 ms
+
+Full-national 400-case context-typeahead stress:
+
+- artefact: `tmp/geocode-hosted-national-benchmark-2026-06-22-fullnational-context-typeahead-400.json`
+- profile: `rural-unit`
+- flag: `--case-context --case-context-radius-km 80`
+- cases: 400 addresses
+- final top/resolvable: 400/400
+- exact top P50/P90/P95: 10 / 15 / 22
+- resolvable top P50/P90/P95: 10 / 12 / 15
+- any-useful-match P50/P90/P95: 10 / 12 / 15
+- wrong top before resolvable: 27
+- request latency P50/P95/max: 2 ms / 917 ms / 4384 ms
+
+400-case context-typeahead segment notes:
+
+| Segment | Cases | Exact P90 | Resolvable P90 | Resolvable P95 | Request P95 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Standard address | 336 | 10 | 10 | 12 | 982 ms |
+| Unit/building address | 64 | 28 | 15 | 15 | 752 ms |
+| Street address | 264 | 10 | 10 | 15 | 781 ms |
+| Unit address | 63 | 28 | 15 | 15 | 758 ms |
+| Lot address | 45 | 10 | 10 | 10 | 2293 ms |
+| Range address | 17 | 10 | 10 | 12 | 3137 ms |
+
+Brutal read on the context tie-breaker:
+
+- This is a genuine quality improvement: wrong-top-before-resolvable dropped from 45 to 27 on the 400-case stress.
+- It also improves the main P90 goal: overall resolvable P90 moved from 15 to 12, with exact P95 improving from 28 to 22.
+- It does not solve the exact unit/building tail. Unit/building exact P90 remains 28, because the system still waits for explicit unit text before treating a unit as exact.
+- It does not solve latency. Overall request P95 improved to 917 ms, but lot/range request P95 is still 2.3 to 3.1 seconds. The remaining serving problem is rural/range/lot lookup shape, not provider coverage.
+- This depends on a legitimate Plan/Nearby context. Cold-start text-only lookup should not get the same region boost.
+
 Brutal read on full national:
 
 - Full national build size is now proven, and it is large but locally possible.
 - The 120-case full-national stress now completes, where the previous equivalent run did not produce an artefact.
-- The wider 400-case run is now the best read: final top/resolvable is 400/400 and overall exact/resolvable P90 is 15.
+- The wider 400-case context-typeahead run is now the best read: final top/resolvable is 400/400, exact P90 is 15 and resolvable P90 is 12.
 - Unit/building resolvable P90 is 15, but exact unit/building P90 is still 28.
-- Latency is materially better than the earlier full-national run, but still not product-ready: the latest partial-index 400-case run is request P95 1062 ms overall and 752 ms for unit/building rows.
-- ACT and SA remain the state tails for typed-character P90, and QLD/SA/WA remain latency tails.
+- Latency is materially better than the earlier full-national run, but still not product-ready: the latest context-typeahead 400-case run is request P95 917 ms overall and 752 ms for unit/building rows.
+- SA remains the exact typed-character tail, ACT improved on resolvable P90, and QLD/SA/WA remain latency tails.
 - The next improvement should target serving shape and packaging, not provider expansion.
 
 ## Safety Rerun After Civic-Number Guard
@@ -1018,19 +1083,20 @@ What improved:
 - The full national compact runtime build completed at 16,900,638 addresses and 14,150.8 MB.
 - The latest wider full-national 400-case rural/unit stress completed and met overall and unit/building resolvable P90 15.
 - The latest partial-index rerun kept overall and unit/building resolvable P90 15 while improving request P95 versus the broad exact-unit index.
+- The latest context-typeahead rerun improved overall resolvable P90 to 12, reduced wrong-top-before-resolvable to 27, and reduced request P95 to 917 ms.
 
 What remains weak:
 
 - Exact top and resolvable top are now deliberately different for unit/building cases. That is safer, but the UI must continue to prevent one-tap routing from `refine_required` rows.
-- The latest full-national 400-case run hit overall exact/resolvable P90 15, but exact unit/building P90 remained 28.
-- Full national request latency is improved but not product-ready: latest request P95 was 1062 ms overall and 752 ms for unit/building rows.
+- The latest full-national 400-case run hit overall exact P90 15 and resolvable P90 12, but exact unit/building P90 remained 28.
+- Full national request latency is improved but not product-ready: latest request P95 was 917 ms overall and 752 ms for unit/building rows.
 - The broad exact-unit index raised the full-national temp runtime footprint from about 14 GB to about 16 GB; the partial-index temp file still needs rebuild/vacuum evidence before claiming a smaller packaged size.
 - The 800-case post-ranker full-national run still has not been rerun successfully after the sampler/prefix/exact-unit fixes.
 - Prefix-only continues to fail safety cases: wrong locality, wrong street number, sibling unit/shop and same-site building aliases.
 - The compact runtime-only index is smaller, but it requires benchmark and tooling paths to use typeahead FTS rather than legacy `search_text`.
 - Guarded unit/building P90 is exactly 15. That meets the target, but leaves no margin.
 - Unit/building exact P95 remains weak at 30 because exact shop/unit selection may require typing the specific unit token.
-- SA exact/resolvable P90 and ACT exact P90 remain weak in the wider full-national run.
+- SA exact/resolvable P90 and ACT exact P90 remain weak in the wider full-national run, even though ACT resolvable P90 improved with context-aware typeahead.
 - Context-aware ranking depends on Plan/Nearby having a meaningful route/current-map anchor. Cold start address search without context still lands at rural/unit P90 18 in the corrected hosted-contract run.
 - `wrongTopBeforeResolvable` is still high in the typed-prefix harness because many short prefixes are inherently ambiguous before enough context arrives. This is acceptable only if UI state treats those rows as suggestions, not route commitments.
 
@@ -1041,4 +1107,4 @@ Next:
 - Rerun the 800-case hosted national benchmark after another serving-shape pass, not before.
 - Add a Plan/Nearby UI smoke case for `refine_required` rows so route submission cannot regress.
 - Recover exact unit/building P90 margin without reopening broad `unit + number` FTS scans.
-- Reduce request P95 before claiming the experience is consistently fast.
+- Reduce rural lot/range request P95 before claiming the experience is consistently fast.

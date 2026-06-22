@@ -1159,8 +1159,7 @@ function createGeocoder({ fetchJson, loadStationData }) {
     const distance = distanceKm({ lat, lon }, { lat: searchContext.nearLat, lon: searchContext.nearLon });
     if (!Number.isFinite(distance)) return 0;
     const radius = searchContext.nearRadiusKm;
-    if (distance <= Math.max(2, radius * 0.25)) return 14;
-    if (distance <= radius) return 10;
+    if (distance <= radius) return 14 + Math.max(0, 1 - distance / radius) * 4;
     if (distance <= radius * 2) return 4;
     return 0;
   }

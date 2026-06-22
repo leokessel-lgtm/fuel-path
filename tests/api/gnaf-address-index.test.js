@@ -395,6 +395,38 @@ test("hybrid typeahead avoids same-street wrong locality and preserves exact uni
         "149.080",
         "-35.241",
       ].join("|"),
+      [
+        "GANT0205",
+        "100 Smith Street, Darwin City NT 0800",
+        "",
+        "",
+        "",
+        "100",
+        "Smith",
+        "Street",
+        "Darwin City",
+        "NT",
+        "0800",
+        "PROPERTY CENTROID",
+        "130.841",
+        "-12.463",
+      ].join("|"),
+      [
+        "GAQLD0206",
+        "Shop 8, 110 Queen Street, Brisbane City QLD 4000",
+        "",
+        "Shop",
+        "8",
+        "110",
+        "Queen",
+        "Street",
+        "Brisbane City",
+        "QLD",
+        "4000",
+        "PROPERTY CENTROID",
+        "153.025",
+        "-27.468",
+      ].join("|"),
     ].join("\n"),
   );
 
@@ -414,12 +446,16 @@ test("hybrid typeahead avoids same-street wrong locality and preserves exact uni
     const symonstonSuggestions = await searchAddressIndex("279 Canberra Avenue Symonston", 3);
     const unitSuggestions = await searchAddressIndex("Canberra Lakes Estate Unit 65 11 Joy Cummings Place Belconnen", 3);
     const baseSuggestions = await searchAddressIndex("Canberra Lakes Estate", 3);
+    const missingSmithSuggestions = await searchAddressIndex("10 Smith Street Darwin NT", 3);
+    const missingQueenSuggestions = await searchAddressIndex("8 Queen Street Brisbane QLD", 3);
 
     assert.equal(symonstonSuggestions[0].label, "279 Canberra Avenue, Symonston ACT 2609");
     assert.equal(unitSuggestions[0].label, "Canberra Lakes Estate, Unit 65, 11 Joy Cummings Place, Belconnen ACT 2617");
     assert.equal(unitSuggestions[0].refineRequired, false);
     assert.equal(baseSuggestions[0].refineRequired, true);
     assert.equal(baseSuggestions[0].sourceLabel, "Building");
+    assert.deepEqual(missingSmithSuggestions, []);
+    assert.deepEqual(missingQueenSuggestions, []);
   });
 });
 

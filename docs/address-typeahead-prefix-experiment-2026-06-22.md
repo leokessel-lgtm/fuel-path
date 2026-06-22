@@ -8,7 +8,7 @@ The tested P90 target is now achieved in sampled stress runs, but not yet proven
 - rural/unit-weighted sampled P90 is 10 overall and unit P90 is 12
 - compact prefix is only safe as a narrow house-number-first fast path
 - building-name, street-name and unit-like input must use typeahead fallback to avoid wrong base suggestions
-- full national rebuild remains blocked by index size until the prefix table is reduced further or made optional
+- a 994,401-row 8-state compact build now fits in 925 MB, but a full national rebuild is still not proven
 
 Compact prefix alone is not safe enough. It is fast and reaches low P90 on successful cases, but it can silently pick the wrong locality, sibling unit/shop or same-name building when the first 15 characters are ambiguous.
 
@@ -206,6 +206,7 @@ Slim schema changes now applied:
 - `key_text` is stored only in the FTS table, not duplicated in `address_typeahead_entries`
 - checkpoint prefix hits still report `address_prefix` when the typed query extends beyond the stored checkpoint
 - prefix checkpoints are now 4, 8, 12 and 15 only; 6 and 10 were removed after stress testing showed hybrid P90 held
+- number-first token-overlap fallback now rejects different civic street numbers, while preserving explicit slash/unit matches such as `8/21`
 
 Measured samples:
 
@@ -221,8 +222,30 @@ Measured samples:
 | 8-state key-trim runtime sample | `--states ACT,NSW,NT,QLD,SA,TAS,VIC,WA --limit-per-state 25000 --omit-legacy-fts --omit-search-backstop` | 208 MB | 1,028,058 | no |
 | Lean-prefix runtime-only | `--states ACT --limit-per-state 100000 --omit-legacy-fts --omit-search-backstop` | 90 MB | 326,548 | no |
 | 8-state lean-prefix runtime sample | `--states ACT,NSW,NT,QLD,SA,TAS,VIC,WA --limit-per-state 25000 --omit-legacy-fts --omit-search-backstop` | 191 MB | 685,372 | no |
+| 8-state lean-prefix runtime sample | `--states ACT,NSW,NT,QLD,SA,TAS,VIC,WA --limit-per-state 125000 --omit-legacy-fts --omit-search-backstop` | 925 MB | 3,281,932 | no |
 
 The lean-prefix runtime-only sample was probed directly with `FUEL_PATH_GNAF_SQLITE_PATH=tmp/gnaf-act-hybrid-runtime-leanprefix-100k.sqlite`. It returned ACT address and unit/building suggestions without `address_fts`, `search_key` or `search_text`, including deduped exact unit results, correct title/subtitle fallback and `address_prefix` evidence for checkpoint prefix hits.
+
+Larger compact build evidence:
+
+- file: `tmp/gnaf-8state-hybrid-runtime-leanprefix-1m.sqlite`
+- total address rows: 994,401
+- state rows: ACT 125,000; NSW 125,000; NT 119,401; QLD 125,000; SA 125,000; TAS 125,000; VIC 125,000; WA 125,000
+- SQLite size: 925 MB
+- `addresses`: 994,401 rows, about 227 MB
+- `address_typeahead_entries`: 2,078,060 rows, about 231 MB
+- `address_prefix_entries`: 3,281,932 rows, about 165 MB
+- `address_typeahead_fts`: 2,078,060 rows, with FTS content about 200 MB and FTS data about 74 MB
+- prefix checkpoints: 820,483 rows at each of 4, 8, 12 and 15 characters
+
+Runtime probe against this 994k-row compact build:
+
+- `40 Unwin Street Weston ACT` returned the matching address prefix.
+- `Unit 1 33 Heysen Street Weston ACT` returned the exact unit first and a `refine_required` base row second.
+- `8 Queen Street Brisbane QLD` returned no local suggestion in the sample rather than falsely returning `Shop 8, 110 Queen Street`.
+- `10 Smith Street Darwin NT` returned no local suggestion in the sample rather than falsely returning `100 Smith Street`.
+- `1 Hannan Street Kalgoorlie WA` returned the matching address prefix.
+- `125 George Street Sydney NSW` returned no local suggestion because the exact address was not in the 125k NSW sample.
 
 Rejected storage experiment:
 
@@ -232,10 +255,63 @@ Rejected storage experiment:
 
 Brutal read:
 
-- 90 MB per 100k ACT rows and 191 MB per 200k across 8 states is a real improvement, but still projects to a large national runtime SQLite.
-- The 8-state sample reduces the risk that the size estimate is ACT-only, but it is still a sample rather than a full 16.9M-row build.
+- 90 MB per 100k ACT rows, 191 MB per 200k across 8 states and 925 MB per 994k across 8 states are real improvements, but still project to a large national runtime SQLite.
+- The 994k 8-state sample reduces the risk that the size estimate is ACT-only, but it is still a sample rather than a full 16.9M-row build.
 - The current code is functionally better and safer, but the full national hybrid index is not production-proven yet.
 - The next storage win is to reduce FTS/typeahead duplication or split the mobile/runtime index from the benchmark/sampling index.
+
+## Safety Rerun After Civic-Number Guard
+
+The manual 994k-row probe found a real safety issue: number-first queries could fall back to token-overlap rows with a different civic street number when the exact address was absent from the sample.
+
+Examples fixed:
+
+- `8 Queen Street Brisbane QLD` no longer returns `Shop 8, 110 Queen Street, Brisbane City QLD 4000`.
+- `10 Smith Street Darwin NT` no longer returns `100 Smith Street` or `101 Smith Street`.
+- Slash/unit shorthand such as `8/21 Lanyon Drive` still resolves because the guard recognises explicit unit number plus street number labels.
+- Range addresses such as `123-131 Canberra Avenue` are treated as ranged street numbers, not slash/unit shorthand.
+
+Balanced safety rerun:
+
+- artefact: `tmp/address-typeahead-experiment-2026-06-22-hybrid-leanprefix-safety2-balanced-1000.json`
+- source index: `data/gnaf/build/gnaf-addresses-national.sqlite`, 11,959.9 MB
+- experiment index: 1.9 MB
+
+| Metric | Hybrid result |
+| --- | ---: |
+| Cases | 1000 |
+| Final exact top | 934/1000 |
+| Final resolvable top | 1000/1000 |
+| Wrong top before resolvable | 534 |
+| Exact P50/P90/P95 | 5 / 10 / 10 |
+| Resolvable P50/P90/P95 | 4 / 10 / 10 |
+| Unit resolvable P90 | 10 |
+| Latency P50/P95 | 1 ms / 9 ms |
+
+Rural/unit safety rerun:
+
+- artefact: `tmp/address-typeahead-experiment-2026-06-22-hybrid-leanprefix-safety2-rural-unit-1000.json`
+- experiment index: 2.0 MB
+
+| Metric | Hybrid result |
+| --- | ---: |
+| Cases | 1000 |
+| Final exact top | 981/1000 |
+| Final resolvable top | 1000/1000 |
+| Wrong top before resolvable | 526 |
+| Exact P50/P90/P95 | 4 / 10 / 10 |
+| Resolvable P50/P90/P95 | 4 / 10 / 10 |
+| Unit resolvable P90 | 12 |
+| Latency P50/P95 | 0 ms / 6 ms |
+
+Rural/unit segment breakdown:
+
+| Segment | Cases | Final exact top | Final resolvable top | Resolvable P90 | Resolvable P95 | Latency P95 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Rural/remote | 561 | 561 | 561 | 8 | 8 | 1 ms |
+| Rural/remote unit | 184 | 174 | 184 | 10 | 12 | 7 ms |
+| Standard | 187 | 187 | 187 | 5 | 15 | 2 ms |
+| Unit/building | 68 | 59 | 68 | 15 | 15 | 8 ms |
 
 ## Brutal Critique
 
@@ -247,21 +323,24 @@ What improved:
 - Exact address duplicates from multiple typeahead keys are removed in the runtime.
 - The benchmark now reports exact top, resolvable top, wrong-top-before-resolvable, unit P90, latency and index size.
 - A wrong building-name prefix regression was found and fixed by routing non-number-first input through typeahead.
+- A wrong civic-number fallback regression was found and fixed for number-first token-overlap matches.
 - Checkpointing reduced the ACT 100k sample from 345 MB to 290 MB, hybrid-only/no-legacy-FTS reduced it to 215 MB, compact runtime-only reduced it to 141 MB, display/rowid trimming reduced it to 107 MB, key trimming reduced it to 98 MB, and lean prefix checkpoints reduced it to 90 MB.
+- The 994,401-row 8-state compact runtime sample came in at 925 MB and passed direct fail-safe probes for missing exact number-first addresses.
 
 What remains weak:
 
 - The existing 12 GB national SQLite file on disk has not been rebuilt with the new hybrid tables. Until it is rebuilt, the live local-national path still falls back to the older broad FTS path.
 - Exact top and resolvable top are now deliberately different for unit/building cases. That is safer, but the UI must continue to prevent one-tap routing from `refine_required` rows.
-- The stress harness samples from the national SQLite and the 8-state build samples only 200k rows; neither proves full 16.9M-row production size, build time or disk footprint.
+- The stress harness samples from the national SQLite and the largest compact 8-state build samples 994,401 rows; neither proves full 16.9M-row production size, build time or disk footprint.
 - Prefix-only continues to fail safety cases: wrong locality, wrong street number, sibling unit/shop and same-site building aliases.
 - The compact runtime-only index is smaller, but removing search backstop columns means benchmark sampling needs a slower label/locality/postcode fallback.
-- Generic unit/building P95 is still 18 in the rural/unit-weighted run. P90 is inside target, but the tail is not fully solved.
+- Generic unit/building P90 is exactly 15 in the rural/unit-weighted safety rerun. That meets the target, but leaves little margin and the tail is not fully solved.
+- `wrongTopBeforeResolvable` is still high in the typed-prefix harness because many short prefixes are inherently ambiguous before enough context arrives. This is acceptable only if UI state treats those rows as suggestions, not route commitments.
 
 Next:
 
 - Compress FTS/typeahead duplication before another full national rebuild.
-- Rebuild the full national SQLite only after the 100k sample projects to an acceptable disk footprint, or deliberately accept the larger server-side index size.
+- Rebuild the full national SQLite only after accepting the likely high-teens-GB runtime footprint, or after another FTS/typeahead compression pass.
 - Measure full-size index bytes, build time and lookup P50/P95 once rebuilt.
 - Run the hosted national benchmark against the rebuilt full index, not just the sampled experiment harness.
 - Add a Plan/Nearby UI smoke case for `refine_required` rows so route submission cannot regress.

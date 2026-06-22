@@ -19,6 +19,7 @@ const OUTPUT_SQLITE = path.resolve(args.outputSqlite || `tmp/address-typeahead-e
 const LIMIT = Number(args.limit || 5);
 const MAX_PREFIX = Number(args.maxPrefix || 15);
 const PROFILE = args.profile || "balanced";
+const UNIT_TERMS = new Set(["apartment", "apt", "flat", "level", "lvl", "office", "shop", "suite", "townhouse", "unit"]);
 
 if (!fs.existsSync(SOURCE_SQLITE)) throw new Error(`Address SQLite does not exist: ${SOURCE_SQLITE}`);
 
@@ -276,7 +277,7 @@ function searchPrefix(db, needle, limit) {
     WHERE p.prefix = ?
     ORDER BY p.rank_weight DESC, LENGTH(e.label), e.label
     LIMIT ?
-  `).all(needle.slice(0, MAX_PREFIX), limit);
+  `).all(needle.slice(0, MAX_PREFIX), limit).filter((row) => experimentRowQualityPass(row, needle));
 }
 
 function searchHybrid(db, needle, limit) {
@@ -308,7 +309,17 @@ function searchTypeahead(db, needle, limit) {
       LENGTH(e.label),
       e.label
     LIMIT ?
-  `).all(ftsQuery, needle, `${needle}%`, `% ${needle}%`, limit);
+  `).all(ftsQuery, needle, `${needle}%`, `% ${needle}%`, limit).filter((row) => experimentRowQualityPass(row, needle));
+}
+
+function experimentRowQualityPass(row, needle) {
+  const unitSlash = queryLeadingUnitSlashNumbers(needle);
+  if (unitSlash && labelUnitAndHouseMatch(row?.label || row?.key_text || "", unitSlash)) return true;
+  const queryHouseNumber = queryLeadingHouseNumber(needle);
+  if (!queryHouseNumber) return true;
+  const rowHouseNumber = labelHouseNumber(row?.label || row?.key_text || "");
+  if (!rowHouseNumber) return true;
+  return houseNumbersCompatible(queryHouseNumber, rowHouseNumber);
 }
 
 function prefixRowsAmbiguous(rows) {
@@ -537,8 +548,73 @@ function normalise(value) {
 }
 
 function queryContainsUnitLikeToken(needle) {
-  const terms = new Set(["apartment", "apt", "flat", "level", "lvl", "office", "shop", "suite", "townhouse", "unit"]);
-  return normalise(needle).split(/\s+/).some((token) => terms.has(token));
+  return normalise(needle).split(/\s+/).some((token) => UNIT_TERMS.has(token));
+}
+
+function queryLeadingHouseNumber(needle) {
+  const tokens = normalise(needle).split(/\s+/).filter(Boolean);
+  if (!tokens.length) return "";
+  if (UNIT_TERMS.has(tokens[0])) return "";
+  return normalisedHouseNumberToken(tokens[0]);
+}
+
+function queryLeadingUnitSlashNumbers(needle) {
+  const tokens = normalise(needle).split(/\s+/).filter(Boolean);
+  if (!/^\d+$/.test(tokens[0] || "")) return null;
+  const houseNumber = normalisedHouseNumberToken(tokens[1]);
+  if (!houseNumber) return null;
+  return { unitNumber: normalisedHouseNumberToken(tokens[0]), houseNumber };
+}
+
+function labelHouseNumber(label) {
+  const parts = String(label || "").split(",").map((part) => part.trim());
+  for (const part of parts) {
+    const tokens = normalise(part).split(/\s+/).filter(Boolean);
+    if (UNIT_TERMS.has(tokens[0])) continue;
+    const houseNumber = normalisedHouseNumberToken(tokens[0]);
+    if (houseNumber) return houseNumber;
+  }
+  return "";
+}
+
+function labelUnitAndHouseMatch(label, unitSlash) {
+  const unitNumber = labelLeadingUnitNumber(label);
+  const houseNumber = labelHouseNumber(label);
+  return Boolean(
+    unitNumber &&
+      houseNumber &&
+      houseNumbersCompatible(unitSlash.unitNumber, unitNumber) &&
+      houseNumbersCompatible(unitSlash.houseNumber, houseNumber),
+  );
+}
+
+function labelLeadingUnitNumber(label) {
+  const parts = String(label || "").split(",").map((part) => part.trim());
+  for (const part of parts) {
+    const tokens = normalise(part).split(/\s+/).filter(Boolean);
+    if (!UNIT_TERMS.has(tokens[0])) continue;
+    const unitNumber = normalisedHouseNumberToken(tokens[1]);
+    if (unitNumber) return unitNumber;
+  }
+  return "";
+}
+
+function normalisedHouseNumberToken(value) {
+  const match = String(value || "").toLowerCase().match(/^(\d+)([a-z]?)$/);
+  if (!match) return "";
+  return `${match[1]}${match[2] || ""}`;
+}
+
+function houseNumbersCompatible(queryNumber, rowNumber) {
+  const query = String(queryNumber || "");
+  const row = String(rowNumber || "");
+  if (!query || !row) return true;
+  if (query === row) return true;
+  const queryParts = query.match(/^(\d+)([a-z]?)$/);
+  const rowParts = row.match(/^(\d+)([a-z]?)$/);
+  if (!queryParts || !rowParts) return false;
+  if (queryParts[2]) return false;
+  return queryParts[1] === rowParts[1];
 }
 
 function percentile(values, percentileValue) {

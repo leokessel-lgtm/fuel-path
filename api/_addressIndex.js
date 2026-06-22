@@ -220,6 +220,7 @@ function hybridRowsToSuggestions(rows, needle, fallbackScore = 900) {
   const suggestions = [];
   const seen = new Set();
   for (const row of rows) {
+    if (!hybridRowQualityPass(row, needle)) continue;
     const record = hybridRowToAddressRecord(row);
     const suggestion = addressRecordToSuggestion(record, hybridMatchType(row, needle), Number(row.rank_weight || fallbackScore));
     const key = String(suggestion.providerId || suggestion.label);
@@ -228,6 +229,16 @@ function hybridRowsToSuggestions(rows, needle, fallbackScore = 900) {
     suggestions.push(suggestion);
   }
   return suggestions;
+}
+
+function hybridRowQualityPass(row, needle) {
+  const unitSlash = queryLeadingUnitSlashNumbers(needle);
+  if (unitSlash && labelUnitAndHouseMatch(row?.address_label || row?.key_text || "", unitSlash)) return true;
+  const queryHouseNumber = queryLeadingHouseNumber(needle);
+  if (!queryHouseNumber) return true;
+  const rowHouseNumber = labelHouseNumber(row?.address_label || row?.key_text || "");
+  if (!rowHouseNumber) return true;
+  return houseNumbersCompatible(queryHouseNumber, rowHouseNumber);
 }
 
 function searchSqlitePrefixEntries(database, needle, limit) {
@@ -339,6 +350,74 @@ function hybridMatchType(row, needle) {
   if (key === needle || label === needle) return "exact_address";
   if (key.startsWith(needle) || needle.startsWith(key) || label.startsWith(needle)) return "address_prefix";
   return "address_token_overlap";
+}
+
+function queryLeadingHouseNumber(needle) {
+  const tokens = normaliseAddressText(needle).split(/\s+/).filter(Boolean);
+  if (!tokens.length) return "";
+  if (SQLITE_UNIT_TERMS.has(tokens[0])) return "";
+  return normalisedHouseNumberToken(tokens[0]);
+}
+
+function queryLeadingUnitSlashNumbers(needle) {
+  const tokens = normaliseAddressText(needle).split(/\s+/).filter(Boolean);
+  if (!/^\d+$/.test(tokens[0] || "")) return null;
+  const houseNumber = normalisedHouseNumberToken(tokens[1]);
+  if (!houseNumber) return null;
+  return { unitNumber: normalisedHouseNumberToken(tokens[0]), houseNumber };
+}
+
+function labelHouseNumber(label) {
+  const parts = String(label || "").split(",").map((part) => part.trim());
+  for (const part of parts) {
+    const normalised = normaliseAddressText(part);
+    const partTokens = normalised.split(/\s+/).filter(Boolean);
+    if (SQLITE_UNIT_TERMS.has(partTokens[0])) continue;
+    const first = partTokens[0];
+    const houseNumber = normalisedHouseNumberToken(first);
+    if (houseNumber) return houseNumber;
+  }
+  return "";
+}
+
+function labelUnitAndHouseMatch(label, unitSlash) {
+  const unitNumber = labelLeadingUnitNumber(label);
+  const houseNumber = labelHouseNumber(label);
+  return Boolean(
+    unitNumber &&
+      houseNumber &&
+      houseNumbersCompatible(unitSlash.unitNumber, unitNumber) &&
+      houseNumbersCompatible(unitSlash.houseNumber, houseNumber),
+  );
+}
+
+function labelLeadingUnitNumber(label) {
+  const parts = String(label || "").split(",").map((part) => part.trim());
+  for (const part of parts) {
+    const tokens = normaliseAddressText(part).split(/\s+/).filter(Boolean);
+    if (!SQLITE_UNIT_TERMS.has(tokens[0])) continue;
+    const unitNumber = normalisedHouseNumberToken(tokens[1]);
+    if (unitNumber) return unitNumber;
+  }
+  return "";
+}
+
+function normalisedHouseNumberToken(value) {
+  const match = String(value || "").toLowerCase().match(/^(\d+)([a-z]?)$/);
+  if (!match) return "";
+  return `${match[1]}${match[2] || ""}`;
+}
+
+function houseNumbersCompatible(queryNumber, rowNumber) {
+  const query = String(queryNumber || "");
+  const row = String(rowNumber || "");
+  if (!query || !row) return true;
+  if (query === row) return true;
+  const queryParts = query.match(/^(\d+)([a-z]?)$/);
+  const rowParts = row.match(/^(\d+)([a-z]?)$/);
+  if (!queryParts || !rowParts) return false;
+  if (queryParts[2]) return false;
+  return queryParts[1] === rowParts[1];
 }
 
 function scoreRecord(record, needle) {
@@ -599,6 +678,13 @@ function detectQueryStateCode(needle) {
 
 function addressMatchQualityPass(row, needle, matchType) {
   if (["exact_address", "address_prefix"].includes(matchType)) return true;
+  const unitSlash = queryLeadingUnitSlashNumbers(needle);
+  if (unitSlash && labelUnitAndHouseMatch(row?.label || row?.search_text || "", unitSlash)) return true;
+  const queryHouseNumber = queryLeadingHouseNumber(needle);
+  if (queryHouseNumber) {
+    const rowHouseNumber = labelHouseNumber(row?.label || row?.search_text || "");
+    if (rowHouseNumber && !houseNumbersCompatible(queryHouseNumber, rowHouseNumber)) return false;
+  }
   const queryTokens = significantAddressTokens(needle);
   if (queryTokens.length < 3) return true;
   const rowTokens = new Set(significantAddressTokens(`${row?.search_text || ""} ${row?.label || ""}`));

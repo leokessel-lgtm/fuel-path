@@ -285,11 +285,20 @@ function searchSqliteHybridIndex(database, needle, limit, searchContext = null, 
       const prefixRows = timeAddressLookupStage(trace, "unit_prefix", () => searchSqlitePrefixEntries(database, needle, limit, searchContext));
       const useContextualPrefixRows = shouldUseContextualAmbiguousPrefixRows(needle, searchContext);
       const safePrefixRows = filterRowsForUnitLotIntent(prefixRows, unitLotIntent);
-      if (safePrefixRows.length && (!prefixRowsAmbiguous(safePrefixRows) || useContextualPrefixRows)) {
+      const contextualUnitPrefixRows = contextualExactUnitStreetPrefixRows(safePrefixRows, needle, searchContext);
+      if (safePrefixRows.length && (!prefixRowsAmbiguous(safePrefixRows) || useContextualPrefixRows || contextualUnitPrefixRows.length)) {
         return attachAddressLookupDebug(
-          hybridRowsToSuggestions(useContextualPrefixRows ? safePrefixRows : preferExactUnitPrefixRows(safePrefixRows), needle, 930),
+          hybridRowsToSuggestions(
+            contextualUnitPrefixRows.length
+              ? contextualUnitPrefixRows
+              : useContextualPrefixRows
+                ? safePrefixRows
+                : preferExactUnitPrefixRows(safePrefixRows),
+            needle,
+            930,
+          ),
           trace,
-          "unit_prefix",
+          contextualUnitPrefixRows.length ? "unit_contextual_prefix" : "unit_prefix",
         );
       }
       if (unitRangePrefixReady) {
@@ -821,6 +830,37 @@ function shouldUseContextualAmbiguousPrefixRows(needle, searchContext) {
     !isStateCode(token),
   );
   return alphaTokens.some((token) => token.length >= 2);
+}
+
+function contextualExactUnitStreetPrefixRows(rows, needle, searchContext) {
+  if (!searchContext || !rows.length) return [];
+  const intent = unitStreetPrefixIntent(needle);
+  if (!intent) return [];
+  const prefix = `${intent.houseNumber} ${intent.streetPrefix}`;
+  const matchedRows = rows.filter((row) =>
+    row.entry_type === "exact" &&
+    row.unit &&
+    rowMatchesUnitIntent(row, intent) &&
+    String(row.base_signature || "").startsWith(prefix),
+  );
+  return matchedRows.length ? matchedRows : [];
+}
+
+function unitStreetPrefixIntent(needle) {
+  const tokens = normaliseAddressText(needle).split(/\s+/).filter(Boolean);
+  const unitIndex = tokens.findIndex((token, index) => SQLITE_UNIT_TERMS.has(token) && normalisedUnitNumberToken(tokens[index + 1]));
+  if (unitIndex < 0) return null;
+  const houseIndex = firstStreetNumberIndexAfterUnit(tokens, unitIndex + 2);
+  if (houseIndex < 0) return null;
+  const streetPrefix = tokens
+    .slice(houseIndex + 1)
+    .find((token) => /[a-z]/.test(token) && !SQLITE_STREET_TYPE_TERMS.has(token));
+  if (!streetPrefix || streetPrefix.length < 2) return null;
+  return {
+    unitNumber: normalisedUnitNumberToken(tokens[unitIndex + 1]),
+    houseNumber: normalisedAddressNumberToken(tokens[houseIndex]),
+    streetPrefix,
+  };
 }
 
 function preferExactUnitPrefixRows(rows) {

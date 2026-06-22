@@ -677,6 +677,59 @@ test("contextual unit prefixes use nearby prefix rows instead of broad typeahead
   });
 });
 
+test("contextual unit street prefixes can use WA-looking street text without typeahead", async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-gnaf-context-prefix-wa-"));
+  const inputPath = path.join(tempDir, "GNAF_CORE.psv");
+  const outputPath = path.join(tempDir, "gnaf-context-prefix-wa.sqlite");
+  fs.writeFileSync(
+    inputPath,
+    [
+      "ADDRESS_DETAIL_PID|ADDRESS_LABEL|FLAT_TYPE|FLAT_NUMBER|NUMBER_FIRST|STREET_NAME|STREET_TYPE|LOCALITY_NAME|STATE|POSTCODE|GEOCODE_TYPE|LONGITUDE|LATITUDE",
+      "GAWA4101|Unit 4, 27 Waddell Road, Palmyra WA 6157|Unit|4|27|Waddell|Road|Palmyra|WA|6157|PROPERTY CENTROID|115.785|-32.040",
+      "GAWA4102|Unit 4, 27 Wangee Road, Mandurah WA 6210|Unit|4|27|Wangee|Road|Mandurah|WA|6210|PROPERTY CENTROID|115.720|-32.530",
+      "GANSW4103|Unit 4, 27 Watt Street, Newcastle NSW 2300|Unit|4|27|Watt|Street|Newcastle|NSW|2300|PROPERTY CENTROID|151.785|-32.925",
+    ].join("\n"),
+  );
+
+  execFileSync(
+    process.execPath,
+    [
+      "scripts/build-gnaf-address-index.mjs",
+      "--input",
+      inputPath,
+      "--output",
+      outputPath,
+      "--omit-legacy-fts",
+      "--omit-search-backstop",
+    ],
+    { cwd: path.resolve(__dirname, "../.."), stdio: "ignore" },
+  );
+
+  await withEnv(
+    {
+      FUEL_PATH_GNAF_SQLITE_PATH: outputPath,
+      FUEL_PATH_GEOCODE_PROVIDER: "nominatim",
+      FUEL_PATH_ADDRESS_LOOKUP_DEBUG: "1",
+    },
+    async () => {
+      const result = await geocode({
+        query: "Unit 4 27 Wa",
+        limit: 3,
+        sessionToken: "context-prefix-wa",
+        searchContext: {
+          nearLat: -32.530,
+          nearLon: 115.720,
+          nearRadiusKm: 80,
+        },
+      });
+
+      assert.equal(result.suggestions[0].label, "Unit 4, 27 Wangee Road, Mandurah WA 6210");
+      assert.equal(result.suggestions[0].refineRequired, false);
+      assert.equal(result.suggestions[0].addressLookupDebug.path, "unit_contextual_prefix");
+    },
+  );
+});
+
 test("building-first unit query can resolve exact unit from indexed base signature", async () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-gnaf-exact-unit-refine-"));
   const inputPath = path.join(tempDir, "GNAF_CORE.psv");

@@ -2260,6 +2260,40 @@ Brutal read on path-debug diagnostics:
 - Venue/name-first rows such as `Common 2 P` and `Albert Par` need a separate text-path optimisation. Tuning unit lookup will not fix those.
 - Next best build steps: materialise unit-lot prefix keys in the builder or add a safe unit-lot lookup table; add a guarded contextual exact-prefix fast path for `unit + civic number + street prefix` rows; then rerun the same 800-case benchmark and compare request P95/max, not just character metrics.
 
+## Full-National Contextual Unit-Prefix Rerun
+
+The runtime now has a narrower contextual fast path for `unit + civic number + street prefix` probes. It only accepts exact unit rows whose base signature starts with the typed civic number and street prefix; context orders those already text-compatible rows, but does not rescue unrelated rows.
+
+- artefact: `tmp/geocode-hosted-national-benchmark-2026-06-22-national-ftscolumn-contextual-unitprefix-800.json`
+- CSV: `tmp/geocode-hosted-national-benchmark-2026-06-22-national-ftscolumn-contextual-unitprefix-800.csv`
+- source SQLite: `tmp/gnaf-national-hybrid-runtime-ftscolumn.sqlite`
+- profile: `rural-unit`
+- flag: `--case-context`
+- cases: 800 addresses, 100 per benchmark state
+- final top/resolvable: 800/800
+- exact top P50/P90/P95: 10 / 15 / 19
+- resolvable top P50/P90/P95: 10 / 12 / 15
+- request latency P50/P95/max: 1 ms / 58 ms / 3,393 ms
+- wrong top before resolvable: 32
+
+Targeted probe evidence:
+
+| Probe | Previous path | Current path | Current local lookup | Read |
+| --- | --- | --- | ---: | --- |
+| `Unit 4 27 Wa` on stale national index | `unit_typeahead` | `unit_contextual_prefix` | 25 ms | fixed the WA-looking street-prefix spike without loosening unit-lot safety |
+| `Unit 3 Lot 1` on stale national index | `unit_typeahead` | `unit_typeahead` | 3,250 ms | still slow because this national SQLite is missing current unit-lot prefix material |
+| `Albert Par` on stale national index | `text_typeahead` | `text_typeahead` | 2,343 ms | still slow; separate venue/name-first optimisation needed |
+| `Unit 3 Lot 1` on 1M raw rebuilt index | n/a | `unit_prefix` | 4 ms | rebuilt index material has the needed unit-lot prefix rows |
+| `Unit 4 Lot 1` on 1M raw rebuilt index | n/a | `unit_prefix` | 3 ms | confirms the builder/index-refresh path removes the unit-lot fallback cost |
+
+Brutal read after contextual unit-prefix patch:
+
+- The character target remains met on this wide rural/unit run: exact P90 is still 15 and resolvable P90 is still 12.
+- The targeted WA-looking unit street-prefix spike is fixed. It no longer appears in the top slow requests.
+- The overall max latency is not fixed. Worst requests are still local SQLite paths, led by stale-index unit-lot rows and venue/name-first `text_typeahead`.
+- The 1M rebuilt raw index proves current builder output has unit-lot prefix material; the 16 GB national diagnostic SQLite is stale for those rows. A fresh national runtime package should remove the SA unit-lot spikes without loosening runtime safety.
+- Next best build steps: rebuild or replace the national runtime index with current raw-builder output when disk space allows; then optimise `text_typeahead` for venue/name-first rows such as `Common 2 P`, `Albert Par`, `Tarcombe 2`, and ACT shop/college labels.
+
 ## Safety Rerun After Civic-Number Guard
 
 The manual 994k-row probe found a real safety issue: number-first queries could fall back to token-overlap rows with a different civic street number when the exact address was absent from the sample.

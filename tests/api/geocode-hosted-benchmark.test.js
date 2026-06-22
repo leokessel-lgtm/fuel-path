@@ -110,6 +110,9 @@ test("hosted national benchmark rural-unit profile samples compact rows by local
     assert.equal(result.summary.byKind.address.finalTopMatch, 8);
     assert.equal(result.summary.byGeoSegment.remote_address.cases, 5);
     assert.equal(result.summary.byGeoSegment.rural_regional_address.cases, 3);
+    assert.equal(result.summary.byGeoSegmentAddressFamily.remote_address.standard_address.cases, 5);
+    assert.equal(result.summary.byGeoSegmentAddressFamily.rural_regional_address.standard_address.cases, 3);
+    assert.equal(result.summary.byGeoSegmentCategory.remote_address.street_address.cases, 5);
     assert.deepEqual(
       result.rows.map((row) => row.expectedLocality).sort(),
       ["Coober Pedy", "East Tamworth", "Karratha", "Katherine South", "Longreach", "Queenstown", "Tuggeranong", "Wodonga"].sort(),

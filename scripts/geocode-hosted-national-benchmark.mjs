@@ -582,6 +582,8 @@ function summarise(rows) {
     byCategory: groupSummary(rows, "category"),
     byAddressFamily: groupSummary(rows, "addressFamily"),
     byGeoSegment: groupSummary(rows, "geoSegment"),
+    byGeoSegmentAddressFamily: crossGroupSummary(rows, "geoSegment", "addressFamily"),
+    byGeoSegmentCategory: crossGroupSummary(rows, "geoSegment", "category"),
     byProvider: groupSummary(rows, "finalTopProvider"),
   };
 }
@@ -630,6 +632,17 @@ function groupSummary(rows, field) {
     [...new Set(rows.map((row) => row[field] || "unknown"))]
       .sort()
       .map((key) => [key, summariseGroup(rows.filter((row) => (row[field] || "unknown") === key))]),
+  );
+}
+
+function crossGroupSummary(rows, outerField, innerField) {
+  return Object.fromEntries(
+    [...new Set(rows.map((row) => row[outerField] || "unknown"))]
+      .sort()
+      .map((outerKey) => {
+        const outerRows = rows.filter((row) => (row[outerField] || "unknown") === outerKey);
+        return [outerKey, groupSummary(outerRows, innerField)];
+      }),
   );
 }
 

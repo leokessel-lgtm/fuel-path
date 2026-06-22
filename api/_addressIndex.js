@@ -83,9 +83,10 @@ function searchSqliteNeedles(needles, limit, searchContext) {
 
 function shouldStopSqliteNeedleSearch(results, needle, limit) {
   if (results.length >= limit) return true;
-  if (!queryContainsUnitLikeToken(needle)) return false;
   const top = results[0];
-  return Boolean(top && top.suggestionType === "exact_address" && top.refineRequired !== true);
+  if (!top || top.suggestionType !== "exact_address" || top.refineRequired === true) return false;
+  if (queryContainsUnitLikeToken(needle)) return true;
+  return shouldSearchLargeSqliteIndex(needle);
 }
 
 async function searchApiIndex(rawQuery, needle, limit) {

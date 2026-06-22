@@ -18,6 +18,7 @@ The tested resolvable P90 target is now achieved in sampled stress runs and boun
 - after routing building-first range queries through embedded address-core prefixes, the same 400-case run kept exact P90 15, resolvable P90 12 and improved request P95 to 437 ms on the backfilled temp DB
 - after generalising embedded address-core prefixes to ordinary venue/building-first civic addresses, the same 400-case run kept exact P90 15, resolvable P90 12 and improved request P95 to 125 ms after adding an 8-character minimum prefix guard
 - after resolving building-name plus unit/shop numbers through base-refine prefix rows and the exact-unit index, the same 400-case run kept exact P90 15 and resolvable P90 12, while reducing overall request P95 to 70 ms and unit/building request P95 to 169 ms
+- after short-circuiting secondary needle searches once the primary needle has an exact address top hit, the same 400-case run kept exact P90 15 and resolvable P90 12, reduced elapsed P95 from 455 ms to 218 ms, and cut range request P95 from 762 ms to 15 ms
 - unit/building resolvable P90 is still 15 in that 400-case run, and exact unit/building P90 is still 28
 - the broad exact-unit index raised the full national temp runtime from about 14 GB to about 16 GB; the partial-index temp file still occupies 16 GB until rebuilt/vacuumed, but currently reports about 1.97 GB free pages after dropping the broad index
 - compact prefix is only safe as a narrow house-number-first fast path
@@ -1288,13 +1289,68 @@ Brutal read on the building-unit pass:
 - Range rows are still the biggest latency weakness: request P95 is 762 ms and elapsed P95 is still above 3 seconds.
 - Ambiguous building-name-only lookups such as `Masonic Village Unit 10` depend on route/current-map context before the runtime can safely choose one exact unit.
 
+## Exact Top Stop Pass
+
+Problem found after the building-unit pass:
+
+- once the primary needle returned a clean exact address, the runtime still searched secondary number-start variants to fill the suggestion list
+- range and lot labels were hit hardest because `112-120 Spoonbill...` could resolve through compact prefix, then still search `120 Spoonbill...` through typeahead FTS
+- this made the benchmark look worse than the actual top-suggestion path: exact top was already found, but unused variant searches inflated elapsed latency
+
+Implementation:
+
+- SQLite needle expansion now stops when the current top result is an exact address, is not `refine_required`, and the current needle has enough address evidence for the large-index search guard
+- unit queries keep their previous exact-unit short-circuit behaviour
+- this does not broaden prefix-only routing; it only avoids extra fallback work after an exact local address is already top
+
+Direct national probes after exact-top short-circuiting:
+
+| Query prefix | Before | After | Top result |
+| --- | ---: | ---: | --- |
+| `112-120 Spoonbill Stre` | about 3279 ms | about 0 ms | exact Spoonbill range |
+| `Lot 138 Plover Str` | about 2405 ms | about 0 ms | exact Plover lot |
+| `Apt 2 9 Maluka Road Katherine East NT` | about 0 ms after first hit, with no extra variants | about 0 ms | exact Apt 2 |
+
+Full-national 400-case exact-stop stress:
+
+- artefact: `tmp/geocode-hosted-national-benchmark-2026-06-22-fullnational-exact-stop-400.json`
+- profile: `rural-unit`
+- flag: `--case-context --case-context-radius-km 80`
+- cases: 400 addresses
+- final top/resolvable: 400/400
+- exact top P50/P90/P95: 10 / 15 / 24
+- resolvable top P50/P90/P95: 10 / 12 / 15
+- wrong top before resolvable: 25
+- request latency P50/P95/max: 1 ms / 70 ms / 2440 ms
+- elapsed latency P50/P95: 5 ms / 218 ms
+
+400-case exact-stop segment notes:
+
+| Segment | Cases | Exact P90 | Resolvable P90 | Resolvable P95 | Latency P95 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Standard address | 336 | 10 | 10 | 12 | 58 ms request |
+| Unit/building address | 64 | 28 | 15 | 15 | 196 ms request |
+| Street address | 264 | 10 | 10 | 15 | 47 ms request |
+| Unit address | 63 | 28 | 15 | 15 | 158 ms request |
+| Lot address | 45 | 10 | 10 | 10 | 107 ms request |
+| Range address | 17 | 10 | 10 | 10 | 15 ms request, 699 ms elapsed |
+
+Brutal read on the exact-stop pass:
+
+- This is a real elapsed-latency cleanup: overall elapsed P95 moved from 455 ms to 218 ms.
+- Range request P95 improved from 762 ms to 15 ms because the runtime no longer keeps searching secondary range-number variants after an exact top hit.
+- Overall request P95 stayed flat at 70 ms, so this is not a full serving-shape fix.
+- Unit/building request P95 moved from 169 ms to 196 ms in this run. That is likely benchmark/sample/cold-cache noise plus remaining early-prefix FTS, but it means this pass should be described as targeted rather than universal.
+- The remaining max request is still 2440 ms on `Apt 2 9 Maluka...`, and venue prefixes such as `Albert Par` and `Tarcombe 2002...` still hit multi-second cold FTS paths before compact prefix evidence is available.
+- The next structural improvement needs building/venue-name prefix coverage or a cheaper exact-name prefix table. The current index cannot make `Queenstown Police Station 2-6` fast before the street token without more local key material.
+
 Brutal read on full national:
 
 - Full national build size is now proven, and it is large but locally possible.
 - The 120-case full-national stress now completes, where the previous equivalent run did not produce an artefact.
-- The wider 400-case building-unit-prefix run is now the best read: final top/resolvable is 400/400, exact P90 is 15 and resolvable P90 is 12.
+- The wider 400-case exact-stop run is now the best read: final top/resolvable is 400/400, exact P90 is 15 and resolvable P90 is 12.
 - Unit/building resolvable P90 is 15, but exact unit/building P90 is still 28.
-- Latency is materially better than the earlier full-national run: the latest building-unit-prefix 400-case run is request P95 70 ms overall and 169 ms for unit/building rows, but range request P95 remains 762 ms and range elapsed P95 remains 3102 ms.
+- Latency is materially better than the earlier full-national run: the latest exact-stop 400-case run is request P95 70 ms overall and elapsed P95 218 ms, but unit/building request P95 remains 196 ms and max request latency still reaches 2440 ms.
 - SA remains the exact typed-character tail, ACT improved on resolvable P90, and range/unit/building rows remain the main latency tails.
 - The next improvement should target serving shape and packaging, not provider expansion.
 
@@ -1383,12 +1439,13 @@ What improved:
 - The latest embedded-range-prefix rerun kept overall resolvable P90 at 12, exact P90 at 15, final top/resolvable at 400/400, and reduced request P95 to 437 ms.
 - The latest embedded-civic-prefix rerun kept overall resolvable P90 at 12, exact P90 at 15, final top/resolvable at 400/400, and reduced request P95 to 125 ms after the Shell lot safety regression was fixed.
 - The latest building-unit-prefix rerun kept overall resolvable P90 at 12, exact P90 at 15, final top/resolvable at 400/400, reduced request P95 to 70 ms, and cut unit/building request P95 to 169 ms.
+- The latest exact-stop rerun kept overall resolvable P90 at 12, exact P90 at 15, final top/resolvable at 400/400, reduced elapsed P95 to 218 ms, cut range request P95 to 15 ms, and reduced wrong-top-before-resolvable to 25.
 
 What remains weak:
 
 - Exact top and resolvable top are now deliberately different for unit/building cases. That is safer, but the UI must continue to prevent one-tap routing from `refine_required` rows.
 - The latest full-national 400-case run hit overall exact P90 15 and resolvable P90 12, but exact unit/building P90 remained 28.
-- Full national request latency is improved but not fully product-ready: latest request P95 was 70 ms overall, 169 ms for unit/building rows, and range elapsed P95 still reached 3102 ms.
+- Full national request latency is improved but not fully product-ready: latest request P95 was 70 ms overall, 196 ms for unit/building rows, and max request latency still reached 2440 ms.
 - The broad exact-unit index raised the full-national temp runtime footprint from about 14 GB to about 16 GB; the partial-index temp file still needs rebuild/vacuum evidence before claiming a smaller packaged size.
 - The 800-case post-ranker full-national run still has not been rerun successfully after the sampler/prefix/exact-unit fixes.
 - Prefix-only continues to fail safety cases: wrong locality, wrong street number, sibling unit/shop and same-site building aliases.
@@ -1399,13 +1456,14 @@ What remains weak:
 - SA exact/resolvable P90 and ACT exact P90 remain weak in the wider full-national run, even though ACT resolvable P90 improved with context-aware typeahead.
 - Range-address latency remains weak until the current range-prefix backfill is replaced by a fresh national rebuild and the remaining cold number-first range spikes are profiled.
 - Short building/venue-name prefixes can still be slow before a civic number is typed, because the embedded-core fast path needs address-number evidence.
+- Building/venue prefixes still need local key material. Without it, `Albert Par`, `Queenstown P` and similar prefixes depend on broad typeahead FTS.
 - Context-aware ranking depends on Plan/Nearby having a meaningful route/current-map anchor. Cold start address search without context still lands at rural/unit P90 18 in the corrected hosted-contract run.
 - `wrongTopBeforeResolvable` is still high in the typed-prefix harness because many short prefixes are inherently ambiguous before enough context arrives. This is acceptable only if UI state treats those rows as suggestions, not route commitments.
 
 Next:
 
 - Compress or shard FTS/typeahead duplication before treating the 16 GB SQLite as a shipping mobile/runtime asset.
-- Profile the remaining range cold-start spikes and rebuild range prefix coverage into a fresh national runtime package.
+- Add or test a compact building/venue-name prefix layer that can serve early venue prefixes without broad FTS, while keeping building-only rows refine-safe.
 - Rerun the 800-case hosted national benchmark after another serving-shape pass, not before.
 - Add a Plan/Nearby UI smoke case for `refine_required` rows so route submission cannot regress.
 - Recover exact unit/building P90 margin without reopening broad `unit + number` FTS scans.

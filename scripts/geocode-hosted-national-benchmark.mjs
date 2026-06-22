@@ -174,7 +174,7 @@ console.log(JSON.stringify({ runId: RUN_ID, jsonPath, csvPath, fetchCalls, summa
 assertThresholds(summary, rows);
 
 async function runCase(testCase, index) {
-  const prefixes = prefixesFor(testCase.query, testCase.kind);
+  const prefixes = prefixesFor(testCase.query, testCase.kind, testCase);
   let firstAnyMatchChars = null;
   let firstTopMatchChars = null;
   let firstResolvableTopChars = null;
@@ -711,7 +711,7 @@ function assertThresholds(summary, rows) {
   }
 }
 
-function prefixesFor(query, kind = "") {
+function prefixesFor(query, kind = "", testCase = {}) {
   const text = String(query || "").trim();
   const minimum = kind === "address" ? MIN_ADDRESS_PREFIX_CHARS : MIN_PREFIX_CHARS;
   const lengths = new Set([
@@ -732,6 +732,8 @@ function prefixesFor(query, kind = "") {
     42,
     text.length,
   ]);
+  const unitIntentChars = unitIntentCompleteCharsForCase(testCase);
+  if (Number.isFinite(unitIntentChars)) lengths.add(unitIntentChars);
   for (let index = 0; index < text.length; index += 1) {
     if (text[index] === " ") lengths.add(index + 1);
   }

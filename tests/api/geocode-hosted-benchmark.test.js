@@ -244,6 +244,62 @@ test("hosted national benchmark counts lot-style base-refine rows as resolvable"
   }
 });
 
+test("hosted national benchmark probes exact unit-intent completion prefixes", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-hosted-benchmark-unit-intent-prefix-"));
+  const inputPath = path.join(dir, "GNAF_CORE.psv");
+  const sqlitePath = path.join(dir, "gnaf-hosted-benchmark-unit-intent-prefix.sqlite");
+  fs.writeFileSync(
+    inputPath,
+    [
+      "ADDRESS_DETAIL_PID|ADDRESS_LABEL|BUILDING_NAME|FLAT_TYPE|FLAT_NUMBER|NUMBER_FIRST|STREET_NAME|STREET_TYPE|LOCALITY_NAME|STATE|POSTCODE|GEOCODE_TYPE|LONGITUDE|LATITUDE",
+      "GAWA9001|The Quarter, Unit 30, 16 Karratha Terrace, Karratha WA 6714|The Quarter|Unit|30|16|Karratha|Terrace|Karratha|WA|6714|PROPERTY CENTROID|116.846|-20.736",
+    ].join("\n"),
+  );
+  execFileSync(
+    process.execPath,
+    ["scripts/build-gnaf-address-index.mjs", "--input", inputPath, "--output", sqlitePath, "--omit-legacy-fts", "--omit-search-backstop"],
+    { cwd: ROOT, stdio: "ignore" },
+  );
+  const api = await startUnitIntentPrefixApi();
+  try {
+    const { stdout } = await execFileAsync(
+      process.execPath,
+      [
+        "scripts/geocode-hosted-national-benchmark.mjs",
+        "--mode",
+        "http",
+        "--api-base",
+        api.url,
+        "--address-sqlite",
+        sqlitePath,
+        "--address-count",
+        "1",
+        "--poi-count",
+        "0",
+        "--states",
+        "WA",
+        "--min-poi-top-rate",
+        "0",
+        "--max-address-p90-chars",
+        "80",
+        "--delay-ms",
+        "0",
+      ],
+      { cwd: ROOT, timeout: 30_000 },
+    );
+    const jsonPath = stdout.match(/"jsonPath": "([^"]+)"/)?.[1];
+    assert.ok(jsonPath, stdout);
+    const result = JSON.parse(fs.readFileSync(path.join(ROOT, jsonPath), "utf8"));
+
+    assert.equal(result.rows[0].unitIntentCompleteChars, 19);
+    assert.equal(result.rows[0].firstTopMatchChars, 19);
+    assert.equal(result.summary.byState.WA.p90TopChars, 19);
+  } finally {
+    await api.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 function buildAddressFixture(rows = ADDRESS_ROWS, extraArgs = []) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-hosted-benchmark-"));
   const inputPath = path.join(dir, "GNAF_CORE.psv");
@@ -261,6 +317,53 @@ function buildAddressFixture(rows = ADDRESS_ROWS, extraArgs = []) {
     { cwd: ROOT, stdio: "ignore" },
   );
   return { dir, inputPath, sqlitePath };
+}
+
+async function startUnitIntentPrefixApi() {
+  const exact = {
+    label: "The Quarter, Unit 30, 16 Karratha Terrace, Karratha WA 6714",
+    state: "WA",
+    postcode: "6714",
+    lat: -20.736,
+    lon: 116.846,
+    provider: "fuel_path_gnaf",
+    type: "address",
+    matchType: "exact_address",
+    suggestionType: "exact_address",
+  };
+  const refine = {
+    label: "The Quarter, 16 Karratha Terrace, Karratha WA 6714",
+    state: "WA",
+    postcode: "6714",
+    lat: -20.736,
+    lon: 116.846,
+    provider: "fuel_path_gnaf",
+    type: "address",
+    matchType: "building_refine",
+    suggestionType: "base_address",
+    refineRequired: true,
+  };
+  const server = http.createServer((request, response) => {
+    const url = new URL(request.url, "http://127.0.0.1");
+    if (url.pathname !== "/api/geocode") {
+      sendJson(response, 404, { error: "not_found" });
+      return;
+    }
+    const query = url.searchParams.get("q") || "";
+    const suggestions = /\bUnit 30\b/i.test(query) ? [exact] : [refine, exact];
+    sendJson(response, 200, {
+      provider: "test",
+      lookupStatus: "ok",
+      location: suggestions[0],
+      suggestions,
+    });
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  return {
+    url: `http://127.0.0.1:${address.port}`,
+    close: () => new Promise((resolve) => server.close(resolve)),
+  };
 }
 
 async function startLotRefineApi() {

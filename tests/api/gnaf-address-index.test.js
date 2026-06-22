@@ -915,6 +915,40 @@ test("lot and range exact labels materialise compact prefix rows", async () => {
   });
 });
 
+test("unit lot queries fail quiet instead of degrading to unrelated token matches", async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-gnaf-unit-lot-safe-"));
+  const inputPath = path.join(tempDir, "GNAF_CORE.psv");
+  const outputPath = path.join(tempDir, "gnaf-unit-lot-safe.sqlite");
+  fs.writeFileSync(
+    inputPath,
+    [
+      "ADDRESS_DETAIL_PID|ADDRESS_LABEL|NUMBER_FIRST|LOT_NUMBER|STREET_NAME|STREET_TYPE|LOCALITY_NAME|STATE|POSTCODE|GEOCODE_TYPE|LONGITUDE|LATITUDE",
+      "GASA7001|Lot 148, Unity Drive, Sheidow Park SA 5158|148||Unity|Drive|Sheidow Park|SA|5158|PROPERTY CENTROID|138.540|-35.080",
+      "GASA7002|1 Unit Street, Coober Pedy SA 5723|1||Unit|Street|Coober Pedy|SA|5723|PROPERTY CENTROID|134.750|-29.012",
+    ].join("\n"),
+  );
+
+  execFileSync(
+    process.execPath,
+    [
+      "scripts/build-gnaf-address-index.mjs",
+      "--input",
+      inputPath,
+      "--output",
+      outputPath,
+    ],
+    { cwd: path.resolve(__dirname, "../.."), stdio: "ignore" },
+  );
+
+  await withEnv({ FUEL_PATH_GNAF_SQLITE_PATH: outputPath }, async () => {
+    const needles = addressSearchNeedles("Unit 4 Lot 141 Elleway Drive Coober Pedy SA 5723").map(({ needle }) => needle);
+    const suggestions = await searchAddressIndex("Unit 4 Lot 141 Elleway Drive Coober Pedy SA 5723", 3);
+
+    assert.deepEqual(needles, ["unit 4 lot 141 elleway drive coober pedy sa 5723"]);
+    assert.deepEqual(suggestions, []);
+  });
+});
+
 test("building-first address queries use embedded address core prefixes", async () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-gnaf-building-address-prefix-"));
   const inputPath = path.join(tempDir, "GNAF_CORE.psv");

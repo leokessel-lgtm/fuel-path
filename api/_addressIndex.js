@@ -226,37 +226,43 @@ function searchSqliteIndex(needle, limit, searchContext = null) {
 
 function searchSqliteHybridIndex(database, needle, limit, searchContext = null) {
   if (queryContainsUnitLikeToken(needle)) {
+    const unitLotIntent = queryUnitLotIntent(needle);
     const unitRangePrefixReady = unitLikeRangeQueryReadyForExactPrefix(needle);
     if (!unitLikeQueryReadyForTypeahead(needle) && !unitRangePrefixReady) return [];
     const exactUnitRows = searchSqliteExactUnitEntries(database, needle, limit);
-    if (exactUnitRows.length) return hybridRowsToSuggestions(exactUnitRows, needle, 960);
+    const safeExactUnitRows = filterRowsForUnitLotIntent(exactUnitRows, unitLotIntent);
+    if (safeExactUnitRows.length) return hybridRowsToSuggestions(safeExactUnitRows, needle, 960);
     if (unitLikeQueryStartsWithUnitToken(needle)) {
       if (unitRangePrefixReady && !unitLikeQueryReadyForTypeahead(needle)) {
         const exactPrefixRows = searchSqlitePrefixEntries(database, needle, limit, searchContext, {
           includeTokenBoundaryPrefix: true,
           minPrefixLength: 12,
         }).filter((row) => row.entry_type === "exact" && row.unit);
-        if (exactPrefixRows.length && !prefixRowsAmbiguous(exactPrefixRows)) {
-          return hybridRowsToSuggestions(preferExactUnitPrefixRows(exactPrefixRows), needle, 940);
+        const safeExactPrefixRows = filterRowsForUnitLotIntent(exactPrefixRows, unitLotIntent);
+        if (safeExactPrefixRows.length && !prefixRowsAmbiguous(safeExactPrefixRows)) {
+          return hybridRowsToSuggestions(preferExactUnitPrefixRows(safeExactPrefixRows), needle, 940);
         }
         return [];
       }
       const prefixRows = searchSqlitePrefixEntries(database, needle, limit, searchContext);
       const useContextualPrefixRows = shouldUseContextualAmbiguousPrefixRows(needle, searchContext);
-      if (prefixRows.length && (!prefixRowsAmbiguous(prefixRows) || useContextualPrefixRows)) {
-        return hybridRowsToSuggestions(useContextualPrefixRows ? prefixRows : preferExactUnitPrefixRows(prefixRows), needle, 930);
+      const safePrefixRows = filterRowsForUnitLotIntent(prefixRows, unitLotIntent);
+      if (safePrefixRows.length && (!prefixRowsAmbiguous(safePrefixRows) || useContextualPrefixRows)) {
+        return hybridRowsToSuggestions(useContextualPrefixRows ? safePrefixRows : preferExactUnitPrefixRows(safePrefixRows), needle, 930);
       }
       if (unitRangePrefixReady) {
         const exactPrefixRows = searchSqlitePrefixEntries(database, needle, limit, searchContext, {
           includeTokenBoundaryPrefix: true,
         }).filter((row) => row.entry_type === "exact" && row.unit);
-        if (exactPrefixRows.length && !prefixRowsAmbiguous(exactPrefixRows)) {
-          return hybridRowsToSuggestions(preferExactUnitPrefixRows(exactPrefixRows), needle, 940);
+        const safeExactPrefixRows = filterRowsForUnitLotIntent(exactPrefixRows, unitLotIntent);
+        if (safeExactPrefixRows.length && !prefixRowsAmbiguous(safeExactPrefixRows)) {
+          return hybridRowsToSuggestions(preferExactUnitPrefixRows(safeExactPrefixRows), needle, 940);
         }
       }
     } else {
       const buildingUnitRows = searchSqliteBuildingUnitEntries(database, needle, limit, searchContext);
-      if (buildingUnitRows.length) return hybridRowsToSuggestions(buildingUnitRows, needle, 960);
+      const safeBuildingUnitRows = filterRowsForUnitLotIntent(buildingUnitRows, unitLotIntent);
+      if (safeBuildingUnitRows.length) return hybridRowsToSuggestions(safeBuildingUnitRows, needle, 960);
       const buildingUnitRefineRows = searchSqliteBuildingUnitRefineEntries(database, needle, limit, searchContext);
       if (buildingUnitRefineRows.length) return hybridRowsToSuggestions(buildingUnitRefineRows, needle, 940);
       const embeddedUnitNeedle = embeddedUnitAddressCoreNeedle(needle);
@@ -265,13 +271,14 @@ function searchSqliteHybridIndex(database, needle, limit, searchContext = null) 
           minPrefixLength: 12,
         });
         const useContextualPrefixRows = shouldUseContextualAmbiguousPrefixRows(embeddedUnitNeedle, searchContext);
-        if (prefixRows.length && (!prefixRowsAmbiguous(prefixRows) || useContextualPrefixRows)) {
-          return hybridRowsToSuggestions(useContextualPrefixRows ? prefixRows : preferExactUnitPrefixRows(prefixRows), needle, 930);
+        const safePrefixRows = filterRowsForUnitLotIntent(prefixRows, unitLotIntent);
+        if (safePrefixRows.length && (!prefixRowsAmbiguous(safePrefixRows) || useContextualPrefixRows)) {
+          return hybridRowsToSuggestions(useContextualPrefixRows ? safePrefixRows : preferExactUnitPrefixRows(safePrefixRows), needle, 930);
         }
       }
     }
     const typeaheadRows = searchSqliteTypeaheadEntries(database, needle, limit, searchContext);
-    return hybridRowsToSuggestions(typeaheadRows, needle);
+    return hybridRowsToSuggestions(filterRowsForUnitLotIntent(typeaheadRows, unitLotIntent), needle);
   }
   if (!/^\d/.test(needle)) {
     if (queryStartsWithLotLikeToken(needle)) {
@@ -1181,6 +1188,34 @@ function unitLikeQueryStartsWithUnitToken(needle) {
   return SQLITE_UNIT_TERMS.has(firstToken);
 }
 
+function queryUnitLotIntent(needle) {
+  const tokens = normaliseAddressText(needle).split(/\s+/).filter(Boolean);
+  const unitIndex = tokens.findIndex((token, index) => SQLITE_UNIT_TERMS.has(token) && normalisedUnitNumberToken(tokens[index + 1]));
+  if (unitIndex < 0) return null;
+  const lotIndex = tokens.findIndex((token, index) =>
+    index > unitIndex + 1 &&
+    token === "lot" &&
+    normalisedUnitNumberToken(tokens[index + 1]),
+  );
+  if (lotIndex < 0) return null;
+  return {
+    unitNumber: normalisedUnitNumberToken(tokens[unitIndex + 1]),
+    lotNumber: normalisedUnitNumberToken(tokens[lotIndex + 1]),
+  };
+}
+
+function filterRowsForUnitLotIntent(rows, intent) {
+  if (!intent) return rows;
+  return rows.filter((row) => rowMatchesUnitLotIntent(row, intent));
+}
+
+function rowMatchesUnitLotIntent(row, intent) {
+  const label = normaliseAddressText(row?.address_label || row?.label || "");
+  if (!label.includes(`lot ${intent.lotNumber}`)) return false;
+  const tokens = label.split(/\s+/).filter(Boolean);
+  return tokens.some((token, index) => SQLITE_UNIT_TERMS.has(token) && normalisedUnitNumberToken(tokens[index + 1]) === intent.unitNumber);
+}
+
 function isStateCode(value) {
   return ["act", "nsw", "nt", "ot", "qld", "sa", "tas", "vic", "wa"].includes(String(value || "").toLowerCase());
 }
@@ -1343,7 +1378,7 @@ function normaliseAddressText(value) {
 
 function addressSearchNeedles(rawQuery) {
   const primary = normaliseAddressText(rawQuery);
-  const variants = [primary, ...complexAddressNeedles(primary)];
+  const variants = queryUnitLotIntent(primary) ? [primary] : [primary, ...complexAddressNeedles(primary)];
   const seen = new Set();
   return variants
     .map((needle) => normaliseAddressText(needle))

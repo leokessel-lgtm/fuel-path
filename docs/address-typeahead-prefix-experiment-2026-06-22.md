@@ -25,6 +25,7 @@ The tested resolvable P90 target is now achieved in sampled stress runs and boun
 - after widening that staged raw run to 1,600 rural/unit cases, unit/building resolvable P90 initially slipped to 18; adding guarded unit-range token-boundary prefix lookup and building-name-plus-partial-unit base refinement restored 1,600/1,600 final top/resolvable, overall resolvable P90 15 and unit/building resolvable P90 15
 - after widening again to 3,200 rural/unit cases, three final top failures appeared around level/site parsing; after skipping `L/Fl/Floor` level markers during exact-unit refinement and treating leading `Site` as a flat/unit type, the rerun hit 3,200/3,200 final top/resolvable, overall resolvable P90 15 and unit/building resolvable P90 15
 - after profiling the 3,200-case latency tail, short under-specified unit-range prefixes such as `Unit 1 1-3` were held until a stored 12-character exact checkpoint was available; the rerun kept 3,200/3,200 final top/resolvable and cut max request latency from 1,328 ms to 497 ms
+- after adding a unit-plus-lot intent guard, the existing full-national compact runtime reran the 800-case rural/unit context benchmark at 800/800 final top/resolvable, exact P90 15, resolvable P90 15 and request P95 62 ms
 - unit/building resolvable P90 is still 15 in that 400-case run, and exact unit/building P90 is still 28
 - the broad exact-unit index raised the full national temp runtime from about 14 GB to about 16 GB; the partial-index temp file still occupies 16 GB until rebuilt/vacuumed, but currently reports about 1.97 GB free pages after dropping the broad index
 - compact prefix is only safe as a narrow house-number-first fast path
@@ -40,6 +41,7 @@ The tested resolvable P90 target is now achieved in sampled stress runs and boun
 - typeahead FTS now uses nearby context as a tie-breaker after text class and stored rank, which helps same-name building/address rows without making Google or broad region bias the default
 - contextual `Lot ...` lookups now use compact prefix before FTS, cutting the lot-address latency tail in the full-national stress run
 - contextual `L<number> ...` labels now use compact prefix before FTS once a street token is present, cutting the SA latency tail without treating bare `L41` as safe
+- unit-plus-lot queries now preserve typed unit and lot intent instead of degrading to broader lot/street variants, preventing stale or broad indexes from surfacing unrelated token-overlap rows
 
 Compact prefix alone is not safe enough. It is fast and reaches low P90 on successful cases, but it can silently pick the wrong locality, sibling unit/shop or same-name building when the first 15 characters are ambiguous.
 
@@ -1676,19 +1678,66 @@ Brutal read on the latency guard:
 - Request P95 moved from 2 ms to 3 ms, so the win is mostly in avoiding pathological max spikes and reducing elapsed P95.
 - There are still max-latency outliers around level/floor unit labels and building-first exact tails. This is better, not finished.
 
+## Full-National Unit-Lot Safety Rerun
+
+Problem found when testing the current runtime against the existing full-national compact artefact:
+
+- an 800-case full-national rural/unit context run initially failed 798/800
+- the two misses were unit-plus-lot Coober Pedy addresses: `Unit 4 Lot 141 Elleway Drive...` and `Unit 3 Lot 150 Van Brugge Street...`
+- the runtime could degrade a unit-plus-lot query into broader generated needles, allowing unrelated token-overlap rows such as `Unity...` or `Unit Street...` to compete before the safe exact unit-lot row
+
+Implementation:
+
+- unit-plus-lot queries now preserve the full primary needle instead of generating broader address-core variants
+- SQLite exact, prefix and typeahead rows are filtered against the typed unit number and lot number when that intent is present
+- regression coverage proves that a stale or incomplete index fails quiet instead of returning unrelated token matches
+
+Full-national 800-case rerun after the guard:
+
+- artefact: `tmp/geocode-hosted-national-benchmark-2026-06-22-fullnational-unitlot-safe-800b.json`
+- source SQLite: `tmp/gnaf-national-hybrid-runtime-ftscolumn.sqlite`
+- profile: `rural-unit`
+- flag: `--case-context`
+- cases: 800 addresses, 100 per benchmark state
+- final top/resolvable: 800/800
+- exact top P50/P90/P95: 10 / 15 / 20
+- resolvable top P50/P90/P95: 10 / 15 / 15
+- wrong top before resolvable: 45
+- request latency P50/P95/max: 1 ms / 62 ms / 3,469 ms
+- elapsed latency P50/P95: 5 ms / 214 ms
+
+800-case segment notes:
+
+| Segment | Cases | Final top/resolvable | Exact P90 | Resolvable P90 | Resolvable P95 | Request P95 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Standard address | 643 | 643/643 | 10 | 10 | 10 | 60 ms |
+| Unit/building address | 157 | 157/157 | 22 | 15 | 15 | 63 ms |
+| Unit category | 156 | 156/156 | 22 | 15 | 15 | 62 ms |
+| Lot address | 73 | 73/73 | 10 | 10 | 10 | 117 ms |
+| Range address | 34 | 34/34 | 10 | 10 | 10 | 651 ms |
+| Street address | 516 | 516/516 | 10 | 10 | 10 | 45 ms |
+
+Brutal read on the unit-lot safety rerun:
+
+- The 800-case full-national gate now passes against the existing compact runtime: exact P90 is 15 and resolvable P90 is 15.
+- The guard is safety-oriented, not a broad ranking trick. It prevents a typed `Unit X Lot Y` intent from silently becoming a weaker lot/street query.
+- Unit/building exact P90 still misses the target at 22. The target is achieved honestly via the resolvable/refine path, not exact-unit top for every complex address.
+- Latency is much better than the earlier full-national runs, but not clean: request P95 is 62 ms overall, elapsed P95 is 214 ms, range request P95 is 651 ms, and max request latency is still 3,469 ms.
+- The full-national artefact is still large and old relative to the latest raw-builder changes. A fresh full-national raw rebuild remains the next packaging proof.
+
 Brutal read on full national:
 
 - Full national build size is now proven, and it is large but locally possible.
-- The 120-case full-national stress now completes, where the previous equivalent run did not produce an artefact.
-- The wider 400-case exact-stop run is now the best read: final top/resolvable is 400/400, exact P90 is 15 and resolvable P90 is 12.
-- Unit/building resolvable P90 is 15, but exact unit/building P90 is still 28.
-- Latency is materially better than the earlier full-national run: the latest exact-stop 400-case run is request P95 70 ms overall and elapsed P95 218 ms, but unit/building request P95 remains 196 ms and max request latency still reaches 2440 ms.
+- The 800-case unit-lot safety rerun is now the best bounded full-national read: final top/resolvable is 800/800, exact P90 is 15 and resolvable P90 is 15.
+- The older 400-case exact-stop run still has the stronger resolvable P90 at 12, but it is narrower than the 800-case rerun.
+- Unit/building resolvable P90 is 15, but exact unit/building P90 is still 22 in the 800-case rerun and 28 in the older 400-case exact-stop run.
+- Latency is materially better than the earliest full-national run: the 800-case unit-lot safety rerun is request P95 62 ms overall and elapsed P95 214 ms, but range request P95 remains 651 ms and max request latency still reaches 3469 ms.
 - The building/venue prefix builder pass has promising rebuilt-sample evidence, but still needs a fresh full-national rebuild before it can replace the exact-stop run as the best full-national read.
 - The raw builder parity pass proves the fresh-build path on 150k real G-NAF rows, but full-national rebuild evidence is still missing.
 - The staged 8-state unit-lot rebuild proves the fresh-build path on 994,401 real G-NAF rows across all benchmark states, but full-national rebuild evidence is still missing.
 - The wider 1,600-case staged pass proves the current runtime shape is stronger than the 800-case pass suggested, but it also confirms exact unit/building remains the hard tail.
 - The heavier 3,200-case staged pass proves the current runtime shape under wider rural/unit sampling, but full-national rebuild evidence and exact unit/building P90 remain open.
-- The unit-range latency pass reduces the staged max-latency spike, but full-national latency remains unproven.
+- The unit-range latency pass reduces the staged max-latency spike, and the 800-case full-national rerun shows a better request P95, but full-national max-latency outliers remain.
 - SA remains the exact typed-character tail, ACT improved on resolvable P90, and range/unit/building rows remain the main latency tails.
 - The next improvement should target serving shape and packaging, not provider expansion.
 

@@ -814,16 +814,20 @@ test("lot and range exact labels materialise compact prefix rows", async () => {
   });
 });
 
-test("building-first range queries use embedded address core prefixes", async () => {
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-gnaf-building-range-prefix-"));
+test("building-first address queries use embedded address core prefixes", async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-gnaf-building-address-prefix-"));
   const inputPath = path.join(tempDir, "GNAF_CORE.psv");
-  const outputPath = path.join(tempDir, "gnaf-building-range-prefix.sqlite");
+  const outputPath = path.join(tempDir, "gnaf-building-address-prefix.sqlite");
   fs.writeFileSync(
     inputPath,
     [
-      "ADDRESS_DETAIL_PID|ADDRESS_LABEL|BUILDING_NAME|NUMBER_FIRST|NUMBER_LAST|STREET_NAME|STREET_TYPE|LOCALITY_NAME|STATE|POSTCODE|GEOCODE_TYPE|LONGITUDE|LATITUDE",
-      "GATAS6201|Queenstown Police Station, 2-6 Sticht Street, Queenstown TAS 7467|Queenstown Police Station|2|6|Sticht|Street|Queenstown|TAS|7467|PROPERTY CENTROID|145.552|-42.080",
-      "GATAS6202|2-6 Sticht Street, Burnie TAS 7320||2|6|Sticht|Street|Burnie|TAS|7320|PROPERTY CENTROID|145.905|-41.052",
+      "ADDRESS_DETAIL_PID|ADDRESS_LABEL|BUILDING_NAME|NUMBER_FIRST|NUMBER_LAST|LOT_NUMBER|STREET_NAME|STREET_TYPE|LOCALITY_NAME|STATE|POSTCODE|GEOCODE_TYPE|LONGITUDE|LATITUDE",
+      "GATAS6201|Queenstown Police Station, 2-6 Sticht Street, Queenstown TAS 7467|Queenstown Police Station|2|6||Sticht|Street|Queenstown|TAS|7467|PROPERTY CENTROID|145.552|-42.080",
+      "GATAS6202|2-6 Sticht Street, Burnie TAS 7320||2|6||Sticht|Street|Burnie|TAS|7320|PROPERTY CENTROID|145.905|-41.052",
+      "GAQLD6203|Albert Park Motor Inn, 55 Ilfracombe Road, Longreach QLD 4730|Albert Park Motor Inn|55|||Ilfracombe|Road|Longreach|QLD|4730|PROPERTY CENTROID|144.250|-23.440",
+      "GAQLD6204|55 Ilfracombe Road, Townsville QLD 4810||55|||Ilfracombe|Road|Townsville|QLD|4810|PROPERTY CENTROID|146.818|-19.259",
+      "GAWA6205|1076 Lakes Road, Nambeelup WA 6207||1076|||Lakes|Road|Nambeelup|WA|6207|PROPERTY CENTROID|115.801|-32.523",
+      "GAWA6206|Shell Service Station, Lot 1076, Searipple Road, Karratha WA 6714|Shell Service Station|||1076|Searipple|Road|Karratha|WA|6714|PROPERTY CENTROID|116.846|-20.736",
     ].join("\n"),
   );
 
@@ -844,20 +848,40 @@ test("building-first range queries use embedded address core prefixes", async ()
   await withEnv({ FUEL_PATH_GNAF_SQLITE_PATH: outputPath }, async () => {
     const sqlite = new DatabaseSync(outputPath, { readOnly: true });
     const rangePrefixRows = sqlite.prepare("SELECT COUNT(*) AS count FROM address_prefix_entries WHERE prefix = ?").get("2 6 stic");
+    const civicPrefixRows = sqlite.prepare("SELECT COUNT(*) AS count FROM address_prefix_entries WHERE prefix = ?").get("55 ilfra");
     sqlite.close();
 
-    const suggestions = await searchAddressIndex("Queenstown Police Station 2-6 Sticht Street Queenstown TAS 7467", 3, {
+    const rangeSuggestions = await searchAddressIndex("Queenstown Police Station 2-6 Sticht Street Queenstown TAS 7467", 3, {
       searchContext: {
         nearLat: -42.080,
         nearLon: 145.552,
       },
     });
+    const civicSuggestions = await searchAddressIndex("Albert Park Motor Inn 55 Ilfracombe Road Longreach QLD 4730", 3, {
+      searchContext: {
+        nearLat: -23.440,
+        nearLon: 144.250,
+      },
+    });
+    const lotVenueSuggestions = await searchAddressIndex("Shell Service Station Lot 1076 Searipple Road Karratha WA 6714", 3, {
+      searchContext: {
+        nearLat: -20.736,
+        nearLon: 116.846,
+      },
+    });
 
     assert.ok(rangePrefixRows.count >= 1);
-    assert.equal(suggestions[0].label, "Queenstown Police Station, 2-6 Sticht Street, Queenstown TAS 7467");
-    assert.equal(suggestions[0].matchType, "exact_address");
-    assert.equal(suggestions[0].sourceLabel, "Exact address");
-    assert.equal(suggestions[0].refineRequired, false);
+    assert.ok(civicPrefixRows.count >= 1);
+    assert.equal(rangeSuggestions[0].label, "Queenstown Police Station, 2-6 Sticht Street, Queenstown TAS 7467");
+    assert.equal(rangeSuggestions[0].matchType, "exact_address");
+    assert.equal(rangeSuggestions[0].sourceLabel, "Exact address");
+    assert.equal(rangeSuggestions[0].refineRequired, false);
+    assert.equal(civicSuggestions[0].label, "Albert Park Motor Inn, 55 Ilfracombe Road, Longreach QLD 4730");
+    assert.equal(civicSuggestions[0].matchType, "exact_address");
+    assert.equal(civicSuggestions[0].sourceLabel, "Exact address");
+    assert.equal(civicSuggestions[0].refineRequired, false);
+    assert.equal(lotVenueSuggestions[0].label, "Shell Service Station, Lot 1076, Searipple Road, Karratha WA 6714");
+    assert.equal(lotVenueSuggestions[0].sourceLabel, "Exact address");
   });
 });
 

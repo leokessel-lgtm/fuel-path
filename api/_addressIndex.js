@@ -245,10 +245,12 @@ function searchSqliteHybridIndex(database, needle, limit, searchContext = null) 
         return hybridRowsToSuggestions(prefixRows, needle, 950);
       }
     }
-    const embeddedRangeNeedle = embeddedRangeAddressCoreNeedle(needle);
-    if (embeddedRangeNeedle) {
-      const prefixRows = searchSqlitePrefixEntries(database, embeddedRangeNeedle, limit, searchContext);
-      if (prefixRows.length && (!prefixRowsAmbiguous(prefixRows) || shouldUseContextualAmbiguousPrefixRows(embeddedRangeNeedle, searchContext))) {
+    const embeddedAddressCoreNeedle = embeddedNumberFirstAddressCoreNeedle(needle);
+    if (embeddedAddressCoreNeedle) {
+      const prefixRows = searchSqlitePrefixEntries(database, embeddedAddressCoreNeedle, limit, searchContext, {
+        minPrefixLength: 8,
+      });
+      if (prefixRows.length && (!prefixRowsAmbiguous(prefixRows) || shouldUseContextualAmbiguousPrefixRows(embeddedAddressCoreNeedle, searchContext))) {
         return hybridRowsToSuggestions(prefixRows, needle, 950);
       }
     }
@@ -288,8 +290,8 @@ function hybridRowQualityPass(row, needle) {
   return houseNumbersCompatible(queryHouseNumber, rowHouseNumber);
 }
 
-function searchSqlitePrefixEntries(database, needle, limit, searchContext = null) {
-  const prefixes = materialisedPrefixesForNeedle(needle);
+function searchSqlitePrefixEntries(database, needle, limit, searchContext = null, options = {}) {
+  const prefixes = materialisedPrefixesForNeedle(needle, options.minPrefixLength);
   if (!prefixes.length) return [];
   const cappedLimit = Math.max(1, Math.min(Number(limit) || 5, 20));
   const run = (prefix) => {
@@ -368,12 +370,12 @@ function searchSqlitePrefixEntries(database, needle, limit, searchContext = null
   return [];
 }
 
-function materialisedPrefixesForNeedle(needle) {
+function materialisedPrefixesForNeedle(needle, minPrefixLength = 4) {
   const text = normaliseAddressText(needle);
   return [15, 12, 8, 4]
     .filter((length) => text.length >= length)
     .map((length) => text.slice(0, length))
-    .filter((prefix) => prefix.length >= 4);
+    .filter((prefix) => prefix.length >= minPrefixLength);
 }
 
 function searchSqliteTypeaheadEntries(database, needle, limit, searchContext = null) {
@@ -507,10 +509,10 @@ function queryStartsWithLotLikeToken(needle) {
   return /^lot\s+[a-z0-9-]+(?:\s|$)/.test(text) || /^l\d+[a-z]?(?:\s|$)/.test(text);
 }
 
-function embeddedRangeAddressCoreNeedle(needle) {
+function embeddedNumberFirstAddressCoreNeedle(needle) {
   const tokens = normaliseAddressText(needle).split(/\s+/).filter(Boolean);
   for (let index = 1; index < tokens.length - 2; index += 1) {
-    if (!/^\d+[a-z]?$/.test(tokens[index]) || !/^\d+[a-z]?$/.test(tokens[index + 1])) continue;
+    if (!normalisedAddressNumberToken(tokens[index])) continue;
     const candidate = tokens.slice(index).join(" ");
     if (shouldSearchLargeSqliteIndex(candidate)) return candidate;
   }

@@ -43,6 +43,7 @@ const pricing = read("src/utils/pricing.ts");
 const decisionEvidence = read("src/utils/decisionEvidence.ts");
 const packageJson = read("package.json");
 const planFieldSmoke = read("scripts/smoke-plan-fields.mjs");
+const nearbyRefineSmoke = read("scripts/smoke-nearby-refine.mjs");
 const androidMapSmoke = read("scripts/native-android-map-smoke.mjs");
 const androidPreviewSmoke = read("scripts/native-android-preview-smoke.mjs");
 const androidPerformanceSummary = read("scripts/native-android-performance-summary.mjs");
@@ -547,6 +548,7 @@ const checks = [
     label: "plan field browser smoke covers rendered precision states",
     ok:
       packageJson.includes('"smoke:plan-fields": "node scripts/smoke-plan-fields.mjs"') &&
+      packageJson.includes('"smoke:nearby-refine": "node scripts/smoke-nearby-refine.mjs"') &&
       planFieldSmoke.includes("blank plan form stays disabled") &&
       planFieldSmoke.includes("partial street input asks for suburb or postcode") &&
       planFieldSmoke.includes("state-only address context is not enough") &&
@@ -612,6 +614,14 @@ const checks = [
     ok:
       nearbyScreen.includes("const selectedPlaceActive = locationQuery.trim().length > 0 && locationQuery.trim() === centre.label;") &&
       nearbyScreen.includes("showCentreMarker={selectedPlaceActive}") &&
+      nearbyScreen.includes("nearbyRefinePointHint") &&
+      nearbyScreen.includes("point.refineRequired") &&
+      nearbyScreen.includes('point.suggestionType === "base_address"') &&
+      nearbyScreen.includes("Choose or type the exact unit before searching nearby.") &&
+      nearbyRefineSmoke.includes("Nearby building refine rows do not move search centre") &&
+      nearbyRefineSmoke.includes("Cairns Central Shopping Centre Shop 22") &&
+      nearbyRefineSmoke.includes("Choose or type the exact unit before searching nearby.") &&
+      nearbyRefineSmoke.includes("expected no station reload after refine selection") &&
       nearbyLocationSearch.includes("styles.inputShell") &&
       nearbyLocationSearch.includes("styles.currentLocationButton") &&
       nearbyLocationSearch.includes("locationInputWithIcon") &&

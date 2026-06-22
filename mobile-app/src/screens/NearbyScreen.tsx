@@ -154,6 +154,11 @@ export function NearbyScreen({
     setLocationError("");
     try {
       const location = await geocodeAddress(query, getAddressSessionToken(), locationSearchContext);
+      const refineHint = nearbyRefinePointHint(location);
+      if (refineHint) {
+        setLocationError(refineHint);
+        return;
+      }
       const nextCentre = {
         lat: location.lat,
         lon: location.lon,
@@ -233,6 +238,11 @@ export function NearbyScreen({
   };
 
   const selectLocationSuggestion = (location: MapPoint) => {
+    const refineHint = nearbyRefinePointHint(location);
+    if (refineHint) {
+      setLocationError(refineHint);
+      return;
+    }
     const nextCentre = {
       lat: location.lat,
       lon: location.lon,
@@ -411,6 +421,14 @@ function distanceKm(left: MapPoint, right: MapPoint) {
 
 function toRad(value: number) {
   return (value * Math.PI) / 180;
+}
+
+function nearbyRefinePointHint(point: MapPoint) {
+  const needsRefinement =
+    point.refineRequired ||
+    point.type === "building" ||
+    point.suggestionType === "base_address";
+  return needsRefinement ? "Choose or type the exact unit before searching nearby." : "";
 }
 
 function stationLimitForRadius(radiusKm: number) {

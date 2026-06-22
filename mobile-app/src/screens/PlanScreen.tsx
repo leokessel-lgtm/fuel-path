@@ -136,6 +136,8 @@ export function PlanScreen({
       return;
     }
     const precisionHint =
+      selectedRoutePointPrecisionHint("start", overrideFromPoint || fromPoint) ||
+      selectedRoutePointPrecisionHint("destination", overrideToPoint || toPoint) ||
       (!overrideFromPoint && !fromPoint ? routeInputPrecisionHint("start", fromLabel) : "") ||
       (!overrideToPoint && !toPoint ? routeInputPrecisionHint("destination", toLabel) : "");
     if (precisionHint) {
@@ -359,6 +361,8 @@ export function PlanScreen({
     [backendDecisionSummary?.whyNotCheapest, candidates],
   );
   const routePrecisionHint =
+    selectedRoutePointPrecisionHint("start", fromPoint) ||
+    selectedRoutePointPrecisionHint("destination", toPoint) ||
     (!fromPoint && from.trim() ? routeInputPrecisionHint("start", from) : "") ||
     (!toPoint && to.trim() ? routeInputPrecisionHint("destination", to) : "");
   const canPlanRoute = Boolean((fromPoint || from.trim()) && (toPoint || to.trim()) && !routePrecisionHint);
@@ -646,6 +650,17 @@ function routeContextNotice(context: ScoreResponse["context"]) {
     return `Using fallback data for ${limited.region}. Do not treat it as a live price recommendation.`;
   }
   return "No live fuel provider covers this route yet.";
+}
+
+function selectedRoutePointPrecisionHint(kind: "destination" | "start", point?: MapPoint) {
+  if (!point) return "";
+  const needsRefinement =
+    point.refineRequired ||
+    point.type === "building" ||
+    point.suggestionType === "base_address";
+  if (!needsRefinement) return "";
+  if (kind === "start") return "Choose or type the exact start unit before planning.";
+  return "Choose or type the exact destination unit before planning.";
 }
 
 function displayLocationLabel(point: MapPoint, fallback: string) {

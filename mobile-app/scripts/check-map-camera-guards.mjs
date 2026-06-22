@@ -32,6 +32,7 @@ const discountPrograms = read("src/data/discountPrograms.ts");
 const fuelPathApi = read("src/api/fuelPathApi.ts");
 const types = read("src/types.ts");
 const locationEvidence = read("src/utils/locationEvidence.ts");
+const locationSuggestionDisplay = read("src/utils/locationSuggestionDisplay.ts");
 const routeCameraInsets = read("src/utils/routeCameraInsets.ts");
 const preferencesStore = read("src/services/preferencesStore.ts");
 const recentLocationsStore = read("src/services/recentLocationsStore.ts");
@@ -536,7 +537,11 @@ const checks = [
       fuelPathApi.includes("Choose a suggestion to confirm this address, or add suburb or postcode.") &&
       fuelPathApi.includes('point.sourceLabel === "Needs confirmation"') &&
       fuelPathApi.includes('point.sourceLabel === "Street/road"') &&
-      fuelPathApi.includes('point.sourceLabel === "Suburb/area"'),
+      fuelPathApi.includes('point.sourceLabel === "Suburb/area"') &&
+      planScreen.includes("selectedRoutePointPrecisionHint") &&
+      planScreen.includes("point.refineRequired") &&
+      planScreen.includes('point.suggestionType === "base_address"') &&
+      planScreen.includes("Choose or type the exact destination unit before planning."),
   },
   {
     label: "plan field browser smoke covers rendered precision states",
@@ -549,8 +554,12 @@ const checks = [
       planFieldSmoke.includes("validation address rows are ranked above POI-like rows") &&
       planFieldSmoke.includes("validation rows keep unconfirmed evidence hidden") &&
       planFieldSmoke.includes("street fallback rows keep street-only evidence hidden") &&
+      planFieldSmoke.includes("building refine rows cannot submit route directly") &&
       planFieldSmoke.includes('assertHiddenText("Street/road")') &&
       planFieldSmoke.includes('assertHiddenText("Not an exact address. Use only if this street or area is enough.")') &&
+      planFieldSmoke.includes("Cairns Central Shopping Centre Shop 22") &&
+      planFieldSmoke.includes('assertText("Building")') &&
+      planFieldSmoke.includes("Choose or type the exact destination unit before planning.") &&
       planFieldSmoke.includes("selecting confirmed From and To unlocks Plan route") &&
       planFieldSmoke.includes("selected broad capital pair can submit route") &&
       planFieldSmoke.includes("airport pair suggestions can submit route") &&
@@ -584,8 +593,8 @@ const checks = [
       !planRouteEditorCard.includes("selectedLocationEvidence") &&
       !routeAddressSuggestions.includes("LocationEvidenceChip") &&
       !routeAddressSuggestions.includes("suggestionNeedsPrecisionDetail") &&
-      routeAddressSuggestions.includes("titleConsumesStreetNumber(parts)") &&
-      routeAddressSuggestions.includes("isStreetNumberFragment") &&
+      locationSuggestionDisplay.includes("titleConsumesStreetNumber(parts)") &&
+      locationSuggestionDisplay.includes("isStreetNumberFragment") &&
       savedPlaceEditor.includes("<LocationEvidenceChip") &&
       savedPlaceEditor.includes("point={suggestion}") &&
       savedPlaceEditor.includes("suggestionNeedsPrecisionDetail(suggestion)") &&
@@ -606,8 +615,8 @@ const checks = [
       nearbyLocationSearch.includes("styles.inputShell") &&
       nearbyLocationSearch.includes("styles.currentLocationButton") &&
       nearbyLocationSearch.includes("locationInputWithIcon") &&
-      nearbyLocationSearch.includes("titleConsumesStreetNumber(parts)") &&
-      nearbyLocationSearch.includes("isStreetNumberFragment") &&
+      locationSuggestionDisplay.includes("titleConsumesStreetNumber(parts)") &&
+      locationSuggestionDisplay.includes("isStreetNumberFragment") &&
       !nearbyLocationSearch.includes("LocationEvidenceChip") &&
       !nearbyLocationSearch.includes("lookupResultEvidence") &&
       !nearbyLocationSearch.includes("suggestionNeedsPrecisionDetail"),

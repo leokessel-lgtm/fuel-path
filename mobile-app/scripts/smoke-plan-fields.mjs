@@ -25,6 +25,14 @@ const validationAddressSuggestions = [
   point("2, George Street, Sydney NSW 2000", -33.8642, 151.2082, "nominatim", "house"),
   point("2 George Street, Brisbane QLD 4000", -27.4716, 153.023, "nominatim", "house"),
 ];
+const buildingRefineSuggestion = {
+  ...point("Cairns Central Shopping Centre, 1-21 Mcleod Street, Cairns City QLD 4870", -16.925, 145.776, "fuel_path_gnaf", "address"),
+  displayTitle: "Cairns Central Shopping Centre",
+  displaySubtitle: "1-21 Mcleod Street, Cairns City QLD 4870",
+  matchType: "building_refine",
+  refineRequired: true,
+  suggestionType: "base_address",
+};
 
 const results = [];
 const apiCalls = [];
@@ -105,6 +113,18 @@ try {
     await assertHiddenText("Street/road");
     await assertHiddenText("Not an exact address. Use only if this street or area is enough.");
     await assertText("Choose a start suggestion to confirm this address.");
+    await assertButtonDisabled("Plan route");
+  });
+
+  await recordCase("building refine rows cannot submit route directly", async () => {
+    await resetApp();
+    await selectSuggestion("From", "Canberra ACT", /Use Canberra ACT/);
+    await fillField("To", "Cairns Central Shopping Centre Shop 22");
+    const suggestion = page.getByRole("button", { name: /Use Cairns Central Shopping Centre/ }).first();
+    await suggestion.waitFor({ state: "visible", timeout: timeoutMs });
+    await assertText("Building");
+    await suggestion.click();
+    await assertText("Choose or type the exact destination unit before planning.");
     await assertButtonDisabled("Plan route");
   });
 
@@ -343,6 +363,7 @@ function suggestionsForQuery(query) {
   if (query === "artamon nsw" || query === "artarmon nsw") return [points.artarmon];
   if (query === "2 george street sydney nsw") return validationAddressSuggestions;
   if (query === "22 paterson street tennant creek nt") return [points.tennantCreekStreet];
+  if (query === "cairns central shopping centre shop 22") return [buildingRefineSuggestion];
   return [];
 }
 

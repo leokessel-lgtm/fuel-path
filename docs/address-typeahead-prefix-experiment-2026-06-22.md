@@ -1914,6 +1914,14 @@ Unit-intent diagnostic rerun:
 - exact top at or after unit intent complete: 1,875
 - exact-top-after-unit-intent delta P50/P90/P95: 6 / 9 / 9
 
+Plan UI safe-refine guard:
+
+- implementation: selected Plan suggestions with `refineRequired`, `type === "building"` or `suggestionType === "base_address"` no longer count as route-ready endpoints
+- rendered smoke case: `building refine rows cannot submit route directly`
+- latest rendered smoke artefact: `tmp/plan-field-browser-smoke-2026-06-22T10-52-52-201Z.md`
+- result: 12/12 Plan field browser smoke cases passed against `http://127.0.0.1:8081/`
+- mobile static guard now requires the selected-refine Plan blocker and the rendered building-refine smoke case
+
 Unit-intent by address family:
 
 | Segment family | Unit intent cases | Unit intent P90 | Unit intent P95 | Exact P90 | Exact P95 | Resolvable P90 | Exact before intent | Top-after-intent delta P90 |
@@ -1941,6 +1949,7 @@ Brutal read on geo-segment metrics:
 - The unit-intent diagnostic explains why: in metro/suburban unit/building rows, unit-intent-complete P90 is also 24. For labels such as `Cairns Central Shopping Centre Shop 22...` or `The Establishment Unit 1203...`, the system cannot safely choose the exact unit before the user has typed the unit term and number.
 - Rural and remote unit intent usually appears much earlier, with unit-intent-complete P90 8. Their exact P90 15 is therefore a smaller post-intent lookup/ranking gap, not the same structural long-building-label problem.
 - The 37 exact-before-intent cases are not a target to optimise aggressively. Some exact rows become safe through address/base evidence before the parsed unit token completes, but treating that as generally safe would re-open sibling-unit risk.
+- The Plan UI guard now matches the benchmark metric: safe base/refine rows may be useful suggestions, but cannot be submitted as route endpoints until the user chooses or types an exact unit/address.
 - Range-address request latency is still visible in all geo segments, especially rural/regional range rows at request P95 83 ms, even though typed-character P90 is fine.
 - The classifier is intentionally simple and benchmark-local. It is evidence segmentation, not a national remoteness taxonomy.
 
@@ -2112,6 +2121,7 @@ What improved:
 - Hosted benchmark output now reports `byGeoSegment`, and the latest 6,400-case staged run includes 1,656 remote and 1,902 rural/regional cases.
 - Hosted benchmark output now reports geo-segment cross tables by address family and category, proving rural/remote unit-building performance separately from metro/suburban unit-building performance.
 - Hosted benchmark output now reports `unitIntentCompleteChars`, making exact-unit P90 failures easier to separate into structurally-too-early versus ranking/index weaknesses.
+- Plan route submission now blocks selected base/building refine suggestions, and the rendered Plan smoke covers that case.
 
 What remains weak:
 
@@ -2145,6 +2155,7 @@ What remains weak:
 - Rural and remote unit/building exact P90 now meets the 15-character target in the staged package, but exact P95 still needs 21 to 22 typed characters. That means the result is good at P90, not a clean exact-unit guarantee.
 - The unit-intent diagnostic proves the metro/suburban exact-unit target is not honestly achievable for many building-first labels at 15 typed characters. Metro/suburban unit/building unit-intent-complete P90 is 24, matching exact P90 24.
 - There is still a post-intent gap: all unit/building rows have top-after-unit-intent delta P90 9. For unit-first rural/remote rows this is the more relevant optimisation target, but it should not be fixed by guessing exact units before the base address is clear.
+- Nearby can still centre on a selected building/base suggestion for nearby-station search. That is less dangerous than Plan route submission, but it should get a deliberate UX decision rather than inheriting Plan's route-safety semantics by accident.
 - `office`-style building names are a known edge case because `office` can be both a building-name word and a unit descriptor.
 - Context-aware ranking depends on Plan/Nearby having a meaningful route/current-map anchor. Cold start address search without context still lands at rural/unit P90 18 in the corrected hosted-contract run.
 - `wrongTopBeforeResolvable` is still high in the typed-prefix harness because many short prefixes are inherently ambiguous before enough context arrives. This is acceptable only if UI state treats those rows as suggestions, not route commitments.

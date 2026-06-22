@@ -247,6 +247,41 @@ Runtime probe against this 994k-row compact build:
 - `1 Hannan Street Kalgoorlie WA` returned the matching address prefix.
 - `125 George Street Sydney NSW` returned no local suggestion because the exact address was not in the 125k NSW sample.
 
+Hosted-contract benchmark against this 994k-row compact build:
+
+- artefact: `tmp/geocode-hosted-national-benchmark-2026-06-22-compact-1m-hosted-address-800.json`
+- mode: module, local compact SQLite, POIs disabled, external provider blocked
+- cases: 800 addresses, 100 per state
+- final top match: 800/800
+- final resolvable top: 800/800
+- exact/resolvable P50/P90/P95: 10 / 15 / 18
+- any-useful-match P50/P90/P95: 10 / 12 / 12
+- unit address exact/resolvable P50/P90/P95: 12 / 15 / 15
+- latency P50/P95: 62 ms / 808 ms
+
+Corrected rural/unit hosted-contract benchmark:
+
+- artefact: `tmp/geocode-hosted-national-benchmark-2026-06-22-compact-1m-hosted-rural-unit-corrected-800.json`
+- profile: `rural-unit`
+- important correction: compact fallback sampling now scopes locality seed matches by state instead of allowing `OR state = ?`, which had made an earlier profile run behave like the balanced sample
+- cases: 800 addresses, including 198 unit addresses, 124 lot addresses and 36 range addresses
+- final top match: 800/800
+- final resolvable top: 800/800
+- exact/resolvable P50/P90/P95: 10 / 18 / 18
+- any-useful-match P50/P90/P95: 10 / 12 / 12
+- unit address exact/resolvable P50/P90/P95: 12 / 15 / 15
+- unit/building family exact/resolvable P50/P90/P95: 12 / 15 / 18
+- latency P50/P95: 127 ms / 927 ms
+
+Brutal read on the hosted-contract runs:
+
+- The balanced hosted-contract run meets the P90 15 target exactly.
+- The corrected rural/unit hosted-contract run does not meet an exact-top P90 15 target overall; it lands at P90 18.
+- The rural/unit miss is concentrated in standard rural street and range addresses where the typed text has not yet included enough locality/context to safely choose between same-number/same-street candidates.
+- Unit/building remains within the target on the corrected rural/unit run: P90 15, final top 198/198 for unit addresses.
+- The useful suggestion is usually present earlier: any-useful-match P90 is 12 in both hosted-contract runs. That is not the same as top exact/resolvable, so it must not be overclaimed.
+- The next product-level improvement is not more blind ranking; it is route/current-region boost evidence that can safely promote the local candidate before the user types the locality.
+
 Rejected storage experiment:
 
 - Prefix dictionary table: storing unique prefix strings once and referencing them by numeric id increased the ACT 100k sample from 98 MB to 108 MB.

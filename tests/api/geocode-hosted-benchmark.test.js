@@ -19,10 +19,20 @@ const ADDRESS_ROWS = [
   ["GATAS0001", "1 Baltonsborough Road, Austins Ferry TAS 7011", "1", "Baltonsborough", "Road", "Austins Ferry", "TAS", "7011", "147.24392043", "-42.7704639"],
   ["GANT0001", "1 Palmerston Circuit, Palmerston City NT 0830", "1", "Palmerston", "Circuit", "Palmerston City", "NT", "0830", "130.98505609", "-12.47843981"],
 ];
+const RURAL_ADDRESS_ROWS = [
+  ["GANSW0101", "40 Napier Street, East Tamworth NSW 2340", "40", "Napier", "Street", "East Tamworth", "NSW", "2340", "150.938", "-31.083"],
+  ["GAACT0101", "21 Lanyon Drive, Tuggeranong ACT 2900", "21", "Lanyon", "Drive", "Tuggeranong", "ACT", "2900", "149.065", "-35.414"],
+  ["GAVIC0101", "37 Lawrence Street, Wodonga VIC 3690", "37", "Lawrence", "Street", "Wodonga", "VIC", "3690", "146.889", "-36.121"],
+  ["GAQLD0101", "18 Swan Street, Longreach QLD 4730", "18", "Swan", "Street", "Longreach", "QLD", "4730", "144.253", "-23.440"],
+  ["GAWA0101", "4603 Basset Road, Karratha WA 6714", "4603", "Basset", "Road", "Karratha", "WA", "6714", "116.846", "-20.736"],
+  ["GASA0101", "10 Kent Street, Coober Pedy SA 5723", "10", "Kent", "Street", "Coober Pedy", "SA", "5723", "134.754", "-29.014"],
+  ["GATAS0101", "20 Alfred Street, Queenstown TAS 7467", "20", "Alfred", "Street", "Queenstown", "TAS", "7467", "145.556", "-42.080"],
+  ["GANT0101", "34 Victoria Highway, Katherine South NT 0850", "34", "Victoria", "Highway", "Katherine South", "NT", "0850", "132.266", "-14.466"],
+];
 
 test("hosted national benchmark runs against an HTTP geocode API contract", async () => {
   const fixture = buildAddressFixture();
-  const api = await startMockGeocodeApi();
+  const api = await startMockGeocodeApi(ADDRESS_ROWS);
   try {
     const { stdout } = await execFileAsync(
       process.execPath,
@@ -63,7 +73,52 @@ test("hosted national benchmark runs against an HTTP geocode API contract", asyn
   }
 });
 
-function buildAddressFixture() {
+test("hosted national benchmark rural-unit profile samples compact rows by locality", async () => {
+  const fixture = buildAddressFixture(RURAL_ADDRESS_ROWS, ["--omit-legacy-fts", "--omit-search-backstop"]);
+  const api = await startMockGeocodeApi(RURAL_ADDRESS_ROWS);
+  try {
+    const { stdout } = await execFileAsync(
+      process.execPath,
+      [
+        "scripts/geocode-hosted-national-benchmark.mjs",
+        "--mode",
+        "http",
+        "--api-base",
+        api.url,
+        "--address-sqlite",
+        fixture.sqlitePath,
+        "--address-count",
+        "8",
+        "--poi-count",
+        "0",
+        "--profile",
+        "rural-unit",
+        "--min-poi-top-rate",
+        "0",
+        "--max-address-p90-chars",
+        "80",
+        "--delay-ms",
+        "0",
+      ],
+      { cwd: ROOT, timeout: 30_000 },
+    );
+    const jsonPath = stdout.match(/"jsonPath": "([^"]+)"/)?.[1];
+    assert.ok(jsonPath, stdout);
+    const result = JSON.parse(fs.readFileSync(path.join(ROOT, jsonPath), "utf8"));
+
+    assert.equal(result.requested.profile, "rural-unit");
+    assert.equal(result.summary.byKind.address.finalTopMatch, 8);
+    assert.deepEqual(
+      result.rows.map((row) => row.expectedLocality).sort(),
+      ["Coober Pedy", "East Tamworth", "Karratha", "Katherine South", "Longreach", "Queenstown", "Tuggeranong", "Wodonga"].sort(),
+    );
+  } finally {
+    await api.close();
+    fs.rmSync(fixture.dir, { recursive: true, force: true });
+  }
+});
+
+function buildAddressFixture(rows = ADDRESS_ROWS, extraArgs = []) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-hosted-benchmark-"));
   const inputPath = path.join(dir, "GNAF_CORE.psv");
   const sqlitePath = path.join(dir, "gnaf-hosted-benchmark.sqlite");
@@ -71,18 +126,18 @@ function buildAddressFixture() {
     inputPath,
     [
       "ADDRESS_DETAIL_PID|ADDRESS_LABEL|NUMBER_FIRST|STREET_NAME|STREET_TYPE|LOCALITY_NAME|STATE|POSTCODE|GEOCODE_TYPE|LONGITUDE|LATITUDE",
-      ...ADDRESS_ROWS.map((row) => row.join("|")),
+      ...rows.map((row) => row.join("|")),
     ].join("\n"),
   );
   execFileSync(
     process.execPath,
-    ["scripts/build-gnaf-address-index.mjs", "--input", inputPath, "--output", sqlitePath],
+    ["scripts/build-gnaf-address-index.mjs", "--input", inputPath, "--output", sqlitePath, ...extraArgs],
     { cwd: ROOT, stdio: "ignore" },
   );
   return { dir, inputPath, sqlitePath };
 }
 
-async function startMockGeocodeApi() {
+async function startMockGeocodeApi(rows = ADDRESS_ROWS) {
   const server = http.createServer((request, response) => {
     const url = new URL(request.url, "http://127.0.0.1");
     if (url.pathname !== "/api/geocode") {
@@ -91,7 +146,7 @@ async function startMockGeocodeApi() {
     }
     const query = url.searchParams.get("q") || "";
     const limit = Math.max(1, Math.min(Number(url.searchParams.get("limit") || 5), 8));
-    const addressSuggestions = ADDRESS_ROWS
+    const addressSuggestions = rows
       .map((row) => ({
         label: row[1],
         state: row[6],

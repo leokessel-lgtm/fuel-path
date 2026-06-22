@@ -21,6 +21,7 @@ const MIN_PREFIX_CHARS = Number(args.minPrefix || process.env.FUEL_PATH_HOSTED_B
 const MIN_ADDRESS_PREFIX_CHARS = Number(args.minAddressPrefix || process.env.FUEL_PATH_HOSTED_BENCHMARK_MIN_ADDRESS_PREFIX || 10);
 const DELAY_MS = Number(args.delayMs || process.env.FUEL_PATH_HOSTED_BENCHMARK_DELAY_MS || (MODE === "http" ? 250 : 0));
 const PROVIDER = args.provider || process.env.FUEL_PATH_GEOCODE_PROVIDER || "nominatim";
+const PROFILE = args.profile || process.env.FUEL_PATH_HOSTED_BENCHMARK_PROFILE || "balanced";
 const EXTERNAL_FAILURE_MODE = args.externalFailure || process.env.FUEL_PATH_HOSTED_BENCHMARK_EXTERNAL_FAILURE || "rate_limit";
 const MIN_ADDRESS_TOP_RATE = Number(args.minAddressTopRate || process.env.FUEL_PATH_HOSTED_BENCHMARK_MIN_ADDRESS_TOP_RATE || 1);
 const MIN_POI_TOP_RATE = Number(args.minPoiTopRate || process.env.FUEL_PATH_HOSTED_BENCHMARK_MIN_POI_TOP_RATE || 0.98);
@@ -103,6 +104,7 @@ const payload = {
   requested: {
     addresses: ADDRESS_COUNT,
     pois: POI_COUNT,
+    profile: PROFILE,
   },
   fetchCalls,
   index: indexEvidence(ADDRESS_SQLITE),
@@ -250,7 +252,7 @@ function sampleAddressCases(sqlitePath, total) {
         `) : database.prepare(`
           SELECT id, label, lat, lon, state, postcode, locality, '' AS search_text
           FROM addresses
-          WHERE label LIKE ? OR locality LIKE ? OR postcode LIKE ? OR state = ?
+          WHERE state = ? AND (label LIKE ? OR locality LIKE ? OR postcode LIKE ?)
           LIMIT 300
         `);
       const seedRows = hasAddressFts
@@ -290,7 +292,7 @@ function addressFallbackParams(seed) {
   const state = text.match(/\b(NSW|ACT|VIC|QLD|WA|SA|TAS|NT)\b/i)?.[1]?.toUpperCase() || "";
   const terms = text.replace(/\b(NSW|ACT|VIC|QLD|WA|SA|TAS|NT)\b/ig, "").trim();
   const like = `%${terms || text}%`;
-  return [like, like, like, state];
+  return [state, like, like, like];
 }
 
 function addressSeedsForState(state) {
@@ -304,7 +306,19 @@ function addressSeedsForState(state) {
     TAS: ["hobart tas", "launceston tas", "queenstown tas", "austins ferry tas", "devonport tas", "burnie tas", "ulverstone tas", "smithton tas"],
     NT: ["darwin nt", "alice springs nt", "palmerston city nt", "tennant creek nt", "katherine nt", "nhulunbuy nt", "yulara nt", "humpty doo nt"],
   };
-  return base[state] || [`${state.toLowerCase()}`];
+  const seeds = base[state] || [`${state.toLowerCase()}`];
+  if (PROFILE !== "rural-unit") return seeds;
+  const ruralFirst = {
+    NSW: ["tamworth nsw", "orange nsw", "wagga wagga nsw", "newcastle nsw", "wollongong nsw"],
+    ACT: ["tuggeranong act", "belconnen act", "gungahlin act", "isabella plains act"],
+    VIC: ["wodonga vic", "traralgon vic", "shepparton vic", "bendigo vic", "ballarat vic"],
+    QLD: ["longreach qld", "cairns qld", "townsville qld", "rockhampton qld", "mackay qld"],
+    WA: ["karratha wa", "broome wa", "kalgoorlie wa", "geraldton wa", "albany wa"],
+    SA: ["coober pedy sa", "mount gambier sa", "port lincoln sa", "whyalla sa", "renmark sa"],
+    TAS: ["queenstown tas", "burnie tas", "devonport tas", "smithton tas", "ulverstone tas"],
+    NT: ["katherine nt", "tennant creek nt", "alice springs nt", "nhulunbuy nt", "humpty doo nt"],
+  };
+  return [...new Set([...(ruralFirst[state] || []), ...seeds])];
 }
 
 function addressSampleQualityPass(row) {

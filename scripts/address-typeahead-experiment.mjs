@@ -105,7 +105,7 @@ function buildExperimentIndex(db, rows) {
       refine_required INTEGER DEFAULT 0,
       unit TEXT,
       rank_weight INTEGER NOT NULL
-    );
+    ) WITHOUT ROWID;
     CREATE VIRTUAL TABLE typeahead_fts USING fts5(
       entry_id UNINDEXED,
       key_text,
@@ -121,7 +121,7 @@ function buildExperimentIndex(db, rows) {
       entry_id TEXT NOT NULL,
       rank_weight INTEGER NOT NULL,
       PRIMARY KEY (prefix, entry_id)
-    );
+    ) WITHOUT ROWID;
   `);
   const insertEntry = db.prepare(`
     INSERT OR REPLACE INTO entries (

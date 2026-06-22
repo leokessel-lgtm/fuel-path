@@ -43,7 +43,7 @@ db.exec(`
     ${includeSearchBackstop ? `,
     search_key TEXT NOT NULL,
     search_text TEXT NOT NULL` : ""}
-  );
+  ) WITHOUT ROWID;
   ${includeLegacyFts ? `CREATE VIRTUAL TABLE address_fts USING fts5(
     id UNINDEXED,
     label,
@@ -76,7 +76,7 @@ db.exec(`
     refine_required INTEGER DEFAULT 0,
     unit TEXT,
     rank_weight INTEGER NOT NULL
-  );
+  ) WITHOUT ROWID;
   CREATE VIRTUAL TABLE address_typeahead_fts USING fts5(
     entry_id UNINDEXED,
     key_text,
@@ -89,7 +89,7 @@ db.exec(`
     entry_id TEXT NOT NULL,
     rank_weight INTEGER NOT NULL,
     PRIMARY KEY (prefix, entry_id)
-  );
+  ) WITHOUT ROWID;
 `);
 
 const insertAddress = db.prepare(`
@@ -443,8 +443,8 @@ function buildTypeaheadEntries({ id, label, structure, display, keys }) {
     {
       entryId: `${id}:exact:label`,
       label,
-      displayTitle: display.title,
-      displaySubtitle: display.subtitle,
+      displayTitle: null,
+      displaySubtitle: null,
       keyText: normaliseAddressText(label),
       prefixKey: normaliseAddressText(label),
       baseSignature,
@@ -458,8 +458,8 @@ function buildTypeaheadEntries({ id, label, structure, display, keys }) {
     entries.push({
       entryId: `${id}:exact:base`,
       label,
-      displayTitle: display.title,
-      displaySubtitle: display.subtitle,
+      displayTitle: null,
+      displaySubtitle: null,
       keyText: [unit, keys.baseKey].filter(Boolean).join(" "),
       prefixKey: [unit, keys.baseKey].filter(Boolean).join(" "),
       baseSignature,

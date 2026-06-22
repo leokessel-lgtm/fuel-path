@@ -11,6 +11,11 @@ module.exports = async function handler(req, res) {
       limit,
       sessionToken: stringParam(req.query.sessionToken),
       provider: stringParam(req.query.provider),
+      searchContext: {
+        nearLat: numberParam(req.query.nearLat, NaN),
+        nearLon: numberParam(req.query.nearLon, NaN),
+        nearRadiusKm: numberParam(req.query.nearRadiusKm, NaN),
+      },
     });
     sendJson(res, 200, payload);
   } catch (error) {

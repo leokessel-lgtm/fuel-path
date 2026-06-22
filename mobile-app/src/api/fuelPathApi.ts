@@ -20,6 +20,11 @@ type GeocodeResponse = {
   warning?: string;
 };
 
+export type LocationSearchContext = {
+  near?: MapPoint;
+  nearRadiusKm?: number;
+};
+
 type RouteResponse = {
   provider: string;
   distanceKm: number;
@@ -130,8 +135,8 @@ export async function getNearbyStations({
   );
 }
 
-export async function geocodeAddress(label: string, sessionToken?: string) {
-  const suggestions = await searchLocations(label, 1, sessionToken);
+export async function geocodeAddress(label: string, sessionToken?: string, context?: LocationSearchContext) {
+  const suggestions = await searchLocations(label, 1, sessionToken, context);
   if (!suggestions[0]) {
     throw new Error("We couldn't find that address. Try a fuller address, suburb or postcode.");
   }
@@ -144,8 +149,8 @@ export async function geocodeAddress(label: string, sessionToken?: string) {
 const locationSearchCache = new Map<string, { expiresAt: number; suggestions: MapPoint[] }>();
 const LOCATION_SEARCH_CACHE_MS = 5 * 60 * 1000;
 
-export async function searchLocations(label: string, limit = 5, sessionToken?: string) {
-  const cacheKey = `${limit}:${label.trim().toLowerCase().replace(/\s+/g, " ")}`;
+export async function searchLocations(label: string, limit = 5, sessionToken?: string, context?: LocationSearchContext) {
+  const cacheKey = `${limit}:${locationSearchContextKey(context)}:${label.trim().toLowerCase().replace(/\s+/g, " ")}`;
   const cached = locationSearchCache.get(cacheKey);
   if (cached && Date.now() < cached.expiresAt) return cached.suggestions;
   if (cached) locationSearchCache.delete(cacheKey);
@@ -153,7 +158,14 @@ export async function searchLocations(label: string, limit = 5, sessionToken?: s
   let payload: GeocodeResponse;
   try {
     payload = await fetchJson<GeocodeResponse>(
-      `/api/geocode?${query({ q: label, limit, sessionToken })}`,
+      `/api/geocode?${query({
+        q: label,
+        limit,
+        sessionToken,
+        nearLat: context?.near?.lat,
+        nearLon: context?.near?.lon,
+        nearRadiusKm: context?.nearRadiusKm,
+      })}`,
     );
   } catch (error) {
     throw new Error(locationLookupErrorMessage(error));
@@ -176,6 +188,15 @@ export async function searchLocations(label: string, limit = 5, sessionToken?: s
     suggestions: decoratedSuggestions,
   });
   return decoratedSuggestions;
+}
+
+function locationSearchContextKey(context?: LocationSearchContext) {
+  if (!context?.near) return "none";
+  return [
+    context.near.lat.toFixed(3),
+    context.near.lon.toFixed(3),
+    Math.round(context.nearRadiusKm || 40),
+  ].join(":");
 }
 
 function locationLookupErrorMessage(error: unknown) {

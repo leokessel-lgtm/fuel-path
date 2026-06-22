@@ -459,6 +459,56 @@ test("hybrid typeahead avoids same-street wrong locality and preserves exact uni
   });
 });
 
+test("geocode search context promotes nearby ambiguous G-NAF address", async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-gnaf-context-rank-"));
+  const inputPath = path.join(tempDir, "GNAF_CORE.psv");
+  const outputPath = path.join(tempDir, "gnaf-context-rank.sqlite");
+  fs.writeFileSync(
+    inputPath,
+    [
+      "ADDRESS_DETAIL_PID|ADDRESS_LABEL|NUMBER_FIRST|STREET_NAME|STREET_TYPE|LOCALITY_NAME|STATE|POSTCODE|GEOCODE_TYPE|LONGITUDE|LATITUDE",
+      "GAWA1001|8 Chamberlain Place, Augusta WA 6290|8|Chamberlain|Place|Augusta|WA|6290|PROPERTY CENTROID|115.159|-34.315",
+      "GAWA1002|8 Chamberlain Place, Heathridge WA 6027|8|Chamberlain|Place|Heathridge|WA|6027|PROPERTY CENTROID|115.763|-31.760",
+    ].join("\n"),
+  );
+
+  execFileSync(
+    process.execPath,
+    [
+      "scripts/build-gnaf-address-index.mjs",
+      "--input",
+      inputPath,
+      "--output",
+      outputPath,
+      "--omit-legacy-fts",
+      "--omit-search-backstop",
+    ],
+    { cwd: path.resolve(__dirname, "../.."), stdio: "ignore" },
+  );
+
+  await withEnv({ FUEL_PATH_GNAF_SQLITE_PATH: outputPath, FUEL_PATH_GEOCODE_PROVIDER: "nominatim" }, async () => {
+    const uncontextualised = await geocode({
+      query: "8 Chamberlain Place",
+      limit: 2,
+      sessionToken: "context-rank-none",
+    });
+    const contextualised = await geocode({
+      query: "8 Chamberlain Place",
+      limit: 2,
+      sessionToken: "context-rank-near",
+      searchContext: {
+        nearLat: -31.760,
+        nearLon: 115.763,
+        nearRadiusKm: 40,
+      },
+    });
+
+    assert.equal(uncontextualised.suggestions[0].label, "8 Chamberlain Place, Augusta WA 6290");
+    assert.equal(contextualised.suggestions[0].label, "8 Chamberlain Place, Heathridge WA 6027");
+    assert.equal(contextualised.suggestions[0].provider, "fuel_path_gnaf");
+  });
+});
+
 test("geocode cache separates seed-only and configured G-NAF index results", async () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-gnaf-cache-mode-"));
   const inputPath = path.join(tempDir, "GNAF_CORE.psv");

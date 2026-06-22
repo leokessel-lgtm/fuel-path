@@ -22,6 +22,8 @@ const MIN_ADDRESS_PREFIX_CHARS = Number(args.minAddressPrefix || process.env.FUE
 const DELAY_MS = Number(args.delayMs || process.env.FUEL_PATH_HOSTED_BENCHMARK_DELAY_MS || (MODE === "http" ? 250 : 0));
 const PROVIDER = args.provider || process.env.FUEL_PATH_GEOCODE_PROVIDER || "nominatim";
 const PROFILE = args.profile || process.env.FUEL_PATH_HOSTED_BENCHMARK_PROFILE || "balanced";
+const CASE_CONTEXT = Boolean(args.caseContext || process.env.FUEL_PATH_HOSTED_BENCHMARK_CASE_CONTEXT === "1");
+const CASE_CONTEXT_RADIUS_KM = Number(args.caseContextRadiusKm || process.env.FUEL_PATH_HOSTED_BENCHMARK_CASE_CONTEXT_RADIUS_KM || 80);
 const EXTERNAL_FAILURE_MODE = args.externalFailure || process.env.FUEL_PATH_HOSTED_BENCHMARK_EXTERNAL_FAILURE || "rate_limit";
 const MIN_ADDRESS_TOP_RATE = Number(args.minAddressTopRate || process.env.FUEL_PATH_HOSTED_BENCHMARK_MIN_ADDRESS_TOP_RATE || 1);
 const MIN_POI_TOP_RATE = Number(args.minPoiTopRate || process.env.FUEL_PATH_HOSTED_BENCHMARK_MIN_POI_TOP_RATE || 0.98);
@@ -105,6 +107,8 @@ const payload = {
     addresses: ADDRESS_COUNT,
     pois: POI_COUNT,
     profile: PROFILE,
+    caseContext: CASE_CONTEXT,
+    caseContextRadiusKm: CASE_CONTEXT ? CASE_CONTEXT_RADIUS_KM : null,
   },
   fetchCalls,
   index: indexEvidence(ADDRESS_SQLITE),
@@ -137,7 +141,7 @@ async function runCase(testCase, index) {
   for (const prefix of prefixes) {
     if (prefix === fullQuery) probedFullQuery = true;
     const started = Date.now();
-    const payload = await geocodeQuery(prefix, index);
+    const payload = await geocodeQuery(prefix, index, testCase);
     elapsedMs += Date.now() - started;
     if (payload?.lookupStatus === "request_timeout") {
       finalPayload = payload;
@@ -160,7 +164,7 @@ async function runCase(testCase, index) {
 
   if (finalPayload?.lookupStatus !== "request_timeout" && !probedFullQuery) {
     const started = Date.now();
-    finalPayload = await geocodeQuery(fullQuery, index);
+    finalPayload = await geocodeQuery(fullQuery, index, testCase);
     elapsedMs += Date.now() - started;
     finalSuggestions = Array.isArray(finalPayload?.suggestions) ? finalPayload.suggestions : [];
   }
@@ -193,13 +197,15 @@ async function runCase(testCase, index) {
   };
 }
 
-async function geocodeQuery(query, index) {
+async function geocodeQuery(query, index, testCase = {}) {
+  const searchContext = caseSearchContext(testCase);
   if (MODE === "module") {
     return geocode({
       query,
       limit: LIMIT,
       sessionToken: `hosted-benchmark-${RUN_ID}-${index}`,
       provider: PROVIDER,
+      searchContext,
     });
   }
   const url = new URL("/api/geocode", API_BASE);
@@ -207,6 +213,11 @@ async function geocodeQuery(query, index) {
   url.searchParams.set("limit", String(LIMIT));
   url.searchParams.set("provider", PROVIDER);
   url.searchParams.set("sessionToken", `hosted-benchmark-${RUN_ID}-${index}`);
+  if (searchContext) {
+    url.searchParams.set("nearLat", String(searchContext.nearLat));
+    url.searchParams.set("nearLon", String(searchContext.nearLon));
+    url.searchParams.set("nearRadiusKm", String(searchContext.nearRadiusKm));
+  }
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   let response;
@@ -222,6 +233,18 @@ async function geocodeQuery(query, index) {
   }
   if (!response.ok) return { suggestions: [], lookupStatus: "http_error", warning: `HTTP ${response.status}` };
   return response.json();
+}
+
+function caseSearchContext(testCase) {
+  if (!CASE_CONTEXT) return null;
+  const nearLat = Number(testCase.expectedLat);
+  const nearLon = Number(testCase.expectedLon);
+  if (!Number.isFinite(nearLat) || !Number.isFinite(nearLon)) return null;
+  return {
+    nearLat,
+    nearLon,
+    nearRadiusKm: CASE_CONTEXT_RADIUS_KM,
+  };
 }
 
 function sampleAddressCases(sqlitePath, total) {
@@ -338,6 +361,8 @@ function addressCaseFromRow(row) {
     query: queryFromAddressLabel(row.label),
     expectedLabel: row.label,
     expectedLocality: row.locality || "",
+    expectedLat: Number(row.lat),
+    expectedLon: Number(row.lon),
     expectedTerms: [row.label, row.locality, row.postcode].filter(Boolean),
     providerExpectation: "fuel_path_gnaf",
   };

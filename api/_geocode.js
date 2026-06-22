@@ -1,5 +1,6 @@
 const { addressIndexStatus, searchAddressIndex } = require("./_addressIndex");
 const { additionalLocalGeocodeHints } = require("./_geocodeHints");
+const { distanceKm } = require("./_geoMath");
 const { providerHealth, providerTimeoutMs } = require("./_providerRuntime");
 const {
   addressrBaseUrl,
@@ -617,6 +618,11 @@ function createGeocoder({ fetchJson, loadStationData }) {
     return String(value || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
   }
 
+  function round(value, decimals = 0) {
+    const factor = 10 ** decimals;
+    return Math.round(Number(value) * factor) / factor;
+  }
+
   function geocodeSuggestionKey(item) {
     return `${Math.round(Number(item.lat) * 100000)}:${Math.round(Number(item.lon) * 100000)}:${normaliseSearchText(item.label).slice(0, 48)}`;
   }
@@ -834,10 +840,11 @@ function createGeocoder({ fetchJson, loadStationData }) {
     return titleCase(value).replace(/\b(Nsw|Act|Nt|Qld|Sa|Tas|Vic|Wa|Ot)\b/g, (match) => match.toUpperCase());
   }
 
-  async function geocode({ query, limit, sessionToken, provider }) {
+  async function geocode({ query, limit, sessionToken, provider, searchContext }) {
     const selectedProvider = selectGeocodeProvider(provider || process.env.FUEL_PATH_GEOCODE_PROVIDER || "auto");
     const addressIndex = addressIndexStatus();
-    const cacheKey = geocodeCacheKey({ provider: selectedProvider, query, limit, addressIndex });
+    const safeSearchContext = normaliseSearchContext(searchContext);
+    const cacheKey = geocodeCacheKey({ provider: selectedProvider, query, limit, addressIndex, searchContext: safeSearchContext });
     const cached = readGeocodeCache(cacheKey);
     if (cached) {
       const cachedCacheMode = cached.lookupStatus === "ok" ? "fresh" : geocodeCacheMode(cached.lookupStatus);
@@ -850,7 +857,8 @@ function createGeocoder({ fetchJson, loadStationData }) {
         sessionToken,
       };
     }
-    const addressSuggestions = await searchAddressIndex(query, limit);
+    const addressLookupLimit = safeSearchContext ? Math.max(limit * 4, 20) : limit;
+    const addressSuggestions = await searchAddressIndex(query, addressLookupLimit);
     const hintSuggestions = localHintGeocode(query, limit);
     const strongHintSuggestions = hintSuggestions.filter(isStrongLocalHintSuggestion);
     const weakHintSuggestions = hintSuggestions.filter((item) => !isStrongLocalHintSuggestion(item));
@@ -868,6 +876,7 @@ function createGeocoder({ fetchJson, loadStationData }) {
         ...stationSuggestions,
       ],
       limit,
+      safeSearchContext,
     );
     let providerSuggestions = [];
     let providerWarning = "";
@@ -907,6 +916,7 @@ function createGeocoder({ fetchJson, loadStationData }) {
       requestedProvider: provider || process.env.FUEL_PATH_GEOCODE_PROVIDER || "auto",
       sessionToken,
       query,
+      ...(safeSearchContext ? { searchContext: safeSearchContext } : {}),
       location: suggestions[0] || null,
       suggestions,
       lookupStatus,
@@ -924,8 +934,8 @@ function createGeocoder({ fetchJson, loadStationData }) {
     return process.env.FUEL_PATH_DISABLE_STATION_GEOCODE === "1";
   }
 
-  function geocodeCacheKey({ provider, query, limit, addressIndex }) {
-    return `${provider}:${limit}:${addressIndexSignature(addressIndex)}:${explicitStateCodeSignature(query)}:${normaliseSearchText(query)}`;
+  function geocodeCacheKey({ provider, query, limit, addressIndex, searchContext }) {
+    return `${provider}:${limit}:${addressIndexSignature(addressIndex)}:${searchContextSignature(searchContext)}:${explicitStateCodeSignature(query)}:${normaliseSearchText(query)}`;
   }
 
   function addressIndexSignature(status) {
@@ -1067,12 +1077,12 @@ function createGeocoder({ fetchJson, loadStationData }) {
     return merged;
   }
 
-  function rankLocalSuggestions(query, items, limit) {
+  function rankLocalSuggestions(query, items, limit, searchContext = null) {
     return items
       .map((item, index) => ({
         item,
         index,
-        score: localSuggestionRank(query, item),
+        score: localSuggestionRank(query, item, searchContext),
       }))
       .sort((left, right) =>
         left.score - right.score ||
@@ -1089,7 +1099,7 @@ function createGeocoder({ fetchJson, loadStationData }) {
       }, []);
   }
 
-  function localSuggestionRank(query, item) {
+  function localSuggestionRank(query, item, searchContext = null) {
     const needle = normaliseSearchText(query);
     const label = normaliseSearchText(item?.label || "");
     const queryStateCode = detectStateCode(query);
@@ -1109,7 +1119,45 @@ function createGeocoder({ fetchJson, loadStationData }) {
     if (regionalPoiNameMatch) score -= 75;
     if (placeIntentMatches(needle, item)) score -= 14;
     if (hasPlaceIntent(needle) && isBroadAreaSuggestion(item) && !placeIntentMatches(needle, item)) score += 10;
+    score -= searchContextBoost(item, searchContext);
     return score;
+  }
+
+  function normaliseSearchContext(value = {}) {
+    if (!value) return null;
+    const lat = Number(value.nearLat);
+    const lon = Number(value.nearLon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+    const radiusKm = Number(value.nearRadiusKm);
+    return {
+      nearLat: round(lat, 5),
+      nearLon: round(lon, 5),
+      nearRadiusKm: Math.max(2, Math.min(300, Number.isFinite(radiusKm) ? radiusKm : 40)),
+    };
+  }
+
+  function searchContextSignature(searchContext) {
+    if (!searchContext) return "context:none";
+    return [
+      "context",
+      searchContext.nearLat.toFixed(3),
+      searchContext.nearLon.toFixed(3),
+      Math.round(searchContext.nearRadiusKm),
+    ].join(":");
+  }
+
+  function searchContextBoost(item, searchContext) {
+    if (!searchContext || item?.provider !== "fuel_path_gnaf") return 0;
+    const lat = Number(item?.lat);
+    const lon = Number(item?.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return 0;
+    const distance = distanceKm({ lat, lon }, { lat: searchContext.nearLat, lon: searchContext.nearLon });
+    if (!Number.isFinite(distance)) return 0;
+    const radius = searchContext.nearRadiusKm;
+    if (distance <= Math.max(2, radius * 0.25)) return 14;
+    if (distance <= radius) return 10;
+    if (distance <= radius * 2) return 4;
+    return 0;
   }
 
   function localMatchTypeRank(matchType) {

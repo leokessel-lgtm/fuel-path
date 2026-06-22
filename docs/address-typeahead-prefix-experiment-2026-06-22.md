@@ -6,7 +6,9 @@ The tested P90 target is now achieved in sampled stress runs, but not yet proven
 
 - rebuilt typeahead FTS is the practical win: sampled hybrid/typeahead P90 is 10 typed characters overall
 - rural/unit-weighted sampled P90 is 10 overall and unit P90 is 12
+- hosted-contract P90 on the 994k compact runtime sample is 15 balanced, 18 rural/unit without nearby context and 12 rural/unit with case-local context
 - compact prefix is only safe as a narrow house-number-first fast path
+- nearby route/current-map context is now used as a small local G-NAF boost, not as a replacement for text evidence
 - building-name, street-name and unit-like input must use typeahead fallback to avoid wrong base suggestions
 - a 994,401-row 8-state compact build now fits in 925 MB, but a full national rebuild is still not proven
 
@@ -282,6 +284,39 @@ Brutal read on the hosted-contract runs:
 - The useful suggestion is usually present earlier: any-useful-match P90 is 12 in both hosted-contract runs. That is not the same as top exact/resolvable, so it must not be overclaimed.
 - The next product-level improvement is not more blind ranking; it is route/current-region boost evidence that can safely promote the local candidate before the user types the locality.
 
+Context-aware hosted-contract benchmark:
+
+- artefact: `tmp/geocode-hosted-national-benchmark-2026-06-22-compact-1m-hosted-rural-unit-context-800.json`
+- profile: `rural-unit`
+- flag: `--case-context --case-context-radius-km 80`
+- implementation path: `/api/geocode` accepts optional `nearLat`, `nearLon` and `nearRadiusKm`; Plan and Nearby pass route/current-map context through `searchLocations` and `geocodeAddress`
+- guardrail: context only gives local G-NAF candidates a modest distance boost after text retrieval; it does not make Google the default provider and does not override exact text evidence
+- cases: 800 addresses, including 198 unit addresses, 124 lot addresses and 36 range addresses
+- final top match: 800/800
+- final resolvable top: 800/800
+- exact/resolvable P50/P90/P95: 10 / 12 / 12
+- any-useful-match P50/P90/P95: 10 / 12 / 12
+- wrong top before resolvable: 109
+- latency P50/P95: 115 ms / 809 ms
+
+Context segment notes:
+
+| Category | Cases | Exact/resolvable P90 | Exact/resolvable P95 |
+| --- | ---: | ---: | ---: |
+| Lot | 124 | 10 | 10 |
+| Range | 36 | 26 | 28 |
+| Street | 430 | 10 | 10 |
+| Suffix | 12 | 10 | 10 |
+| Unit | 198 | 12 | 12 |
+
+Brutal read on context:
+
+- The P90 15 goal is achieved on the rural/unit hosted-contract run when the product has a legitimate nearby context.
+- This is a product-ranker improvement, not a full-text index miracle: it fixes same-number/same-street regional ambiguity by using route/current-map evidence.
+- Range addresses remain the weak tail at P90 26 and P95 28 inside the context run. That tail is small in this sample, but it is real.
+- Context must stay a bounded boost. If it becomes a hard override, it can route users to the wrong same-name address near them.
+- Google remains benchmark/fallback only; this change improves the local-first path.
+
 Rejected storage experiment:
 
 - Prefix dictionary table: storing unique prefix strings once and referencing them by numeric id increased the ACT 100k sample from 98 MB to 108 MB.
@@ -354,9 +389,11 @@ What improved:
 
 - The local SQLite builders now create production-shaped typeahead and optional prefix tables.
 - Hybrid/typeahead achieves the target on sampled stress: P90 10 overall, P90 10 balanced unit cases and P90 12 rural/unit-weighted unit cases.
+- The hosted-contract path now hits P90 12 on the 994k rural/unit sample when valid nearby context is supplied.
 - The runtime no longer treats building/base suggestions as exact route targets; `refine_required` survives into suggestions.
 - Exact address duplicates from multiple typeahead keys are removed in the runtime.
 - The benchmark now reports exact top, resolvable top, wrong-top-before-resolvable, unit P90, latency and index size.
+- The benchmark can now replay case-local context so route/current-map ranking can be measured separately from pure text lookup.
 - A wrong building-name prefix regression was found and fixed by routing non-number-first input through typeahead.
 - A wrong civic-number fallback regression was found and fixed for number-first token-overlap matches.
 - Checkpointing reduced the ACT 100k sample from 345 MB to 290 MB, hybrid-only/no-legacy-FTS reduced it to 215 MB, compact runtime-only reduced it to 141 MB, display/rowid trimming reduced it to 107 MB, key trimming reduced it to 98 MB, and lean prefix checkpoints reduced it to 90 MB.
@@ -370,6 +407,8 @@ What remains weak:
 - Prefix-only continues to fail safety cases: wrong locality, wrong street number, sibling unit/shop and same-site building aliases.
 - The compact runtime-only index is smaller, but removing search backstop columns means benchmark sampling needs a slower label/locality/postcode fallback.
 - Generic unit/building P90 is exactly 15 in the rural/unit-weighted safety rerun. That meets the target, but leaves little margin and the tail is not fully solved.
+- Range addresses remain weak even with context: the hosted rural/unit context run shows range P90 26 and P95 28.
+- Context-aware ranking depends on Plan/Nearby having a meaningful route/current-map anchor. Cold start address search without context still lands at rural/unit P90 18 in the corrected hosted-contract run.
 - `wrongTopBeforeResolvable` is still high in the typed-prefix harness because many short prefixes are inherently ambiguous before enough context arrives. This is acceptable only if UI state treats those rows as suggestions, not route commitments.
 
 Next:
@@ -379,3 +418,4 @@ Next:
 - Measure full-size index bytes, build time and lookup P50/P95 once rebuilt.
 - Run the hosted national benchmark against the rebuilt full index, not just the sampled experiment harness.
 - Add a Plan/Nearby UI smoke case for `refine_required` rows so route submission cannot regress.
+- Add explicit range-address search keys or range-aware rank bonuses if range addresses matter for the next launch slice.

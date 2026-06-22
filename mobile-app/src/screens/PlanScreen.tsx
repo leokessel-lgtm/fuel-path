@@ -86,6 +86,14 @@ export function PlanScreen({
   const [error, setError] = useState("");
   const routeEditVersionRef = useRef(0);
   const routeRequestIdRef = useRef(0);
+  const fromSearchContext = useMemo(
+    () => (toPoint ? { near: toPoint, nearRadiusKm: 80 } : undefined),
+    [toPoint],
+  );
+  const toSearchContext = useMemo(
+    () => (fromPoint ? { near: fromPoint, nearRadiusKm: 80 } : undefined),
+    [fromPoint],
+  );
   const {
     activeAddressField,
     clearAddressSuggestionError,
@@ -97,7 +105,12 @@ export function PlanScreen({
     suggestionsError,
     suggestionsLoading,
     toSuggestions,
-  } = useRouteAddressSuggestions({ from, to });
+  } = useRouteAddressSuggestions({
+    from,
+    fromContext: fromSearchContext,
+    to,
+    toContext: toSearchContext,
+  });
   const eligiblePreferenceDiscounts = eligibleDiscountIds(preferences);
   const approvedPolicyBrands = preferences.fuelPolicyEnabled
     ? preferences.approvedPolicyBrands
@@ -143,11 +156,14 @@ export function PlanScreen({
       const resolvedFromPoint =
         overrideFromPoint ||
         fromPoint ||
-        (await geocodeAddress(from, getAddressSessionToken("from")));
+        (await geocodeAddress(from, getAddressSessionToken("from"), fromSearchContext));
       const resolvedToPoint =
         overrideToPoint ||
         toPoint ||
-        (await geocodeAddress(to, getAddressSessionToken("to")));
+        (await geocodeAddress(to, getAddressSessionToken("to"), {
+          near: resolvedFromPoint,
+          nearRadiusKm: 80,
+        }));
       const route = await getRoute(resolvedFromPoint, resolvedToPoint);
       const score = await scoreRoute({
         approvedPolicyBrands,

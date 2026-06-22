@@ -58,6 +58,10 @@ export function NearbyScreen({
   const [resolvingLocation, setResolvingLocation] = useState(false);
   const [error, setError] = useState("");
   const [stationNotice, setStationNotice] = useState("");
+  const locationSearchContext = useMemo(
+    () => ({ near: centre, nearRadiusKm: Math.max(nearbyRadiusKm, minMapSearchRadiusKm) }),
+    [centre, nearbyRadiusKm],
+  );
   const {
     addRecentLocation,
     clearLocationSearch,
@@ -72,7 +76,7 @@ export function NearbyScreen({
     setLocationQuery,
     suggestionsLoading,
     updateLocationQuery,
-  } = useNearbyLocationSearch();
+  } = useNearbyLocationSearch(locationSearchContext);
 
   useEffect(() => {
     let active = true;
@@ -149,7 +153,7 @@ export function NearbyScreen({
     setResolvingLocation(true);
     setLocationError("");
     try {
-      const location = await geocodeAddress(query, getAddressSessionToken());
+      const location = await geocodeAddress(query, getAddressSessionToken(), locationSearchContext);
       const nextCentre = {
         lat: location.lat,
         lon: location.lon,

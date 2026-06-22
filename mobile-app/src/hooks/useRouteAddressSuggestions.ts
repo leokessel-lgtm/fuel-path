@@ -1,11 +1,21 @@
 import { useEffect, useRef, useState } from "react";
 
-import { searchLocations } from "../api/fuelPathApi";
+import { LocationSearchContext, searchLocations } from "../api/fuelPathApi";
 import { MapPoint } from "../types";
 
 type RouteAddressField = "from" | "to";
 
-export function useRouteAddressSuggestions({ from, to }: { from: string; to: string }) {
+export function useRouteAddressSuggestions({
+  from,
+  fromContext,
+  to,
+  toContext,
+}: {
+  from: string;
+  fromContext?: LocationSearchContext;
+  to: string;
+  toContext?: LocationSearchContext;
+}) {
   const [activeAddressField, setActiveAddressField] = useState<RouteAddressField | null>(null);
   const [fromSuggestions, setFromSuggestions] = useState<MapPoint[]>([]);
   const [toSuggestions, setToSuggestions] = useState<MapPoint[]>([]);
@@ -32,7 +42,12 @@ export function useRouteAddressSuggestions({ from, to }: { from: string; to: str
     setSuggestionsLoading(field);
     setSuggestionsError("");
     const timer = setTimeout(() => {
-      searchLocations(query, 5, addressSessionTokensRef.current[field])
+      searchLocations(
+        query,
+        5,
+        addressSessionTokensRef.current[field],
+        field === "from" ? fromContext : toContext,
+      )
         .then((suggestions) => {
           if (!active) return;
           setAddressSuggestions(field, suggestions);
@@ -51,7 +66,17 @@ export function useRouteAddressSuggestions({ from, to }: { from: string; to: str
       active = false;
       clearTimeout(timer);
     };
-  }, [activeAddressField, from, to]);
+  }, [
+    activeAddressField,
+    from,
+    fromContext?.near?.lat,
+    fromContext?.near?.lon,
+    fromContext?.nearRadiusKm,
+    to,
+    toContext?.near?.lat,
+    toContext?.near?.lon,
+    toContext?.nearRadiusKm,
+  ]);
 
   const clearAddressSuggestionError = () => setSuggestionsError("");
 

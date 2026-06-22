@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 
-import { searchLocations } from "../api/fuelPathApi";
+import { LocationSearchContext, searchLocations } from "../api/fuelPathApi";
 import { MapPoint } from "../types";
 
-export function useNearbyLocationSearch() {
+export function useNearbyLocationSearch(context?: LocationSearchContext) {
   const [locationQuery, setLocationQuery] = useState("");
   const [recentLocations, setRecentLocations] = useState<MapPoint[]>([]);
   const [locationSuggestions, setLocationSuggestions] = useState<MapPoint[]>([]);
@@ -25,7 +25,7 @@ export function useNearbyLocationSearch() {
     setSuggestionsLoading(true);
     setLocationError("");
     const timer = setTimeout(() => {
-      searchLocations(query, 5, addressSessionTokenRef.current)
+      searchLocations(query, 5, addressSessionTokenRef.current, context)
         .then((suggestions) => {
           if (active) setLocationSuggestions(suggestions);
         })
@@ -43,7 +43,7 @@ export function useNearbyLocationSearch() {
       active = false;
       clearTimeout(timer);
     };
-  }, [locationQuery, locationSearchActive]);
+  }, [context?.near?.lat, context?.near?.lon, context?.nearRadiusKm, locationQuery, locationSearchActive]);
 
   const addRecentLocation = (location: MapPoint) => {
     setRecentLocations((current) => {

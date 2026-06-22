@@ -12,6 +12,7 @@ The tested P90 target is now achieved in sampled stress runs, but not yet proven
 - building-name, street-name and unit-like input must use typeahead fallback to avoid wrong base suggestions
 - a 994,401-row 8-state compact build now fits in 925 MB, but a full national rebuild is still not proven
 - a unit-prefix rebuild improves request latency and unit-first exact lookup, but raises the 994,401-row sample to 952 MB
+- metadata trimming reduces the 8-state 200k compact sample from 191 MB to 182 MB while keeping the rural/unit hosted-contract benchmark at overall P90 15
 
 Compact prefix alone is not safe enough. It is fast and reaches low P90 on successful cases, but it can silently pick the wrong locality, sibling unit/shop or same-name building when the first 15 characters are ambiguous.
 
@@ -226,6 +227,8 @@ Measured samples:
 | Lean-prefix runtime-only | `--states ACT --limit-per-state 100000 --omit-legacy-fts --omit-search-backstop` | 90 MB | 326,548 | no |
 | 8-state lean-prefix runtime sample | `--states ACT,NSW,NT,QLD,SA,TAS,VIC,WA --limit-per-state 25000 --omit-legacy-fts --omit-search-backstop` | 191 MB | 685,372 | no |
 | 8-state lean-prefix runtime sample | `--states ACT,NSW,NT,QLD,SA,TAS,VIC,WA --limit-per-state 125000 --omit-legacy-fts --omit-search-backstop` | 925 MB | 3,281,932 | no |
+| Metadata-trim + unit-prefix runtime-only | `--states ACT --limit-per-state 100000 --omit-legacy-fts --omit-search-backstop` | 86 MB | 373,410 | no |
+| 8-state metadata-trim + unit-prefix runtime sample | `--states ACT,NSW,NT,QLD,SA,TAS,VIC,WA --limit-per-state 25000 --omit-legacy-fts --omit-search-backstop` | 182 MB | 787,938 | no |
 
 The lean-prefix runtime-only sample was probed directly with `FUEL_PATH_GNAF_SQLITE_PATH=tmp/gnaf-act-hybrid-runtime-leanprefix-100k.sqlite`. It returned ACT address and unit/building suggestions without `address_fts`, `search_key` or `search_text`, including deduped exact unit results, correct title/subtitle fallback and `address_prefix` evidence for checkpoint prefix hits.
 
@@ -485,6 +488,56 @@ Brutal read on unit prefixes:
 - The target is met, but not beaten: overall and unit/building resolvable P90 are still exactly 15.
 - Exact unit/building P95 is still 22 because the safe exact unit often needs the user to type the unit-specific part. That is acceptable only because the resolvable-path metric counts safe base/refine suggestions separately from exact routing.
 - The storage cost is not free. +27 MB on a 994k-row sample is likely material on a full national rebuild.
+
+## Metadata Trim Rebuild
+
+Follow-up storage improvement:
+
+- `address_typeahead_fts` now stores only `entry_id` and `key_text`
+- `address_prefix_entries` now stores only `prefix` and `entry_id`
+- ranking metadata remains in `address_typeahead_entries`, which the runtime already joins for both FTS and prefix retrieval
+- runtime prefix ordering now uses `address_typeahead_entries.rank_weight` rather than duplicating rank on every prefix row
+- this keeps the same local-first retrieval contract while reducing duplicated metadata in the compact SQLite
+
+Measured rebuilds:
+
+- ACT 100k runtime-only file: `tmp/gnaf-act-hybrid-runtime-metatrim-100k.sqlite`
+- ACT 100k size: 86 MB, down from the previous 90 MB lean-prefix sample despite adding unit-prefix rows
+- ACT 100k rows: 100,000 addresses, 205,068 typeahead rows, 373,410 prefix rows
+- 8-state 200k runtime-only file: `tmp/gnaf-8state-hybrid-runtime-metatrim-200k.sqlite`
+- 8-state 200k size: 182 MB, down from the previous 191 MB lean-prefix sample
+- 8-state 200k rows: 200,000 addresses, 422,626 typeahead rows, 787,938 prefix rows
+
+8-state metadata-trim hosted-contract benchmark:
+
+- artefact: `tmp/geocode-hosted-national-benchmark-2026-06-22-metatrim-200k-rural-unit-context-800.json`
+- profile: `rural-unit`
+- flag: `--case-context --case-context-radius-km 80`
+- cases: 800 addresses
+- final top match: 800/800
+- final resolvable top: 800/800
+- exact top P50/P90/P95: 10 / 15 / 15
+- resolvable top P50/P90/P95: 10 / 15 / 15
+- any-useful-match P50/P90/P95: 10 / 12 / 15
+- wrong top before resolvable: 52
+- cumulative case latency P50/P95: 13 ms / 61 ms
+- request latency P50/P95/max: 1 ms / 30 ms / 84 ms
+
+Metadata-trim unit/building family:
+
+- cases: 191
+- exact top P50/P90/P95: 12 / 18 / 18
+- any-useful-match P50/P90/P95: 12 / 15 / 18
+- resolvable top P50/P90/P95: 12 / 15 / 18
+- request latency P95: 37 ms
+
+Brutal read on metadata trimming:
+
+- This is a clean storage reduction, not a ranking breakthrough.
+- The 8-state 200k sample is smaller than the previous 191 MB lean-prefix build while carrying the extra unit-prefix rows, so the direction is good.
+- The 200k sample is much faster than the 994k sample, but that latency number should not be used as a production claim.
+- Overall hosted-contract P90 still meets 15, but unit/building exact P90 is 18 and unit/building resolvable P95 is 18. Safe refinement remains essential.
+- The full-national footprint is still unproven. This lowers the likely projection, but does not remove the need for a full rebuild or a larger 994k metadata-trim rebuild.
 
 Rejected storage experiment:
 

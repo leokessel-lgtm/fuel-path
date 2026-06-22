@@ -83,15 +83,11 @@ db.exec(`
   ) WITHOUT ROWID;
   CREATE VIRTUAL TABLE address_typeahead_fts USING fts5(
     entry_id UNINDEXED,
-    key_text,
-    entry_type UNINDEXED,
-    refine_required UNINDEXED,
-    rank_weight UNINDEXED
+    key_text
   );
   CREATE TABLE address_prefix_entries (
     prefix TEXT NOT NULL,
     entry_id TEXT NOT NULL,
-    rank_weight INTEGER NOT NULL,
     PRIMARY KEY (prefix, entry_id)
   ) WITHOUT ROWID;
 `);
@@ -120,13 +116,13 @@ const insertTypeaheadEntry = db.prepare(`
 `);
 const insertTypeaheadFts = db.prepare(`
   INSERT INTO address_typeahead_fts (
-    entry_id, key_text, entry_type, refine_required, rank_weight
+    entry_id, key_text
   )
-  VALUES (?, ?, ?, ?, ?)
+  VALUES (?, ?)
 `);
 const insertPrefixEntry = db.prepare(`
-  INSERT OR IGNORE INTO address_prefix_entries (prefix, entry_id, rank_weight)
-  VALUES (?, ?, ?)
+  INSERT OR IGNORE INTO address_prefix_entries (prefix, entry_id)
+  VALUES (?, ?)
 `);
 
 let total = 0;
@@ -224,13 +220,10 @@ for (const state of states) {
       insertTypeaheadFts.run(
         entry.entryId,
         entry.keyText,
-        entry.entryType,
-        entry.refineRequired ? 1 : 0,
-        entry.rankWeight,
       );
       if (shouldMaterialisePrefix(entry)) {
         for (const prefix of compactPrefixes(entry.prefixKey, compactPrefixMode(entry))) {
-          insertPrefixEntry.run(prefix, entry.entryId, entry.rankWeight);
+          insertPrefixEntry.run(prefix, entry.entryId);
         }
       }
     }

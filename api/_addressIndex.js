@@ -275,7 +275,7 @@ function searchSqlitePrefixEntries(database, needle, limit) {
     JOIN address_typeahead_entries e ON e.entry_id = p.entry_id
     JOIN addresses a ON a.id = e.address_id
     WHERE p.prefix = ?
-    ORDER BY p.rank_weight DESC, LENGTH(a.label), a.label
+    ORDER BY e.rank_weight DESC, LENGTH(a.label), a.label
     LIMIT ?
   `).all(prefix, Math.max(1, Math.min(Number(limit) || 5, 20)));
 }

@@ -201,6 +201,7 @@ function searchSqliteIndex(needle, limit) {
 
 function searchSqliteHybridIndex(database, needle, limit) {
   if (queryContainsUnitLikeToken(needle)) {
+    if (!unitLikeQueryReadyForTypeahead(needle)) return [];
     const typeaheadRows = searchSqliteTypeaheadEntries(database, needle, limit);
     return hybridRowsToSuggestions(typeaheadRows, needle);
   }
@@ -659,10 +660,40 @@ const SQLITE_FTS_STOP_TERMS = new Set([
 ]);
 
 const SQLITE_UNIT_TERMS = new Set(["apartment", "apt", "flat", "level", "lvl", "office", "shop", "suite", "townhouse", "unit"]);
+const SQLITE_STREET_TYPE_TERMS = new Set([
+  "avenue",
+  "boulevard",
+  "circuit",
+  "close",
+  "court",
+  "crescent",
+  "drive",
+  "esplanade",
+  "highway",
+  "lane",
+  "parade",
+  "parkway",
+  "place",
+  "road",
+  "square",
+  "street",
+  "terrace",
+  "way",
+]);
 
 function queryContainsUnitLikeToken(needle) {
   const tokens = normaliseAddressText(needle).split(/\s+/).filter(Boolean);
   return tokens.some((token) => SQLITE_UNIT_TERMS.has(token));
+}
+
+function unitLikeQueryReadyForTypeahead(needle) {
+  const tokens = normaliseAddressText(needle).split(/\s+/).filter(Boolean);
+  return tokens.some((token) =>
+    !SQLITE_UNIT_TERMS.has(token) &&
+    !SQLITE_STREET_TYPE_TERMS.has(token) &&
+    !/^\d+[a-z]?$/.test(token) &&
+    token.length >= 3,
+  );
 }
 
 function isStateCode(value) {

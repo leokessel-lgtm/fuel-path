@@ -134,6 +134,7 @@ async function runCase(testCase, index) {
   let finalPayload = null;
   let finalSuggestions = [];
   let elapsedMs = 0;
+  const requestElapsedMs = [];
   let probedFullQuery = false;
   let wrongTopBeforeResolvable = false;
   const fullQuery = testCase.query.trim();
@@ -142,7 +143,9 @@ async function runCase(testCase, index) {
     if (prefix === fullQuery) probedFullQuery = true;
     const started = Date.now();
     const payload = await geocodeQuery(prefix, index, testCase);
-    elapsedMs += Date.now() - started;
+    const requestMs = Date.now() - started;
+    elapsedMs += requestMs;
+    requestElapsedMs.push(requestMs);
     if (payload?.lookupStatus === "request_timeout") {
       finalPayload = payload;
       finalSuggestions = [];
@@ -165,7 +168,9 @@ async function runCase(testCase, index) {
   if (finalPayload?.lookupStatus !== "request_timeout" && !probedFullQuery) {
     const started = Date.now();
     finalPayload = await geocodeQuery(fullQuery, index, testCase);
-    elapsedMs += Date.now() - started;
+    const requestMs = Date.now() - started;
+    elapsedMs += requestMs;
+    requestElapsedMs.push(requestMs);
     finalSuggestions = Array.isArray(finalPayload?.suggestions) ? finalPayload.suggestions : [];
   }
 
@@ -193,6 +198,11 @@ async function runCase(testCase, index) {
     finalLookupStatus: finalPayload?.lookupStatus || "",
     finalWarning: finalPayload?.warning || "",
     elapsedMs,
+    requestCount: requestElapsedMs.length,
+    requestElapsedMs,
+    p50RequestMs: percentile(requestElapsedMs, 50),
+    p95RequestMs: percentile(requestElapsedMs, 95),
+    maxRequestMs: requestElapsedMs.length ? Math.max(...requestElapsedMs) : null,
     result: finalTopMatch ? "top_match" : finalAnyMatch ? "ranked_match" : finalSuggestions.length ? "suggestions_but_not_expected" : "no_suggestion",
   };
 }
@@ -469,22 +479,25 @@ function suggestionResolvesCase(testCase, suggestion) {
 }
 
 function addressParts(value) {
-  const text = String(value || "");
-  const normalised = normalise(text);
+  const normalised = normalise(value);
   const unitMatch = normalised.match(/\b(?:unit|flat|apartment|apt|suite|townhouse|shop|office|offc|level|lvl|kiosk|ksk)\s+([a-z0-9-]+)\b/);
-  const streetMatch = normalised.match(/\b(\d+[a-z]?(?:-\d+[a-z]?)?)\s+([a-z0-9 ]+?)\s+(street|road|avenue|drive|highway|terrace|circuit|way|lane|place|court|crescent|boulevard|parade|parkway|esplanade|square)\b/);
-  const stateMatch = normalised.match(/\b(nsw|act|qld|vic|wa|sa|tas|nt)\b/);
-  const postcodeMatch = normalised.match(/\b(\d{4})\b/);
-  if (!streetMatch || !stateMatch) return null;
-  const beforeState = normalised.slice(0, normalised.lastIndexOf(` ${stateMatch[1]}`)).trim();
-  const locality = beforeState.split(/\b(?:street|road|avenue|drive|highway|terrace|circuit|way|lane|place|court|crescent|boulevard|parade|parkway|esplanade|square)\b/).pop()?.trim() || "";
+  const statePostcodeMatch = normalised.match(/\b(nsw|act|qld|vic|wa|sa|tas|nt)\s+(\d{4})\b/);
+  if (!statePostcodeMatch) return null;
+  const streetSource = normalised.replace(/\b(?:unit|flat|apartment|apt|suite|townhouse|shop|office|offc|level|lvl|kiosk|ksk)\s+[a-z0-9-]+\b/g, " ");
+  const streetPattern = /\b(\d+[a-z]?(?:-\d+[a-z]?)?)\s+([a-z0-9 ]+?)\s+(street|road|avenue|drive|highway|terrace|circuit|way|lane|place|court|crescent|boulevard|parade|parkway|esplanade|square)\b/g;
+  const stateIndex = streetSource.lastIndexOf(` ${statePostcodeMatch[1]}`);
+  const streetMatches = [...streetSource.matchAll(streetPattern)].filter((match) => stateIndex < 0 || match.index < stateIndex);
+  const streetMatch = streetMatches.at(-1);
+  if (!streetMatch) return null;
+  const beforeState = streetSource.slice(0, stateIndex >= 0 ? stateIndex : undefined).trim();
+  const locality = beforeState.slice((streetMatch.index || 0) + streetMatch[0].length).trim();
   return {
     unit: unitMatch?.[1] || "",
     number: streetMatch[1],
     street: `${streetMatch[2].trim()} ${streetMatch[3]}`,
     locality,
-    state: stateMatch[1],
-    postcode: postcodeMatch?.[1] || "",
+    state: statePostcodeMatch[1],
+    postcode: statePostcodeMatch[2],
   };
 }
 
@@ -504,6 +517,7 @@ function summariseGroup(rows) {
   const anyChars = rows.map((row) => row.firstAnyMatchChars).filter(Number.isFinite);
   const resolvableTopChars = rows.map((row) => row.firstResolvableTopChars).filter(Number.isFinite);
   const elapsed = rows.map((row) => row.elapsedMs).filter(Number.isFinite);
+  const requestElapsed = rows.flatMap((row) => Array.isArray(row.requestElapsedMs) ? row.requestElapsedMs : []).filter(Number.isFinite);
   return {
     cases: rows.length,
     finalTopMatch: rows.filter((row) => row.finalTopMatch).length,
@@ -530,6 +544,10 @@ function summariseGroup(rows) {
     p95ResolvableTopChars: percentile(resolvableTopChars, 95),
     p50ElapsedMs: percentile(elapsed, 50),
     p95ElapsedMs: percentile(elapsed, 95),
+    p50RequestMs: percentile(requestElapsed, 50),
+    p95RequestMs: percentile(requestElapsed, 95),
+    maxRequestMs: requestElapsed.length ? Math.max(...requestElapsed) : null,
+    requestLatencySamples: requestElapsed.length,
   };
 }
 
@@ -681,6 +699,10 @@ function toCsv(rows) {
     "finalTopType",
     "finalLookupStatus",
     "elapsedMs",
+    "requestCount",
+    "p50RequestMs",
+    "p95RequestMs",
+    "maxRequestMs",
   ];
   return [headers.join(","), ...rows.map((row) => headers.map((header) => csvEscape(row[header])).join(","))].join("\n");
 }

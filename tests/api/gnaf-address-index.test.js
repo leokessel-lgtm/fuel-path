@@ -557,6 +557,42 @@ test("geocode promotes base refine suggestion for ambiguous building prefixes", 
   });
 });
 
+test("unit-like SQLite queries wait for a meaningful street token before typeahead", async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-gnaf-unit-readiness-"));
+  const inputPath = path.join(tempDir, "GNAF_CORE.psv");
+  const outputPath = path.join(tempDir, "gnaf-unit-readiness.sqlite");
+  fs.writeFileSync(
+    inputPath,
+    [
+      "ADDRESS_DETAIL_PID|ADDRESS_LABEL|FLAT_TYPE|FLAT_NUMBER|NUMBER_FIRST|STREET_NAME|STREET_TYPE|LOCALITY_NAME|STATE|POSTCODE|GEOCODE_TYPE|LONGITUDE|LATITUDE",
+      "GAVIC3001|Unit 1, 1 Stott Court, Wodonga VIC 3690|Unit|1|1|Stott|Court|Wodonga|VIC|3690|PROPERTY CENTROID|146.886|-36.123",
+      "GAVIC3002|Unit 2, 2 Stott Court, Wodonga VIC 3690|Unit|2|2|Stott|Court|Wodonga|VIC|3690|PROPERTY CENTROID|146.887|-36.124",
+    ].join("\n"),
+  );
+
+  execFileSync(
+    process.execPath,
+    [
+      "scripts/build-gnaf-address-index.mjs",
+      "--input",
+      inputPath,
+      "--output",
+      outputPath,
+      "--omit-legacy-fts",
+      "--omit-search-backstop",
+    ],
+    { cwd: path.resolve(__dirname, "../.."), stdio: "ignore" },
+  );
+
+  await withEnv({ FUEL_PATH_GNAF_SQLITE_PATH: outputPath }, async () => {
+    const broadUnit = await searchAddressIndex("Unit 2 2", 3);
+    const exactUnit = await searchAddressIndex("Unit 2 2 Stott", 3);
+
+    assert.deepEqual(broadUnit, []);
+    assert.equal(exactUnit[0].label, "Unit 2, 2 Stott Court, Wodonga VIC 3690");
+  });
+});
+
 test("geocode cache separates seed-only and configured G-NAF index results", async () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-gnaf-cache-mode-"));
   const inputPath = path.join(tempDir, "GNAF_CORE.psv");

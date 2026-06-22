@@ -366,6 +366,54 @@ Corrected brutal read:
 - Resolvable P95 is better than exact P95 because safe base/refine rows can appear before the exact unit/shop. That is acceptable only if the UI continues to prevent direct routing from `refine_required` rows.
 - Latency remains too high for a final product claim: P95 893 ms in the 994k local compact sample, with NT/VIC/unit-heavy segments dragging.
 
+## Unit Broad-Query Latency Guard
+
+Follow-up issue found:
+
+- early unit prefixes such as `Unit 2 2` woke the rebuilt FTS path with very broad tokens like `unit` and `2`
+- the worst rows were genuine unit cases such as `Unit 2, 2 Stott Court, Wodonga VIC 3690`
+- the benchmark's previous latency number was cumulative per case; it did not separate individual request latency from the total cost of probing many prefixes
+
+Fixes:
+
+- unit-like SQLite queries now wait for a meaningful non-numeric, non-street-type token before running typeahead FTS
+- broad `Unit 2 2` returns no local suggestion rather than doing an expensive broad FTS scan
+- `Unit 2 2 Stott` still resolves once the street/building token is present
+- hosted benchmark rows now store per-request timing samples and summary output reports actual request P50/P95
+
+Guarded context-aware hosted-contract benchmark:
+
+- artefact: `tmp/geocode-hosted-national-benchmark-2026-06-22-compact-1m-hosted-rural-unit-context-unitguard-latency-800.json`
+- profile: `rural-unit`
+- flag: `--case-context --case-context-radius-km 80`
+- cases: 800 addresses
+- final top match: 800/800
+- final resolvable top: 800/800
+- exact top P50/P90/P95: 10 / 15 / 18
+- resolvable top P50/P90/P95: 10 / 15 / 15
+- any-useful-match P50/P90/P95: 10 / 15 / 15
+- wrong top before resolvable: 85
+- cumulative case latency P50/P95: 123 ms / 566 ms
+- request latency P50/P95/max: 9 ms / 289 ms / 546 ms
+
+Guarded segment notes:
+
+| Category | Cases | Resolvable P90 | Resolvable P95 | Request P95 |
+| --- | ---: | ---: | ---: | ---: |
+| Lot | 123 | 10 | 10 | 128 ms |
+| Range | 25 | 12 | 12 | 216 ms |
+| Street | 430 | 12 | 18 | 132 ms |
+| Suffix | 12 | 10 | 10 | 50 ms |
+| Unit | 210 | 15 | 15 | 371 ms |
+
+Guarded brutal read:
+
+- This is a real latency improvement: unit request P95 dropped from about 1021 ms in the prior run to 371 ms.
+- The cost is also real: overall and unit/building resolvable P90 moved from 12 to exactly 15.
+- That still meets the stated 15-character target, but leaves no margin.
+- The guard is product-safe because it withholds broad unit suggestions rather than guessing between sibling units.
+- Next improvement should recover unit/building margin without reopening broad `unit + number` FTS scans, probably with compact unit prefix rows or a small exact-unit prefix table.
+
 Rejected storage experiment:
 
 - Prefix dictionary table: storing unique prefix strings once and referencing them by numeric id increased the ACT 100k sample from 98 MB to 108 MB.
@@ -445,8 +493,10 @@ What improved:
 - The benchmark now reports exact top, resolvable top, wrong-top-before-resolvable, unit P90, latency and index size.
 - The benchmark can now replay case-local context so route/current-map ranking can be measured separately from pure text lookup.
 - The benchmark now classifies shop/office/level/kiosk rows as unit/building rather than accidental range addresses.
+- The benchmark now separates cumulative case time from actual per-request P50/P95 latency.
 - A wrong building-name prefix regression was found and fixed by routing non-number-first input through typeahead.
 - A wrong civic-number fallback regression was found and fixed for number-first token-overlap matches.
+- A broad unit-query latency regression was reduced by holding typeahead until a meaningful street/building token is present.
 - Checkpointing reduced the ACT 100k sample from 345 MB to 290 MB, hybrid-only/no-legacy-FTS reduced it to 215 MB, compact runtime-only reduced it to 141 MB, display/rowid trimming reduced it to 107 MB, key trimming reduced it to 98 MB, and lean prefix checkpoints reduced it to 90 MB.
 - The 994,401-row 8-state compact runtime sample came in at 925 MB and passed direct fail-safe probes for missing exact number-first addresses.
 
@@ -457,9 +507,9 @@ What remains weak:
 - The stress harness samples from the national SQLite and the largest compact 8-state build samples 994,401 rows; neither proves full 16.9M-row production size, build time or disk footprint.
 - Prefix-only continues to fail safety cases: wrong locality, wrong street number, sibling unit/shop and same-site building aliases.
 - The compact runtime-only index is smaller, but removing search backstop columns means benchmark sampling needs a slower label/locality/postcode fallback.
-- Generic unit/building P90 is exactly 15 in the rural/unit-weighted safety rerun. That meets the target, but leaves little margin and the tail is not fully solved.
-- Unit/building P95 remains weak in the corrected hosted-context run: exact/resolvable P95 is 22 even though P90 is 12.
-- Latency remains weak in the corrected hosted-context run: overall P95 is 893 ms, with unit/building P95 at 1743 ms.
+- Guarded unit/building P90 is exactly 15. That meets the target, but leaves no margin.
+- Unit/building exact P95 remains weak at 26 because exact shop/unit selection may require typing the specific unit token.
+- Request latency is better but not final-product fast: guarded overall request P95 is 289 ms and unit request P95 is 371 ms on the 994k local compact sample.
 - Context-aware ranking depends on Plan/Nearby having a meaningful route/current-map anchor. Cold start address search without context still lands at rural/unit P90 18 in the corrected hosted-contract run.
 - `wrongTopBeforeResolvable` is still high in the typed-prefix harness because many short prefixes are inherently ambiguous before enough context arrives. This is acceptable only if UI state treats those rows as suggestions, not route commitments.
 
@@ -470,4 +520,5 @@ Next:
 - Measure full-size index bytes, build time and lookup P50/P95 once rebuilt.
 - Run the hosted national benchmark against the rebuilt full index, not just the sampled experiment harness.
 - Add a Plan/Nearby UI smoke case for `refine_required` rows so route submission cannot regress.
-- Attack unit/building P95 and lookup latency before claiming the experience is consistently fast.
+- Recover unit/building P90 margin without reopening broad `unit + number` FTS scans.
+- Reduce request P95 before claiming the experience is consistently fast.

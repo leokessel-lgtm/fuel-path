@@ -10,6 +10,7 @@ const outputPath = path.resolve(args.output || "prototype/data/gnaf-addresses.sq
 const limit = args.limit ? Number(args.limit) : 0;
 const includeLegacyFts = !args.omitLegacyFts;
 const includeSearchBackstop = includeLegacyFts || !args.omitSearchBackstop;
+const SQLITE_LEVEL_MARKER_TERMS = new Set(["fl", "floor", "l", "level", "lvl"]);
 
 if (!fs.existsSync(inputPath)) {
   throw new Error(`Input file does not exist: ${inputPath}`);
@@ -469,6 +470,22 @@ function buildTypeaheadEntries({ id, label, structure, display, keys }) {
       rankWeight: unit ? 940 : 1000,
     });
   }
+  const level = levelText(structure) || levelTextFromLabel(label, unit, keys.baseKey);
+  if (keys.baseKey && unit && level) {
+    entries.push({
+      entryId: `${id}:exact:level-base`,
+      label,
+      displayTitle: null,
+      displaySubtitle: null,
+      keyText: [unit, level, keys.baseKey].filter(Boolean).join(" "),
+      prefixKey: [unit, level, keys.baseKey].filter(Boolean).join(" "),
+      baseSignature,
+      entryType: "exact",
+      refineRequired: false,
+      unit,
+      rankWeight: 945,
+    });
+  }
   if (keys.baseKey && structure.buildingName && !unit) {
     const street = [structure.number || (structure.lot ? `Lot ${structure.lot}` : ""), structure.street].filter(Boolean).join(" ");
     const place = [structure.locality, structure.state, structure.postcode].filter(Boolean).join(" ");
@@ -513,6 +530,23 @@ function unitText(structure) {
   return normaliseAddressText(`${structure.flatType || "Unit"} ${structure.flatNumber}`);
 }
 
+function levelText(structure) {
+  if (!structure.levelNumber) return "";
+  return normaliseAddressText(`${structure.levelType || "Level"} ${structure.levelNumber}`);
+}
+
+function levelTextFromLabel(label, unit, baseSignature) {
+  if (!unit) return "";
+  const base = normaliseAddressText(baseSignature);
+  const parts = String(label || "").split(",").map((part) => normaliseAddressText(part)).filter(Boolean);
+  for (const part of parts) {
+    if (part === unit || part === base || base.startsWith(part)) continue;
+    const tokens = part.split(/\s+/).filter(Boolean);
+    if (SQLITE_LEVEL_MARKER_TERMS.has(tokens[0]) && /^[a-z0-9-]+$/.test(tokens[1] || "")) return part;
+  }
+  return "";
+}
+
 function compactPrefixes(value, mode = "default") {
   const text = normaliseAddressText(value);
   const prefixes = new Set();
@@ -526,6 +560,7 @@ function compactPrefixes(value, mode = "default") {
 function shouldMaterialisePrefix(entry) {
   return entry.entryType === "base_refine" ||
     (String(entry.entryId).endsWith(":exact:base") && (!entry.unit || entry.rankWeight >= 900)) ||
+    (String(entry.entryId).endsWith(":exact:level-base") && entry.unit) ||
     (String(entry.entryId).endsWith(":exact:building") && !entry.unit) ||
     isLotOrRangeExactLabelEntry(entry);
 }

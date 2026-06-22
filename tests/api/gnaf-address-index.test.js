@@ -845,10 +845,25 @@ test("exact unit refinement skips level markers before street number", async () 
   );
 
   await withEnv({ FUEL_PATH_GNAF_SQLITE_PATH: outputPath }, async () => {
+    const sqlite = new DatabaseSync(outputPath, { readOnly: true });
+    const shopLevelPrefixRows = sqlite.prepare("SELECT COUNT(*) AS count FROM address_prefix_entries WHERE prefix = ?").get("shop 9001 l ");
+    const unitLevelPrefixRows = sqlite.prepare("SELECT COUNT(*) AS count FROM address_prefix_entries WHERE prefix = ?").get("unit 9 fl 2 ");
+    sqlite.close();
+
+    const earlyShopLevel = await searchAddressIndex("Shop 9001 L 2", 3);
+    const earlyUnitLevel = await searchAddressIndex("Unit 9 Fl 2", 3);
+    const incompleteUnitLevel = await searchAddressIndex("Unit 9 Fl", 3);
     const shopLevel = await searchAddressIndex("Shop 9001 L 2 20 Benjamin Way Belconnen ACT 2617", 3);
     const unitLevel = await searchAddressIndex("Unit 9 Fl 2 118 Broome Street Cottesloe WA 6011", 3);
     const site = await searchAddressIndex("Site V 87 Airfield Road Traralgon VIC 3844", 3);
 
+    assert.ok(shopLevelPrefixRows.count >= 1);
+    assert.ok(unitLevelPrefixRows.count >= 1);
+    assert.equal(earlyShopLevel[0].label, "Shop 9001, L 2, 20 Benjamin Way, Belconnen ACT 2617");
+    assert.equal(earlyShopLevel[0].refineRequired, false);
+    assert.equal(earlyUnitLevel[0].label, "Unit 9, Fl 2, 118 Broome Street, Cottesloe WA 6011");
+    assert.equal(earlyUnitLevel[0].refineRequired, false);
+    assert.deepEqual(incompleteUnitLevel, []);
     assert.equal(shopLevel[0].label, "Shop 9001, L 2, 20 Benjamin Way, Belconnen ACT 2617");
     assert.equal(shopLevel[0].refineRequired, false);
     assert.equal(unitLevel[0].label, "Unit 9, Fl 2, 118 Broome Street, Cottesloe WA 6011");

@@ -180,6 +180,7 @@ function searchSqliteIndex(needle, limit, searchContext = null) {
   if (sqliteHybridIndexAvailable(database)) {
     const hybridResults = searchSqliteHybridIndex(database, needle, limit, searchContext);
     if (hybridResults.length) return hybridResults;
+    if (queryContainsUnitLikeToken(needle)) return [];
   }
   if (isLargeSqliteIndex(sqlitePath) && !shouldSearchLargeSqliteIndex(needle)) return [];
 
@@ -228,12 +229,13 @@ function searchSqliteHybridIndex(database, needle, limit, searchContext = null) 
   if (queryContainsUnitLikeToken(needle)) {
     const unitLotIntent = queryUnitLotIntent(needle);
     const unitRangePrefixReady = unitLikeRangeQueryReadyForExactPrefix(needle);
-    if (!unitLikeQueryReadyForTypeahead(needle) && !unitRangePrefixReady) return [];
+    const unitLevelPrefixReady = unitLikeLevelQueryReadyForExactPrefix(needle);
+    if (!unitLikeQueryReadyForTypeahead(needle) && !unitRangePrefixReady && !unitLevelPrefixReady) return [];
     const exactUnitRows = searchSqliteExactUnitEntries(database, needle, limit);
     const safeExactUnitRows = filterRowsForUnitLotIntent(exactUnitRows, unitLotIntent);
     if (safeExactUnitRows.length) return hybridRowsToSuggestions(safeExactUnitRows, needle, 960);
     if (unitLikeQueryStartsWithUnitToken(needle)) {
-      if (unitRangePrefixReady && !unitLikeQueryReadyForTypeahead(needle)) {
+      if ((unitRangePrefixReady || unitLevelPrefixReady) && !unitLikeQueryReadyForTypeahead(needle)) {
         const exactPrefixRows = searchSqlitePrefixEntries(database, needle, limit, searchContext, {
           includeTokenBoundaryPrefix: true,
           minPrefixLength: 12,
@@ -430,7 +432,7 @@ function materialisedPrefixesForNeedle(needle, minPrefixLength = 4) {
 
 function materialisedTokenBoundaryPrefixesForNeedle(needle, minPrefixLength = 4) {
   const text = normaliseAddressText(needle);
-  if (!text || text.length < minPrefixLength) return [];
+  if (!text || `${text} `.length < minPrefixLength) return [];
   return [text, `${text} `]
     .filter((prefix) => prefix.length >= minPrefixLength);
 }
@@ -754,6 +756,7 @@ function shouldUseContextualAmbiguousPrefixRows(needle, searchContext) {
   const alphaTokens = tokens.filter((token) =>
     /[a-z]/.test(token) &&
     !SQLITE_UNIT_TERMS.has(token) &&
+    !SQLITE_LEVEL_MARKER_TERMS.has(token) &&
     !SQLITE_STREET_TYPE_TERMS.has(token) &&
     !isStateCode(token),
   );
@@ -1151,6 +1154,7 @@ function unitLikeQueryReadyForTypeahead(needle) {
   const tokens = normaliseAddressText(needle).split(/\s+/).filter(Boolean);
   return tokens.some((token) =>
     !SQLITE_UNIT_TERMS.has(token) &&
+    !SQLITE_LEVEL_MARKER_TERMS.has(token) &&
     !SQLITE_STREET_TYPE_TERMS.has(token) &&
     !/^\d+[a-z]?$/.test(token) &&
     token.length >= 2,
@@ -1165,6 +1169,17 @@ function unitLikeRangeQueryReadyForExactPrefix(needle) {
     .slice(unitIndex + 2)
     .filter((token) => normalisedAddressNumberToken(token));
   return numberTokens.length >= 2;
+}
+
+function unitLikeLevelQueryReadyForExactPrefix(needle) {
+  const tokens = normaliseAddressText(needle).split(/\s+/).filter(Boolean);
+  const unitIndex = tokens.findIndex((token, index) => SQLITE_UNIT_TERMS.has(token) && normalisedUnitNumberToken(tokens[index + 1]));
+  if (unitIndex < 0) return false;
+  return tokens.some((token, index) =>
+    index > unitIndex + 1 &&
+    SQLITE_LEVEL_MARKER_TERMS.has(token) &&
+    normalisedUnitNumberToken(tokens[index + 1]),
+  );
 }
 
 function isQueryUnitLikeToken(token, index, tokens) {

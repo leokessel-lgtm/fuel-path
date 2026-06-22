@@ -118,6 +118,61 @@ test("hosted national benchmark rural-unit profile samples compact rows by local
   }
 });
 
+test("hosted national benchmark counts ranged base-refine rows as resolvable", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-hosted-benchmark-refine-"));
+  const inputPath = path.join(dir, "GNAF_CORE.psv");
+  const sqlitePath = path.join(dir, "gnaf-hosted-benchmark-refine.sqlite");
+  fs.writeFileSync(
+    inputPath,
+    [
+      "ADDRESS_DETAIL_PID|ADDRESS_LABEL|BUILDING_NAME|FLAT_TYPE|FLAT_NUMBER|NUMBER_FIRST|NUMBER_LAST|STREET_NAME|STREET_TYPE|LOCALITY_NAME|STATE|POSTCODE|GEOCODE_TYPE|LONGITUDE|LATITUDE",
+      "GAQLD9001|Buchanan Apartment, Unit 1406, 2-10 Greenslopes Street, Cairns North QLD 4870|Buchanan Apartment|Unit|1406|2|10|Greenslopes|Street|Cairns North|QLD|4870|PROPERTY CENTROID|145.750|-16.910",
+    ].join("\n"),
+  );
+  execFileSync(
+    process.execPath,
+    ["scripts/build-gnaf-address-index.mjs", "--input", inputPath, "--output", sqlitePath, "--omit-legacy-fts", "--omit-search-backstop"],
+    { cwd: ROOT, stdio: "ignore" },
+  );
+  const api = await startRangedRefineApi();
+  try {
+    const { stdout } = await execFileAsync(
+      process.execPath,
+      [
+        "scripts/geocode-hosted-national-benchmark.mjs",
+        "--mode",
+        "http",
+        "--api-base",
+        api.url,
+        "--address-sqlite",
+        sqlitePath,
+        "--address-count",
+        "1",
+        "--poi-count",
+        "0",
+        "--states",
+        "QLD",
+        "--min-poi-top-rate",
+        "0",
+        "--max-address-p90-chars",
+        "80",
+        "--delay-ms",
+        "0",
+      ],
+      { cwd: ROOT, timeout: 30_000 },
+    );
+    const jsonPath = stdout.match(/"jsonPath": "([^"]+)"/)?.[1];
+    assert.ok(jsonPath, stdout);
+    const result = JSON.parse(fs.readFileSync(path.join(ROOT, jsonPath), "utf8"));
+
+    assert.equal(result.rows[0].firstResolvableTopChars, 10);
+    assert.equal(result.rows[0].wrongTopBeforeResolvable, false);
+  } finally {
+    await api.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 function buildAddressFixture(rows = ADDRESS_ROWS, extraArgs = []) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-hosted-benchmark-"));
   const inputPath = path.join(dir, "GNAF_CORE.psv");
@@ -135,6 +190,53 @@ function buildAddressFixture(rows = ADDRESS_ROWS, extraArgs = []) {
     { cwd: ROOT, stdio: "ignore" },
   );
   return { dir, inputPath, sqlitePath };
+}
+
+async function startRangedRefineApi() {
+  const exact = {
+    label: "Buchanan Apartment, Unit 1406, 2-10 Greenslopes Street, Cairns North QLD 4870",
+    state: "QLD",
+    postcode: "4870",
+    lat: -16.91,
+    lon: 145.75,
+    provider: "fuel_path_gnaf",
+    type: "address",
+    matchType: "exact_address",
+    suggestionType: "exact_address",
+  };
+  const refine = {
+    label: "Buchanan Apartment, 2-10 Greenslopes Street, Cairns North QLD 4870",
+    state: "QLD",
+    postcode: "4870",
+    lat: -16.91,
+    lon: 145.75,
+    provider: "fuel_path_gnaf",
+    type: "address",
+    matchType: "building_refine",
+    suggestionType: "base_address",
+    refineRequired: true,
+  };
+  const server = http.createServer((request, response) => {
+    const url = new URL(request.url, "http://127.0.0.1");
+    if (url.pathname !== "/api/geocode") {
+      sendJson(response, 404, { error: "not_found" });
+      return;
+    }
+    const query = url.searchParams.get("q") || "";
+    const suggestions = query.includes("Street") ? [exact] : [refine, exact];
+    sendJson(response, 200, {
+      provider: "test",
+      lookupStatus: "ok",
+      location: suggestions[0],
+      suggestions,
+    });
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  return {
+    url: `http://127.0.0.1:${address.port}`,
+    close: () => new Promise((resolve) => server.close(resolve)),
+  };
 }
 
 async function startMockGeocodeApi(rows = ADDRESS_ROWS) {

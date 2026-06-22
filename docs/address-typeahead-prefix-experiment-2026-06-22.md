@@ -2,19 +2,23 @@
 
 ## TLDR
 
-The tested P90 target is now achieved in sampled stress runs, but not yet proven on a rebuilt full national index:
+The tested P90 target is now achieved in sampled stress runs and in one full national pre-fix run, but the full national retrieval path is still too slow:
 
 - rebuilt typeahead FTS is the practical win: sampled hybrid/typeahead P90 is 10 typed characters overall
 - rural/unit-weighted sampled P90 is 10 overall and unit P90 is 12
 - hosted-contract P90 on the 994k compact runtime sample is 15 balanced, 18 rural/unit without nearby context and 12 rural/unit with case-local context
+- the full national `detail=column` compact runtime build is proven at 16.9M addresses and 14 GB
+- the full national rural/unit context benchmark hit exact/resolvable P90 15, but request P95 was 3.5 seconds and one request reached 31.5 seconds
+- a post-fix full national rerun was aborted after 20 minutes without an artefact; a smaller 120-case rerun was also aborted after 4 minutes without an artefact
 - compact prefix is only safe as a narrow house-number-first fast path
 - nearby route/current-map context is now used as a small local G-NAF boost, not as a replacement for text evidence
 - building-name, street-name and unit-like input must use typeahead fallback to avoid wrong base suggestions
-- a 994,401-row 8-state compact build now fits in 925 MB, but a full national rebuild is still not proven
+- a 994,401-row 8-state compact build fits in 925 MB, and the later full national build fits in 14 GB
 - a unit-prefix rebuild improves request latency and unit-first exact lookup, but raises the 994,401-row sample to 952 MB
 - metadata trimming reduces the 8-state 200k compact sample from 191 MB to 182 MB while keeping the rural/unit hosted-contract benchmark at overall P90 15
 - FTS `detail=column` reduces the 8-state 200k compact sample again to 176 MB without hurting the rural/unit benchmark
 - the larger 994,401-row `detail=column` sample is now 858 MB and keeps rural/unit hosted-contract resolvable P90 at 15
+- number-first address queries no longer give building/base refine rows a broad boost, so nearby exact addresses can beat remote ambiguous complexes
 
 Compact prefix alone is not safe enough. It is fast and reaches low P90 on successful cases, but it can silently pick the wrong locality, sibling unit/shop or same-name building when the first 15 characters are ambiguous.
 
@@ -634,7 +638,7 @@ Brutal read on the larger `detail=column` rebuild:
 - It keeps the core target: overall and unit/building resolvable P90 are still 15.
 - It slightly improves request P95 versus the previous 994k unit-prefix run: 154 ms overall instead of 171 ms, and 193 ms unit request P95 instead of 212 ms.
 - It still does not create margin. P90 is exactly 15, and unit/building exact P95 remains 22.
-- Full national size is still unproven. The 994k sample is a much better proxy than the 200k sample, but not a substitute for a full 16.9M-row rebuild.
+- At this point in the experiment, full national size was still unproven. The later full build resolved size, but not serving latency.
 
 Rejected storage experiment:
 
@@ -646,8 +650,100 @@ Brutal read:
 
 - 90 MB per 100k ACT rows, 191 MB per 200k across 8 states and 925 MB per 994k across 8 states are real improvements, but still project to a large national runtime SQLite.
 - The 994k 8-state sample reduces the risk that the size estimate is ACT-only, but it is still a sample rather than a full 16.9M-row build.
-- The current code is functionally better and safer, but the full national hybrid index is not production-proven yet.
+- The current code is functionally better and safer, but the full national hybrid index is not production-ready yet.
 - The next storage win is to reduce FTS/typeahead duplication or split the mobile/runtime index from the benchmark/sampling index.
+
+## Full National Detail=Column Build
+
+The full compact runtime build completed:
+
+- file: `tmp/gnaf-national-hybrid-runtime-ftscolumn.sqlite`
+- command shape: `--states ACT,NSW,NT,QLD,SA,TAS,VIC,WA --omit-legacy-fts --omit-search-backstop`
+- address rows: 16,900,638
+- SQLite size: 14,150.8 MB
+- `address_typeahead_entries`: 34,415,129 rows
+- `address_prefix_entries`: 59,638,152 rows
+- `address_typeahead_fts`: 34,415,129 rows
+- disk remaining after build: about 36 GiB
+
+State counts from the build output:
+
+| State | Address rows |
+| --- | ---: |
+| ACT | 282,553 |
+| NSW | 5,206,855 |
+| NT | 119,401 |
+| QLD | 3,566,078 |
+| SA | 1,282,166 |
+| TAS | 375,613 |
+| VIC | 4,394,828 |
+| WA | 1,673,144 |
+
+Full national rural/unit context benchmark before the number-first refine-rank fix:
+
+- artefact: `tmp/geocode-hosted-national-benchmark-2026-06-22-fullnational-ftscolumn-rural-unit-context-800.json`
+- profile: `rural-unit`
+- flag: `--case-context --case-context-radius-km 80`
+- cases: 800 addresses
+- final top match: 800/800
+- final resolvable top: 800/800
+- exact top P50/P90/P95: 10 / 15 / 18
+- resolvable top P50/P90/P95: 10 / 15 / 18
+- any-useful-match P50/P90/P95: 10 / 15 / 18
+- wrong top before resolvable: 160
+- cumulative case latency P50/P95: 1323 ms / 8872 ms
+- request latency P50/P95/max: 305 ms / 3482 ms / 31501 ms
+
+Full national segment notes from that run:
+
+| Segment | Cases | Resolvable P90 | Resolvable P95 | Request P95 | Wrong top before resolvable |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Standard address | 660 | 18 | 18 | 2106 ms | 144 |
+| Unit/building address | 140 | 15 | 15 | 6199 ms | 16 |
+| Street address | 556 | 18 | 18 | 2137 ms | 139 |
+| Unit address | 140 | 15 | 15 | 6199 ms | 16 |
+
+State P90 tail:
+
+| State | Resolvable P90 | Resolvable P95 | Request P95 |
+| --- | ---: | ---: | ---: |
+| ACT | 18 | 22 | 1528 ms |
+| NSW | 15 | 15 | 1923 ms |
+| NT | 15 | 15 | 5326 ms |
+| QLD | 18 | 18 | 2027 ms |
+| SA | 10 | 12 | 2446 ms |
+| TAS | 18 | 18 | 2880 ms |
+| VIC | 15 | 15 | 6033 ms |
+| WA | 10 | 12 | 1543 ms |
+
+Number-first refine-rank regression:
+
+- The full national run exposed a ranker bug: `building_refine` rows were strongly promoted for non-specific unit intent, even for number-first street queries.
+- Example: `93 Tamworth S` with context near Abermain could surface a remote Dubbo building/base row ahead of `93 Tamworth Street, Abermain NSW 2326`.
+- Fix: only apply the broad building/base refine boost when the query is not number-first.
+- Regression coverage: `number-first context keeps nearby exact address ahead of remote base refine` in `tests/api/gnaf-address-index.test.js`.
+- Representative probes after the fix:
+  - `93 Tamworth S` near Abermain returns `93 Tamworth Street, Abermain NSW 2326` first.
+  - `85 Falcon Street` near Longreach returns `85 Falcon Street, Longreach QLD 4730` first.
+  - `17 Alfred Street Q` near Queenstown returns `17 Alfred Street, Queenstown TAS 7467` first.
+  - `Karratha City Plaza` still returns a base refine suggestion first.
+  - `2 Stott Court Wodonga` still returns a base refine suggestion first.
+
+Post-fix full national benchmark status:
+
+- 800-case rerun command: `2026-06-22-fullnational-ftscolumn-context-refine-rank-800`
+- result: aborted after about 20 minutes with no JSON artefact
+- smaller 120-case rerun command: `2026-06-22-fullnational-ftscolumn-context-refine-rank-120`
+- result: aborted after about 4 minutes with no JSON artefact
+
+Brutal read on full national:
+
+- Full national build size is now proven, and it is large but locally possible.
+- The character target is technically met overall in the completed full national run: exact and resolvable top P90 are both 15.
+- The result has no useful product margin: standard/street addresses still sit at P90 18 in that run.
+- Unit/building is no longer the character tail in the completed full national run, but it is the latency tail: request P95 is 6.2 seconds.
+- The post-fix full benchmark could not be completed in a bounded turn because the full-index retrieval path is too slow.
+- The next improvement should be retrieval pruning or a smaller serving index, not provider expansion and not more rank-only tuning.
 
 ## Safety Rerun After Civic-Number Guard
 
@@ -718,15 +814,18 @@ What improved:
 - The benchmark now separates cumulative case time from actual per-request P50/P95 latency.
 - A wrong building-name prefix regression was found and fixed by routing non-number-first input through typeahead.
 - A wrong civic-number fallback regression was found and fixed for number-first token-overlap matches.
+- A wrong number-first building-refine ranking regression was found and fixed so nearby exact addresses can beat remote ambiguous base rows.
 - A broad unit-query latency regression was reduced by holding typeahead until a meaningful street/building token is present.
 - Checkpointing reduced the ACT 100k sample from 345 MB to 290 MB, hybrid-only/no-legacy-FTS reduced it to 215 MB, compact runtime-only reduced it to 141 MB, display/rowid trimming reduced it to 107 MB, key trimming reduced it to 98 MB, and lean prefix checkpoints reduced it to 90 MB.
 - The 994,401-row 8-state compact runtime sample came in at 925 MB and passed direct fail-safe probes for missing exact number-first addresses.
+- The full national compact runtime build completed at 16,900,638 addresses and 14,150.8 MB.
 
 What remains weak:
 
-- The existing 12 GB national SQLite file on disk has not been rebuilt with the new hybrid tables. Until it is rebuilt, the live local-national path still falls back to the older broad FTS path.
 - Exact top and resolvable top are now deliberately different for unit/building cases. That is safer, but the UI must continue to prevent one-tap routing from `refine_required` rows.
-- The stress harness samples from the national SQLite and the largest compact 8-state build samples 994,401 rows; neither proves full 16.9M-row production size, build time or disk footprint.
+- The completed full national rural/unit run hit overall exact/resolvable P90 15, but standard/street address P90 remained 18.
+- Full national request latency is not product-ready: request P95 was 3482 ms overall and 6199 ms for unit/building rows in the completed run.
+- Post-fix full national benchmark reruns could not complete in a bounded turn: 800 cases were aborted after about 20 minutes, and 120 cases after about 4 minutes.
 - Prefix-only continues to fail safety cases: wrong locality, wrong street number, sibling unit/shop and same-site building aliases.
 - The compact runtime-only index is smaller, but removing search backstop columns means benchmark sampling needs a slower label/locality/postcode fallback.
 - Guarded unit/building P90 is exactly 15. That meets the target, but leaves no margin.
@@ -737,10 +836,10 @@ What remains weak:
 
 Next:
 
-- Compress FTS/typeahead duplication before another full national rebuild.
-- Rebuild the full national SQLite only after accepting the likely high-teens-GB runtime footprint, or after another FTS/typeahead compression pass.
-- Measure full-size index bytes, build time and lookup P50/P95 once rebuilt.
-- Run the hosted national benchmark against the rebuilt full index, not just the sampled experiment harness.
+- Prune full-index retrieval before more rank-only tuning.
+- Compress or shard FTS/typeahead duplication before treating the 14 GB SQLite as a shipping mobile/runtime asset.
+- Add query-plan timing around prefix, typeahead FTS and fallback phases so the slow full-national requests are attributable.
+- Rerun the hosted national benchmark against the full index only after retrieval pruning, with a hard timeout and progress output.
 - Add a Plan/Nearby UI smoke case for `refine_required` rows so route submission cannot regress.
 - Recover unit/building P90 margin without reopening broad `unit + number` FTS scans.
 - Reduce request P95 before claiming the experience is consistently fast.

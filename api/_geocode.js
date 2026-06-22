@@ -1112,7 +1112,7 @@ function createGeocoder({ fetchJson, loadStationData }) {
     else if (label.startsWith(needle)) score -= 18;
     else if (label.includes(needle)) score -= 4;
     if (!refineRequired && unitIntent === "specific" && labelMatchesUnitIntent(query, item?.label)) score -= 35;
-    if (refineRequired && unitIntent !== "specific") score -= 55;
+    if (refineRequired && unitIntent !== "specific" && !isNumberFirstAddressQuery(needle)) score -= 55;
     if (refineRequired && unitIntent === "specific") score += 45;
     if (item?.provider === "fuel_path_regional_gazetteer" && item?.type === "regional_town" && !hasPlaceIntent(needle)) {
       score -= 10;
@@ -1181,6 +1181,10 @@ function createGeocoder({ fetchJson, loadStationData }) {
     const match = text.match(/\b(?:apartment|apt|flat|level|lvl|office|offc|shop|suite|townhouse|unit)\s+([a-z0-9-]+)\b/);
     if (!match) return "none";
     return match[1].length >= 2 ? "specific" : "partial";
+  }
+
+  function isNumberFirstAddressQuery(needle) {
+    return /^\d+[a-z]?(?:-\d+[a-z]?)?\b/.test(normaliseSearchText(needle));
   }
 
   function labelMatchesUnitIntent(query, label) {

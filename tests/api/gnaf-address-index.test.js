@@ -558,6 +558,55 @@ test("geocode promotes base refine suggestion for ambiguous building prefixes", 
   });
 });
 
+test("number-first context keeps nearby exact address ahead of remote base refine", async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-gnaf-refine-number-context-"));
+  const inputPath = path.join(tempDir, "GNAF_CORE.psv");
+  const outputPath = path.join(tempDir, "gnaf-refine-number-context.sqlite");
+  fs.writeFileSync(
+    inputPath,
+    [
+      "ADDRESS_DETAIL_PID|ADDRESS_LABEL|BUILDING_NAME|FLAT_TYPE|FLAT_NUMBER|NUMBER_FIRST|STREET_NAME|STREET_TYPE|LOCALITY_NAME|STATE|POSTCODE|GEOCODE_TYPE|LONGITUDE|LATITUDE",
+      "GANSW3001|Tamworth Shops, Shop 1, 93 Tamworth Street, Dubbo NSW 2830|Tamworth Shops|Shop|1|93|Tamworth|Street|Dubbo|NSW|2830|PROPERTY CENTROID|148.601|-32.244",
+      "GANSW3002|Tamworth Shops, Shop 2, 93 Tamworth Street, Dubbo NSW 2830|Tamworth Shops|Shop|2|93|Tamworth|Street|Dubbo|NSW|2830|PROPERTY CENTROID|148.6011|-32.2441",
+      "GANSW3003|Tamworth Shops, Shop 3, 93 Tamworth Street, Dubbo NSW 2830|Tamworth Shops|Shop|3|93|Tamworth|Street|Dubbo|NSW|2830|PROPERTY CENTROID|148.6012|-32.2442",
+      "GANSW3004|93 Tamworth Street, Abermain NSW 2326||||93|Tamworth|Street|Abermain|NSW|2326|PROPERTY CENTROID|151.428|-32.807",
+    ].join("\n"),
+  );
+
+  execFileSync(
+    process.execPath,
+    [
+      "scripts/build-gnaf-address-index.mjs",
+      "--input",
+      inputPath,
+      "--output",
+      outputPath,
+      "--omit-legacy-fts",
+      "--omit-search-backstop",
+    ],
+    { cwd: path.resolve(__dirname, "../.."), stdio: "ignore" },
+  );
+
+  await withEnv({ FUEL_PATH_GNAF_SQLITE_PATH: outputPath, FUEL_PATH_GEOCODE_PROVIDER: "nominatim" }, async () => {
+    const contextualised = await geocode({
+      query: "93 Tamworth S",
+      limit: 5,
+      sessionToken: "refine-number-context",
+      searchContext: {
+        nearLat: -32.807,
+        nearLon: 151.428,
+        nearRadiusKm: 80,
+      },
+    });
+    const buildingRefine = contextualised.suggestions.find((suggestion) => suggestion.matchType === "building_refine");
+
+    assert.equal(contextualised.suggestions[0].label, "93 Tamworth Street, Abermain NSW 2326");
+    assert.equal(contextualised.suggestions[0].refineRequired, false);
+    assert.ok(buildingRefine);
+    assert.notEqual(buildingRefine.label, contextualised.suggestions[0].label);
+  });
+});
+
 test("unit-like SQLite queries wait for a meaningful street token before typeahead", async () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-gnaf-unit-readiness-"));
   const inputPath = path.join(tempDir, "GNAF_CORE.psv");

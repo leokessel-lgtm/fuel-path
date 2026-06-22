@@ -814,6 +814,51 @@ test("lot and range exact labels materialise compact prefix rows", async () => {
   });
 });
 
+test("L-number address labels use contextual compact prefix rows", async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-gnaf-l-number-prefix-"));
+  const inputPath = path.join(tempDir, "GNAF_CORE.psv");
+  const outputPath = path.join(tempDir, "gnaf-l-number-prefix.sqlite");
+  fs.writeFileSync(
+    inputPath,
+    [
+      "ADDRESS_DETAIL_PID|ADDRESS_LABEL|FLAT_TYPE|FLAT_NUMBER|NUMBER_FIRST|STREET_NAME|STREET_TYPE|LOCALITY_NAME|STATE|POSTCODE|GEOCODE_TYPE|LONGITUDE|LATITUDE",
+      "GASA6101|L41 Hutchison Street, Coober Pedy SA 5723|||L41|Hutchison|Street|Coober Pedy|SA|5723|PROPERTY CENTROID|134.754|-29.013",
+      "GASA6102|Unit 1, L41 Hutchison Street, Coober Pedy SA 5723|Unit|1|L41|Hutchison|Street|Coober Pedy|SA|5723|PROPERTY CENTROID|134.755|-29.014",
+      "GANSW6103|L41 Bucky Springs Road, Coolumbooka NSW 2632|||L41|Bucky Springs|Road|Coolumbooka|NSW|2632|PROPERTY CENTROID|149.390|-36.820",
+    ].join("\n"),
+  );
+
+  execFileSync(
+    process.execPath,
+    [
+      "scripts/build-gnaf-address-index.mjs",
+      "--input",
+      inputPath,
+      "--output",
+      outputPath,
+      "--omit-legacy-fts",
+      "--omit-search-backstop",
+    ],
+    { cwd: path.resolve(__dirname, "../.."), stdio: "ignore" },
+  );
+
+  await withEnv({ FUEL_PATH_GNAF_SQLITE_PATH: outputPath }, async () => {
+    const uncontextualised = await searchAddressIndex("L41", 3);
+    const contextualised = await searchAddressIndex("L41 Hut", 3, {
+      searchContext: {
+        nearLat: -29.013,
+        nearLon: 134.754,
+      },
+    });
+    const specific = await searchAddressIndex("L41 Hutchiso", 3);
+
+    assert.deepEqual(uncontextualised, []);
+    assert.equal(contextualised[0].label, "L41 Hutchison Street, Coober Pedy SA 5723");
+    assert.equal(contextualised[0].refineRequired, false);
+    assert.equal(specific[0].label, "L41 Hutchison Street, Coober Pedy SA 5723");
+  });
+});
+
 test("geocode cache separates seed-only and configured G-NAF index results", async () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-gnaf-cache-mode-"));
   const inputPath = path.join(tempDir, "GNAF_CORE.psv");

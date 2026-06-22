@@ -14,6 +14,7 @@ The tested resolvable P90 target is now achieved in sampled stress runs and boun
 - after slimming that exact-unit index to a partial exact-unit-only index and short-circuiting SQLite variant searches after a safe exact unit hit, the same 400-case full-national run kept exact/resolvable P90 15 and reduced request P95 to 1.06 seconds
 - after allowing nearby route/current-map context to break typeahead ties, the same 400-case run improved overall resolvable P90 from 15 to 12 and request P95 from 1.06 seconds to 917 ms
 - after routing contextual `Lot ...` queries through guarded compact prefix, the same 400-case run kept resolvable P90 12 and reduced request P95 to 762 ms
+- after extending the same guarded compact prefix path to `L<number> ...` address labels, the same 400-case run kept resolvable P90 12 and reduced request P95 to 469 ms
 - unit/building resolvable P90 is still 15 in that 400-case run, and exact unit/building P90 is still 28
 - the broad exact-unit index raised the full national temp runtime from about 14 GB to about 16 GB; the partial-index temp file still occupies 16 GB until rebuilt/vacuumed, but currently reports about 1.97 GB free pages after dropping the broad index
 - compact prefix is only safe as a narrow house-number-first fast path
@@ -28,6 +29,7 @@ The tested resolvable P90 target is now achieved in sampled stress runs and boun
 - compact-runtime benchmark sampling now uses typeahead FTS rather than broad label scans
 - typeahead FTS now uses nearby context as a tie-breaker after text class and stored rank, which helps same-name building/address rows without making Google or broad region bias the default
 - contextual `Lot ...` lookups now use compact prefix before FTS, cutting the lot-address latency tail in the full-national stress run
+- contextual `L<number> ...` labels now use compact prefix before FTS once a street token is present, cutting the SA latency tail without treating bare `L41` as safe
 
 Compact prefix alone is not safe enough. It is fast and reaches low P90 on successful cases, but it can silently pick the wrong locality, sibling unit/shop or same-name building when the first 15 characters are ambiguous.
 
@@ -1062,14 +1064,65 @@ Brutal read on the lot-prefix pass:
 - SA remains the typed-character tail, mostly due `L...` Coober Pedy labels that are not yet treated as lot-style prefixes.
 - Unit/building exact P90 is unchanged at 28.
 
+## Contextual L-Number Prefix Fast Path
+
+The SA tail showed many Coober Pedy labels like `L41 Hutchison Street`. These are G-NAF base-address labels with unit siblings, not ordinary street numbers. The prefix table already had usable rows at stored checkpoints, but runtime treated `L41...` as generic text and paid FTS for every prefix/full-query check.
+
+Implementation:
+
+- `L<number> ...` queries now share the guarded lot-style prefix route
+- bare `L41` stays unsafe when ambiguous; the fixture proves it returns no result without a street token
+- contextual `L41 Hut` can resolve through compact prefix because the query now has a street token and nearby context
+- fixture coverage verifies the `L41 Hutchison Street` base row stays exact while the unit sibling remains a refine option
+
+Direct national probes after runtime `L<number>` prefix routing:
+
+| Query | Before | After | Top result |
+| --- | ---: | ---: | --- |
+| `L41 Hutchison Street Coober Pedy SA 5723` | 826 ms | 1 ms | exact L41 Hutchison |
+| `L441 Ward Street Coober Pedy SA 5723` | 814 ms | 1 ms | exact L441 Ward |
+| `L667 Brewster Street Coober Pedy SA 5723` | 787 ms | 1 ms | exact L667 Brewster |
+| `L825 Paxton Road Coober Pedy SA 5723` | similar FTS tail | 1 ms | exact L825 Paxton |
+
+Full-national 400-case L-number-prefix stress:
+
+- artefact: `tmp/geocode-hosted-national-benchmark-2026-06-22-fullnational-l-number-prefix-400.json`
+- profile: `rural-unit`
+- flag: `--case-context --case-context-radius-km 80`
+- cases: 400 addresses
+- final top/resolvable: 400/400
+- exact top P50/P90/P95: 10 / 15 / 22
+- resolvable top P50/P90/P95: 10 / 12 / 15
+- wrong top before resolvable: 26
+- request latency P50/P95/max: 1 ms / 469 ms / 3590 ms
+
+400-case L-number-prefix segment notes:
+
+| Segment | Cases | Exact P90 | Resolvable P90 | Resolvable P95 | Request P95 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Standard address | 336 | 10 | 10 | 12 | 208 ms |
+| Unit/building address | 64 | 28 | 15 | 15 | 758 ms |
+| Street address | 264 | 10 | 10 | 15 | 169 ms |
+| Unit address | 63 | 28 | 15 | 15 | 776 ms |
+| Lot address | 45 | 10 | 10 | 10 | 408 ms |
+| Range address | 17 | 10 | 10 | 12 | 3160 ms |
+
+Brutal read on the L-number pass:
+
+- This is another real latency improvement: overall request P95 moved from 762 ms to 469 ms.
+- It specifically fixes the SA latency tail: SA request P95 moved from 981 ms in the context-typeahead run to 30 ms.
+- It does not fix SA typed-character P90. The Coober Pedy rows still only become exact/resolvable late because short `L<number>` prefixes are genuinely ambiguous across states and same-base unit siblings.
+- It does not fix range latency. The current temp DB still lacks the fresh range exact-label prefix rebuild needed to prove that slice.
+- Unit/building exact P90 remains 28.
+
 Brutal read on full national:
 
 - Full national build size is now proven, and it is large but locally possible.
 - The 120-case full-national stress now completes, where the previous equivalent run did not produce an artefact.
-- The wider 400-case lot-prefix run is now the best read: final top/resolvable is 400/400, exact P90 is 15 and resolvable P90 is 12.
+- The wider 400-case L-number-prefix run is now the best read: final top/resolvable is 400/400, exact P90 is 15 and resolvable P90 is 12.
 - Unit/building resolvable P90 is 15, but exact unit/building P90 is still 28.
-- Latency is materially better than the earlier full-national run, but still not fully product-ready: the latest lot-prefix 400-case run is request P95 762 ms overall and 760 ms for unit/building rows.
-- SA remains the exact typed-character tail, ACT improved on resolvable P90, and range/unit/building rows remain latency tails.
+- Latency is materially better than the earlier full-national run: the latest L-number-prefix 400-case run is request P95 469 ms overall, but unit/building P95 remains 758 ms and range P95 remains 3160 ms.
+- SA remains the exact typed-character tail, ACT improved on resolvable P90, and range/unit/building rows remain the main latency tails.
 - The next improvement should target serving shape and packaging, not provider expansion.
 
 ## Safety Rerun After Civic-Number Guard
@@ -1153,12 +1206,13 @@ What improved:
 - The latest partial-index rerun kept overall and unit/building resolvable P90 15 while improving request P95 versus the broad exact-unit index.
 - The latest context-typeahead rerun improved overall resolvable P90 to 12, reduced wrong-top-before-resolvable to 27, and reduced request P95 to 917 ms.
 - The latest lot-prefix rerun kept overall resolvable P90 at 12, reduced wrong-top-before-resolvable to 26, reduced request P95 to 762 ms, and cut lot-address request P95 to 281 ms.
+- The latest L-number-prefix rerun kept overall resolvable P90 at 12, kept wrong-top-before-resolvable at 26, reduced request P95 to 469 ms, and cut SA request P95 to 30 ms.
 
 What remains weak:
 
 - Exact top and resolvable top are now deliberately different for unit/building cases. That is safer, but the UI must continue to prevent one-tap routing from `refine_required` rows.
 - The latest full-national 400-case run hit overall exact P90 15 and resolvable P90 12, but exact unit/building P90 remained 28.
-- Full national request latency is improved but not fully product-ready: latest request P95 was 762 ms overall and 760 ms for unit/building rows.
+- Full national request latency is improved but not fully product-ready: latest request P95 was 469 ms overall, 758 ms for unit/building rows and 3160 ms for range rows.
 - The broad exact-unit index raised the full-national temp runtime footprint from about 14 GB to about 16 GB; the partial-index temp file still needs rebuild/vacuum evidence before claiming a smaller packaged size.
 - The 800-case post-ranker full-national run still has not been rerun successfully after the sampler/prefix/exact-unit fixes.
 - Prefix-only continues to fail safety cases: wrong locality, wrong street number, sibling unit/shop and same-site building aliases.
@@ -1178,4 +1232,3 @@ Next:
 - Add a Plan/Nearby UI smoke case for `refine_required` rows so route submission cannot regress.
 - Recover exact unit/building P90 margin without reopening broad `unit + number` FTS scans.
 - Rebuild the full national runtime with range exact-label prefixes and re-measure range request P95.
-- Treat `L...` Coober Pedy labels as lot-style structured prefixes if source evidence confirms that interpretation.

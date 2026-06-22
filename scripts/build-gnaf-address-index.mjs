@@ -503,7 +503,14 @@ function compactPrefixes(value, mode = "default") {
 
 function shouldMaterialisePrefix(entry) {
   return entry.entryType === "base_refine" ||
-    (String(entry.entryId).endsWith(":exact:base") && (!entry.unit || entry.rankWeight >= 900));
+    (String(entry.entryId).endsWith(":exact:base") && (!entry.unit || entry.rankWeight >= 900)) ||
+    isLotOrRangeExactLabelEntry(entry);
+}
+
+function isLotOrRangeExactLabelEntry(entry) {
+  if (entry.entryType !== "exact" || entry.unit || !String(entry.entryId).endsWith(":exact:label")) return false;
+  const key = normaliseAddressText(entry.keyText);
+  return /^lot [a-z0-9-]+ /.test(key) || /^\d+ \d+ [a-z]/.test(key);
 }
 
 function compactPrefixMode(entry) {

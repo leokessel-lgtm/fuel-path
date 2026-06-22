@@ -771,6 +771,49 @@ test("unit-like SQLite queries wait for a meaningful street token before typeahe
   });
 });
 
+test("lot and range exact labels materialise compact prefix rows", async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-gnaf-lot-range-prefix-"));
+  const inputPath = path.join(tempDir, "GNAF_CORE.psv");
+  const outputPath = path.join(tempDir, "gnaf-lot-range-prefix.sqlite");
+  fs.writeFileSync(
+    inputPath,
+    [
+      "ADDRESS_DETAIL_PID|ADDRESS_LABEL|NUMBER_FIRST|NUMBER_LAST|LOT_NUMBER|STREET_NAME|STREET_TYPE|LOCALITY_NAME|STATE|POSTCODE|GEOCODE_TYPE|LONGITUDE|LATITUDE",
+      "GAQLD6001|Lot 2, Cassowary Street, Longreach QLD 4730|||2|Cassowary|Street|Longreach|QLD|4730|PROPERTY CENTROID|144.250|-23.440",
+      "GAQLD6002|112-120 Spoonbill Street, Longreach QLD 4730|112|120||Spoonbill|Street|Longreach|QLD|4730|PROPERTY CENTROID|144.251|-23.441",
+    ].join("\n"),
+  );
+
+  execFileSync(
+    process.execPath,
+    [
+      "scripts/build-gnaf-address-index.mjs",
+      "--input",
+      inputPath,
+      "--output",
+      outputPath,
+      "--omit-legacy-fts",
+      "--omit-search-backstop",
+    ],
+    { cwd: path.resolve(__dirname, "../.."), stdio: "ignore" },
+  );
+
+  await withEnv({ FUEL_PATH_GNAF_SQLITE_PATH: outputPath }, async () => {
+    const sqlite = new DatabaseSync(outputPath, { readOnly: true });
+    const lotPrefixRows = sqlite.prepare("SELECT COUNT(*) AS count FROM address_prefix_entries WHERE prefix = ?").get("lot 2 ca");
+    const rangePrefixRows = sqlite.prepare("SELECT COUNT(*) AS count FROM address_prefix_entries WHERE prefix = ?").get("112 120 ");
+    sqlite.close();
+
+    const lotSuggestions = await searchAddressIndex("Lot 2 Ca", 3);
+    const rangeSuggestions = await searchAddressIndex("112-120 Sp", 3);
+
+    assert.ok(lotPrefixRows.count >= 1);
+    assert.ok(rangePrefixRows.count >= 1);
+    assert.equal(lotSuggestions[0].label, "Lot 2, Cassowary Street, Longreach QLD 4730");
+    assert.equal(rangeSuggestions[0].label, "112-120 Spoonbill Street, Longreach QLD 4730");
+  });
+});
+
 test("geocode cache separates seed-only and configured G-NAF index results", async () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-gnaf-cache-mode-"));
   const inputPath = path.join(tempDir, "GNAF_CORE.psv");

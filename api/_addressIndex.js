@@ -239,6 +239,12 @@ function searchSqliteHybridIndex(database, needle, limit, searchContext = null) 
     return hybridRowsToSuggestions(typeaheadRows, needle);
   }
   if (!/^\d/.test(needle)) {
+    if (queryStartsWithLotToken(needle)) {
+      const prefixRows = searchSqlitePrefixEntries(database, needle, limit, searchContext);
+      if (prefixRows.length && (!prefixRowsAmbiguous(prefixRows) || shouldUseContextualAmbiguousPrefixRows(needle, searchContext))) {
+        return hybridRowsToSuggestions(prefixRows, needle, 950);
+      }
+    }
     const typeaheadRows = searchSqliteTypeaheadEntries(database, needle, limit, searchContext);
     return hybridRowsToSuggestions(typeaheadRows, needle);
   }
@@ -487,6 +493,10 @@ function normalisedUnitNumberToken(value) {
 function normalisedAddressNumberToken(value) {
   const match = String(value || "").toLowerCase().match(/^(?:lot\s*)?[a-z]?\d+[a-z]?(?:-\d+[a-z]?)?$/);
   return match ? match[0] : "";
+}
+
+function queryStartsWithLotToken(needle) {
+  return /^lot\s+[a-z0-9-]+(?:\s|$)/.test(normaliseAddressText(needle));
 }
 
 function prefixRowsAmbiguous(rows) {

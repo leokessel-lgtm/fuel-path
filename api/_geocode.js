@@ -1,7 +1,7 @@
 const { addressIndexStatus, searchAddressIndex } = require("./_addressIndex");
 const { additionalLocalGeocodeHints } = require("./_geocodeHints");
 const { distanceKm } = require("./_geoMath");
-const { providerHealth, providerTimeoutMs } = require("./_providerRuntime");
+const { providerHealth, providerTimeoutMs, withProviderRetries } = require("./_providerRuntime");
 const {
   addressrBaseUrl,
   addressrHeaders,
@@ -40,6 +40,7 @@ function createGeocoder({ fetchJson, loadStationData }) {
 
   const GEOCODE_QUERY_CORRECTIONS = {
     artamon: "artarmon",
+    eston: "easton",
   };
 
   const LOCAL_GEOCODE_HINTS = [
@@ -146,7 +147,7 @@ function createGeocoder({ fetchJson, loadStationData }) {
       lat: -37.669012,
       lon: 144.841027,
       kind: "airport",
-      aliases: ["melbourne airport", "tullamarine airport"],
+      aliases: ["mel airport", "melbourne airport", "tullamarine airport"],
     },
     {
       label: "Brisbane CBD, Brisbane QLD",
@@ -270,6 +271,8 @@ function createGeocoder({ fetchJson, loadStationData }) {
   const STREET_QUERY_PATTERN = /^(.+\b(?:street|st|road|rd|avenue|ave|drive|dr|parade|pde|place|pl|lane|ln|way|crescent|cres)\b)\b.*$/i;
   const PARTIAL_STREET_QUERY_PATTERN = /^(\d+[a-z]?\s+[a-z][a-z\s'-]{2,})$/i;
   const STREET_TYPE_EXPANSIONS = ["street", "road", "avenue", "drive", "parade", "place", "lane", "way"];
+  const SQLITE_STREET_LIKE_TERMS = new Set(["ave", "avenue", "boulevard", "circuit", "court", "cres", "crescent", "drive", "dr", "highway", "lane", "ln", "parade", "pde", "place", "pl", "road", "rd", "street", "st", "terrace", "way"]);
+  const SQLITE_UNIT_LIKE_TERMS = new Set(["apartment", "apt", "flat", "level", "lot", "office", "shop", "suite", "townhouse", "unit"]);
   const STATION_QUERY_TERMS = [
     "7 eleven",
     "ampol",
@@ -858,7 +861,10 @@ function createGeocoder({ fetchJson, loadStationData }) {
       };
     }
     const addressLookupLimit = safeSearchContext ? Math.max(limit * 4, 20) : limit;
-    const addressSuggestions = await searchAddressIndex(query, addressLookupLimit, { searchContext: safeSearchContext });
+    const rawAddressSuggestions = shouldSkipAddressIndex(query, addressIndex)
+      ? []
+      : await searchAddressIndex(query, addressLookupLimit, { searchContext: safeSearchContext });
+    const addressSuggestions = filterSafeAddressSuggestions(query, rawAddressSuggestions);
     const hintSuggestions = localHintGeocode(query, limit);
     const strongHintSuggestions = hintSuggestions.filter(isStrongLocalHintSuggestion);
     const weakHintSuggestions = hintSuggestions.filter((item) => !isStrongLocalHintSuggestion(item));
@@ -880,23 +886,34 @@ function createGeocoder({ fetchJson, loadStationData }) {
     );
     let providerSuggestions = [];
     let providerWarning = "";
-    if (!hasExactAddressSuggestion(addressSuggestions) && !hasStrongLocalSuggestion(localSuggestions)) {
+    if (!hasExactAddressSuggestion(addressSuggestions) && !hasStrongLocalSuggestion(localSuggestions) && !shouldSuppressExternalGeocode(query, localSuggestions)) {
       try {
-        providerSuggestions =
-          selectedProvider === "google"
-            ? await googleGeocode(query, limit, sessionToken)
-            : selectedProvider === "addressr"
-              ? await addressrGeocode(query, limit)
-              : selectedProvider === "mapbox"
-                ? await mapboxGeocode(query, limit)
-                : selectedProvider === "here"
-                  ? await hereGeocode(query, limit)
-                  : selectedProvider === "geoapify"
-                    ? await geoapifyGeocode(query, limit)
-                    : await nominatimGeocode(query, limit);
+        providerSuggestions = await withProviderRetries(
+          selectedProvider,
+          () => {
+            return selectedProvider === "google"
+              ? googleGeocode(query, limit, sessionToken)
+              : selectedProvider === "addressr"
+                ? addressrGeocode(query, limit)
+                : selectedProvider === "mapbox"
+                  ? mapboxGeocode(query, limit)
+                  : selectedProvider === "here"
+                    ? hereGeocode(query, limit)
+                    : selectedProvider === "geoapify"
+                      ? geoapifyGeocode(query, limit)
+                      : nominatimGeocode(query, limit);
+          },
+          {
+            retries: 1,
+            isRetriableError: (error) => isRetriableGeocodeError(error, selectedProvider),
+          },
+        );
       } catch (error) {
         providerWarning = geocodeProviderWarning(error, selectedProvider);
       }
+    }
+    if (!providerWarning && hasUsefulLocalFallback(query, localSuggestions)) {
+      providerWarning = "Using local address fallback without external geocoding.";
     }
     const suggestions =
       selectedProvider === "nominatim"
@@ -915,6 +932,7 @@ function createGeocoder({ fetchJson, loadStationData }) {
       recommendedProductionProvider: RECOMMENDED_GEOCODE_PROVIDER,
       requestedProvider: provider || process.env.FUEL_PATH_GEOCODE_PROVIDER || "auto",
       sessionToken,
+      // Keep raw query in the response for client compatibility; avoid logging this value in app logging, as infra/proxy logs may still capture request URLs.
       query,
       ...(safeSearchContext ? { searchContext: safeSearchContext } : {}),
       location: suggestions[0] || null,
@@ -960,6 +978,103 @@ function createGeocoder({ fetchJson, loadStationData }) {
     );
   }
 
+  function filterSafeAddressSuggestions(query, suggestions) {
+    return suggestions.filter((item) => safeAddressSuggestion(query, item));
+  }
+
+  function safeAddressSuggestion(query, item) {
+    if (item?.provider !== "fuel_path_gnaf") return true;
+    if (item?.matchType === "address_fuzzy") return true;
+    const needle = normaliseSearchText(query);
+    const label = normaliseSearchText(item?.label || "");
+    if (!needle || !label) return false;
+
+    if (isBroadLocalityOnlyQuery(query)) return false;
+    if (hasPlaceIntent(needle)) {
+      return addressLabelSubstantiallyStartsWithQuery(query, item?.label);
+    }
+
+    const queryStateCode = detectStateCode(query);
+    const itemStateCode = detectStateCode(item?.label || "");
+    if (queryStateCode && itemStateCode && queryStateCode !== itemStateCode) return false;
+
+    const queryLocality = detectQueryLocality(query);
+    const itemLocality = extractLabelLocality(item?.label || "");
+    if (queryLocality && itemLocality && !localityMatches(queryLocality, itemLocality)) return false;
+
+    if (isPostalAddressQuery(query)) return false;
+    if (isUnderSpecifiedStreetAddressQuery(query) && !queryLocality && !queryStateCode && !queryHasPostcode(query)) return false;
+    if (hasSensitiveAddressContext(query) && !addressLabelSubstantiallyStartsWithQuery(query, item?.label)) return false;
+
+    return true;
+  }
+
+  function shouldSuppressExternalGeocode(query, localSuggestions = []) {
+    const queryStateCode = detectStateCode(query);
+    const queryLocality = detectQueryLocality(query);
+    return (
+      hasSensitiveAddressContext(query) ||
+      isPostalAddressQuery(query) ||
+      hasUsefulLocalFallback(query, localSuggestions) ||
+      (isUnderSpecifiedStreetAddressQuery(query) && !queryLocality && !queryStateCode && !queryHasPostcode(query))
+    );
+  }
+
+  function hasUsefulLocalFallback(query, localSuggestions) {
+    if (!localSuggestions.length) return false;
+    const first = localSuggestions[0];
+    if (first?.provider !== "fuel_path_regional_gazetteer") return false;
+    if (first?.matchType !== "regional_street_locality") return false;
+    const queryLocality = detectQueryLocality(query);
+    const itemLocality = extractLabelLocality(first?.label || "");
+    return Boolean(queryLocality && itemLocality && localityMatches(queryLocality, itemLocality));
+  }
+
+  function shouldSkipAddressIndex(query, addressIndex) {
+    if (addressIndex?.apiConfigured) return false;
+    const queryStateCode = detectStateCode(query);
+    const queryLocality = detectQueryLocality(query);
+    return (
+      hasSensitiveAddressContext(query) ||
+      isPostalAddressQuery(query) ||
+      isBroadLocalityOnlyQuery(query) ||
+      hasPlaceIntent(normaliseSearchText(query)) ||
+      (isUnderSpecifiedStreetAddressQuery(query) && !queryLocality && !queryStateCode && !queryHasPostcode(query))
+    );
+  }
+
+  function isBroadLocalityOnlyQuery(query) {
+    const tokens = normaliseSearchText(query).split(" ").filter(Boolean);
+    if (tokens.length > 3) return false;
+    return tokens.length > 0 && !tokens.some((token) =>
+      /^\d/.test(token) ||
+      SQLITE_STREET_LIKE_TERMS.has(token) ||
+      SQLITE_UNIT_LIKE_TERMS.has(token) ||
+      placeIntentTerms(token).length,
+    );
+  }
+
+  function addressLabelSubstantiallyStartsWithQuery(query, label) {
+    const queryTokens = normaliseSearchText(query).split(" ").filter((token) => token.length >= 3);
+    const labelTokens = normaliseSearchText(label).split(" ");
+    if (!queryTokens.length) return false;
+    return queryTokens.every((token) => labelTokens.some((labelToken) => labelToken === token || labelToken.startsWith(token)));
+  }
+
+  function isUnderSpecifiedStreetAddressQuery(query) {
+    const text = normaliseSearchText(query);
+    return /(?:^|\s)\d+[a-z]?(?:-\d+[a-z]?)?\s+[a-z][a-z0-9']*\s+(?:st|street|rd|road|ave|avenue|dr|drive|pde|parade|pl|place|ln|lane|ct|court|cres|crescent|way)(?:\s|$)/.test(text) ||
+      /^[a-z][a-z0-9']*\s+(?:st|street|rd|road|ave|avenue|dr|drive|pde|parade|pl|place|ln|lane|ct|court|cres|crescent|way)(?:\s|$)/.test(text);
+  }
+
+  function isPostalAddressQuery(query) {
+    return /\b(?:po\s+box|gpo\s+box|locked\s+bag|private\s+bag|rmb)\b/i.test(String(query || ""));
+  }
+
+  function hasSensitiveAddressContext(query) {
+    return /\b(?:domestic\s+violence|shelter|refuge|medical\s+centre|clinic|hospital|mental\s+health|crisis|counselling|rehab|safe\s+house)\b/i.test(String(query || ""));
+  }
+
   function readGeocodeCache(key) {
     const entry = geocodeCache.get(key);
     if (!entry) return null;
@@ -1003,6 +1118,27 @@ function createGeocoder({ fetchJson, loadStationData }) {
 
   function isRateLimitError(error) {
     return String(error?.message || error).includes("429");
+  }
+
+  function isRetriableGeocodeError(error, provider) {
+    const message = String(error?.message || error || "");
+    const providerName = String(provider || "").toLowerCase();
+
+    if (/No location found for|too short|session token|daily fallback cap|disabled by cost controls|requires durable quota storage|quota|cap reached|not configured/i.test(message)) {
+      return false;
+    }
+
+    const status = /Provider returned (\d{3})/i.exec(message)?.[1];
+    if (status) {
+      const code = Number(status);
+      if (code === 408) return true;
+      if (code === 429) {
+        return providerName !== "nominatim";
+      }
+      return code >= 500;
+    }
+
+    return /timed out|network|fetch failed|ECONN|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|socket/i.test(message);
   }
 
   function geocodeProviderHealth(provider, lookupStatus, warning = "", cacheMode = "none") {

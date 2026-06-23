@@ -143,7 +143,15 @@ function providerRetryDelayMs(provider) {
   return Math.round(boundedNumber(specific || globalValue, 0, 2000, 50));
 }
 
-async function withProviderRetries(provider, load, { retries = providerRetryAttempts(provider), delayMs = providerRetryDelayMs(provider) } = {}) {
+async function withProviderRetries(
+  provider,
+  load,
+  {
+    retries = providerRetryAttempts(provider),
+    delayMs = providerRetryDelayMs(provider),
+    isRetriableError = isRetriableProviderError,
+  } = {},
+) {
   let lastError;
   const attempts = Math.max(1, Math.min(4, Math.round(Number(retries) || 0) + 1));
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
@@ -153,7 +161,7 @@ async function withProviderRetries(provider, load, { retries = providerRetryAtte
       return result;
     } catch (error) {
       lastError = error;
-      if (attempt >= attempts || !isRetriableProviderError(error)) throw error;
+      if (attempt >= attempts || !isRetriableError(error)) throw error;
       if (delayMs > 0) await delay(delayMs);
     }
   }

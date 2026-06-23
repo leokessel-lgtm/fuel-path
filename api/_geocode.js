@@ -1037,11 +1037,15 @@ function createGeocoder({ fetchJson, loadStationData }) {
     if (addressIndex?.apiConfigured) return false;
     const queryStateCode = detectStateCode(query);
     const queryLocality = detectQueryLocality(query);
+    const queryNeedle = normaliseSearchText(query);
+    const hasUnitLikeSignal = /\b(?:unit|flat|apart|apartment|lot|level|lvl|shop|suite|townhouse|site|office|offc|building|base)\b/.test(queryNeedle);
+    const placeIntentSignal = hasPlaceIntent(queryNeedle);
+    const queryTokens = queryNeedle.split(" ").filter(Boolean);
     return (
       (hasSensitiveAddressContext(query) && !addressLikeQuery(query)) ||
       isPostalAddressQuery(query) ||
-      isBroadLocalityOnlyQuery(query) ||
-      (hasPlaceIntent(normaliseSearchText(query)) && !addressLikeQuery(query) && !isPlaceWordAddressSignal(query)) ||
+      (isBroadLocalityOnlyQuery(query) && !hasUnitLikeSignal && !placeIntentSignal) ||
+      (placeIntentSignal && queryTokens.length <= 2 && !addressLikeQuery(query) && !isPlaceWordAddressSignal(query) && !hasUnitLikeSignal) ||
       (isUnderSpecifiedStreetAddressQuery(query) && !queryLocality && !queryStateCode && !queryHasPostcode(query))
     );
   }
@@ -1363,6 +1367,7 @@ function createGeocoder({ fetchJson, loadStationData }) {
     if (/^\d+\s+\d+\b/.test(text)) return "specific";
     const match = text.match(/\b(?:apartment|apt|flat|level|lvl|office|offc|shop|suite|townhouse|unit)\s+([a-z0-9-]+)\b/);
     if (!match) return "none";
+    if (queryHasUnitAddressProgress(text)) return "specific";
     return match[1].length >= 2 ? "specific" : "partial";
   }
 
@@ -1390,7 +1395,14 @@ function createGeocoder({ fetchJson, loadStationData }) {
     }
     const unitMatch = queryText.match(/\b(apartment|apt|flat|office|offc|shop|suite|townhouse|unit)\s+([a-z0-9-]+)\b/);
     if (!unitMatch) return false;
-    return new RegExp(`\\b${unitMatch[1]}\\s+${unitMatch[2]}\\b`).test(labelText);
+    const unitLabelMatch = new RegExp(`\\b${unitMatch[1]}\\s+${unitMatch[2]}\\b`);
+    if (unitLabelMatch.test(labelText)) return true;
+    const unitPrefixPattern = new RegExp(`^\\s*${unitMatch[2]}\\b|\\b${unitMatch[2]}\\b\\s*,`);
+    return unitPrefixPattern.test(labelText);
+  }
+
+  function labelHasExplicitUnit(labelText) {
+    return /\b(?:apartment|apt|flat|office|offc|shop|suite|townhouse|unit)\s+[a-z0-9-]+\b/.test(labelText);
   }
 
   function regionalPoiNameMatches(needle, item) {

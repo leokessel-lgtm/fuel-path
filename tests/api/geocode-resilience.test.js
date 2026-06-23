@@ -1,4 +1,8 @@
 const assert = require("node:assert/strict");
+const { execFileSync } = require("node:child_process");
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
 const test = require("node:test");
 
 const { geocode } = require("../../api/_backend");
@@ -303,6 +307,112 @@ test("local POI hints with street-name suffixes do not get filtered as fake loca
   });
 });
 
+test("place-word address-like queries still resolve exact G-NAF rows", async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-gnaf-place-intent-address-"));
+  const inputPath = path.join(tempDir, "GNAF_CORE.psv");
+  const outputPath = path.join(tempDir, "gnaf-place-intent.sqlite");
+  fs.writeFileSync(
+    inputPath,
+    [
+      "ADDRESS_DETAIL_PID|ADDRESS_LABEL|BUILDING_NAME|FLAT_TYPE|FLAT_NUMBER|LEVEL_TYPE|LEVEL_NUMBER|NUMBER_FIRST|NUMBER_FIRST_SUFFIX|STREET_NAME|STREET_TYPE|LOCALITY_NAME|STATE|POSTCODE|GEOCODE_TYPE|LONGITUDE|LATITUDE",
+      "GAPOS1001|Shell Service Station, Lot 1076, Searipple Road, Karratha WA 6714||| | | |1076| |Searipple|Road|Karratha|WA|6714|PROPERTY CENTROID|116.846|-20.736",
+    ].join("\n"),
+  );
+
+  execFileSync(
+    process.execPath,
+    [
+      "scripts/build-gnaf-address-index.mjs",
+      "--input",
+      inputPath,
+      "--output",
+      outputPath,
+      "--omit-legacy-fts",
+      "--omit-search-backstop",
+    ],
+    { cwd: path.resolve(__dirname, "../.."), stdio: "ignore" },
+  );
+
+  await withGeocodeEnv(
+    {
+      FUEL_PATH_GEOCODE_PROVIDER: "nominatim",
+      FUEL_PATH_GNAF_SQLITE_PATH: outputPath,
+      FUEL_PATH_DISABLE_STATION_GEOCODE: "1",
+    },
+    async () => {
+      const mockFetch = installFetchMock(() =>
+        jsonResponse({ error: { message: "Should not call external provider when exact index match exists" } }, 500),
+      );
+
+      const result = await geocode({
+        query: "Shell Service Station Lot 1076 Searipple Road Karratha WA 6714",
+        limit: 5,
+        sessionToken: "place-intent-address-session",
+      });
+
+      assert.equal(result.location.provider, "fuel_path_gnaf");
+      assert.equal(result.location.matchType, "exact_address");
+      assert.equal(result.location.label, "Shell Service Station, Lot 1076, Searipple Road, Karratha WA 6714");
+      assert.equal(mockFetch.calls.length, 0);
+
+      mockFetch.restore();
+    },
+  );
+});
+
+test("place-word address queries with house numbers still use G-NAF local index", async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-gnaf-place-intent-prefix-"));
+  const inputPath = path.join(tempDir, "GNAF_CORE.psv");
+  const outputPath = path.join(tempDir, "gnaf-place-intent-prefix.sqlite");
+  fs.writeFileSync(
+    inputPath,
+    [
+      "ADDRESS_DETAIL_PID|ADDRESS_LABEL|BUILDING_NAME|FLAT_TYPE|FLAT_NUMBER|LEVEL_TYPE|LEVEL_NUMBER|NUMBER_FIRST|NUMBER_FIRST_SUFFIX|STREET_NAME|STREET_TYPE|LOCALITY_NAME|STATE|POSTCODE|GEOCODE_TYPE|LONGITUDE|LATITUDE",
+      "GAACT1003|Tuggeranong Arts Centre, 137 Reid Street, Tuggeranong ACT 2900||| | | |137| |Reid|Street|Tuggeranong|ACT|2900|PROPERTY CENTROID|149.0667|-35.35",
+    ].join("\n"),
+  );
+
+  execFileSync(
+    process.execPath,
+    [
+      "scripts/build-gnaf-address-index.mjs",
+      "--input",
+      inputPath,
+      "--output",
+      outputPath,
+      "--omit-legacy-fts",
+      "--omit-search-backstop",
+    ],
+    { cwd: path.resolve(__dirname, "../.."), stdio: "ignore" },
+  );
+
+  await withGeocodeEnv(
+    {
+      FUEL_PATH_GEOCODE_PROVIDER: "nominatim",
+      FUEL_PATH_GNAF_SQLITE_PATH: outputPath,
+      FUEL_PATH_DISABLE_STATION_GEOCODE: "1",
+    },
+    async () => {
+      const mockFetch = installFetchMock(() =>
+        jsonResponse({ error: { message: "Should not call external provider when local index returns index candidates" } }, 500),
+      );
+
+      const result = await geocode({
+        query: "Tuggeranong Arts Centre 137 Reid",
+        limit: 5,
+        sessionToken: "place-intent-prefix-session",
+      });
+
+      assert.equal(result.location.provider, "fuel_path_gnaf");
+      assert.equal(result.location.label, "Tuggeranong Arts Centre, 137 Reid Street, Tuggeranong ACT 2900");
+      assert.equal(result.location.state, "ACT");
+      assert.equal(mockFetch.calls.length, 0);
+
+      mockFetch.restore();
+    },
+  );
+});
+
 test("ACT city-level locality does not block ACT street hints", async () => {
   await withGeocodeEnv({ FUEL_PATH_GEOCODE_PROVIDER: "nominatim" }, async () => {
     const mockFetch = installFetchMock(() =>
@@ -322,6 +432,115 @@ test("ACT city-level locality does not block ACT street hints", async () => {
 
     mockFetch.restore();
   });
+});
+
+test("hospital-road with lot locality query does not get replaced by regional street fallback", async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-gnaf-place-intent-hospital-"));
+  const inputPath = path.join(tempDir, "GNAF_CORE.psv");
+  const outputPath = path.join(tempDir, "gnaf-place-intent-hospital.sqlite");
+  fs.writeFileSync(
+    inputPath,
+    [
+      "ADDRESS_DETAIL_PID|ADDRESS_LABEL|BUILDING_NAME|FLAT_TYPE|FLAT_NUMBER|LEVEL_TYPE|LEVEL_NUMBER|NUMBER_FIRST|NUMBER_FIRST_SUFFIX|STREET_NAME|STREET_TYPE|LOCALITY_NAME|STATE|POSTCODE|GEOCODE_TYPE|LONGITUDE|LATITUDE",
+      "GAPOS1002|Lot 89, Hospital Road, Coober Pedy SA 5723|||| | |89| |Hospital|Road|Coober Pedy|SA|5723|PROPERTY CENTROID|134.761| -29.0048",
+    ].join("\n"),
+  );
+
+  execFileSync(
+    process.execPath,
+    [
+      "scripts/build-gnaf-address-index.mjs",
+      "--input",
+      inputPath,
+      "--output",
+      outputPath,
+      "--omit-legacy-fts",
+      "--omit-search-backstop",
+    ],
+    { cwd: path.resolve(__dirname, "../.."), stdio: "ignore" },
+  );
+
+  await withGeocodeEnv(
+    {
+      FUEL_PATH_GEOCODE_PROVIDER: "nominatim",
+      FUEL_PATH_GNAF_SQLITE_PATH: outputPath,
+      FUEL_PATH_DISABLE_STATION_GEOCODE: "1",
+    },
+    async () => {
+      const mockFetch = installFetchMock(() =>
+        jsonResponse({ error: { message: "Should not call external provider when exact index match exists" } }, 500),
+      );
+
+      const result = await geocode({
+        query: "Lot 89 Hospital Road Coober Pedy SA 5723",
+        limit: 5,
+        sessionToken: "place-intent-hospital-session",
+      });
+
+      assert.equal(result.location.provider, "fuel_path_gnaf");
+      assert.equal(result.location.matchType, "exact_address");
+      assert.equal(result.location.label, "Lot 89, Hospital Road, Coober Pedy SA 5723");
+      assert.equal(mockFetch.calls.length, 0);
+
+      mockFetch.restore();
+    },
+  );
+});
+
+test("ambiguous multi-state Bowes Street unit query prefers exact state-locality match", async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-gnaf-place-intent-bowes-"));
+  const inputPath = path.join(tempDir, "GNAF_CORE.psv");
+  const outputPath = path.join(tempDir, "gnaf-place-intent-bowes.sqlite");
+  fs.writeFileSync(
+    inputPath,
+    [
+      "ADDRESS_DETAIL_PID|ADDRESS_LABEL|BUILDING_NAME|FLAT_TYPE|FLAT_NUMBER|LEVEL_TYPE|LEVEL_NUMBER|NUMBER_FIRST|NUMBER_FIRST_SUFFIX|STREET_NAME|STREET_TYPE|LOCALITY_NAME|STATE|POSTCODE|GEOCODE_TYPE|LONGITUDE|LATITUDE",
+      "GATAS700900001|Queenstown Scout Hall, 15 Bowes Street, Queenstown TAS 7467| | | | | |15| |Bowes|Street|Queenstown|TAS|7467|PROPERTY CENTROID|145.55966148|-42.0797863",
+      "GAACT700900002|L 2, 15 Bowes Street, Phillip ACT 2606| | | |L|2|15| |Bowes|Street|Phillip|ACT|2606|PROPERTY CENTROID|149.0841|-35.3081",
+    ].join("\n"),
+  );
+
+  execFileSync(
+    process.execPath,
+    [
+      "scripts/build-gnaf-address-index.mjs",
+      "--input",
+      inputPath,
+      "--output",
+      outputPath,
+      "--omit-legacy-fts",
+      "--omit-search-backstop",
+    ],
+    { cwd: path.resolve(__dirname, "../.."), stdio: "ignore" },
+  );
+
+  await withGeocodeEnv(
+    {
+      FUEL_PATH_GEOCODE_PROVIDER: "nominatim",
+      FUEL_PATH_GNAF_SQLITE_PATH: outputPath,
+      FUEL_PATH_DISABLE_STATION_GEOCODE: "1",
+    },
+    async () => {
+      const mockFetch = installFetchMock(() =>
+        jsonResponse({ error: { message: "Should not call external provider when exact index match exists" } }, 500),
+      );
+
+      const result = await geocode({
+        query: "Queenstown Scout Hall 15 Bowes Street Queenstown TAS 7467",
+        limit: 5,
+        sessionToken: "place-intent-bowes-session",
+      });
+
+      assert.equal(result.location.provider, "fuel_path_gnaf");
+      assert.equal(result.location.matchType, "exact_address");
+      assert.equal(result.location.label, "Queenstown Scout Hall, 15 Bowes Street, Queenstown TAS 7467");
+      assert.equal(result.location.state, "TAS");
+      assert.equal(result.location.postcode, "7467");
+      assert.equal(mockFetch.calls.length, 0);
+
+      mockFetch.restore();
+    },
+  );
 });
 
 test("curated local hints outrank broad regional fallbacks", async () => {

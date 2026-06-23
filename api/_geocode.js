@@ -991,6 +991,9 @@ function createGeocoder({ fetchJson, loadStationData }) {
 
     if (isBroadLocalityOnlyQuery(query)) return false;
     if (hasPlaceIntent(needle)) {
+      if (addressLikeQuery(query)) {
+        return addressLikeIntentMatch(query, item?.label);
+      }
       return addressLabelSubstantiallyStartsWithQuery(query, item?.label);
     }
 
@@ -1004,7 +1007,7 @@ function createGeocoder({ fetchJson, loadStationData }) {
 
     if (isPostalAddressQuery(query)) return false;
     if (isUnderSpecifiedStreetAddressQuery(query) && !queryLocality && !queryStateCode && !queryHasPostcode(query)) return false;
-    if (hasSensitiveAddressContext(query) && !addressLabelSubstantiallyStartsWithQuery(query, item?.label)) return false;
+    if (hasSensitiveAddressContext(query) && !addressLikeIntentMatch(query, item?.label) && !addressLabelSubstantiallyStartsWithQuery(query, item?.label)) return false;
 
     return true;
   }
@@ -1013,7 +1016,7 @@ function createGeocoder({ fetchJson, loadStationData }) {
     const queryStateCode = detectStateCode(query);
     const queryLocality = detectQueryLocality(query);
     return (
-      hasSensitiveAddressContext(query) ||
+      (hasSensitiveAddressContext(query) && !addressLikeQuery(query)) ||
       isPostalAddressQuery(query) ||
       hasUsefulLocalFallback(query, localSuggestions) ||
       (isUnderSpecifiedStreetAddressQuery(query) && !queryLocality && !queryStateCode && !queryHasPostcode(query))
@@ -1035,12 +1038,53 @@ function createGeocoder({ fetchJson, loadStationData }) {
     const queryStateCode = detectStateCode(query);
     const queryLocality = detectQueryLocality(query);
     return (
-      hasSensitiveAddressContext(query) ||
+      (hasSensitiveAddressContext(query) && !addressLikeQuery(query)) ||
       isPostalAddressQuery(query) ||
       isBroadLocalityOnlyQuery(query) ||
-      hasPlaceIntent(normaliseSearchText(query)) ||
+      (hasPlaceIntent(normaliseSearchText(query)) && !addressLikeQuery(query) && !isPlaceWordAddressSignal(query)) ||
       (isUnderSpecifiedStreetAddressQuery(query) && !queryLocality && !queryStateCode && !queryHasPostcode(query))
     );
+  }
+
+  function addressLikeQuery(query) {
+    const needle = normaliseSearchText(query);
+    if (!needle) return false;
+    if (/\b(?:unit|flat|unit|apart|apartment|lot|level|lvl|shop|suite|townhouse|site|office|offc|building)\b/.test(needle)) return true;
+    const containsHouseNumber = /\b\d+[a-z]?(?:-\d+[a-z]?)?\b/.test(needle);
+    const containsStreetToken = /\b(?:street|st|road|rd|avenue|ave|drive|dr|parade|pde|place|pl|terrace|highway|mall|court|close|vista|circuit|way|lane|ln)\b/.test(needle);
+    if (containsHouseNumber && (containsStreetToken || queryHasPostcode(query))) return true;
+    return containsHouseNumber && hasExplicitUppercaseStateCode(query) && containsStreetToken;
+  }
+
+  function isPlaceWordAddressSignal(query) {
+    const needle = normaliseSearchText(query);
+    if (!needle) return false;
+    if (!/\b\d+[a-z]?(?:-\d+[a-z]?)?\b/.test(needle)) return false;
+    if (isPostalAddressQuery(query)) return false;
+    return true;
+  }
+
+  function addressLikeIntentMatch(query, label) {
+    const labelText = normaliseSearchText(label || "");
+    if (!labelText) return false;
+    const queryStateCode = detectStateCode(query);
+    const labelStateCode = detectStateCode(label);
+    if (queryStateCode && labelStateCode && queryStateCode !== labelStateCode) return false;
+
+    const queryPostcode = /\b\d{4}\b/.exec(String(query || ""));
+    if (queryPostcode) {
+      const labelPostcode = /\b\d{4}\b/.exec(labelText)?.[0];
+      if (!labelPostcode || labelPostcode !== queryPostcode[0]) return false;
+    }
+
+    const queryLocality = detectQueryLocality(query);
+    const labelLocality = extractLabelLocality(label || "");
+    if (queryLocality && labelLocality && !localityMatches(queryLocality, labelLocality)) return false;
+
+    const houseNumbers = String(query || "").match(/\b\d+[a-z]?(?:-\d+[a-z]?)?\b/g) || [];
+    if (houseNumbers.length && !houseNumbers.some((number) => labelText.includes(number))) return false;
+
+    return true;
   }
 
   function isBroadLocalityOnlyQuery(query) {

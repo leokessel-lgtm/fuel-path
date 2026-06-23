@@ -918,7 +918,7 @@ function createGeocoder({ fetchJson, loadStationData }) {
     const suggestions =
       selectedProvider === "nominatim"
         ? mergeGeocodeSuggestions([...localSuggestions, ...providerSuggestions], limit)
-        : mergeGeocodeSuggestions([...addressSuggestions, ...providerSuggestions, ...localSuggestions], limit);
+        : mergeGeocodeSuggestions([...localSuggestions, ...providerSuggestions, ...addressSuggestions], limit);
     const lookupStatus = suggestions.length
       ? providerWarning
         ? "local_fallback"
@@ -1292,8 +1292,12 @@ function createGeocoder({ fetchJson, loadStationData }) {
     else if (label.startsWith(needle)) score -= 18;
     else if (label.includes(needle)) score -= 4;
     if (!refineRequired && unitIntent === "specific" && labelMatchesUnitIntent(query, item?.label)) score -= 35;
-    if (refineRequired && unitIntent !== "specific" && !isNumberFirstAddressQuery(needle)) score -= 55;
-    if (refineRequired && unitIntent === "specific") score += 45;
+    if (refineRequired) {
+      const unitAddressProgress = queryHasUnitAddressProgress(needle);
+      if (unitIntent !== "specific" && !unitAddressProgress) score += 55;
+      else if (unitAddressProgress) score += 12;
+      else if (unitIntent === "specific") score += 6;
+    }
     if (item?.provider === "fuel_path_regional_gazetteer" && item?.type === "regional_town" && !hasPlaceIntent(needle)) {
       score -= 10;
     }
@@ -1364,6 +1368,17 @@ function createGeocoder({ fetchJson, loadStationData }) {
 
   function isNumberFirstAddressQuery(needle) {
     return /^\d+[a-z]?(?:-\d+[a-z]?)?\b/.test(normaliseSearchText(needle));
+  }
+
+  function queryHasUnitAddressProgress(needle) {
+    const text = normaliseSearchText(needle);
+    const match = text.match(/\b(?:unit|flat|apartment|apt|lot|level|lvl|office|offc|shop|suite|townhouse|site|building)\b/);
+    if (!match) return false;
+    const suffix = text.slice(match.index + match[0].length).trim();
+    const numbers = suffix.match(/\b\d+[a-z]?(?:-\d+[a-z]?)?\b/g) || [];
+    if (numbers.length >= 2) return true;
+    if (numbers.length === 1 && /\b(?:street|st|road|rd|avenue|ave|drive|dr|pde|parade|place|pl|lane|ln|court|ct|cres|crescent|way)\b/.test(suffix)) return true;
+    return false;
   }
 
   function labelMatchesUnitIntent(query, label) {

@@ -33,6 +33,7 @@ const ADDITIONAL_LOCAL_GEOCODE_HINTS = [
   hint("Hornsby NSW 2077", -33.704, 151.099, "suburb"),
   hint("Manly NSW 2095", -33.797, 151.288, "suburb"),
   hint("Randwick NSW 2031", -33.914, 151.241, "suburb"),
+  hint("Artarmon Station, Artarmon NSW 2064", -33.8089, 151.1842, "station", ["artamon station", "artarmon station"]),
   hint("Miranda NSW 2228", -34.034, 151.101, "suburb"),
   hint("Wollongong NSW 2500", -34.4278, 150.8931, "city"),
   hint("Newcastle NSW 2300", -32.9283, 151.7817, "city"),

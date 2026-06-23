@@ -31,6 +31,123 @@ test("validation geocode rate limits degrade without throwing", async () => {
   });
 });
 
+test("transient geocode provider failure retries once before returning success", async () => {
+  await withGeocodeEnv(
+    {
+      FUEL_PATH_GEOCODE_PROVIDER: "mapbox",
+      FUEL_PATH_MAPBOX_ACCESS_TOKEN: "test-mapbox-token",
+    },
+    async () => {
+    const query = `7 Retry Street ${Date.now()}`;
+    let calls = 0;
+    const mockFetch = installFetchMock(() => {
+      calls += 1;
+      if (calls === 1) {
+        return jsonResponse({ error: { message: "Provider temporarily unavailable" } }, 503);
+      }
+      return jsonResponse({
+        features: [
+          {
+            geometry: { coordinates: [151.2, -33.9] },
+            properties: {
+              full_address: `${query}, Sydney NSW 2000, Australia`,
+            },
+          },
+        ],
+      });
+    });
+
+    const result = await geocode({
+      query,
+      limit: 5,
+      sessionToken: "transient-success-session",
+    });
+
+    assert.equal(result.lookupStatus, "ok");
+    assert.equal(result.location.provider, "mapbox");
+    assert.equal(result.location.label, `${query}, Sydney NSW 2000, Australia`);
+    assert.equal(result.degraded, false);
+    assert.equal(mockFetch.calls.length, 2);
+
+    mockFetch.restore();
+  });
+});
+
+test("transient geocode provider failure retries once and then degrades", async () => {
+  await withGeocodeEnv(
+    {
+      FUEL_PATH_GEOCODE_PROVIDER: "mapbox",
+      FUEL_PATH_MAPBOX_ACCESS_TOKEN: "test-mapbox-token",
+    },
+    async () => {
+    const query = `X${Date.now()}-non-match`;
+    const mockFetch = installFetchMock(() => jsonResponse({ error: { message: "Downstream timeout" } }, 503));
+
+    const result = await geocode({
+      query,
+      limit: 5,
+      sessionToken: "transient-fail-session",
+    });
+
+    assert.equal(result.lookupStatus, "degraded");
+    assert.equal(result.degraded, true);
+    assert.equal(result.location, null);
+    assert.equal(mockFetch.calls.length, 2);
+
+    mockFetch.restore();
+  });
+});
+
+test("geocode provider auth/key errors do not retry", async () => {
+  await withGeocodeEnv(
+    {
+      FUEL_PATH_GEOCODE_PROVIDER: "mapbox",
+      FUEL_PATH_MAPBOX_ACCESS_TOKEN: "test-mapbox-token",
+    },
+    async () => {
+      const query = `Mapbox Auth Error ${Date.now()}`;
+      const mockFetch = installFetchMock(() => jsonResponse({ message: "Invalid token" }, 401));
+
+      const result = await geocode({
+        query,
+        limit: 5,
+        sessionToken: "mapbox-auth-session",
+      });
+
+      assert.equal(result.lookupStatus, "degraded");
+      assert.equal(result.degraded, true);
+      assert.match(result.warning, /temporarily unavailable/);
+      assert.equal(mockFetch.calls.length, 1);
+
+      mockFetch.restore();
+    },
+  );
+});
+
+test("geocode provider quota errors do not retry", async () => {
+  await withGeocodeEnv(
+    {
+      FUEL_PATH_GEOCODE_PROVIDER: "mapbox",
+      FUEL_PATH_MAPBOX_ACCESS_TOKEN: "test-mapbox-token",
+    },
+    async () => {
+      const query = `Mapbox Quota Error ${Date.now()}`;
+      const mockFetch = installFetchMock(() => jsonResponse({ message: "quota exceeded for this key" }, 429));
+
+      const result = await geocode({
+        query,
+        limit: 5,
+        sessionToken: "mapbox-quota-session",
+      });
+
+      assert.equal(result.lookupStatus, "degraded");
+      assert.equal(mockFetch.calls.length, 1);
+
+      mockFetch.restore();
+    },
+  );
+});
+
 test("local geocode hints survive provider rate limiting", async () => {
   await withGeocodeEnv({ FUEL_PATH_GEOCODE_PROVIDER: "nominatim" }, async () => {
     const mockFetch = installFetchMock(() =>
@@ -52,6 +169,55 @@ test("local geocode hints survive provider rate limiting", async () => {
     assert.equal(result.providerHealth.nominatim.status, "degraded");
 
     mockFetch.restore();
+  });
+});
+
+test("transient geocode provider failure falls back to local/G-NAF suggestions", async () => {
+  await withGeocodeEnv(
+    {
+      FUEL_PATH_GEOCODE_PROVIDER: "mapbox",
+      FUEL_PATH_MAPBOX_ACCESS_TOKEN: "test-mapbox-token",
+    },
+    async () => {
+    const mockFetch = installFetchMock(() =>
+      jsonResponse({ error: { message: "Transient provider failure" } }, 500),
+    );
+
+    const result = await geocode({
+      query: "100 Queen Street Brisbane QLD",
+      limit: 5,
+      sessionToken: "local-fallback-after-retry-session",
+    });
+
+    assert.equal(result.lookupStatus, "local_fallback");
+    assert.equal(result.location.label, "Queen Street, Brisbane QLD 4000");
+    assert.equal(result.location.provider, "fuel_path_hint");
+    assert.equal(mockFetch.calls.length, 2);
+    assert.equal(result.degraded, true);
+
+    mockFetch.restore();
+  });
+});
+
+test("geocode does not log raw address query from application code", async () => {
+  await withGeocodeEnv({ FUEL_PATH_GEOCODE_PROVIDER: "nominatim" }, async () => {
+    const query = `PII Street ${Date.now()}`;
+    const mockFetch = installFetchMock(() => jsonResponse({ error: { message: "Too many requests" } }, 429));
+    const spy = installConsoleSpy();
+    try {
+      const result = await geocode({
+        query,
+        limit: 5,
+        sessionToken: "privacy-console-session",
+      });
+
+      assert.equal(result.lookupStatus, "degraded");
+      assert.equal(spy.calls.some(({ args }) => args.some((arg) => String(arg).includes(query))), false);
+      assert.equal(spy.calls.length, 0);
+    } finally {
+      spy.restore();
+      mockFetch.restore();
+    }
   });
 });
 
@@ -809,6 +975,38 @@ function installFetchMock(handler) {
     calls,
     restore() {
       global.fetch = originalFetch;
+    },
+  };
+}
+
+function installConsoleSpy() {
+  const entries = [];
+  const previous = {
+    log: console.log,
+    warn: console.warn,
+    error: console.error,
+    info: console.info,
+    debug: console.debug,
+  };
+
+  const record = (level) => (...args) => {
+    entries.push({ level, args });
+  };
+
+  console.log = record("log");
+  console.warn = record("warn");
+  console.error = record("error");
+  console.info = record("info");
+  console.debug = record("debug");
+
+  return {
+    calls: entries,
+    restore() {
+      console.log = previous.log;
+      console.warn = previous.warn;
+      console.error = previous.error;
+      console.info = previous.info;
+      console.debug = previous.debug;
     },
   };
 }

@@ -1,0 +1,107 @@
+[
+  {
+    "id": "unit-slash-01",
+    "category": "unit_slash",
+    "query": "3/47 Smith St Parramatta",
+    "expected": "Unit 3/47 Smith Street, Parramatta NSW 2150",
+    "why": "Common slash-style unit address with abbreviated street type."
+  },
+  {
+    "id": "unit-slash-02",
+    "category": "unit_slash",
+    "query": "unit 7 12 Railway Pde Kogarah",
+    "expected": "Unit 7/12 Railway Parade, Kogarah NSW 2217",
+    "why": "Unit token plus street abbreviation and suburb."
+  },
+  {
+    "id": "apartment-level-01",
+    "category": "apartment_level",
+    "query": "Level 4 Suite 12 100 Walker St North Sydney",
+    "expected": "Level 4, Suite 12/100 Walker Street, North Sydney NSW 2060",
+    "why": "Level/suite phrasing is common in business addresses."
+  },
+  {
+    "id": "apartment-level-02",
+    "category": "apartment_level",
+    "query": "Townhouse 4 18 Bland St Ashfield",
+    "expected": "Townhouse 4/18 Bland Street, Ashfield NSW 2131",
+    "why": "Dwelling type before street address."
+  },
+  {
+    "id": "rural-lot-01",
+    "category": "rural_lot",
+    "query": "Lot 12 Gundagai Road Cootamundra",
+    "expected": "Lot 12 Gundagai Road, Cootamundra NSW 2590",
+    "why": "Rural lot style query."
+  },
+  {
+    "id": "rural-lot-02",
+    "category": "rural_lot",
+    "query": "123 Unnamed Road Walgett",
+    "expected": "Potentially unverifiable rural road address near Walgett NSW",
+    "why": "Tests whether the system avoids overconfident precision."
+  },
+  {
+    "id": "po-box-01",
+    "category": "po_box",
+    "query": "PO Box 123 Darlinghurst NSW",
+    "expected": "PO Box 123, Darlinghurst NSW 2010, no precise coordinate expected",
+    "why": "Postal-only address should not be treated as a normal street coordinate."
+  },
+  {
+    "id": "ambiguous-01",
+    "category": "ambiguous_street",
+    "query": "George Street",
+    "expected": "Ambiguous street; should ask for locality or show options",
+    "why": "High-risk common street name."
+  },
+  {
+    "id": "ambiguous-02",
+    "category": "ambiguous_street",
+    "query": "100 Main St",
+    "expected": "Ambiguous street number/name; should not confidently guess",
+    "why": "Common street name with insufficient locality."
+  },
+  {
+    "id": "boundary-01",
+    "category": "boundary_edge",
+    "query": "12 Commonwealth Ave Canberra ACT",
+    "expected": "12 Commonwealth Avenue, Yarralumla ACT 2600 or clear ACT-local disambiguation",
+    "why": "People use broad city names for ACT suburbs."
+  },
+  {
+    "id": "suburb-poi-01",
+    "category": "suburb_poi",
+    "query": "mel airport",
+    "expected": "Melbourne Airport, Tullamarine VIC 3045",
+    "why": "Short POI query with abbreviation."
+  },
+  {
+    "id": "suburb-poi-02",
+    "category": "suburb_poi",
+    "query": "Canberra",
+    "expected": "Canberra ACT",
+    "why": "Broad city/locality lookup should not return a random address."
+  },
+  {
+    "id": "typo-fuzzy-01",
+    "category": "typo_fuzzy",
+    "query": "artamon station",
+    "expected": "Artarmon Station, Artarmon NSW 2064",
+    "why": "Common misspelling of a known POI."
+  },
+  {
+    "id": "typo-fuzzy-02",
+    "category": "typo_fuzzy",
+    "query": "66b eston avenue",
+    "expected": "66B Easton Avenue, Sylvania NSW 2224",
+    "why": "Typo in street name with unit-like street number."
+  },
+  {
+    "id": "privacy-01",
+    "category": "privacy_sensitive",
+    "query": "3/12 Smith St Domestic Violence Shelter Parramatta",
+    "expected": "Sensitive descriptive context should not be sent externally verbatim",
+    "why": "Checks raw query exposure risk when local resolution is weak."
+  }
+]

@@ -1,9 +1,13 @@
 #!/usr/bin/env node
+import fs from "node:fs";
+import path from "node:path";
 
 const API_BASE = (process.env.FUEL_PATH_API_BASE || "https://fuel-path.vercel.app").replace(/\/$/, "");
 const fuel = process.env.FUEL_PATH_SMOKE_FUEL || "U91";
 const radiusKm = Number(process.env.FUEL_PATH_SMOKE_RADIUS_KM || 35);
 const limit = Number(process.env.FUEL_PATH_SMOKE_LIMIT || 20);
+const runId = new Date().toISOString().replace(/[:.]/g, "-");
+const outputDir = path.resolve("tmp");
 
 const cases = [
   c("wa-broome", "Broome WA 6725", -17.9614, 122.2359, "regional_remote"),
@@ -28,11 +32,12 @@ for (const item of cases) {
   ]);
   const combinedCount = stations.returned + chargers.returned;
   const chargerMetadata = chargerMetadataSummary(chargers.items);
+  const status = combinedStatus(stations, chargers, combinedCount);
   results.push({
     id: item.id,
     label: item.label,
     category: item.category,
-    status: stations.status === 200 && chargers.status === 200 && combinedCount > 0 ? "pass" : "fail",
+    status,
     stations: {
       status: stations.status,
       returned: stations.returned,
@@ -53,10 +58,22 @@ for (const item of cases) {
 }
 
 const summary = summarise(results);
-console.log(JSON.stringify({ apiBase: API_BASE, fuel, radiusKm, limit, summary, results }, null, 2));
+const payload = { runId, apiBase: API_BASE, fuel, radiusKm, limit, summary, results };
+fs.mkdirSync(outputDir, { recursive: true });
+const jsonPath = path.join(outputDir, `combined-nearby-rural-remote-smoke-${runId}.json`);
+const reportPath = path.join(outputDir, `combined-nearby-rural-remote-smoke-${runId}.md`);
+fs.writeFileSync(jsonPath, `${JSON.stringify(payload, null, 2)}\n`);
+fs.writeFileSync(reportPath, renderReport(payload));
+console.log(JSON.stringify({ ...payload, jsonPath, reportPath }, null, 2));
 
 if (summary.failed > 0) {
   throw new Error(`${summary.failed}/${summary.cases} rural/remote combined nearby cases failed`);
+}
+
+function combinedStatus(stations, chargers, combinedCount) {
+  if (stations.status !== 200 || chargers.status !== 200) return "fail";
+  if (combinedCount > 0) return "pass";
+  return "coverage_gap";
 }
 
 function c(id, label, lat, lon, category) {
@@ -143,18 +160,49 @@ function usefulnessPreview(stations, chargers) {
 }
 
 function summarise(rows) {
-  const failedRows = rows.filter((row) => row.status !== "pass");
+  const failedRows = rows.filter((row) => row.status === "fail");
+  const coverageGapRows = rows.filter((row) => row.status === "coverage_gap");
   const chargerLocations = rows.filter((row) => row.chargers.returned > 0);
   const poorMetadata = rows.filter((row) => row.chargers.returned > 0 && row.chargers.metadataQuality === "poor");
   return {
     cases: rows.length,
-    passed: rows.length - failedRows.length,
+    passed: rows.filter((row) => row.status === "pass").length,
     failed: failedRows.length,
+    coverageGaps: coverageGapRows.length,
     chargerLocations: chargerLocations.length,
     noChargerLocations: rows.length - chargerLocations.length,
     poorEvMetadataLocations: poorMetadata.length,
     stationResultTotal: rows.reduce((total, row) => total + row.stations.returned, 0),
     chargerResultTotal: rows.reduce((total, row) => total + row.chargers.returned, 0),
     failures: failedRows.map((row) => row.id),
+    coverageGapLocations: coverageGapRows.map((row) => row.id),
   };
+}
+
+function renderReport(payload) {
+  const { summary, results } = payload;
+  return `# Combined nearby rural/remote smoke
+
+Run: ${payload.runId}
+
+## Summary
+
+- Cases: ${summary.cases}
+- Passed with fuel or charger results: ${summary.passed}
+- Coverage gaps with no fuel or charger results: ${summary.coverageGaps}
+- Failed HTTP or malformed provider responses: ${summary.failed}
+- Charger locations: ${summary.chargerLocations}
+- No-charger locations: ${summary.noChargerLocations}
+- Poor EV metadata locations: ${summary.poorEvMetadataLocations}
+- Fuel station result total: ${summary.stationResultTotal}
+- Charger result total: ${summary.chargerResultTotal}
+
+## Coverage gaps
+
+${results.filter((row) => row.status === "coverage_gap").map((row) => `- ${row.id}: ${row.label}; fuel warning="${row.stations.warning || "none"}"; charger warning="${row.chargers.warning || "none"}"`).join("\n") || "- None"}
+
+## Failures
+
+${results.filter((row) => row.status === "fail").map((row) => `- ${row.id}: station HTTP ${row.stations.status}, charger HTTP ${row.chargers.status}`).join("\n") || "- None"}
+`;
 }

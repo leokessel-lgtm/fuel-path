@@ -249,9 +249,6 @@ export function NearbyStationSheet({
           {topControls && !isPeek ? <View style={styles.topControls}>{topControls}</View> : null}
           {selected && !sheetExpanded ? (
             <>
-              {!isPeek ? (
-                <Text numberOfLines={1} style={styles.peekHint}>Browse view. Full list for more.</Text>
-              ) : null}
               <SelectedStationCard
                 onNavigate={() => onNavigateToStation(selected)}
                 selected={selected}

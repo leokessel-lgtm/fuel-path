@@ -777,6 +777,9 @@ function ensureLeafletStyles() {
       .leaflet-control-attribution {
         font-size: 10px;
       }
+      .leaflet-bottom.leaflet-right .leaflet-control-zoom {
+        margin-bottom: 132px;
+      }
       .fuel-path-marker {
         align-items: center;
         background: ${colors.white};

@@ -529,3 +529,38 @@ Brutal read:
 - The highest-risk visible claim surfaces now have a repeatable static audit.
 - This does not replace rendered smoke testing after deployment; it prevents risky copy from being reintroduced into the source files.
 - Backend route scoring still carries internal dollar economics for ranking. That is acceptable only while the UI and public copy avoid presenting it as a guaranteed user saving.
+
+## Production smoke, mocked map interaction and wider stress rerun
+
+Run window: 2026-06-29 12:10-13:08 AEST.
+
+### Iterations forced by the stress work
+
+- Production smoke initially failed EV Nearby because EV charger rows with missing `distanceKm` crashed the web UI. Fixed by rendering `Distance unknown` instead of calling `toFixed` on missing provider distance.
+- Mocked map interaction initially exposed Leaflet zoom controls being blocked by the bottom sheet on phone/tablet. Fixed by raising the web zoom control above the lower sheet.
+- Frontend failure-state stress initially hid EV provider errors behind a `0 chargers nearby` message. Fixed by showing EV provider errors in the visible charger sheet, not only the full sheet.
+
+### Final passing evidence
+
+| Gate | Evidence | Result |
+|---|---|---:|
+| Production smoke matrix | `tmp/production-smoke-matrix-stress-2026-06-29T12-52-28-760Z.json` | 9/9 pass |
+| Mocked map interaction stress | `tmp/map-interaction-mocked-stress-2026-06-29T12-52-29-153Z.json` | 3/3 pass |
+| Full Plan browser click stress | `tmp/plan-route-browser-click-stress-2026-06-29T12-20-52-635Z.json` | 300/300 routes, 900/900 station clicks pass |
+| Full live Plan API stress | `tmp/plan-route-live-api-stress-2026-06-29T12-54-39-174Z.json` | 300/300 pass, 1 NT coverage warning |
+| Map density and performance | `tmp/map-density-performance-stress-2026-06-29T12-46-53-110Z.json` | 4/4 pass |
+| Frontend failure-state UX | `tmp/frontend-failure-state-stress-2026-06-29T12-51-06-689Z.json` | 7/7 pass |
+| Provider integration chaos | `tmp/provider-integration-chaos-stress-2026-06-29T12-46-18-375Z.json` | 15/15 pass |
+| State fuel provider malformed payload chaos | `tmp/state-fuel-provider-chaos-stress-2026-06-29T12-46-18-381Z.json` | 7/7 pass |
+| Route recommendation adversarial scoring | `tmp/route-recommendation-adversarial-stress-2026-06-29T12-46-18-763Z.json` | 8/8 pass |
+| Module-level Plan route recommendation stress | `tmp/plan-route-recommendation-stress-2026-06-29T12-46-19-713Z.json` | 300/300 pass |
+| Claim-safety audit | `tmp/claim-safety-audit-stress-2026-06-29T12-46-19-701Z.json` | 20/20 pass |
+| Rural/remote combined nearby smoke | `tmp/combined-nearby-rural-remote-smoke-2026-06-29T12-54-00-253Z.json` | 11/12 pass, 1 expected coverage gap |
+| Mobile app typecheck | `cd mobile-app && npm run typecheck` | pass |
+
+### Brutal critique after this pass
+
+- The app is much more resilient than before this run: the stress work found and fixed one real EV runtime crash, one real map-control overlap, and one real EV outage-message visibility issue.
+- The strongest remaining product limitation is not route/scoring stability. It is data coverage and quality: NT live fuel remains unavailable, Tennant Creek is a combined fuel/EV coverage gap, and API Ninjas EV metadata is often thin with missing power values.
+- The EV provider trial script is not useful from this terminal without local `OPENWEB_NINJA_API_KEY` or `API_NINJAS_API_KEY`; production EV results do work through deployed server configuration, but local provider-trial evidence remains skipped.
+- Browser stress is now strong for controlled UI states and route journeys, but not yet a substitute for physical-device native map smoke.

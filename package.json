@@ -55,7 +55,9 @@
     "test:frontend-failure-states": "node scripts/frontend-failure-state-stress.mjs",
     "test:route-adversarial": "node scripts/route-recommendation-adversarial-stress.mjs",
     "test:map-density": "node scripts/map-density-performance-stress.mjs",
-    "test:claim-safety": "node scripts/claim-safety-audit-stress.mjs"
+    "test:claim-safety": "node scripts/claim-safety-audit-stress.mjs",
+    "test:production-smoke-matrix": "node scripts/production-smoke-matrix-stress.mjs",
+    "test:map-interactions:mocked": "node scripts/map-interaction-mocked-stress.mjs"
   },
   "engines": {
     "node": "22.x"

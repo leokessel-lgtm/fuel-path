@@ -36,6 +36,9 @@ function normaliseSavedCommute(commute: SavedCommute): SavedCommute {
     fuel: commute.fuel,
     alertEnabled: Boolean(commute.alertEnabled),
     alertTime: normaliseAlertTime(commute.alertTime),
+    minSavingDollars: boundedNumber(commute.minSavingDollars, 1, 25, 5),
+    maxDetourMinutes: boundedNumber(commute.maxDetourMinutes, 1, 30, 8),
+    tankThresholdPercent: boundedNumber(commute.tankThresholdPercent, 5, 95, 45),
     alertStatus: commute.alertStatus || (commute.alertEnabled ? "scheduled" : "off"),
     alertStatusMessage: commute.alertStatusMessage,
     backendSyncedAt: commute.backendSyncedAt,
@@ -56,6 +59,12 @@ function normaliseMapPoint(point: MapPoint): MapPoint {
 
 function normaliseAlertTime(value: string) {
   return /^([01]\d|2[0-3]):[0-5]\d$/.test(value) ? value : "07:30";
+}
+
+function boundedNumber(value: unknown, min: number, max: number, fallback: number) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(min, Math.min(max, Math.round(parsed)));
 }
 
 function isSavedCommute(value: unknown): value is SavedCommute {

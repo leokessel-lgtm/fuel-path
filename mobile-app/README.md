@@ -29,13 +29,13 @@ python3 web-demo/server.py --host 127.0.0.1 --port 4174 --env prototype/.env
 Start the native app preview from this folder:
 
 ```sh
-npm run web -- --port 8082
+npm run web -- --port 8081
 ```
 
 Open:
 
 ```text
-http://127.0.0.1:8082
+http://127.0.0.1:8081
 ```
 
 ## Device Testing Note

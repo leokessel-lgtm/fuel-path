@@ -49,6 +49,8 @@ module.exports = async function handler(req, res) {
       economy: Number(req.method === "POST" ? body.economy || 8.2 : numberParam(query.economy, 8.2)),
       reserveKm: Number(req.method === "POST" ? body.reserveKm || 35 : numberParam(query.reserveKm, 35)),
       corridorKm: Number(req.method === "POST" ? body.corridorKm || 2.5 : numberParam(query.corridorKm, 2.5)),
+      minSavingDollars: Number(req.method === "POST" ? body.minSavingDollars || 5 : numberParam(query.minSavingDollars, 5)),
+      maxDetourMinutes: Number(req.method === "POST" ? body.maxDetourMinutes || 8 : numberParam(query.maxDetourMinutes, 8)),
       eligibleDiscounts,
       includeMemberPrices,
       includeClosed,
@@ -64,9 +66,21 @@ module.exports = async function handler(req, res) {
         capability: data.capability,
         regionCapabilities: data.regionCapabilities || [],
         routeProvider: route.provider,
+        brandFilter,
+        brands: brandFilter ? Array.from(brands) : [],
         generatedAt: new Date().toISOString(),
         cacheHit: data.cacheHit,
         cacheAgeSeconds: data.cacheAgeSeconds,
+        cacheMode: data.cacheMode,
+        degraded: Boolean(data.degraded),
+        providerHealth: data.providerHealth || {},
+        provenance: {
+          source: data.source,
+          provider: data.provider,
+          cacheMode: data.cacheMode,
+          degraded: Boolean(data.degraded),
+          providerStatuses: providerStatuses(data.providerHealth),
+        },
         warning: data.warning,
       },
       recommendations,
@@ -105,4 +119,17 @@ function routeFromPayloadFromQuery(query) {
     defaultCorridorKm: numberParam(query.corridorKm, 2.5),
     defaultDetourSpeedKmh: numberParam(query.detourSpeedKmh, 45),
   });
+}
+
+function providerStatuses(providerHealth = {}) {
+  return Object.fromEntries(
+    Object.entries(providerHealth).map(([provider, health]) => [
+      provider,
+      {
+        status: health?.status || "unknown",
+        cacheMode: health?.cacheMode || "none",
+        cacheAgeSeconds: Number.isFinite(Number(health?.cacheAgeSeconds)) ? Number(health.cacheAgeSeconds) : null,
+      },
+    ]),
+  );
 }

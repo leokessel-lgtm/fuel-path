@@ -16,7 +16,7 @@ function alertStorageStatus({ maxRecords = DEFAULT_MAX_RECORDS } = {}) {
   if (!databaseUrl()) {
     return {
       mode: "memory_ephemeral",
-      configured: true,
+      configured: false,
       durable: false,
       maxRecords,
       deviceCount: memoryStore.devices.length,
@@ -88,11 +88,11 @@ async function upsertPushDevice(record) {
 
 async function upsertSavedRoute(record) {
   if (testStorage) return testStorage.upsertSavedRoute(record);
-  if (!databaseUrl()) return upsertMemory("routes", record);
+  if (!databaseUrl()) return upsertMemorySavedRoute(record);
 
   const sql = await getSql();
   await ensureTables(sql);
-  await sql`
+  const rows = await sql`
     INSERT INTO fuel_path_saved_routes (
       id, user_id, name, from_lat, from_lon, from_label, to_lat, to_lon, to_label, fuel,
       alert_enabled, alert_time_local, timezone, min_saving_dollars, max_detour_minutes,
@@ -120,11 +120,42 @@ async function upsertSavedRoute(record) {
       min_saving_dollars = EXCLUDED.min_saving_dollars,
       max_detour_minutes = EXCLUDED.max_detour_minutes,
       paused_until = EXCLUDED.paused_until,
-      last_alert_sent_at = EXCLUDED.last_alert_sent_at,
+      last_alert_sent_at = COALESCE(EXCLUDED.last_alert_sent_at, fuel_path_saved_routes.last_alert_sent_at),
       updated_at = EXCLUDED.updated_at,
       raw = EXCLUDED.raw
+    RETURNING *
   `;
-  return record;
+  return rows[0] ? rowToRoute(rows[0]) : record;
+}
+
+async function deleteSavedRoute({ routeId = "", userId = "" } = {}) {
+  const safeRouteId = cleanText(routeId);
+  const safeUserId = cleanText(userId);
+  if (!safeRouteId) throw new Error("routeId is required");
+  if (testStorage?.deleteSavedRoute) return testStorage.deleteSavedRoute({ routeId: safeRouteId, userId: safeUserId });
+  if (!databaseUrl()) {
+    const index = memoryStore.routes.findIndex((item) =>
+      item.id === safeRouteId && (!safeUserId || item.userId === safeUserId)
+    );
+    if (index < 0) return null;
+    const [deleted] = memoryStore.routes.splice(index, 1);
+    return deleted || null;
+  }
+
+  const sql = await getSql();
+  await ensureTables(sql);
+  const rows = safeUserId
+    ? await sql`
+      DELETE FROM fuel_path_saved_routes
+      WHERE id = ${safeRouteId} AND user_id = ${safeUserId}
+      RETURNING *
+    `
+    : await sql`
+      DELETE FROM fuel_path_saved_routes
+      WHERE id = ${safeRouteId}
+      RETURNING *
+    `;
+  return rows[0] ? rowToRoute(rows[0]) : null;
 }
 
 async function appendRouteAlertEvaluation(record) {
@@ -133,7 +164,7 @@ async function appendRouteAlertEvaluation(record) {
 
   const sql = await getSql();
   await ensureTables(sql);
-  await sql`
+  const inserted = await sql`
     INSERT INTO fuel_path_route_alert_evaluations (
       id, saved_route_id, user_id, status, reason, station_code, station_name,
       estimated_saving_dollars, detour_minutes, freshness_minutes, message_title, message_body,
@@ -146,8 +177,16 @@ async function appendRouteAlertEvaluation(record) {
       ${record.messageBody || null}, ${record.evaluatedAt}, ${record.pushDeliveryEnabled},
       ${record.pushTicketId || null}, ${record.pushReceiptStatus || null}, ${JSON.stringify(record)}
     )
+    ON CONFLICT (id) DO NOTHING
+    RETURNING *
   `;
-  return record;
+  if (inserted[0]) return record;
+  const existing = await sql`
+    SELECT * FROM fuel_path_route_alert_evaluations
+    WHERE id = ${record.id}
+    LIMIT 1
+  `;
+  return existing[0] ? { ...rowToEvaluation(existing[0]), _alreadyRecorded: true } : record;
 }
 
 async function updateRouteAlertDelivery({ evaluationId, pushTicketId = "", pushReceiptStatus = "" } = {}) {
@@ -345,6 +384,98 @@ async function listPendingPushTicketEvaluations({ limit = 100 } = {}) {
   `).map(rowToEvaluation);
 }
 
+async function purgeAlertRetention({
+  now = new Date().toISOString(),
+  dryRun = false,
+  inactiveDeviceDays = 90,
+  disabledRouteDays = 90,
+  evaluationDays = 180,
+} = {}) {
+  if (testStorage?.purgeAlertRetention) {
+    return testStorage.purgeAlertRetention({
+      now,
+      dryRun,
+      inactiveDeviceDays,
+      disabledRouteDays,
+      evaluationDays,
+    });
+  }
+
+  const deviceCutoff = cutoffIso(now, inactiveDeviceDays);
+  const routeCutoff = cutoffIso(now, disabledRouteDays);
+  const evaluationCutoff = cutoffIso(now, evaluationDays);
+  if (!databaseUrl()) {
+    return purgeMemoryAlertRetention({
+      dryRun,
+      deviceCutoff,
+      routeCutoff,
+      evaluationCutoff,
+    });
+  }
+
+  const sql = await getSql();
+  await ensureTables(sql);
+  if (dryRun) {
+    const [devices, routes, evaluations] = await Promise.all([
+      sql`
+        SELECT COUNT(*)::int AS count
+        FROM fuel_path_push_devices
+        WHERE status <> 'active'
+          AND COALESCE(invalidated_at, last_seen_at) < ${deviceCutoff}
+      `,
+      sql`
+        SELECT COUNT(*)::int AS count
+        FROM fuel_path_saved_routes
+        WHERE alert_enabled = false
+          AND updated_at < ${routeCutoff}
+      `,
+      sql`
+        SELECT COUNT(*)::int AS count
+        FROM fuel_path_route_alert_evaluations
+        WHERE evaluated_at < ${evaluationCutoff}
+      `,
+    ]);
+    return {
+      dryRun: true,
+      inactiveDeviceCutoff: deviceCutoff,
+      disabledRouteCutoff: routeCutoff,
+      evaluationCutoff,
+      deletedDeviceCount: Number(devices[0]?.count || 0),
+      deletedRouteCount: Number(routes[0]?.count || 0),
+      deletedEvaluationCount: Number(evaluations[0]?.count || 0),
+    };
+  }
+
+  const [devices, routes, evaluations] = await Promise.all([
+    sql`
+      DELETE FROM fuel_path_push_devices
+      WHERE status <> 'active'
+        AND COALESCE(invalidated_at, last_seen_at) < ${deviceCutoff}
+      RETURNING id
+    `,
+    sql`
+      DELETE FROM fuel_path_saved_routes
+      WHERE alert_enabled = false
+        AND updated_at < ${routeCutoff}
+      RETURNING id
+    `,
+    sql`
+      DELETE FROM fuel_path_route_alert_evaluations
+      WHERE evaluated_at < ${evaluationCutoff}
+      RETURNING id
+    `,
+  ]);
+  return {
+    dryRun: false,
+    inactiveDeviceCutoff: deviceCutoff,
+    disabledRouteCutoff: routeCutoff,
+    evaluationCutoff,
+    deletedDeviceCount: devices.length,
+    deletedRouteCount: routes.length,
+    deletedEvaluationCount: evaluations.length,
+  };
+}
+
 function upsertMemory(key, record) {
   const records = memoryStore[key];
   const index = records.findIndex((item) => item.id === record.id);
@@ -353,7 +484,25 @@ function upsertMemory(key, record) {
   return record;
 }
 
+function upsertMemorySavedRoute(record) {
+  const index = memoryStore.routes.findIndex((item) => item.id === record.id);
+  if (index < 0) {
+    memoryStore.routes.push(record);
+    return record;
+  }
+  const existing = memoryStore.routes[index];
+  const merged = {
+    ...record,
+    createdAt: existing.createdAt || record.createdAt,
+    lastAlertSentAt: record.lastAlertSentAt || existing.lastAlertSentAt,
+  };
+  memoryStore.routes[index] = merged;
+  return merged;
+}
+
 function appendMemoryEvaluation(record) {
+  const existing = memoryStore.evaluations.find((item) => item.id === record.id);
+  if (existing) return { ...existing, _alreadyRecorded: true };
   memoryStore.evaluations.push(record);
   if (memoryStore.evaluations.length > DEFAULT_MAX_RECORDS) {
     memoryStore.evaluations.splice(0, memoryStore.evaluations.length - DEFAULT_MAX_RECORDS);
@@ -368,6 +517,36 @@ function filterMemory(records, { userId = "", status = "", limit = 50 } = {}) {
     .filter((record) => (!safeUserId || record.userId === safeUserId) && (!safeStatus || record.status === safeStatus))
     .slice(-boundedLimit(limit))
     .reverse();
+}
+
+function purgeMemoryAlertRetention({
+  dryRun,
+  deviceCutoff,
+  routeCutoff,
+  evaluationCutoff,
+}) {
+  const staleDevice = (record) => record.status !== "active" && olderThan(record.invalidatedAt || record.lastSeenAt, deviceCutoff);
+  const staleRoute = (record) => record.alertEnabled === false && olderThan(record.updatedAt, routeCutoff);
+  const staleEvaluation = (record) => olderThan(record.evaluatedAt, evaluationCutoff);
+  const deletedDeviceCount = memoryStore.devices.filter(staleDevice).length;
+  const deletedRouteCount = memoryStore.routes.filter(staleRoute).length;
+  const deletedEvaluationCount = memoryStore.evaluations.filter(staleEvaluation).length;
+
+  if (!dryRun) {
+    memoryStore.devices = memoryStore.devices.filter((record) => !staleDevice(record));
+    memoryStore.routes = memoryStore.routes.filter((record) => !staleRoute(record));
+    memoryStore.evaluations = memoryStore.evaluations.filter((record) => !staleEvaluation(record));
+  }
+
+  return {
+    dryRun,
+    inactiveDeviceCutoff: deviceCutoff,
+    disabledRouteCutoff: routeCutoff,
+    evaluationCutoff,
+    deletedDeviceCount,
+    deletedRouteCount,
+    deletedEvaluationCount,
+  };
 }
 
 async function getSql() {
@@ -512,12 +691,16 @@ function rawObject(value) {
 }
 
 function rowToEvaluation(row) {
+  const raw = rawObject(row.raw);
   return {
     id: row.id,
     routeId: row.saved_route_id,
     userId: row.user_id,
     status: row.status,
     reason: row.reason,
+    outcome: raw.outcome,
+    outcomeLabel: raw.outcomeLabel,
+    outcomeSummary: raw.outcomeSummary,
     stationCode: row.station_code || undefined,
     stationName: row.station_name || undefined,
     estimatedSavingDollars: optionalNumber(row.estimated_saving_dollars),
@@ -550,6 +733,20 @@ function boundedLimit(value) {
   return Math.max(1, Math.min(DEFAULT_MAX_RECORDS, Number(value || 50)));
 }
 
+function cutoffIso(now, days) {
+  const base = new Date(now);
+  const safeBase = Number.isNaN(base.getTime()) ? new Date() : base;
+  const safeDays = Math.max(1, Number(days || 1));
+  return new Date(safeBase.getTime() - safeDays * 24 * 60 * 60 * 1000).toISOString();
+}
+
+function olderThan(value, cutoff) {
+  if (!value) return false;
+  const date = new Date(value);
+  const cutoffDate = new Date(cutoff);
+  return !Number.isNaN(date.getTime()) && !Number.isNaN(cutoffDate.getTime()) && date < cutoffDate;
+}
+
 function nullableNumber(value) {
   return Number.isFinite(value) ? value : null;
 }
@@ -574,10 +771,12 @@ module.exports = {
   alertStorageStatus,
   appendRouteAlertEvaluation,
   counts,
+  deleteSavedRoute,
   listPushDevices,
   listPendingPushTicketEvaluations,
   listRouteAlertEvaluations,
   listSavedRoutes,
+  purgeAlertRetention,
   setAlertStorageForTests,
   updatePushDeviceStatus,
   updateRouteAlertDelivery,

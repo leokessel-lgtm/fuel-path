@@ -1,0 +1,30 @@
+{
+  "privacyContact": "",
+  "privacyPolicyUrl": "https://fuel-path.vercel.app/web-demo/privacy",
+  "privacyPolicySource": "web-demo/privacy.html",
+  "appStoreUrl": "",
+  "googlePlayUrl": "",
+  "privacyContactConfirmed": false,
+  "storeListingLinksConfirmed": false,
+  "applePrivacyReviewed": false,
+  "applePrivacyReviewReference": "",
+  "googleDataSafetyReviewed": false,
+  "googleDataSafetyReviewReference": "",
+  "providerLimitationsDisclosed": false,
+  "providerLimitationsDisclosureReference": "",
+  "supportProcessReady": false,
+  "supportProcessReference": "",
+  "reviewedAt": "",
+  "reviewer": "",
+  "notes": [
+    "Copy this template to a private or release-specific evidence file before store submission.",
+    "Use a real Fuel Path privacy contact. Do not use example.com, placeholder, public personal inbox, personal temporary, generic public form URL or todo values. If the contact is a URL, it must be on a Fuel Path-owned host.",
+    "Use final HTTPS listing URLs from apps.apple.com and play.google.com. The Apple listing slug must match the native Expo slug in mobile-app/app.json, and the Google Play package must match the native Android package.",
+    "Keep privacyPolicySource pointed at the published policy source and ensure it contains the final privacy contact method before setting release flags.",
+    "Re-check Apple App Privacy and Google Play Data Safety answers against actual app behaviour before setting the review flags.",
+    "When review flags are true, fill the matching reference fields with dated source-like references for the same evidence category, such as STORE-DATA-SAFETY.md Apple App Privacy review 2026-06-20, STORE-DATA-SAFETY.md Google Data Safety review 2026-06-20, app-listing-provider-limitations-disclosure-ticket-2026-06-20 or SUPPORT-RUNBOOK.md support process review 2026-06-20. Any referenced .md source must exist beside this evidence file or in the repo, match the evidence category and not contain API tokens or secrets. Support process evidence must reference the support runbook or a runbook review source, not just an inbox confirmation. Reference dates must not be future-dated or older than 30 days by default.",
+    "When any release review flag is true, set reviewedAt to a non-future YYYY-MM-DD and reviewer to the accountable release reviewer, not a generic role. Review evidence must be no older than 30 days by default; any custom freshness window is capped at 90 days.",
+    "Confirm public copy discloses provider limitations and that support/contact handling is ready before setting the release flags.",
+    "The readiness gate treats legacy confirmation booleans as audit notes only. It will not clear without the concrete contact, Fuel Path-owned policy URL, both listing URLs, reviewed disclosure evidence and review metadata."
+  ]
+}

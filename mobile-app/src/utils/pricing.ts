@@ -1,4 +1,5 @@
 import { AppPreferences, Station, StationViewModel } from "../types";
+import { eligibleDiscountIds, isDiscountRedeemedToday } from "./discountRedemptions";
 
 const VALUE_DISTANCE_PENALTY_CPL_PER_KM = 0.85;
 
@@ -12,15 +13,22 @@ export function stationPriceView(
 
   let discountCpl = 0;
   let discountLabel = "";
+  const eligibleDiscounts = eligibleDiscountIds(preferences);
   for (const discount of station.discounts || []) {
     if (
-      preferences.selectedDiscounts.includes(discount.id) &&
+      eligibleDiscounts.includes(discount.id) &&
       Number(discount.centsPerLitre || 0) > discountCpl
     ) {
       discountCpl = Number(discount.centsPerLitre || 0);
       discountLabel = discount.label;
     }
   }
+  const possibleDiscount = bestPossibleDiscount(station, preferences);
+  const possibleDiscountCpl = Number(possibleDiscount?.centsPerLitre || 0);
+  const possibleLowerCpl =
+    possibleDiscount && possibleDiscountCpl > discountCpl
+      ? Math.max(0, pumpCpl - possibleDiscountCpl)
+      : undefined;
 
   return {
     station,
@@ -28,9 +36,41 @@ export function stationPriceView(
     adjustedCpl: Math.max(0, pumpCpl - discountCpl),
     discountCpl,
     discountLabel,
+    possibleLowerCpl,
+    possibleLowerLabel:
+      possibleLowerCpl !== undefined
+        ? possibleDiscountLabel(possibleDiscount, preferences)
+        : undefined,
+    possibleLowerDisclosure:
+      possibleLowerCpl !== undefined
+        ? "Possible lower price, not guaranteed."
+        : undefined,
+    possibleDiscountCpl: possibleLowerCpl !== undefined ? possibleDiscountCpl : undefined,
     distanceKm: Number(station.distanceKm || 0),
     fuel,
   };
+}
+
+function bestPossibleDiscount(station: Station, preferences: AppPreferences) {
+  if (preferences.selectedDiscounts.length === 0) return undefined;
+  return [...(station.discounts || [])]
+    .filter((discount) => Number(discount.centsPerLitre || 0) > 0)
+    .sort((left, right) => Number(right.centsPerLitre || 0) - Number(left.centsPerLitre || 0))
+    .find((discount) => {
+      const selected = preferences.selectedDiscounts.includes(discount.id);
+      return !selected || isDiscountRedeemedToday(preferences, discount.id);
+    });
+}
+
+function possibleDiscountLabel(
+  discount: NonNullable<Station["discounts"]>[number] | undefined,
+  preferences: AppPreferences,
+) {
+  if (!discount) return "";
+  if (preferences.selectedDiscounts.includes(discount.id)) {
+    return `${discount.label} possible if unused, not guaranteed`;
+  }
+  return `${discount.label} possible if configured, not guaranteed`;
 }
 
 export type TomorrowPriceView = {

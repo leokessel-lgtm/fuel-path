@@ -19,7 +19,7 @@ export function BrandBadge({ station, size = 34 }: { station: Station; size?: nu
       ]}
     >
       {style.icon ? (
-        <Image source={style.icon} style={styles.image} resizeMode="cover" />
+        <Image source={style.icon} style={styles.image} resizeMode="contain" />
       ) : (
         <Text style={[styles.initials, { fontSize: Math.max(10, size * 0.34) }]}>
           {style.initials}

@@ -26,6 +26,7 @@ const ROUTE_ALERT_CHANNEL_ID = "route-alerts";
 
 export async function configureRouteNotificationHandler() {
   if (Platform.OS === "web") return;
+  if (androidNotificationsUnavailableInExpoGo()) return;
 
   const Notifications = await import("expo-notifications");
   Notifications.setNotificationHandler({
@@ -46,6 +47,13 @@ export async function getRouteNotificationPermission(): Promise<PermissionResult
     };
   }
 
+  if (androidNotificationsUnavailableInExpoGo()) {
+    return {
+      state: "unavailable",
+      message: "Android Expo Go cannot run route notifications. Use a development or preview build.",
+    };
+  }
+
   const Notifications = await import("expo-notifications");
   const permission = await Notifications.getPermissionsAsync();
   return permissionResultForStatus(permission.status);
@@ -56,6 +64,13 @@ export async function requestRouteNotificationPermission(): Promise<PermissionRe
     return {
       state: "unavailable",
       message: "Route alerts need an iOS or Android build.",
+    };
+  }
+
+  if (androidNotificationsUnavailableInExpoGo()) {
+    return {
+      state: "unavailable",
+      message: "Android Expo Go cannot run route notifications. Use a development or preview build.",
     };
   }
 
@@ -76,6 +91,13 @@ export async function scheduleSavedCommuteAlert(commute: SavedCommute): Promise<
     return {
       status: "unavailable",
       message: "Alert scheduling needs an iOS or Android build.",
+    };
+  }
+
+  if (androidNotificationsUnavailableInExpoGo()) {
+    return {
+      status: "unavailable",
+      message: "Android Expo Go cannot schedule route notifications. Use a development or preview build.",
     };
   }
 
@@ -136,6 +158,13 @@ export async function getExpoRoutePushToken(): Promise<PushTokenResult> {
     };
   }
 
+  if (androidNotificationsUnavailableInExpoGo() || remotePushUnavailableInExpoGo()) {
+    return {
+      status: "unavailable",
+      message: "Backend push alerts need a development or preview build, not Expo Go.",
+    };
+  }
+
   try {
     const Notifications = await import("expo-notifications");
     await ensureRouteAlertChannel(Notifications);
@@ -160,7 +189,7 @@ export async function getExpoRoutePushToken(): Promise<PushTokenResult> {
     return {
       status: "ready",
       token: token.data,
-      message: "Push token ready.",
+      message: "Validation push token ready for backend alert sync.",
     };
   } catch {
     return {
@@ -171,7 +200,7 @@ export async function getExpoRoutePushToken(): Promise<PushTokenResult> {
 }
 
 export async function cancelSavedCommuteAlert(commute: SavedCommute): Promise<ScheduleResult> {
-  if (Platform.OS !== "web" && commute.scheduledNotificationId) {
+  if (Platform.OS !== "web" && !androidNotificationsUnavailableInExpoGo() && commute.scheduledNotificationId) {
     try {
       const Notifications = await import("expo-notifications");
       await Notifications.cancelScheduledNotificationAsync(commute.scheduledNotificationId);
@@ -205,7 +234,7 @@ function permissionResultForStatus(status: string): PermissionResult {
   if (status === "granted") {
     return {
       state: "granted",
-      message: "Route alerts are enabled for this device.",
+      message: "Route alert permission is enabled on this validation build.",
     };
   }
 
@@ -229,6 +258,14 @@ function expoProjectId() {
     Constants.easConfig?.projectId ||
     ""
   );
+}
+
+function remotePushUnavailableInExpoGo() {
+  return Constants.appOwnership === "expo";
+}
+
+function androidNotificationsUnavailableInExpoGo() {
+  return Platform.OS === "android" && Constants.appOwnership === "expo";
 }
 
 function parseAlertTime(value: string) {

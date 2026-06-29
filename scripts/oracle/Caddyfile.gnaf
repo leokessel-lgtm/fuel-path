@@ -1,0 +1,4 @@
+gnaf.152.69.175.222.sslip.io {
+  encode zstd gzip
+  reverse_proxy 127.0.0.1:8787
+}

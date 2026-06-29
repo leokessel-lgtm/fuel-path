@@ -60,6 +60,16 @@ module.exports = async function handler(req, res) {
         generatedAt: new Date().toISOString(),
         cacheHit: data.cacheHit,
         cacheAgeSeconds: data.cacheAgeSeconds,
+        cacheMode: data.cacheMode,
+        degraded: Boolean(data.degraded),
+        providerHealth: data.providerHealth || {},
+        provenance: {
+          source: data.source,
+          provider: data.provider,
+          cacheMode: data.cacheMode,
+          degraded: Boolean(data.degraded),
+          providerStatuses: providerStatuses(data.providerHealth),
+        },
         warning: data.warning,
       },
       stations: selected.map((station) => stationPayload(station, { fuel, distanceKm: station.distanceKm })),
@@ -84,4 +94,17 @@ function boundedNumberParam(value, name, fallback, { min, max, clampMax = true }
   if (parsed < min) throw new Error(`${name} must be at least ${min}`);
   if (!clampMax && parsed > max) throw new Error(`${name} must be at most ${max}`);
   return Math.min(parsed, max);
+}
+
+function providerStatuses(providerHealth = {}) {
+  return Object.fromEntries(
+    Object.entries(providerHealth).map(([provider, health]) => [
+      provider,
+      {
+        status: health?.status || "unknown",
+        cacheMode: health?.cacheMode || "none",
+        cacheAgeSeconds: Number.isFinite(Number(health?.cacheAgeSeconds)) ? Number(health.cacheAgeSeconds) : null,
+      },
+    ]),
+  );
 }

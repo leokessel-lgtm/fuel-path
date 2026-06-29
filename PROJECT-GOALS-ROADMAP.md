@@ -1,12 +1,86 @@
 # Fuel Path Project Goals And Roadmap
 
-Last updated: 17 June 2026, Australia/Sydney
+Last updated: 21 June 2026, Australia/Sydney
 
 ## Main Project Goals
 
 Fuel Path should be a whole-of-Australia fuel decision app, not a state-first fuel map. Feature depth can vary by jurisdiction, but every state and territory must have an explicit capability state so users never confuse missing data with a genuine recommendation.
 
 Fuel Path should stay focused on four differentiators.
+
+## Active Beta Readiness Blockers
+
+Before Fuel Path can be treated as safe enough for real-user beta testing, address the current readiness blockers:
+
+- provider usage, caching and attribution terms for NSW/ACT, QLD and TAS
+- iOS native validation
+- privacy/store evidence, including contact method, listing links, store privacy/data-safety review references and provider limitation disclosure
+- support readiness, including a concrete support process reference
+
+Android physical-device render and performance validation is now captured for the current preview APK on Pixel 9 Pro `49231FDAP0017N`; keep it current for later builds, but it is no longer the active beta blocker.
+
+Keep `npm run check:beta-readiness -- --api-base https://fuel-path.vercel.app --allow-blocked` as the summary gate until these are cleared.
+
+## Next Prioritised Phases
+
+The latest Gold Mining scorecard keeps the product focused on the highest-scoring ideas: net-savings route ranking, trust/freshness, the core drive decision, saved-route alerts and discount-aware real price. Treat these as validation phases, not proof that the market is already won.
+
+### Phase 1: Beta Evidence And Safe Test Gate
+
+**Priority:** P0 now.
+
+**Do next:**
+
+- Confirm provider usage, caching and attribution terms for NSW/ACT, QLD and TAS.
+- Capture iOS simulator or physical-device validation covering Plan, Nearby and Account.
+- Fill privacy contact, store listing links, Apple privacy review, Google Data Safety review, provider limitation disclosure and support-process evidence.
+- Keep Android performance evidence current for each preview APK and add a lower-end Android pass before broad public performance claims.
+
+**Why:** Real-user testing is not credible while the app is blocked on terms, iOS, store/privacy and support evidence.
+
+### Phase 2: Core Route Decision Validation
+
+**Priority:** P0 immediately after the safe test gate.
+
+**Do next:**
+
+- Run the route-decision behaviour test with commuters and high-frequency drivers.
+- Test real routes against the top recommendation, net saving, detour cost, freshness and "cheapest is not best" explanation.
+- Measure whether users would change a real fuel decision, not whether they like the concept.
+
+**Success signal:** At least 4 of 7 target users would change a real decision, 4 of 7 understand the recommendation without explanation, and at least 3 can explain why the cheapest pump price did or did not win.
+
+### Phase 3: Trust, Saved Routes And Real Price
+
+**Priority:** P1 once Phase 2 shows behaviour change.
+
+**Do next:**
+
+- Validate saved-route alert usefulness with commuter/high-frequency users.
+- Validate discount wallet comprehension with users who already use fuel discounts, dockets, clubs, Costco, fuel locks or fleet cards.
+- Keep freshness, confidence and source limitations visible in the same flow as the recommendation.
+
+**Success signal:** Saved-route alerts avoid feeling like fuel spam, users can set saving/detour thresholds, and discount users understand pump price versus confirmed adjusted price versus possible lower price.
+
+### Phase 4: Narrow Fleet-Lite Pilot
+
+**Priority:** P1/P2, only after consumer/high-frequency behaviour is promising.
+
+**Do next:**
+
+- Test "cheapest in policy" with 1 to 3 small operators.
+- Keep the pilot to approved brands/cards and a simple weekly report.
+- Avoid full fleet admin, payroll, driver management, billing and enterprise integrations.
+
+**Success signal:** At least one operator agrees to a follow-up pilot or gives concrete willingness-to-pay evidence.
+
+### Parked Until Evidence Improves
+
+- Payment or cashback marketplace.
+- Community price editing.
+- EV or mixed-fleet expansion.
+- Broad road-trip mode.
+- Prediction-led marketing before back-testing.
 
 ### Goal 1: Best Fuel Decision, Not Another Map
 
@@ -89,10 +163,10 @@ The app should represent all Australian states and territories as first-class re
 | ACT | Covered through API.NSW FuelCheck feed | Keep visible as ACT capability, confirm permitted usage terms |
 | QLD | Live provider adapter validated | Confirm licence/usage constraints before public/commercial launch |
 | WA | Live FuelWatch statewide v2 implemented | Monitor request budget, regional smoke coverage and tomorrow-price UX |
-| VIC | Pending Servo Saver API access | Implement adapter after approved schema is available |
-| SA | Pending access path | Confirm API/access process and implement adapter |
-| TAS | Pending provider implementation | Confirm feed access and implement adapter |
-| NT | Pending access path | Confirm MyFuel NT data/API access and implement adapter |
+| VIC | Access confirmed; schema/terms pending | Implement adapter after approved schema, licence, caching and attribution terms are captured |
+| SA | Live provider adapter validated | Configure production token server-side before live SA prices appear |
+| TAS | API.NSW Fuel API v2 path confirmed | Validate v2 payloads with approved credentials, then implement adapter |
+| NT | Pending access path | Confirm MyFuel NT API/data access and usage terms before implementation |
 
 Capability labels in the app and backend should be:
 
@@ -231,6 +305,7 @@ Goal 1 is the current priority. The product must first prove that it can make a 
 
 - One top recommendation card.
 - Short action label: fill here, fill on route, wait, skip, or top up.
+- `wait` is allowed only where a provider exposes locked future pricing, not from unproven prediction.
 - One primary reason.
 - One key risk or confidence cue.
 - Detail hidden behind a secondary disclosure.
@@ -357,6 +432,33 @@ The map should maximise useful viewing area, keep the route or nearby search are
 - At least 6 of 8 users say Fuel Path reduces manual comparison effort before public beta.
 
 **Priority:** P1, next.
+
+### 1.10 National Location Lookup Strategy
+
+**Objective:** Let users enter Australian addresses, suburbs and places reliably without making paid Google lookup the default build dependency.
+
+**Build scope:**
+
+- Use hosted G-NAF as the primary Australian street-address index.
+- Keep Fuel Path local hints, regional gazetteer records and station matches as the second lookup layer.
+- Use Google Places only as a backend-controlled fallback for POIs, landmarks and hard misses.
+- Keep Nominatim as validation-only fallback, not production autocomplete.
+- Expose address-index mode, external fallback mode, paid-fallback status and attribution in `/api/status`.
+- Require explicit paid-fallback enablement before Google Places can be called.
+- Apply session tokens, AU-only restrictions, field masks, cache rules, daily caps and fail-closed quota behaviour.
+- Show user-facing lookup states when an address is exact, broader, fallback-powered, unavailable or blocked by cost/quota controls.
+
+**Success metrics:**
+
+- Exact hosted G-NAF street-address matches call 0 external paid providers.
+- Google Places is called only when paid fallback is explicitly enabled and no strong G-NAF/local result exists.
+- 100% of Google Places requests use a session token, AU restriction and minimal field mask.
+- Daily Google fallback cap blocks further paid calls once reached.
+- `/api/status` clearly reports primary provider, hosted G-NAF mode, paid fallback state and cap.
+- 600-case national benchmark reports right-result rate, characters-to-correct-suggestion and provider-call count.
+- Users see a useful no-match or fallback-disabled state instead of a misleading blank result.
+
+**Priority:** P0, immediate.
 
 ## Goal 2 Breakdown
 
@@ -548,11 +650,12 @@ Prediction is not a headline feature until it earns trust.
 ### Now: Prove Goal 1
 
 1. Build the national provider capability matrix into backend status and user-facing capability states.
-2. Keep production-grade address suggestions behind the backend provider adapter.
-3. Keep route results to a useful decision set, with progressive expansion for long metro, regional and interstate routes.
-4. Keep stale-price severity for untrusted sources and region capability in recommendation confidence.
-5. Keep Plan Trip focused on trip intent, one recommendation and route map.
-6. Keep secondary setup behind Account or detail views.
+2. Roll out hosted G-NAF-first location lookup with controlled Google POI fallback.
+3. Keep production-grade address suggestions behind the backend provider adapter.
+4. Keep route results to a useful decision set, with progressive expansion for long metro, regional and interstate routes.
+5. Keep stale-price severity for untrusted sources and region capability in recommendation confidence.
+6. Keep Plan Trip focused on trip intent, one recommendation and route map.
+7. Keep secondary setup behind Account or detail views.
 
 ### Next: Make The Decision Trustworthy
 

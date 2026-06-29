@@ -2,6 +2,7 @@ const {
   alertsStatus,
   alertsWriteAuthorised,
   alertsWriteSecurity,
+  deleteBackendSavedRoute,
   evaluateSavedRouteAlert,
   listBackendAlertEvaluations,
   listBackendPushDevices,
@@ -80,6 +81,10 @@ module.exports = async function handler(req, res) {
       sendJson(res, 202, await saveBackendSavedRoute(req.body || {}));
       return;
     }
+    if (action === "delete-route") {
+      sendJson(res, 202, await deleteBackendSavedRoute(req.body || {}));
+      return;
+    }
     if (action === "evaluate") {
       sendJson(res, 202, await evaluateSavedRouteAlert(req.body || {}));
       return;
@@ -87,7 +92,7 @@ module.exports = async function handler(req, res) {
 
     sendJson(res, 400, {
       error: "Unsupported alert action.",
-      supportedActions: ["register-device", "save-route", "evaluate"],
+      supportedActions: ["register-device", "save-route", "delete-route", "evaluate"],
       alerts: await alertsStatus(),
     });
   } catch (error) {

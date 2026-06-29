@@ -1,11 +1,20 @@
 const assert = require("node:assert/strict");
 const { execFileSync } = require("node:child_process");
 const fs = require("node:fs");
+const http = require("node:http");
 const os = require("node:os");
 const path = require("node:path");
+const { DatabaseSync } = require("node:sqlite");
 const test = require("node:test");
 
-const { addressIndexStatus, searchAddressIndex } = require("../../api/_addressIndex");
+const {
+  addressIndexStatus,
+  addressSearchNeedles,
+  normaliseAddressText,
+  searchAddressIndex,
+  shouldSearchLargeSqliteIndex,
+  sqliteFtsTermsForNeedle,
+} = require("../../api/_addressIndex");
 const { geocode } = require("../../api/_backend");
 
 test("seeded AU address index resolves full address before external geocoding", async () => {
@@ -28,8 +37,8 @@ test("seeded AU address index resolves full address before external geocoding", 
   });
 });
 
-test("seeded AU address index handles abbreviations and suburb context", () => {
-  const suggestions = searchAddressIndex("87a corea st sylvania nsw 2224", 3);
+test("seeded AU address index handles abbreviations and suburb context", async () => {
+  const suggestions = await searchAddressIndex("87a corea st sylvania nsw 2224", 3);
 
   assert.equal(suggestions[0].label, "87A Corea Street, Sylvania NSW 2224");
   assert.equal(suggestions[0].confidence, "high");
@@ -52,12 +61,1200 @@ test("G-NAF SQLite index can be built and queried without a paid provider", asyn
 
   await withEnv({ FUEL_PATH_GNAF_SQLITE_PATH: outputPath }, async () => {
     const status = addressIndexStatus();
-    const suggestions = searchAddressIndex("66b easton ave sylvania", 3);
+    const suggestions = await searchAddressIndex("66b easton ave sylvania", 3);
 
     assert.equal(status.mode, "sqlite");
     assert.equal(suggestions[0].label, "66B Easton Avenue, Sylvania NSW 2224");
     assert.equal(suggestions[0].provider, "fuel_path_gnaf");
   });
+});
+
+test("G-NAF Core shaped rows index unit and slash address variants", async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-gnaf-core-"));
+  const inputPath = path.join(tempDir, "GNAF_CORE.psv");
+  const outputPath = path.join(tempDir, "gnaf-core.sqlite");
+  fs.writeFileSync(
+    inputPath,
+    [
+      [
+        "ADDRESS_DETAIL_PID",
+        "ADDRESS_LABEL",
+        "FLAT_TYPE",
+        "FLAT_NUMBER",
+        "NUMBER_FIRST",
+        "NUMBER_FIRST_SUFFIX",
+        "STREET_NAME",
+        "STREET_TYPE",
+        "LOCALITY_NAME",
+        "STATE",
+        "POSTCODE",
+        "ALIAS_PRINCIPAL",
+        "PRIMARY_SECONDARY",
+        "GEOCODE_TYPE",
+        "LONGITUDE",
+        "LATITUDE",
+      ].join("|"),
+      [
+        "GATEST0001",
+        "Unit 5, 34 South Coast Highway, Karratha WA 6714",
+        "Unit",
+        "5",
+        "34",
+        "",
+        "South Coast",
+        "Highway",
+        "Karratha",
+        "WA",
+        "6714",
+        "PRINCIPAL",
+        "SECONDARY",
+        "PROPERTY CENTROID",
+        "116.846",
+        "-20.736",
+      ].join("|"),
+      [
+        "GATEST0002",
+        "87A Corea Street, Sylvania NSW 2224",
+        "",
+        "",
+        "87",
+        "A",
+        "Corea",
+        "Street",
+        "Sylvania",
+        "NSW",
+        "2224",
+        "PRINCIPAL",
+        "PRIMARY",
+        "PROPERTY CENTROID",
+        "151.0997397",
+        "-34.0153146",
+      ].join("|"),
+      [
+        "GATEST0003",
+        "51 Princes Highway, Sylvania NSW 2224",
+        "",
+        "",
+        "51",
+        "",
+        "Princes",
+        "Highway",
+        "Sylvania",
+        "NSW",
+        "2224",
+        "PRINCIPAL",
+        "PRIMARY",
+        "PROPERTY CENTROID",
+        "151.11144796",
+        "-34.00692907",
+      ].join("|"),
+      [
+        "GATEST0004",
+        "Adina Serviced Apartments Canberra James Court, Unit 77, 74 Northbourne Avenue, Braddon ACT 2612",
+        "Unit",
+        "77",
+        "74",
+        "",
+        "Northbourne",
+        "Avenue",
+        "Braddon",
+        "ACT",
+        "2612",
+        "PRINCIPAL",
+        "SECONDARY",
+        "PROPERTY CENTROID",
+        "149.1323",
+        "-35.2749",
+      ].join("|"),
+    ].join("\n"),
+  );
+
+  execFileSync(
+    process.execPath,
+    [
+      "scripts/build-gnaf-address-index.mjs",
+      "--input",
+      inputPath,
+      "--output",
+      outputPath,
+    ],
+    { cwd: path.resolve(__dirname, "../.."), stdio: "ignore" },
+  );
+
+  await withEnv({ FUEL_PATH_GNAF_SQLITE_PATH: outputPath }, async () => {
+    const unitSuggestions = await searchAddressIndex("5/34 south coast highway karratha", 3);
+    const suffixSuggestions = await searchAddressIndex("87a corea street sylvania", 3);
+    const highwaySuggestions = await searchAddressIndex("51 Princes Hwy, Sylvania NSW 2224", 3);
+    const complexSuggestions = await searchAddressIndex(
+      "Adina Serviced Apartments Canberra James Court Unit 77 74 Northbourne Ave Braddon ACT",
+      3,
+    );
+
+    assert.equal(unitSuggestions[0].label, "Unit 5, 34 South Coast Highway, Karratha WA 6714");
+    assert.equal(unitSuggestions[0].provider, "fuel_path_gnaf");
+    assert.equal(unitSuggestions[0].displayTitle, "Unit 5");
+    assert.equal(unitSuggestions[0].displaySubtitle, "34 South Coast Highway, Karratha WA 6714");
+    assert.equal(unitSuggestions[0].sourceLabel, "Exact address");
+    assert.equal(suffixSuggestions[0].label, "87A Corea Street, Sylvania NSW 2224");
+    assert.equal(highwaySuggestions[0].label, "51 Princes Highway, Sylvania NSW 2224");
+    assert.equal(highwaySuggestions[0].matchType, "exact_address");
+    assert.equal(
+      complexSuggestions[0].label,
+      "Adina Serviced Apartments Canberra James Court, Unit 77, 74 Northbourne Avenue, Braddon ACT 2612",
+    );
+    assert.equal(complexSuggestions[0].provider, "fuel_path_gnaf");
+    assert.equal(complexSuggestions[0].displayTitle, "Adina Serviced Apartments Canberra James Court, Unit 77");
+    assert.equal(complexSuggestions[0].displaySubtitle, "74 Northbourne Avenue, Braddon ACT 2612");
+  });
+});
+
+test("address normalisation covers common Australian street abbreviations", () => {
+  assert.equal(normaliseAddressText("51 Princes Hwy, Sylvania NSW 2224"), "51 princes highway sylvania nsw 2224");
+  assert.equal(normaliseAddressText("10 Smith Cct, Bruce ACT"), "10 smith circuit bruce act");
+  assert.equal(normaliseAddressText("3 Harbour Tce & Cnr Bay Rd"), "3 harbour terrace corner bay road");
+  assert.equal(normaliseAddressText("8 Ocean Pkwy, Mt Martha VIC"), "8 ocean parkway mount martha vic");
+});
+
+test("complex unit queries produce address-core search needles", () => {
+  const needles = addressSearchNeedles(
+    "Adina Serviced Apartments Canberra James Court Unit 77 74 Northbourne Ave Braddon ACT",
+  ).map((item) => item.needle);
+  const buildingAliasNeedles = addressSearchNeedles("Building 5, 34 South Coast Highway, Karratha WA 6714").map((item) => item.needle);
+  const suiteAliasNeedles = addressSearchNeedles("Suite 2, 22 Paterson Street Tennant Creek NT 0860").map((item) => item.needle);
+  const bldgAliasNeedles = addressSearchNeedles("Bldg 2, 22 Paterson Street Tennant Creek NT 0860").map((item) => item.needle);
+  const blgAliasNeedles = addressSearchNeedles("Blg 2, 12 Hutchison Street Coober Pedy SA 5723").map((item) => item.needle);
+  const steAliasNeedles = addressSearchNeedles("Ste 3, 15 Wonga Street Longreach QLD 4730").map((item) => item.needle);
+
+  assert.ok(needles.includes("unit 77 74 northbourne avenue braddon act"));
+  assert.ok(needles.includes("74 northbourne avenue braddon act"));
+  assert.ok(buildingAliasNeedles.includes("unit 5 34 south coast highway karratha wa 6714"));
+  assert.ok(suiteAliasNeedles.includes("unit 2 22 paterson street tennant creek nt 0860"));
+  assert.ok(bldgAliasNeedles.includes("unit 2 22 paterson street tennant creek nt 0860"));
+  assert.ok(blgAliasNeedles.includes("unit 2 12 hutchison street coober pedy sa 5723"));
+  assert.ok(steAliasNeedles.includes("unit 3 15 wonga street longreach qld 4730"));
+});
+
+test("large G-NAF SQLite searches skip broad prefixes and drop noisy address tokens", async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-gnaf-large-gate-"));
+  const inputPath = path.join(tempDir, "GNAF_CORE.psv");
+  const outputPath = path.join(tempDir, "gnaf-large-gate.sqlite");
+  fs.writeFileSync(
+    inputPath,
+    [
+      "ADDRESS_DETAIL_PID|ADDRESS_LABEL|FLAT_TYPE|FLAT_NUMBER|NUMBER_FIRST|NUMBER_FIRST_SUFFIX|STREET_NAME|STREET_TYPE|LOCALITY_NAME|STATE|POSTCODE|GEOCODE_TYPE|LONGITUDE|LATITUDE",
+      "GATEST0001|Unit 8, 21 Lanyon Drive, Tuggeranong ACT 2900|Unit|8|21||Lanyon|Drive|Tuggeranong|ACT|2900|PROPERTY CENTROID|149.065|-35.414",
+      "GATEST0002|66B Easton Avenue, Sylvania NSW 2224|||66|B|Easton|Avenue|Sylvania|NSW|2224|PROPERTY CENTROID|151.0993847|-34.0114122",
+      "GATEST0003|Townhouse 3, 44 Beltana Road, Pialligo ACT 2609|Townhouse|3|44||Beltana|Road|Pialligo|ACT|2609|PROPERTY CENTROID|149.181|-35.302",
+    ].join("\n"),
+  );
+
+  execFileSync(
+    process.execPath,
+    [
+      "scripts/build-gnaf-address-index.mjs",
+      "--input",
+      inputPath,
+      "--output",
+      outputPath,
+    ],
+    { cwd: path.resolve(__dirname, "../.."), stdio: "ignore" },
+  );
+
+  assert.equal(shouldSearchLargeSqliteIndex("22 pat"), false);
+  assert.equal(shouldSearchLargeSqliteIndex("22 paterson tennant"), true);
+  assert.deepEqual(sqliteFtsTermsForNeedle("Townhouse 3 44 Beltana Road Pialligo"), ["44", "beltana", "pialligo"]);
+  assert.deepEqual(sqliteFtsTermsForNeedle("8/21 Lanyon Drive Tuggeranong ACT"), ["21", "lanyon", "tuggeranong", "act"]);
+  assert.deepEqual(sqliteFtsTermsForNeedle("Unit 1005 3-5 Gardiner Street Darwin City NT"), ["1005", "3", "5", "gardiner", "darwin", "city", "nt"]);
+
+  await withEnv(
+    {
+      FUEL_PATH_GNAF_SQLITE_PATH: outputPath,
+      FUEL_PATH_GNAF_LARGE_SQLITE_BYTES: "1",
+    },
+    async () => {
+      assert.deepEqual(await searchAddressIndex("22 pat", 3), []);
+
+      const unitSuggestions = await searchAddressIndex("8/21 Lanyon Drive Tuggeranong ACT", 3);
+      const suffixSuggestions = await searchAddressIndex("66B Easton Avenue Sylvania", 3);
+      const townhouseSuggestions = await searchAddressIndex("Townhouse 3 44 Beltana Road Pialligo", 3);
+
+      assert.equal(unitSuggestions[0].label, "Unit 8, 21 Lanyon Drive, Tuggeranong ACT 2900");
+      assert.equal(suffixSuggestions[0].label, "66B Easton Avenue, Sylvania NSW 2224");
+      assert.equal(townhouseSuggestions[0].label, "Townhouse 3, 44 Beltana Road, Pialligo ACT 2609");
+    },
+  );
+});
+
+test("G-NAF SQLite exact address ranking beats nearby house numbers", async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-gnaf-exact-rank-"));
+  const inputPath = path.join(tempDir, "GNAF_CORE.psv");
+  const outputPath = path.join(tempDir, "gnaf-exact-rank.sqlite");
+  fs.writeFileSync(
+    inputPath,
+    [
+      "ADDRESS_DETAIL_PID|ADDRESS_LABEL|NUMBER_FIRST|STREET_NAME|STREET_TYPE|LOCALITY_NAME|STATE|POSTCODE|GEOCODE_TYPE|LONGITUDE|LATITUDE",
+      "GATEST0012|12 Adelaide Street, Balgowlah Heights NSW 2093|12|Adelaide|Street|Balgowlah Heights|NSW|2093|PROPERTY CENTROID|151.2581|-33.8071",
+      "GATEST0001|1 Adelaide Street, Balgowlah Heights NSW 2093|1|Adelaide|Street|Balgowlah Heights|NSW|2093|PROPERTY CENTROID|151.2589|-33.8079",
+      "GATEST0011|11 Adelaide Street, Balgowlah Heights NSW 2093|11|Adelaide|Street|Balgowlah Heights|NSW|2093|PROPERTY CENTROID|151.2583|-33.8073",
+    ].join("\n"),
+  );
+
+  execFileSync(
+    process.execPath,
+    [
+      "scripts/build-gnaf-address-index.mjs",
+      "--input",
+      inputPath,
+      "--output",
+      outputPath,
+    ],
+    { cwd: path.resolve(__dirname, "../.."), stdio: "ignore" },
+  );
+
+  await withEnv({ FUEL_PATH_GNAF_SQLITE_PATH: outputPath }, async () => {
+    const suggestions = await searchAddressIndex("1 Adelaide Street Balgowlah Heights NSW 2093", 3);
+
+    assert.equal(suggestions[0].label, "1 Adelaide Street, Balgowlah Heights NSW 2093");
+    assert.equal(suggestions[0].matchType, "exact_address");
+  });
+});
+
+test("hybrid typeahead avoids same-street wrong locality and preserves exact unit intent", async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-gnaf-hybrid-safety-"));
+  const inputPath = path.join(tempDir, "GNAF_CORE.psv");
+  const outputPath = path.join(tempDir, "gnaf-hybrid-safety.sqlite");
+  fs.writeFileSync(
+    inputPath,
+    [
+      [
+        "ADDRESS_DETAIL_PID",
+        "ADDRESS_LABEL",
+        "BUILDING_NAME",
+        "FLAT_TYPE",
+        "FLAT_NUMBER",
+        "NUMBER_FIRST",
+        "STREET_NAME",
+        "STREET_TYPE",
+        "LOCALITY_NAME",
+        "STATE",
+        "POSTCODE",
+        "GEOCODE_TYPE",
+        "LONGITUDE",
+        "LATITUDE",
+      ].join("|"),
+      [
+        "GAACT0201",
+        "279 Canberra Avenue, Symonston ACT 2609",
+        "",
+        "",
+        "",
+        "279",
+        "Canberra",
+        "Avenue",
+        "Symonston",
+        "ACT",
+        "2609",
+        "PROPERTY CENTROID",
+        "149.160",
+        "-35.346",
+      ].join("|"),
+      [
+        "GAACT0202",
+        "279 Canberra Avenue, Fyshwick ACT 2609",
+        "",
+        "",
+        "",
+        "279",
+        "Canberra",
+        "Avenue",
+        "Fyshwick",
+        "ACT",
+        "2609",
+        "PROPERTY CENTROID",
+        "149.171",
+        "-35.331",
+      ].join("|"),
+      [
+        "GAACT0203",
+        "Canberra Lakes Estate, Unit 65, 11 Joy Cummings Place, Belconnen ACT 2617",
+        "Canberra Lakes Estate",
+        "Unit",
+        "65",
+        "11",
+        "Joy Cummings",
+        "Place",
+        "Belconnen",
+        "ACT",
+        "2617",
+        "PROPERTY CENTROID",
+        "149.079",
+        "-35.240",
+      ].join("|"),
+      [
+        "GAACT0204",
+        "Canberra Lakes Estate, Unit 8, 11 Joy Cummings Place, Belconnen ACT 2617",
+        "Canberra Lakes Estate",
+        "Unit",
+        "8",
+        "11",
+        "Joy Cummings",
+        "Place",
+        "Belconnen",
+        "ACT",
+        "2617",
+        "PROPERTY CENTROID",
+        "149.080",
+        "-35.241",
+      ].join("|"),
+      [
+        "GANT0205",
+        "100 Smith Street, Darwin City NT 0800",
+        "",
+        "",
+        "",
+        "100",
+        "Smith",
+        "Street",
+        "Darwin City",
+        "NT",
+        "0800",
+        "PROPERTY CENTROID",
+        "130.841",
+        "-12.463",
+      ].join("|"),
+      [
+        "GAQLD0206",
+        "Shop 8, 110 Queen Street, Brisbane City QLD 4000",
+        "",
+        "Shop",
+        "8",
+        "110",
+        "Queen",
+        "Street",
+        "Brisbane City",
+        "QLD",
+        "4000",
+        "PROPERTY CENTROID",
+        "153.025",
+        "-27.468",
+      ].join("|"),
+    ].join("\n"),
+  );
+
+  execFileSync(
+    process.execPath,
+    [
+      "scripts/build-gnaf-address-index.mjs",
+      "--input",
+      inputPath,
+      "--output",
+      outputPath,
+    ],
+    { cwd: path.resolve(__dirname, "../.."), stdio: "ignore" },
+  );
+
+  await withEnv({ FUEL_PATH_GNAF_SQLITE_PATH: outputPath }, async () => {
+    const symonstonSuggestions = await searchAddressIndex("279 Canberra Avenue Symonston", 3);
+    const unitSuggestions = await searchAddressIndex("Canberra Lakes Estate Unit 65 11 Joy Cummings Place Belconnen", 3);
+    const baseSuggestions = await searchAddressIndex("Canberra Lakes Estate", 3);
+    const missingSmithSuggestions = await searchAddressIndex("10 Smith Street Darwin NT", 3);
+    const missingQueenSuggestions = await searchAddressIndex("8 Queen Street Brisbane QLD", 3);
+
+    assert.equal(symonstonSuggestions[0].label, "279 Canberra Avenue, Symonston ACT 2609");
+    assert.equal(unitSuggestions[0].label, "Canberra Lakes Estate, Unit 65, 11 Joy Cummings Place, Belconnen ACT 2617");
+    assert.equal(unitSuggestions[0].refineRequired, false);
+    assert.equal(baseSuggestions[0].refineRequired, true);
+    assert.equal(baseSuggestions[0].sourceLabel, "Building");
+    assert.deepEqual(missingSmithSuggestions, []);
+    assert.deepEqual(missingQueenSuggestions, []);
+  });
+});
+
+test("geocode search context promotes nearby ambiguous G-NAF address", async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-gnaf-context-rank-"));
+  const inputPath = path.join(tempDir, "GNAF_CORE.psv");
+  const outputPath = path.join(tempDir, "gnaf-context-rank.sqlite");
+  fs.writeFileSync(
+    inputPath,
+    [
+      "ADDRESS_DETAIL_PID|ADDRESS_LABEL|NUMBER_FIRST|STREET_NAME|STREET_TYPE|LOCALITY_NAME|STATE|POSTCODE|GEOCODE_TYPE|LONGITUDE|LATITUDE",
+      "GAWA1001|8 Chamberlain Place, Augusta WA 6290|8|Chamberlain|Place|Augusta|WA|6290|PROPERTY CENTROID|115.159|-34.315",
+      "GAWA1002|8 Chamberlain Place, Heathridge WA 6027|8|Chamberlain|Place|Heathridge|WA|6027|PROPERTY CENTROID|115.763|-31.760",
+      "GAACT1003|Rose Cottage Inn, 1 Isabella Drive, Tuggeranong ACT 2900|1|Isabella|Drive|Tuggeranong|ACT|2900|PROPERTY CENTROID|149.144|-35.405",
+      "GAACT1004|Rose Cottage Inn, 1 Isabella Drive, Gilmore ACT 2905|1|Isabella|Drive|Gilmore|ACT|2905|PROPERTY CENTROID|149.142|-35.406",
+    ].join("\n"),
+  );
+
+  execFileSync(
+    process.execPath,
+    [
+      "scripts/build-gnaf-address-index.mjs",
+      "--input",
+      inputPath,
+      "--output",
+      outputPath,
+      "--omit-legacy-fts",
+      "--omit-search-backstop",
+    ],
+    { cwd: path.resolve(__dirname, "../.."), stdio: "ignore" },
+  );
+
+  await withEnv({ FUEL_PATH_GNAF_SQLITE_PATH: outputPath, FUEL_PATH_GEOCODE_PROVIDER: "nominatim" }, async () => {
+    const uncontextualised = await geocode({
+      query: "8 Chamberlain Place",
+      limit: 2,
+      sessionToken: "context-rank-none",
+    });
+    const contextualised = await geocode({
+      query: "8 Chamberlain Place",
+      limit: 2,
+      sessionToken: "context-rank-near",
+      searchContext: {
+        nearLat: -31.760,
+        nearLon: 115.763,
+        nearRadiusKm: 40,
+      },
+    });
+    const buildingNameContextualised = await geocode({
+      query: "Rose Cottage Inn",
+      limit: 2,
+      sessionToken: "context-rank-building-name",
+      searchContext: {
+        nearLat: -35.405,
+        nearLon: 149.144,
+        nearRadiusKm: 40,
+      },
+    });
+
+    assert.equal(uncontextualised.suggestions[0].label, "8 Chamberlain Place, Augusta WA 6290");
+    assert.equal(contextualised.suggestions[0].label, "8 Chamberlain Place, Heathridge WA 6027");
+    assert.equal(contextualised.suggestions[0].provider, "fuel_path_gnaf");
+    assert.equal(buildingNameContextualised.suggestions[0].label, "Rose Cottage Inn, 1 Isabella Drive, Tuggeranong ACT 2900");
+    assert.equal(buildingNameContextualised.suggestions[0].provider, "fuel_path_gnaf");
+  });
+});
+
+test("geocode promotes base refine suggestion for ambiguous building prefixes", async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-gnaf-building-refine-"));
+  const inputPath = path.join(tempDir, "GNAF_CORE.psv");
+  const outputPath = path.join(tempDir, "gnaf-building-refine.sqlite");
+  fs.writeFileSync(
+    inputPath,
+    [
+      "ADDRESS_DETAIL_PID|ADDRESS_LABEL|BUILDING_NAME|FLAT_TYPE|FLAT_NUMBER|NUMBER_FIRST|STREET_NAME|STREET_TYPE|LOCALITY_NAME|STATE|POSTCODE|GEOCODE_TYPE|LONGITUDE|LATITUDE",
+      "GAWA2001|Karratha City Plaza, Shop 9, 16 Sharpe Avenue, Karratha WA 6714|Karratha City Plaza|Shop|9|16|Sharpe|Avenue|Karratha|WA|6714|PROPERTY CENTROID|116.846|-20.736",
+      "GAWA2002|Karratha City Plaza, Shop 11, 16 Sharpe Avenue, Karratha WA 6714|Karratha City Plaza|Shop|11|16|Sharpe|Avenue|Karratha|WA|6714|PROPERTY CENTROID|116.8461|-20.7361",
+      "GAWA2003|Karratha City Plaza, Shop 14, 16 Sharpe Avenue, Karratha WA 6714|Karratha City Plaza|Shop|14|16|Sharpe|Avenue|Karratha|WA|6714|PROPERTY CENTROID|116.8462|-20.7362",
+      "GAACT2004|Australian Taxation Office, 40 Cameron Avenue, Belconnen ACT 2617|Australian Taxation Office|||40|Cameron|Avenue|Belconnen|ACT|2617|PROPERTY CENTROID|149.070|-35.240",
+    ].join("\n"),
+  );
+
+  execFileSync(
+    process.execPath,
+    [
+      "scripts/build-gnaf-address-index.mjs",
+      "--input",
+      inputPath,
+      "--output",
+      outputPath,
+      "--omit-legacy-fts",
+      "--omit-search-backstop",
+    ],
+    { cwd: path.resolve(__dirname, "../.."), stdio: "ignore" },
+  );
+
+  await withEnv({ FUEL_PATH_GNAF_SQLITE_PATH: outputPath, FUEL_PATH_GEOCODE_PROVIDER: "nominatim" }, async () => {
+    const buildingOnly = await geocode({
+      query: "Karratha City Plaza",
+      limit: 3,
+      sessionToken: "building-refine-only",
+    });
+    const exactShop = await geocode({
+      query: "Karratha City Plaza Shop 14",
+      limit: 3,
+      sessionToken: "building-refine-shop",
+    });
+    const officeBuilding = await geocode({
+      query: "Australian Taxation Of",
+      limit: 3,
+      sessionToken: "building-refine-office-word",
+      searchContext: {
+        nearLat: -35.240,
+        nearLon: 149.070,
+        nearRadiusKm: 80,
+      },
+    });
+
+    assert.equal(buildingOnly.suggestions[0].label, "Karratha City Plaza, 16 Sharpe Avenue, Karratha WA 6714");
+    assert.equal(buildingOnly.suggestions[0].refineRequired, true);
+    assert.equal(buildingOnly.suggestions[0].matchType, "building_refine");
+    assert.equal(exactShop.suggestions[0].label, "Karratha City Plaza, Shop 14, 16 Sharpe Avenue, Karratha WA 6714");
+    assert.equal(exactShop.suggestions[0].refineRequired, false);
+    assert.equal(officeBuilding.suggestions[0].label, "Australian Taxation Office, 40 Cameron Avenue, Belconnen ACT 2617");
+    assert.equal(officeBuilding.suggestions[0].refineRequired, false);
+  });
+});
+
+test("number-first context keeps nearby exact address ahead of remote base refine", async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-gnaf-refine-number-context-"));
+  const inputPath = path.join(tempDir, "GNAF_CORE.psv");
+  const outputPath = path.join(tempDir, "gnaf-refine-number-context.sqlite");
+  fs.writeFileSync(
+    inputPath,
+    [
+      "ADDRESS_DETAIL_PID|ADDRESS_LABEL|BUILDING_NAME|FLAT_TYPE|FLAT_NUMBER|NUMBER_FIRST|STREET_NAME|STREET_TYPE|LOCALITY_NAME|STATE|POSTCODE|GEOCODE_TYPE|LONGITUDE|LATITUDE",
+      "GANSW3001|Tamworth Shops, Shop 1, 93 Tamworth Street, Dubbo NSW 2830|Tamworth Shops|Shop|1|93|Tamworth|Street|Dubbo|NSW|2830|PROPERTY CENTROID|148.601|-32.244",
+      "GANSW3002|Tamworth Shops, Shop 2, 93 Tamworth Street, Dubbo NSW 2830|Tamworth Shops|Shop|2|93|Tamworth|Street|Dubbo|NSW|2830|PROPERTY CENTROID|148.6011|-32.2441",
+      "GANSW3003|Tamworth Shops, Shop 3, 93 Tamworth Street, Dubbo NSW 2830|Tamworth Shops|Shop|3|93|Tamworth|Street|Dubbo|NSW|2830|PROPERTY CENTROID|148.6012|-32.2442",
+      "GANSW3004|93 Tamworth Street, Abermain NSW 2326||||93|Tamworth|Street|Abermain|NSW|2326|PROPERTY CENTROID|151.428|-32.807",
+    ].join("\n"),
+  );
+
+  execFileSync(
+    process.execPath,
+    [
+      "scripts/build-gnaf-address-index.mjs",
+      "--input",
+      inputPath,
+      "--output",
+      outputPath,
+      "--omit-legacy-fts",
+      "--omit-search-backstop",
+    ],
+    { cwd: path.resolve(__dirname, "../.."), stdio: "ignore" },
+  );
+
+  await withEnv({ FUEL_PATH_GNAF_SQLITE_PATH: outputPath, FUEL_PATH_GEOCODE_PROVIDER: "nominatim" }, async () => {
+    const contextualised = await geocode({
+      query: "93 Tamworth S",
+      limit: 5,
+      sessionToken: "refine-number-context",
+      searchContext: {
+        nearLat: -32.807,
+        nearLon: 151.428,
+        nearRadiusKm: 80,
+      },
+    });
+
+    assert.equal(contextualised.suggestions[0].label, "93 Tamworth Street, Abermain NSW 2326");
+    assert.equal(contextualised.suggestions[0].refineRequired, false);
+    assert.ok(contextualised.suggestions.every((suggestion) => suggestion.label !== "Tamworth Shops, 93 Tamworth Street, Dubbo NSW 2830"));
+  });
+});
+
+test("contextual unit prefixes use nearby prefix rows instead of broad typeahead", async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-gnaf-context-prefix-unit-"));
+  const inputPath = path.join(tempDir, "GNAF_CORE.psv");
+  const outputPath = path.join(tempDir, "gnaf-context-prefix-unit.sqlite");
+  fs.writeFileSync(
+    inputPath,
+    [
+      "ADDRESS_DETAIL_PID|ADDRESS_LABEL|FLAT_TYPE|FLAT_NUMBER|NUMBER_FIRST|STREET_NAME|STREET_TYPE|LOCALITY_NAME|STATE|POSTCODE|GEOCODE_TYPE|LONGITUDE|LATITUDE",
+      "GAWA4001|Unit 1, 10 Roy Road, Coodanup WA 6210|Unit|1|10|Roy|Road|Coodanup|WA|6210|PROPERTY CENTROID|115.750|-32.550",
+      "GAVIC4002|Unit 1, 10 Roseland Road, Wodonga VIC 3690|Unit|1|10|Roseland|Road|Wodonga|VIC|3690|PROPERTY CENTROID|146.887|-36.123",
+      "GANSW4003|Unit 1, 10 Rocca Street, Ryde NSW 2112|Unit|1|10|Rocca|Street|Ryde|NSW|2112|PROPERTY CENTROID|151.105|-33.810",
+    ].join("\n"),
+  );
+
+  execFileSync(
+    process.execPath,
+    [
+      "scripts/build-gnaf-address-index.mjs",
+      "--input",
+      inputPath,
+      "--output",
+      outputPath,
+      "--omit-legacy-fts",
+      "--omit-search-backstop",
+    ],
+    { cwd: path.resolve(__dirname, "../.."), stdio: "ignore" },
+  );
+
+  await withEnv({ FUEL_PATH_GNAF_SQLITE_PATH: outputPath, FUEL_PATH_GEOCODE_PROVIDER: "nominatim" }, async () => {
+    const contextualised = await geocode({
+      query: "Unit 1 10 Ro",
+      limit: 3,
+      sessionToken: "context-prefix-unit",
+      searchContext: {
+        nearLat: -36.123,
+        nearLon: 146.887,
+        nearRadiusKm: 80,
+      },
+    });
+
+    assert.equal(contextualised.suggestions[0].label, "Unit 1, 10 Roseland Road, Wodonga VIC 3690");
+    assert.equal(contextualised.suggestions[0].refineRequired, false);
+  });
+});
+
+test("building-first unit query can resolve exact unit from indexed base signature", async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-gnaf-exact-unit-refine-"));
+  const inputPath = path.join(tempDir, "GNAF_CORE.psv");
+  const outputPath = path.join(tempDir, "gnaf-exact-unit-refine.sqlite");
+  fs.writeFileSync(
+    inputPath,
+    [
+      "ADDRESS_DETAIL_PID|ADDRESS_LABEL|BUILDING_NAME|FLAT_TYPE|FLAT_NUMBER|NUMBER_FIRST|STREET_NAME|STREET_TYPE|LOCALITY_NAME|STATE|POSTCODE|GEOCODE_TYPE|LONGITUDE|LATITUDE",
+      "GAACT5001|Tuggeranong Business Centre, Unit 1, 12 Kett Street, Kambah ACT 2902|Tuggeranong Business Centre|Unit|1|12|Kett|Street|Kambah|ACT|2902|PROPERTY CENTROID|149.063|-35.378",
+      "GAACT5002|Tuggeranong Business Centre, Unit 2, 12 Kett Street, Kambah ACT 2902|Tuggeranong Business Centre|Unit|2|12|Kett|Street|Kambah|ACT|2902|PROPERTY CENTROID|149.064|-35.379",
+      "GAACT5003|Tuggeranong Business Centre, Unit 3, 12 Kett Street, Kambah ACT 2902|Tuggeranong Business Centre|Unit|3|12|Kett|Street|Kambah|ACT|2902|PROPERTY CENTROID|149.065|-35.380",
+    ].join("\n"),
+  );
+
+  execFileSync(
+    process.execPath,
+    [
+      "scripts/build-gnaf-address-index.mjs",
+      "--input",
+      inputPath,
+      "--output",
+      outputPath,
+      "--omit-legacy-fts",
+      "--omit-search-backstop",
+    ],
+    { cwd: path.resolve(__dirname, "../.."), stdio: "ignore" },
+  );
+
+  await withEnv({ FUEL_PATH_GNAF_SQLITE_PATH: outputPath, FUEL_PATH_GEOCODE_PROVIDER: "nominatim" }, async () => {
+    const sqlite = new DatabaseSync(outputPath, { readOnly: true });
+    const indexSql = sqlite.prepare("SELECT sql FROM sqlite_master WHERE name = ?").get("address_typeahead_base_unit_idx").sql;
+    sqlite.close();
+
+    const indexResults = await searchAddressIndex("Tuggeranong Business Centre Unit 2 12 Kett Street Kambah ACT 2902", 3);
+    const partialUnitRefine = await searchAddressIndex("Tuggeranong Business Centre Un", 3, {
+      searchContext: {
+        nearLat: -35.379,
+        nearLon: 149.064,
+      },
+    });
+    const bareUnitRefine = await searchAddressIndex("Tuggeranong Business Centre Unit", 3, {
+      searchContext: {
+        nearLat: -35.379,
+        nearLon: 149.064,
+      },
+    });
+    const buildingUnitOnly = await searchAddressIndex("Tuggeranong Business Centre Unit 2", 3, {
+      searchContext: {
+        nearLat: -35.379,
+        nearLon: 149.064,
+      },
+    });
+    const partialUnit = await searchAddressIndex("Tuggeranong Business Centre Unit 2 12 Kett", 3, {
+      searchContext: {
+        nearLat: -35.379,
+        nearLon: 149.064,
+      },
+    });
+    const exactUnit = await geocode({
+      query: "Tuggeranong Business Centre Unit 2 12 Kett Street Kambah ACT 2902",
+      limit: 3,
+      sessionToken: "exact-unit-refine",
+      searchContext: {
+        nearLat: -35.379,
+        nearLon: 149.064,
+        nearRadiusKm: 80,
+      },
+    });
+
+    assert.match(indexSql, /WHERE entry_type = 'exact' AND unit <> ''/);
+    assert.equal(indexResults[0].label, "Tuggeranong Business Centre, Unit 2, 12 Kett Street, Kambah ACT 2902");
+    assert.equal(indexResults.length, 1);
+    assert.equal(partialUnitRefine[0].label, "Tuggeranong Business Centre, 12 Kett Street, Kambah ACT 2902");
+    assert.equal(partialUnitRefine[0].refineRequired, true);
+    assert.equal(bareUnitRefine[0].label, "Tuggeranong Business Centre, 12 Kett Street, Kambah ACT 2902");
+    assert.equal(bareUnitRefine[0].refineRequired, true);
+    assert.equal(buildingUnitOnly[0].label, "Tuggeranong Business Centre, Unit 2, 12 Kett Street, Kambah ACT 2902");
+    assert.equal(buildingUnitOnly[0].refineRequired, false);
+    assert.equal(partialUnit[0].label, "Tuggeranong Business Centre, Unit 2, 12 Kett Street, Kambah ACT 2902");
+    assert.equal(partialUnit[0].refineRequired, false);
+    assert.equal(exactUnit.suggestions[0].label, "Tuggeranong Business Centre, Unit 2, 12 Kett Street, Kambah ACT 2902");
+    assert.equal(exactUnit.suggestions[0].refineRequired, false);
+  });
+});
+
+test("unit-like SQLite queries wait for a meaningful street token before typeahead", async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-gnaf-unit-readiness-"));
+  const inputPath = path.join(tempDir, "GNAF_CORE.psv");
+  const outputPath = path.join(tempDir, "gnaf-unit-readiness.sqlite");
+  fs.writeFileSync(
+    inputPath,
+    [
+      "ADDRESS_DETAIL_PID|ADDRESS_LABEL|FLAT_TYPE|FLAT_NUMBER|NUMBER_FIRST|STREET_NAME|STREET_TYPE|LOCALITY_NAME|STATE|POSTCODE|GEOCODE_TYPE|LONGITUDE|LATITUDE",
+      "GAVIC3001|Unit 1, 1 Stott Court, Wodonga VIC 3690|Unit|1|1|Stott|Court|Wodonga|VIC|3690|PROPERTY CENTROID|146.886|-36.123",
+      "GAVIC3002|Unit 2, 2 Stott Court, Wodonga VIC 3690|Unit|2|2|Stott|Court|Wodonga|VIC|3690|PROPERTY CENTROID|146.887|-36.124",
+      "GAVIC3003|Unit 3, 5A Woodland Street, Wodonga VIC 3690|Unit|3|5A|Woodland|Street|Wodonga|VIC|3690|PROPERTY CENTROID|146.888|-36.125",
+    ].join("\n"),
+  );
+
+  execFileSync(
+    process.execPath,
+    [
+      "scripts/build-gnaf-address-index.mjs",
+      "--input",
+      inputPath,
+      "--output",
+      outputPath,
+      "--omit-legacy-fts",
+      "--omit-search-backstop",
+    ],
+    { cwd: path.resolve(__dirname, "../.."), stdio: "ignore" },
+  );
+
+  await withEnv({ FUEL_PATH_GNAF_SQLITE_PATH: outputPath }, async () => {
+    const broadUnit = await searchAddressIndex("Unit 2 2", 3);
+    const shortStreetToken = await searchAddressIndex("Unit 3 5A Wo", 3);
+    const exactUnit = await searchAddressIndex("Unit 2 2 Stott", 3);
+    const baseRefine = await searchAddressIndex("2 Stott Court Wodonga", 3);
+    const sqlite = new DatabaseSync(outputPath, { readOnly: true });
+    const broadPrefixRows = sqlite.prepare("SELECT COUNT(*) AS count FROM address_prefix_entries WHERE prefix = ?").get("unit 2 2");
+    const unitPrefixRows = sqlite.prepare("SELECT COUNT(*) AS count FROM address_prefix_entries WHERE prefix = ?").get("unit 3 5a wo");
+    const typeaheadFtsSql = sqlite.prepare("SELECT sql FROM sqlite_master WHERE name = ?").get("address_typeahead_fts").sql;
+    const typeaheadFtsColumns = sqlite.prepare("PRAGMA table_info(address_typeahead_fts)").all().map((row) => row.name);
+    const prefixColumns = sqlite.prepare("PRAGMA table_info(address_prefix_entries)").all().map((row) => row.name);
+    sqlite.close();
+
+    assert.deepEqual(broadUnit, []);
+    assert.equal(broadPrefixRows.count, 0);
+    assert.equal(unitPrefixRows.count, 1);
+    assert.match(typeaheadFtsSql, /detail=column/);
+    assert.deepEqual(typeaheadFtsColumns, ["entry_id", "key_text"]);
+    assert.deepEqual(prefixColumns, ["prefix", "entry_id"]);
+    assert.equal(shortStreetToken[0].label, "Unit 3, 5A Woodland Street, Wodonga VIC 3690");
+    assert.equal(exactUnit[0].label, "Unit 2, 2 Stott Court, Wodonga VIC 3690");
+    assert.equal(baseRefine[0].label, "2 Stott Court, Wodonga VIC 3690");
+    assert.equal(baseRefine[0].refineRequired, true);
+  });
+});
+
+test("exact unit refinement skips level markers before street number", async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-gnaf-level-unit-refine-"));
+  const inputPath = path.join(tempDir, "GNAF_CORE.psv");
+  const outputPath = path.join(tempDir, "gnaf-level-unit-refine.sqlite");
+  fs.writeFileSync(
+    inputPath,
+    [
+      "ADDRESS_DETAIL_PID|ADDRESS_LABEL|FLAT_TYPE|FLAT_NUMBER|LEVEL_TYPE|LEVEL_NUMBER|NUMBER_FIRST|STREET_NAME|STREET_TYPE|LOCALITY_NAME|STATE|POSTCODE|GEOCODE_TYPE|LONGITUDE|LATITUDE",
+      "GAACT7001|Shop 9001, L 2, 20 Benjamin Way, Belconnen ACT 2617|Shop|9001|L|2|20|Benjamin|Way|Belconnen|ACT|2617|PROPERTY CENTROID|149.070|-35.240",
+      "GAWA7002|Unit 9, Fl 2, 118 Broome Street, Cottesloe WA 6011|Unit|9|Fl|2|118|Broome|Street|Cottesloe|WA|6011|PROPERTY CENTROID|115.754|-31.994",
+      "GAVIC7003|Site V, 87 Airfield Road, Traralgon VIC 3844|Site|V|||87|Airfield|Road|Traralgon|VIC|3844|PROPERTY CENTROID|146.538|-38.207",
+    ].join("\n"),
+  );
+
+  execFileSync(
+    process.execPath,
+    [
+      "scripts/build-gnaf-address-index.mjs",
+      "--input",
+      inputPath,
+      "--output",
+      outputPath,
+      "--omit-legacy-fts",
+      "--omit-search-backstop",
+    ],
+    { cwd: path.resolve(__dirname, "../.."), stdio: "ignore" },
+  );
+
+  await withEnv({ FUEL_PATH_GNAF_SQLITE_PATH: outputPath }, async () => {
+    const shopLevel = await searchAddressIndex("Shop 9001 L 2 20 Benjamin Way Belconnen ACT 2617", 3);
+    const unitLevel = await searchAddressIndex("Unit 9 Fl 2 118 Broome Street Cottesloe WA 6011", 3);
+    const site = await searchAddressIndex("Site V 87 Airfield Road Traralgon VIC 3844", 3);
+
+    assert.equal(shopLevel[0].label, "Shop 9001, L 2, 20 Benjamin Way, Belconnen ACT 2617");
+    assert.equal(shopLevel[0].refineRequired, false);
+    assert.equal(unitLevel[0].label, "Unit 9, Fl 2, 118 Broome Street, Cottesloe WA 6011");
+    assert.equal(unitLevel[0].refineRequired, false);
+    assert.equal(site[0].label, "Site V, 87 Airfield Road, Traralgon VIC 3844");
+    assert.equal(site[0].refineRequired, false);
+  });
+});
+
+test("lot and range exact labels materialise compact prefix rows", async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-gnaf-lot-range-prefix-"));
+  const inputPath = path.join(tempDir, "GNAF_CORE.psv");
+  const outputPath = path.join(tempDir, "gnaf-lot-range-prefix.sqlite");
+  fs.writeFileSync(
+    inputPath,
+    [
+      "ADDRESS_DETAIL_PID|ADDRESS_LABEL|FLAT_TYPE|FLAT_NUMBER|NUMBER_FIRST|NUMBER_LAST|LOT_NUMBER|STREET_NAME|STREET_TYPE|LOCALITY_NAME|STATE|POSTCODE|GEOCODE_TYPE|LONGITUDE|LATITUDE",
+      "GAQLD6001|Lot 2, Cassowary Street, Longreach QLD 4730|||||2|Cassowary|Street|Longreach|QLD|4730|PROPERTY CENTROID|144.250|-23.440",
+      "GAQLD6002|112-120 Spoonbill Street, Longreach QLD 4730|||112|120||Spoonbill|Street|Longreach|QLD|4730|PROPERTY CENTROID|144.251|-23.441",
+      "GASA6003|Unit 4, Lot 141, Elleway Drive, Coober Pedy SA 5723|Unit|4|||141|Elleway|Drive|Coober Pedy|SA|5723|PROPERTY CENTROID|134.749|-29.013",
+      "GAQLD6004|Unit 7, 267-269 Esplanade, Cairns North QLD 4870|Unit|7|267|269||Esplanade||Cairns North|QLD|4870|PROPERTY CENTROID|145.763|-16.906",
+    ].join("\n"),
+  );
+
+  execFileSync(
+    process.execPath,
+    [
+      "scripts/build-gnaf-address-index.mjs",
+      "--input",
+      inputPath,
+      "--output",
+      outputPath,
+      "--omit-legacy-fts",
+      "--omit-search-backstop",
+    ],
+    { cwd: path.resolve(__dirname, "../.."), stdio: "ignore" },
+  );
+
+  await withEnv({ FUEL_PATH_GNAF_SQLITE_PATH: outputPath }, async () => {
+    const sqlite = new DatabaseSync(outputPath, { readOnly: true });
+    const lotPrefixRows = sqlite.prepare("SELECT COUNT(*) AS count FROM address_prefix_entries WHERE prefix = ?").get("lot 2 ca");
+    const rangePrefixRows = sqlite.prepare("SELECT COUNT(*) AS count FROM address_prefix_entries WHERE prefix = ?").get("112 120 ");
+    const unitLotPrefixRows = sqlite.prepare("SELECT COUNT(*) AS count FROM address_prefix_entries WHERE prefix = ?").get("unit 4 lot 141 ");
+    const unitRangePrefixRows = sqlite.prepare("SELECT COUNT(*) AS count FROM address_prefix_entries WHERE prefix = ?").get("unit 7 267 269 ");
+    sqlite.close();
+
+    const lotSuggestions = await searchAddressIndex("Lot 2 Ca", 3);
+    const rangeSuggestions = await searchAddressIndex("112-120 Sp", 3);
+    const spacedRangeSuggestions = await searchAddressIndex("112 - 120 Sp", 3);
+    const unitLotSuggestions = await searchAddressIndex("Unit 4 Lot 141 Elleway", 3);
+    const prematureUnitRangeSuggestions = await searchAddressIndex("Unit 7 267", 3);
+    const unitRangeSuggestions = await searchAddressIndex("Unit 7 267-269", 3);
+    const spacedUnitRangeSuggestionsWithNoHyphen = await searchAddressIndex("Unit 7 267 269", 3);
+    const spacedUnitRangeSuggestions = await searchAddressIndex("Unit 7 267 - 269", 3);
+
+    assert.ok(lotPrefixRows.count >= 1);
+    assert.ok(rangePrefixRows.count >= 1);
+    assert.ok(unitLotPrefixRows.count >= 1);
+    assert.ok(unitRangePrefixRows.count >= 1);
+    assert.equal(lotSuggestions[0].label, "Lot 2, Cassowary Street, Longreach QLD 4730");
+    assert.equal(rangeSuggestions[0].label, "112-120 Spoonbill Street, Longreach QLD 4730");
+    assert.equal(spacedRangeSuggestions[0].label, "112-120 Spoonbill Street, Longreach QLD 4730");
+    assert.equal(unitLotSuggestions[0].label, "Unit 4, Lot 141, Elleway Drive, Coober Pedy SA 5723");
+    assert.equal(unitLotSuggestions[0].refineRequired, false);
+    assert.deepEqual(prematureUnitRangeSuggestions, []);
+    assert.equal(unitRangeSuggestions[0].label, "Unit 7, 267-269 Esplanade, Cairns North QLD 4870");
+    assert.equal(spacedUnitRangeSuggestionsWithNoHyphen[0].label, "Unit 7, 267-269 Esplanade, Cairns North QLD 4870");
+    assert.equal(spacedUnitRangeSuggestions[0].label, "Unit 7, 267-269 Esplanade, Cairns North QLD 4870");
+    assert.equal(unitRangeSuggestions[0].refineRequired, false);
+  });
+});
+
+test("unit lot queries fail quiet instead of degrading to unrelated token matches", async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-gnaf-unit-lot-safe-"));
+  const inputPath = path.join(tempDir, "GNAF_CORE.psv");
+  const outputPath = path.join(tempDir, "gnaf-unit-lot-safe.sqlite");
+  fs.writeFileSync(
+    inputPath,
+    [
+      "ADDRESS_DETAIL_PID|ADDRESS_LABEL|NUMBER_FIRST|LOT_NUMBER|STREET_NAME|STREET_TYPE|LOCALITY_NAME|STATE|POSTCODE|GEOCODE_TYPE|LONGITUDE|LATITUDE",
+      "GASA7001|Lot 148, Unity Drive, Sheidow Park SA 5158|148||Unity|Drive|Sheidow Park|SA|5158|PROPERTY CENTROID|138.540|-35.080",
+      "GASA7002|1 Unit Street, Coober Pedy SA 5723|1||Unit|Street|Coober Pedy|SA|5723|PROPERTY CENTROID|134.750|-29.012",
+    ].join("\n"),
+  );
+
+  execFileSync(
+    process.execPath,
+    [
+      "scripts/build-gnaf-address-index.mjs",
+      "--input",
+      inputPath,
+      "--output",
+      outputPath,
+    ],
+    { cwd: path.resolve(__dirname, "../.."), stdio: "ignore" },
+  );
+
+  await withEnv({ FUEL_PATH_GNAF_SQLITE_PATH: outputPath }, async () => {
+    const needles = addressSearchNeedles("Unit 4 Lot 141 Elleway Drive Coober Pedy SA 5723").map(({ needle }) => needle);
+    const suggestions = await searchAddressIndex("Unit 4 Lot 141 Elleway Drive Coober Pedy SA 5723", 3);
+
+    assert.deepEqual(needles, ["unit 4 lot 141 elleway drive coober pedy sa 5723"]);
+    assert.deepEqual(suggestions, []);
+  });
+});
+
+test("building-first address queries use embedded address core prefixes", async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-gnaf-building-address-prefix-"));
+  const inputPath = path.join(tempDir, "GNAF_CORE.psv");
+  const outputPath = path.join(tempDir, "gnaf-building-address-prefix.sqlite");
+  fs.writeFileSync(
+    inputPath,
+    [
+      "ADDRESS_DETAIL_PID|ADDRESS_LABEL|BUILDING_NAME|NUMBER_FIRST|NUMBER_LAST|LOT_NUMBER|STREET_NAME|STREET_TYPE|LOCALITY_NAME|STATE|POSTCODE|GEOCODE_TYPE|LONGITUDE|LATITUDE",
+      "GATAS6201|Queenstown Police Station, 2-6 Sticht Street, Queenstown TAS 7467|Queenstown Police Station|2|6||Sticht|Street|Queenstown|TAS|7467|PROPERTY CENTROID|145.552|-42.080",
+      "GATAS6202|2-6 Sticht Street, Burnie TAS 7320||2|6||Sticht|Street|Burnie|TAS|7320|PROPERTY CENTROID|145.905|-41.052",
+      "GAQLD6203|Albert Park Motor Inn, 55 Ilfracombe Road, Longreach QLD 4730|Albert Park Motor Inn|55|||Ilfracombe|Road|Longreach|QLD|4730|PROPERTY CENTROID|144.250|-23.440",
+      "GAQLD6204|55 Ilfracombe Road, Townsville QLD 4810||55|||Ilfracombe|Road|Townsville|QLD|4810|PROPERTY CENTROID|146.818|-19.259",
+      "GAWA6205|1076 Lakes Road, Nambeelup WA 6207||1076|||Lakes|Road|Nambeelup|WA|6207|PROPERTY CENTROID|115.801|-32.523",
+      "GAWA6206|Shell Service Station, Lot 1076, Searipple Road, Karratha WA 6714|Shell Service Station|||1076|Searipple|Road|Karratha|WA|6714|PROPERTY CENTROID|116.846|-20.736",
+    ].join("\n"),
+  );
+
+  execFileSync(
+    process.execPath,
+    [
+      "scripts/build-gnaf-address-index.mjs",
+      "--input",
+      inputPath,
+      "--output",
+      outputPath,
+      "--omit-legacy-fts",
+      "--omit-search-backstop",
+    ],
+    { cwd: path.resolve(__dirname, "../.."), stdio: "ignore" },
+  );
+
+  await withEnv({ FUEL_PATH_GNAF_SQLITE_PATH: outputPath }, async () => {
+    const sqlite = new DatabaseSync(outputPath, { readOnly: true });
+    const rangePrefixRows = sqlite.prepare("SELECT COUNT(*) AS count FROM address_prefix_entries WHERE prefix = ?").get("2 6 stic");
+    const civicPrefixRows = sqlite.prepare("SELECT COUNT(*) AS count FROM address_prefix_entries WHERE prefix = ?").get("55 ilfra");
+    const buildingRangePrefixRows = sqlite.prepare("SELECT COUNT(*) AS count FROM address_prefix_entries WHERE prefix = ?").get("queenstown p");
+    const buildingCivicPrefixRows = sqlite.prepare("SELECT COUNT(*) AS count FROM address_prefix_entries WHERE prefix = ?").get("albert p");
+    sqlite.close();
+
+    const rangeBuildingPrefixSuggestions = await searchAddressIndex("Queenstown P", 3, {
+      searchContext: {
+        nearLat: -42.080,
+        nearLon: 145.552,
+      },
+    });
+    const rangeSuggestions = await searchAddressIndex("Queenstown Police Station 2-6 Sticht Street Queenstown TAS 7467", 3, {
+      searchContext: {
+        nearLat: -42.080,
+        nearLon: 145.552,
+      },
+    });
+    const civicBuildingPrefixSuggestions = await searchAddressIndex("Albert Par", 3, {
+      searchContext: {
+        nearLat: -23.440,
+        nearLon: 144.250,
+      },
+    });
+    const civicSuggestions = await searchAddressIndex("Albert Park Motor Inn 55 Ilfracombe Road Longreach QLD 4730", 3, {
+      searchContext: {
+        nearLat: -23.440,
+        nearLon: 144.250,
+      },
+    });
+    const lotVenueSuggestions = await searchAddressIndex("Shell Service Station Lot 1076 Searipple Road Karratha WA 6714", 3, {
+      searchContext: {
+        nearLat: -20.736,
+        nearLon: 116.846,
+      },
+    });
+
+    assert.ok(rangePrefixRows.count >= 1);
+    assert.ok(civicPrefixRows.count >= 1);
+    assert.ok(buildingRangePrefixRows.count >= 1);
+    assert.ok(buildingCivicPrefixRows.count >= 1);
+    assert.equal(rangeBuildingPrefixSuggestions[0].label, "Queenstown Police Station, 2-6 Sticht Street, Queenstown TAS 7467");
+    assert.equal(rangeBuildingPrefixSuggestions[0].matchType, "address_prefix");
+    assert.equal(rangeBuildingPrefixSuggestions[0].sourceLabel, "Exact address");
+    assert.equal(rangeBuildingPrefixSuggestions[0].refineRequired, false);
+    assert.equal(rangeSuggestions[0].label, "Queenstown Police Station, 2-6 Sticht Street, Queenstown TAS 7467");
+    assert.equal(rangeSuggestions[0].matchType, "exact_address");
+    assert.equal(rangeSuggestions[0].sourceLabel, "Exact address");
+    assert.equal(rangeSuggestions[0].refineRequired, false);
+    assert.equal(civicBuildingPrefixSuggestions[0].label, "Albert Park Motor Inn, 55 Ilfracombe Road, Longreach QLD 4730");
+    assert.equal(civicBuildingPrefixSuggestions[0].matchType, "address_prefix");
+    assert.equal(civicBuildingPrefixSuggestions[0].sourceLabel, "Exact address");
+    assert.equal(civicBuildingPrefixSuggestions[0].refineRequired, false);
+    assert.equal(civicSuggestions[0].label, "Albert Park Motor Inn, 55 Ilfracombe Road, Longreach QLD 4730");
+    assert.equal(civicSuggestions[0].matchType, "exact_address");
+    assert.equal(civicSuggestions[0].sourceLabel, "Exact address");
+    assert.equal(civicSuggestions[0].refineRequired, false);
+    assert.equal(lotVenueSuggestions[0].label, "Shell Service Station, Lot 1076, Searipple Road, Karratha WA 6714");
+    assert.equal(lotVenueSuggestions[0].sourceLabel, "Exact address");
+  });
+});
+
+test("L-number address labels use contextual compact prefix rows", async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-gnaf-l-number-prefix-"));
+  const inputPath = path.join(tempDir, "GNAF_CORE.psv");
+  const outputPath = path.join(tempDir, "gnaf-l-number-prefix.sqlite");
+  fs.writeFileSync(
+    inputPath,
+    [
+      "ADDRESS_DETAIL_PID|ADDRESS_LABEL|FLAT_TYPE|FLAT_NUMBER|NUMBER_FIRST|STREET_NAME|STREET_TYPE|LOCALITY_NAME|STATE|POSTCODE|GEOCODE_TYPE|LONGITUDE|LATITUDE",
+      "GASA6101|L41 Hutchison Street, Coober Pedy SA 5723|||L41|Hutchison|Street|Coober Pedy|SA|5723|PROPERTY CENTROID|134.754|-29.013",
+      "GASA6102|Unit 1, L41 Hutchison Street, Coober Pedy SA 5723|Unit|1|L41|Hutchison|Street|Coober Pedy|SA|5723|PROPERTY CENTROID|134.755|-29.014",
+      "GANSW6103|L41 Bucky Springs Road, Coolumbooka NSW 2632|||L41|Bucky Springs|Road|Coolumbooka|NSW|2632|PROPERTY CENTROID|149.390|-36.820",
+    ].join("\n"),
+  );
+
+  execFileSync(
+    process.execPath,
+    [
+      "scripts/build-gnaf-address-index.mjs",
+      "--input",
+      inputPath,
+      "--output",
+      outputPath,
+      "--omit-legacy-fts",
+      "--omit-search-backstop",
+    ],
+    { cwd: path.resolve(__dirname, "../.."), stdio: "ignore" },
+  );
+
+  await withEnv({ FUEL_PATH_GNAF_SQLITE_PATH: outputPath }, async () => {
+    const uncontextualised = await searchAddressIndex("L41", 3);
+    const contextualised = await searchAddressIndex("L41 Hut", 3, {
+      searchContext: {
+        nearLat: -29.013,
+        nearLon: 134.754,
+      },
+    });
+    const specific = await searchAddressIndex("L41 Hutchiso", 3);
+
+    assert.deepEqual(uncontextualised, []);
+    assert.equal(contextualised[0].label, "L41 Hutchison Street, Coober Pedy SA 5723");
+    assert.equal(contextualised[0].refineRequired, false);
+    assert.equal(specific[0].label, "L41 Hutchison Street, Coober Pedy SA 5723");
+  });
+});
+
+test("geocode cache separates seed-only and configured G-NAF index results", async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-gnaf-cache-mode-"));
+  const inputPath = path.join(tempDir, "GNAF_CORE.psv");
+  const outputPath = path.join(tempDir, "gnaf-cache-mode.sqlite");
+  fs.writeFileSync(
+    inputPath,
+    [
+      "ADDRESS_DETAIL_PID|ADDRESS_LABEL|FLAT_TYPE|FLAT_NUMBER|NUMBER_FIRST|STREET_NAME|STREET_TYPE|LOCALITY_NAME|STATE|POSTCODE|GEOCODE_TYPE|LONGITUDE|LATITUDE",
+      "GAACT0001|Unit 8, 21 Lanyon Drive, Tuggeranong ACT 2900|Unit|8|21|Lanyon|Drive|Tuggeranong|ACT|2900|PROPERTY CENTROID|149.065|-35.414",
+    ].join("\n"),
+  );
+
+  execFileSync(
+    process.execPath,
+    [
+      "scripts/build-gnaf-address-index.mjs",
+      "--input",
+      inputPath,
+      "--output",
+      outputPath,
+    ],
+    { cwd: path.resolve(__dirname, "../.."), stdio: "ignore" },
+  );
+
+  const mockFetch = installFetchMock();
+  try {
+    await withEnv({ FUEL_PATH_GEOCODE_PROVIDER: "nominatim" }, async () => {
+      const seedOnly = await geocode({
+        query: "8/21 Lanyon Drive Tuggeranong ACT",
+        limit: 5,
+        sessionToken: "gnaf-cache-mode-seed",
+      });
+      assert.notEqual(seedOnly.location?.label, "Unit 8, 21 Lanyon Drive, Tuggeranong ACT 2900");
+      assert.notEqual(seedOnly.location?.provider, "fuel_path_gnaf");
+    });
+
+    await withEnv({ FUEL_PATH_GEOCODE_PROVIDER: "nominatim", FUEL_PATH_GNAF_SQLITE_PATH: outputPath }, async () => {
+      const indexed = await geocode({
+        query: "8/21 Lanyon Drive Tuggeranong ACT",
+        limit: 5,
+        sessionToken: "gnaf-cache-mode-sqlite",
+      });
+      assert.equal(indexed.location?.label, "Unit 8, 21 Lanyon Drive, Tuggeranong ACT 2900");
+      assert.equal(indexed.location?.provider, "fuel_path_gnaf");
+      assert.match(indexed.location?.matchType || "", /^address_/);
+    });
+  } finally {
+    mockFetch.restore();
+  }
+});
+
+test("G-NAF fuzzy lookup fails safe instead of returning wrong remote address", async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-gnaf-fail-safe-"));
+  const inputPath = path.join(tempDir, "GNAF_CORE.psv");
+  const outputPath = path.join(tempDir, "gnaf-core.sqlite");
+  fs.writeFileSync(
+    inputPath,
+    [
+      "ADDRESS_DETAIL_PID|ADDRESS_LABEL|NUMBER_FIRST|STREET_NAME|STREET_TYPE|LOCALITY_NAME|STATE|POSTCODE|GEOCODE_TYPE|LONGITUDE|LATITUDE",
+      "GANT0001|34 Victoria Highway, Katherine South NT 0850|34|Victoria|Highway|Katherine South|NT|0850|PROPERTY CENTROID|132.266|-14.466",
+    ].join("\n"),
+  );
+
+  execFileSync(
+    process.execPath,
+    [
+      "scripts/build-gnaf-address-index.mjs",
+      "--input",
+      inputPath,
+      "--output",
+      outputPath,
+    ],
+    { cwd: path.resolve(__dirname, "../.."), stdio: "ignore" },
+  );
+
+  await withEnv({ FUEL_PATH_GNAF_SQLITE_PATH: outputPath }, async () => {
+    const suggestions = await searchAddressIndex("5/34 south coast highway karratha", 3);
+    assert.deepEqual(suggestions, []);
+  });
+});
+
+
+test("G-NAF Core rows can be exported for Postgres COPY loading", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-gnaf-copy-"));
+  const inputPath = path.join(tempDir, "GNAF_CORE.psv");
+  const outputPath = path.join(tempDir, "gnaf.copy.tsv");
+  fs.writeFileSync(
+    inputPath,
+    [
+      "ADDRESS_DETAIL_PID|ADDRESS_LABEL|NUMBER_FIRST|STREET_NAME|STREET_TYPE|LOCALITY_NAME|STATE|POSTCODE|GEOCODE_TYPE|LONGITUDE|LATITUDE",
+      "GATEST0003|66B Easton Avenue, Sylvania NSW 2224|66|Easton|Avenue|Sylvania|NSW|2224|PROPERTY CENTROID|151.0993847|-34.0114122",
+    ].join("\n"),
+  );
+
+  execFileSync(
+    process.execPath,
+    [
+      "scripts/export-gnaf-core-postgres-copy.mjs",
+      "--input",
+      inputPath,
+      "--output",
+      outputPath,
+    ],
+    { cwd: path.resolve(__dirname, "../.."), stdio: "ignore" },
+  );
+
+  const lines = fs.readFileSync(outputPath, "utf8").trim().split(/\r?\n/);
+  assert.equal(lines.length, 2);
+  assert.match(lines[0], /^id\tlabel\tlat\tlon\tstate\tpostcode/);
+  assert.match(lines[1], /^GATEST0003\t66B Easton Avenue, Sylvania NSW 2224\t-34\.0114122\t151\.0993847\tNSW\t2224/);
+});
+
+test("Oracle-hosted G-NAF API is preferred when configured", async () => {
+  const api = await startMockGnafApi();
+  await withEnv(
+    {
+      FUEL_PATH_GNAF_API_URL: api.url,
+      FUEL_PATH_GNAF_API_TOKEN: "test-token",
+    },
+    async () => {
+      const status = addressIndexStatus();
+      const suggestions = await searchAddressIndex("87a corea street sylvania", 3);
+
+      assert.equal(status.mode, "api");
+      assert.equal(status.apiConfigured, true);
+      assert.equal(suggestions[0].label, "87A Corea Street, Sylvania NSW 2224");
+      assert.equal(suggestions[0].provider, "fuel_path_gnaf");
+      assert.equal(suggestions[0].providerId, "GANSW_API_1");
+      assert.equal(api.requests[0].authorization, "Bearer test-token");
+    },
+  );
+  await api.close();
+});
+
+test("G-NAF API failure falls back to seed records", async () => {
+  const api = await startMockGnafApi({ status: 503 });
+  await withEnv(
+    {
+      FUEL_PATH_GNAF_API_URL: api.url,
+      FUEL_PATH_GNAF_API_TOKEN: "test-token",
+    },
+    async () => {
+      const suggestions = await searchAddressIndex("66b easton avenue sylvania", 3);
+
+      assert.equal(suggestions[0].label, "66B Easton Avenue, Sylvania NSW 2224");
+      assert.equal(suggestions[0].provider, "fuel_path_gnaf");
+      assert.notEqual(suggestions[0].providerId, "GANSW_API_1");
+    },
+  );
+  await api.close();
 });
 
 function installFetchMock() {
@@ -82,9 +1279,52 @@ function installFetchMock() {
   };
 }
 
+async function startMockGnafApi({ status = 200 } = {}) {
+  const requests = [];
+  const server = http.createServer((request, response) => {
+    requests.push({
+      url: request.url,
+      authorization: request.headers.authorization,
+    });
+    response.writeHead(status, { "content-type": "application/json" });
+    response.end(
+      JSON.stringify({
+        ok: status === 200,
+        suggestions:
+          status === 200
+            ? [
+                {
+                  id: "GANSW_API_1",
+                  label: "87A Corea Street, Sylvania NSW 2224",
+                  lat: -34.0153146,
+                  lon: 151.0997397,
+                  state: "NSW",
+                  postcode: "2224",
+                  accuracy: "PROPERTY CENTROID",
+                  matchType: "exact_address",
+                  score: 1000,
+                },
+              ]
+            : [],
+      }),
+    );
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  return {
+    requests,
+    url: `http://127.0.0.1:${address.port}`,
+    close: () => new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve()))),
+  };
+}
+
 async function withEnv(overrides, callback) {
   const keys = [
+    "FUEL_PATH_GNAF_API_URL",
+    "FUEL_PATH_GNAF_API_TOKEN",
     "FUEL_PATH_GNAF_SQLITE_PATH",
+    "FUEL_PATH_GNAF_DATABASE_URL",
+    "FUEL_PATH_GNAF_LARGE_SQLITE_BYTES",
     "FUEL_PATH_GEOCODE_PROVIDER",
     "FUEL_PATH_GOOGLE_MAPS_API_KEY",
     "GOOGLE_MAPS_API_KEY",

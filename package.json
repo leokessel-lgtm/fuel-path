@@ -1,15 +1,60 @@
 {
   "private": true,
   "scripts": {
+    "validate:tas-v2": "node scripts/validate-api-nsw-v2-tas.mjs",
+    "validate:vic-servo-saver": "node scripts/validate-vic-servo-saver-smoke.mjs",
+    "validate:vic-servo-saver:matrix": "node scripts/validate-vic-servo-saver-smoke.mjs --matrix",
+    "validate:ev-provider-trials": "node scripts/validate-ev-provider-trial-smoke.mjs",
+    "validate:combined-nearby-rural-remote": "node scripts/validate-combined-nearby-rural-remote-smoke.mjs",
     "test:geocode-matrix": "node scripts/geocode-matrix.mjs",
     "test:geocode-matrix:local": "FUEL_PATH_MATRIX_MODE=module FUEL_PATH_MATRIX_PROVIDER_FAILURE=rate_limit node scripts/geocode-matrix.mjs",
     "test:geocode-regional-hard": "node scripts/geocode-regional-hard-matrix.mjs",
-    "test:geocode-regional-hard:local": "FUEL_PATH_MATRIX_MODE=module FUEL_PATH_MATRIX_PROVIDER_FAILURE=rate_limit node scripts/geocode-regional-hard-matrix.mjs"
+    "test:geocode-regional-hard:local": "FUEL_PATH_MATRIX_MODE=module FUEL_PATH_MATRIX_PROVIDER_FAILURE=rate_limit node scripts/geocode-regional-hard-matrix.mjs",
+    "test:geocode-route-fields:local": "node scripts/geocode-route-field-stress.mjs",
+    "test:geocode-route-exact-addresses:local": "node scripts/geocode-route-exact-address-field-stress.mjs",
+    "test:plan-route-recommendations:local": "node scripts/plan-route-recommendation-stress.mjs",
+    "test:plan-route-browser-clicks": "node scripts/plan-route-browser-click-stress.mjs",
+    "test:plan-route-browser-clicks:full": "FUEL_PATH_PLAN_BROWSER_STRESS_PAIRS=300 node scripts/plan-route-browser-click-stress.mjs",
+    "test:plan-route-visual-snapshots": "FUEL_PATH_PLAN_BROWSER_STRESS_PAIRS=8 FUEL_PATH_PLAN_BROWSER_STRESS_SNAPSHOTS=8 node scripts/plan-route-browser-click-stress.mjs",
+    "test:plan-route-live-api": "node scripts/plan-route-live-api-stress.mjs",
+    "test:plan-route-live-api:full": "FUEL_PATH_PLAN_LIVE_STRESS_PAIRS=300 node scripts/plan-route-live-api-stress.mjs",
+    "test:geocode-prefix-600:local": "node scripts/geocode-600-prefix-benchmark.mjs",
+    "test:geocode-hosted-preview": "node scripts/geocode-hosted-preview-smoke.mjs",
+    "test:geocode-hosted-national": "node scripts/geocode-hosted-national-benchmark.mjs",
+    "test:geocode-rural-unit-prefix-smoke": "FUEL_PATH_SMOKE_SQLITE_MODE=fixture node scripts/geocode-rural-unit-unit-prefix-smoke.mjs",
+    "experiment:address-typeahead": "node scripts/address-typeahead-experiment.mjs",
+    "test:geocode-local-national-address-smoke": "FUEL_PATH_GNAF_DATABASE_URL= FUEL_PATH_GNAF_API_URL= FUEL_PATH_GNAF_API_TOKEN= FUEL_PATH_GNAF_SQLITE_PATH=data/gnaf/build/gnaf-addresses-national.sqlite node scripts/geocode-hosted-national-benchmark.mjs --mode module --address-count 32 --poi-count 0 --delay-ms 0 --min-poi-top-rate 0 --min-address-prefix 30 --max-address-p90-chars 80",
+    "test:geocode-exact-address-readiness:local": "node scripts/geocode-exact-address-readiness.mjs",
+    "build:gnaf-sqlite": "node scripts/build-gnaf-address-index.mjs",
+    "build:gnaf-raw-sqlite": "node scripts/build-gnaf-raw-address-index.mjs",
+    "export:gnaf-postgres-copy": "node scripts/export-gnaf-core-postgres-copy.mjs",
+    "check:lookup-readiness": "node scripts/check-lookup-readiness.mjs",
+    "check:provider-terms": "node scripts/check-provider-terms-readiness.mjs",
+    "check:store-publishing": "node scripts/check-store-publishing-readiness.mjs",
+    "check:support-readiness": "node scripts/check-support-readiness.mjs",
+    "check:beta-readiness": "node scripts/check-beta-readiness.mjs",
+    "check:database-platform": "node scripts/check-database-platform-review.mjs",
+    "check:secret-hygiene": "node scripts/check-secret-hygiene.mjs",
+    "check:validation-results": "node scripts/check-validation-results.mjs",
+    "publish:lookup-readiness-evidence": "node scripts/publish-lookup-readiness-evidence.mjs",
+    "summarise:lookup-release-evidence": "node scripts/summarise-lookup-release-evidence.mjs",
+    "plan:lookup-deploy": "node scripts/plan-lookup-deployment-stages.mjs",
+    "release:lookup-local": "node scripts/run-lookup-local-release.mjs",
+    "check:gnaf-hosted": "node scripts/check-gnaf-hosted-config.mjs",
+    "check:gnaf-hosted:readiness": "node scripts/check-gnaf-hosted-config.mjs --mode readiness",
+    "review:gnaf-hosted-storage": "node scripts/review-gnaf-hosted-storage.mjs",
+    "plan:gnaf-hosted-load": "node scripts/plan-gnaf-hosted-load.mjs",
+    "load:gnaf-raw-postgres": "node scripts/load-gnaf-raw-postgres.mjs",
+    "start:gnaf-api": "node scripts/oracle/gnaf-api-server.mjs",
+    "load:gnaf-compact-postgres": "node scripts/load-gnaf-compact-postgres.mjs",
+    "test:geocode-focused-regression": "node scripts/geocode-focused-regression.mjs",
+    "check:production-lookup-monitor": "node scripts/check-production-lookup-monitor.mjs"
   },
   "engines": {
     "node": "22.x"
   },
   "dependencies": {
-    "@neondatabase/serverless": "^1.1.0"
+    "@neondatabase/serverless": "^1.1.0",
+    "pg": "^8.21.0"
   }
 }

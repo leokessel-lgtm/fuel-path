@@ -1,11 +1,12 @@
 import { useEffect } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { colors, radii, shadow, spacing } from "../theme";
-import { MapPoint, StationViewModel } from "../types";
+import { colors, mapSkin, radii, shadow, spacing } from "../theme";
+import { EvCharger, MapPoint, StationViewModel } from "../types";
 import { BrandBadge } from "./BrandBadge";
 
 const maxStationMarkers = 240;
+const mixedEnergyMaxStationMarkers = 48;
 
 type CameraInsets = {
   top?: number;
@@ -16,9 +17,12 @@ type CameraInsets = {
 
 export function StationMap({
   centre,
+  chargers = [],
   stations,
+  selectedChargerId,
   selectedStationCode,
   onSelect,
+  onSelectCharger,
   onViewportStationsChange,
   onMapSearchAreaChange: _onMapSearchAreaChange,
   cameraFocusKey: _cameraFocusKey,
@@ -26,11 +30,15 @@ export function StationMap({
   routeEndpoints,
   routePoints = [],
   cameraInsets,
+  userLocation,
 }: {
   centre: MapPoint;
+  chargers?: EvCharger[];
   stations: StationViewModel[];
+  selectedChargerId?: string;
   selectedStationCode?: string;
   onSelect: (stationCode: string) => void;
+  onSelectCharger?: (chargerId: string) => void;
   onViewportStationsChange?: (stationCodes: string[]) => void;
   onMapSearchAreaChange?: (area: { centre: MapPoint; radiusKm: number }) => void;
   cameraFocusKey?: string;
@@ -38,6 +46,7 @@ export function StationMap({
   routeEndpoints?: { from: MapPoint; to: MapPoint };
   routePoints?: MapPoint[];
   cameraInsets?: CameraInsets;
+  userLocation?: MapPoint;
 }) {
   useEffect(() => {
     onViewportStationsChange?.(stations.map((item) => item.station.stationCode));
@@ -51,10 +60,16 @@ export function StationMap({
       : [routeEndpoints.from, routeEndpoints.to]
     : [
         centre,
+        ...(userLocation ? [userLocation] : []),
         ...stations.map((item) => ({
           lat: item.station.lat,
           lon: item.station.lon,
           label: item.station.name,
+        })),
+        ...chargers.map((charger) => ({
+          lat: charger.lat,
+          lon: charger.lon,
+          label: charger.name,
         })),
       ];
   const bounds = boundingBox(points);
@@ -62,6 +77,11 @@ export function StationMap({
   return (
     <View style={styles.map}>
       <View style={styles.mapGrid} />
+      {!routeEndpoints && userLocation ? (
+        <View style={[styles.userLocationPin, positionForPoint(userLocation, bounds, activeInsets)]}>
+          <View style={styles.userLocationPinInner} />
+        </View>
+      ) : null}
       {!routeEndpoints && showCentreMarker ? (
         <View style={[styles.locationPin, positionForPoint(centre, bounds, activeInsets)]}>
           <View style={styles.locationPinInner} />
@@ -73,7 +93,7 @@ export function StationMap({
           style={[styles.routeDot, positionForPoint(point, bounds, activeInsets)]}
         />
       ))}
-      {stations.slice(0, maxStationMarkers).map((item) => {
+      {stations.slice(0, chargers.length ? mixedEnergyMaxStationMarkers : maxStationMarkers).map((item) => {
         const selected = item.station.stationCode === selectedStationCode;
         return (
           <Pressable
@@ -86,7 +106,33 @@ export function StationMap({
             ]}
           >
             <BrandBadge station={item.station} size={28} />
-            <Text style={styles.pinPrice}>{item.adjustedCpl.toFixed(1)}</Text>
+            <Text style={[styles.pinPrice, selected && styles.pinPriceSelected]}>
+              {item.adjustedCpl.toFixed(1)}
+            </Text>
+          </Pressable>
+        );
+      })}
+      {chargers.slice(0, maxStationMarkers).map((charger) => {
+        const selected = charger.id === selectedChargerId;
+        const label = charger.maxPowerKw ? `${Math.round(charger.maxPowerKw)}kW` : "";
+        return (
+          <Pressable
+            accessibilityLabel={`Select charger ${charger.name}`}
+            accessibilityRole="button"
+            key={charger.id}
+            onPress={() => onSelectCharger?.(charger.id)}
+            style={[
+              styles.evPin,
+              positionForPoint(charger, bounds, activeInsets),
+              selected && styles.evPinSelected,
+            ]}
+          >
+            <Text style={[styles.evPinIcon, selected && styles.evPinIconSelected]}>⚡</Text>
+            {label ? (
+              <Text style={[styles.evPinLabel, selected && styles.evPinLabelSelected]}>
+                {label}
+              </Text>
+            ) : null}
           </Pressable>
         );
       })}
@@ -185,7 +231,7 @@ const styles = StyleSheet.create({
     opacity: 0.9,
   },
   routeDot: {
-    backgroundColor: colors.green,
+    backgroundColor: mapSkin.route,
     borderRadius: radii.pill,
     height: 7,
     marginLeft: -3,
@@ -217,10 +263,35 @@ const styles = StyleSheet.create({
     top: 8,
     width: 8,
   },
+  userLocationPin: {
+    ...shadow.soft,
+    backgroundColor: colors.blue,
+    borderColor: colors.white,
+    borderRadius: radii.pill,
+    borderBottomLeftRadius: 4,
+    borderWidth: 3,
+    height: 30,
+    marginLeft: -15,
+    marginTop: -30,
+    position: "absolute",
+    transform: [{ rotate: "-45deg" }],
+    width: 30,
+  },
+  userLocationPinInner: {
+    backgroundColor: colors.white,
+    borderColor: colors.blueSoft,
+    borderRadius: radii.pill,
+    borderWidth: 2,
+    height: 10,
+    left: 7,
+    position: "absolute",
+    top: 7,
+    width: 10,
+  },
   pin: {
     ...shadow.soft,
     alignItems: "center",
-    backgroundColor: colors.green,
+    backgroundColor: colors.white,
     borderColor: colors.white,
     borderRadius: radii.pill,
     borderWidth: 2,
@@ -234,17 +305,57 @@ const styles = StyleSheet.create({
     position: "absolute",
   },
   pinSelected: {
-    backgroundColor: colors.ink,
+    backgroundColor: colors.black,
     transform: [{ scale: 1.05 }],
   },
   pinPrice: {
-    color: colors.white,
+    color: colors.greenDark,
     fontSize: 13,
     fontWeight: "900",
   },
+  pinPriceSelected: {
+    color: colors.white,
+  },
+  evPin: {
+    ...shadow.soft,
+    alignItems: "center",
+    backgroundColor: colors.blue,
+    borderColor: colors.blue,
+    borderRadius: 18,
+    borderWidth: 2,
+    flexDirection: "row",
+    gap: spacing.xs,
+    marginLeft: -24,
+    marginTop: -38,
+    minWidth: 48,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 8,
+    position: "absolute",
+  },
+  evPinSelected: {
+    backgroundColor: colors.black,
+    borderColor: colors.black,
+    transform: [{ scale: 1.05 }],
+  },
+  evPinIcon: {
+    color: "#ffd166",
+    fontSize: 16,
+    fontWeight: "900",
+  },
+  evPinIconSelected: {
+    color: "#ffd166",
+  },
+  evPinLabel: {
+    color: colors.white,
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  evPinLabelSelected: {
+    color: colors.white,
+  },
   destinationPin: {
     ...shadow.soft,
-    backgroundColor: colors.green,
+    backgroundColor: mapSkin.route,
     borderColor: colors.white,
     borderRadius: radii.pill,
     borderBottomLeftRadius: 4,

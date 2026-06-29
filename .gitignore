@@ -27,6 +27,15 @@ android/
 *.sqlite-shm
 *.sqlite-wal
 tmp/
+data/gnaf/
+provider-samples/
+var/
+!var/.gitkeep
+var/tooling/
+.playwright-cli/
+**/.playwright-cli/
+**/native-artifacts/
+oracle-stack/**/*.zip
 .DS_Store
 
 # Credentials and signing material

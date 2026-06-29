@@ -8,15 +8,19 @@ import MapView, {
   type Region,
 } from "react-native-maps";
 
-import { colors, radii, shadow, spacing } from "../theme";
+import { colors, mapSkin, radii, shadow, spacing } from "../theme";
 import { MapPoint, StationViewModel } from "../types";
 import { BrandBadge } from "./BrandBadge";
 
 const maxStationMarkers = 240;
-const maxPriceMarkers = 34;
-const maxDotMarkers = 90;
-const markerGridSize = 92;
-const compactMarkerGridSize = 36;
+const maxPriceMarkers = 18;
+const maxDotMarkers = 56;
+const markerGridSize = 132;
+const compactMarkerGridSize = 48;
+const decorativeStationMarkerAccessibility = {
+  accessibilityElementsHidden: true,
+  importantForAccessibility: "no-hide-descendants" as const,
+};
 
 type CameraInsets = {
   top?: number;
@@ -37,6 +41,7 @@ export function StationMap({
   routeEndpoints,
   routePoints = [],
   cameraInsets,
+  userLocation,
 }: {
   centre: MapPoint;
   stations: StationViewModel[];
@@ -49,6 +54,7 @@ export function StationMap({
   routeEndpoints?: { from: MapPoint; to: MapPoint };
   routePoints?: MapPoint[];
   cameraInsets?: CameraInsets;
+  userLocation?: MapPoint;
 }) {
   const mapRef = useRef<MapView | null>(null);
   const markerRefs = useRef<Record<string, MapMarker | null>>({});
@@ -72,18 +78,26 @@ export function StationMap({
   );
   const cameraCoordinates = useMemo(() => {
     if (routeEndpoints) {
-      if (visibleRoutePoints.length >= 2) return visibleRoutePoints;
-      return [routeEndpoints.from, routeEndpoints.to];
+      const routeStationCameraPoints = stations.slice(0, maxPriceMarkers).map((item) => ({
+        lat: item.station.lat,
+        lon: item.station.lon,
+        label: item.station.name,
+      }));
+      if (visibleRoutePoints.length >= 2) return [...visibleRoutePoints, ...routeStationCameraPoints];
+      return [routeEndpoints.from, routeEndpoints.to, ...routeStationCameraPoints];
     }
+    const cameraStations = showCentreMarker
+      ? nearestStationsForCamera(stations, centre, 12)
+      : stations.slice(0, maxStationMarkers);
     return [
       centre,
-      ...stations.slice(0, maxStationMarkers).map((item) => ({
+      ...cameraStations.map((item) => ({
         lat: item.station.lat,
         lon: item.station.lon,
         label: item.station.name,
       })),
     ];
-  }, [centre, routeEndpoints, stations, visibleRoutePoints]);
+  }, [centre, routeEndpoints, showCentreMarker, stations, visibleRoutePoints]);
   const initialRegion = useMemo(() => regionForPoint(centre), [centre]);
   const markerGroups = useMemo(
     () => visibleMarkerGroups(stations.slice(0, maxStationMarkers), currentRegion, selectedStationCode),
@@ -101,8 +115,17 @@ export function StationMap({
     ].join("|");
     const cameraContextChanged = cameraKey !== lastCameraKeyRef.current;
     if (!cameraContextChanged && userMovedMapRef.current) return;
+    if (cameraContextChanged) {
+      userGestureStartedRef.current = false;
+      lastReportedUserCentreKeyRef.current = "";
+      setMapMovedByUser(false);
+    }
 
     runProgrammaticMapMove(programmaticMoveRef, () => {
+      if (cameraCoordinates.length === 1) {
+        mapRef.current?.animateToRegion(regionForPoint(cameraCoordinates[0]), 260);
+        return;
+      }
       mapRef.current?.fitToCoordinates(
         cameraCoordinates.map((point) => ({
           latitude: point.lat,
@@ -203,9 +226,22 @@ export function StationMap({
               latitude: point.lat,
               longitude: point.lon,
             }))}
-            strokeColor={colors.green}
-            strokeWidth={5}
+            strokeColor={mapSkin.route}
+            strokeWidth={6}
           />
+        ) : null}
+
+        {!routeEndpoints && userLocation ? (
+          <Marker
+            coordinate={{ latitude: userLocation.lat, longitude: userLocation.lon }}
+            title="My location"
+            tracksViewChanges={false}
+            zIndex={900}
+          >
+            <View style={styles.userLocationPin}>
+              <View style={styles.userLocationPinInner} />
+            </View>
+          </Marker>
         ) : null}
 
         {!routeEndpoints && showCentreMarker ? (
@@ -239,11 +275,10 @@ export function StationMap({
 
         {markerGroups.dotMarkers.map((item) => (
           <Marker
+            {...decorativeStationMarkerAccessibility}
             coordinate={{ latitude: item.station.lat, longitude: item.station.lon }}
-            description={`${item.adjustedCpl.toFixed(1)} c/L`}
             key={`dot-${item.station.stationCode}`}
             onPress={() => handleMarkerPress(item.station.stationCode)}
-            title={item.station.name}
             tracksViewChanges={false}
             zIndex={100}
           >
@@ -255,20 +290,26 @@ export function StationMap({
           const selected = item.station.stationCode === selectedStationCode;
           return (
             <Marker
+              {...decorativeStationMarkerAccessibility}
               coordinate={{ latitude: item.station.lat, longitude: item.station.lon }}
-              description={`${item.adjustedCpl.toFixed(1)} c/L`}
               key={item.station.stationCode}
               onPress={() => handleMarkerPress(item.station.stationCode)}
               ref={(marker) => {
                 markerRefs.current[item.station.stationCode] = marker;
               }}
-              title={item.station.name}
               tracksViewChanges={false}
               zIndex={selected ? 700 : 500}
             >
-              <View style={[styles.pin, selected && styles.pinSelected]}>
-                <BrandBadge station={item.station} size={24} />
-                <Text style={styles.pinPrice}>{item.adjustedCpl.toFixed(1)}</Text>
+              <View style={styles.pinAnchor}>
+                <View style={[styles.pin, selected && styles.pinSelected]}>
+                  <Text style={[styles.pinPrice, selected && styles.pinPriceSelected]}>
+                    {item.adjustedCpl.toFixed(1)}
+                  </Text>
+                  <View style={styles.pinBrand}>
+                    <BrandBadge station={item.station} size={22} />
+                  </View>
+                </View>
+                <View style={[styles.pinPointer, selected && styles.pinPointerSelected]} />
               </View>
             </Marker>
           );
@@ -394,6 +435,26 @@ function markerPriorityScore(item: StationViewModel) {
   return item.adjustedCpl + item.distanceKm * 0.85;
 }
 
+function nearestStationsForCamera(
+  stations: StationViewModel[],
+  centre: MapPoint,
+  maxStations: number,
+) {
+  return [...stations]
+    .sort((left, right) => {
+      const leftDistance = distanceKm(centre, {
+        lat: left.station.lat,
+        lon: left.station.lon,
+      });
+      const rightDistance = distanceKm(centre, {
+        lat: right.station.lat,
+        lon: right.station.lon,
+      });
+      return leftDistance - rightDistance;
+    })
+    .slice(0, maxStations);
+}
+
 function markerCell(item: StationViewModel, region: Region, gridSize: number) {
   const safeLatDelta = Math.max(region.latitudeDelta, 0.005);
   const safeLonDelta = Math.max(region.longitudeDelta, 0.005);
@@ -508,9 +569,31 @@ const styles = StyleSheet.create({
     top: 8,
     width: 8,
   },
+  userLocationPin: {
+    ...shadow.soft,
+    backgroundColor: colors.blue,
+    borderColor: colors.white,
+    borderRadius: radii.pill,
+    borderBottomLeftRadius: 4,
+    borderWidth: 3,
+    height: 30,
+    transform: [{ rotate: "-45deg" }],
+    width: 30,
+  },
+  userLocationPinInner: {
+    backgroundColor: colors.white,
+    borderColor: colors.blueSoft,
+    borderRadius: radii.pill,
+    borderWidth: 2,
+    height: 10,
+    left: 7,
+    position: "absolute",
+    top: 7,
+    width: 10,
+  },
   destinationPin: {
     ...shadow.soft,
-    backgroundColor: colors.green,
+    backgroundColor: mapSkin.route,
     borderColor: colors.white,
     borderRadius: radii.pill,
     borderBottomLeftRadius: 4,
@@ -528,27 +611,59 @@ const styles = StyleSheet.create({
     top: 8,
     width: 8,
   },
+  pinAnchor: {
+    alignItems: "center",
+  },
   pin: {
     ...shadow.soft,
     alignItems: "center",
-    backgroundColor: colors.green,
-    borderColor: colors.white,
-    borderRadius: radii.pill,
-    borderWidth: 2,
-    flexDirection: "row",
-    gap: spacing.xs,
-    minWidth: 76,
-    padding: 4,
-    paddingRight: spacing.sm,
+    backgroundColor: colors.white,
+    borderColor: "rgba(7, 86, 66, 0.18)",
+    borderRadius: radii.md,
+    borderWidth: 1,
+    height: 46,
+    minWidth: 54,
+    overflow: "hidden",
+    width: 54,
   },
   pinSelected: {
-    backgroundColor: colors.ink,
-    transform: [{ scale: 1.05 }],
+    borderColor: colors.black,
+    boxShadow: "0 0 0 4px rgba(255, 106, 61, 0.35)",
   },
   pinPrice: {
+    backgroundColor: colors.greenDark,
     color: colors.white,
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: "900",
+    lineHeight: 16,
+    minWidth: 54,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 3,
+    textAlign: "center",
+  },
+  pinPriceSelected: {
+    backgroundColor: colors.black,
+  },
+  pinBrand: {
+    alignItems: "center",
+    backgroundColor: colors.white,
+    minHeight: 24,
+    justifyContent: "center",
+    width: "100%",
+  },
+  pinPointer: {
+    borderLeftColor: "transparent",
+    borderLeftWidth: 6,
+    borderRightColor: "transparent",
+    borderRightWidth: 6,
+    borderTopColor: colors.white,
+    borderTopWidth: 8,
+    height: 0,
+    marginTop: -1,
+    width: 0,
+  },
+  pinPointerSelected: {
+    borderTopColor: colors.white,
   },
   compactPin: {
     ...shadow.soft,

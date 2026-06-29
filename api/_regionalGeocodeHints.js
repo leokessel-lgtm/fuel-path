@@ -1,5 +1,7 @@
 const REGIONAL_TOWNS = [
   // NSW.
+  town("Newcastle", "NSW", -32.9283, 151.7817, "2300"),
+  town("Wollongong", "NSW", -34.4278, 150.8931, "2500"),
   town("Griffith", "NSW", -34.2885, 146.0509, "2680"),
   town("Wagga Wagga", "NSW", -35.1082, 147.3598, "2650", ["wagga"]),
   town("Armidale", "NSW", -30.5147, 151.6658, "2350"),
@@ -25,8 +27,21 @@ const REGIONAL_TOWNS = [
   town("Parkes", "NSW", -33.1372, 148.1759, "2870"),
   town("Jenolan", "NSW", -33.8212, 150.0228, "2790"),
   town("Mungo", "NSW", -33.746, 143.133, "2715"),
+  town("Lord Howe Island", "NSW", -31.555, 159.085, "2898"),
+  town("Lightning Ridge", "NSW", -29.429, 147.978, "2834"),
+  town("Tibooburra", "NSW", -29.43, 142.01, "2880"),
+  town("Tilpa", "NSW", -30.935, 144.417, "2840"),
+  town("White Cliffs", "NSW", -30.851, 143.087, "2836"),
+  town("Wilcannia", "NSW", -31.56, 143.378, "2836"),
+  town("Menindee", "NSW", -32.393, 142.417, "2879"),
+  town("Bourke", "NSW", -30.091, 145.938, "2840"),
+  town("Walgett", "NSW", -30.024, 148.115, "2832"),
+  town("Coonabarabran", "NSW", -31.273, 149.279, "2357"),
 
   // ACT.
+  town("Cotter", "ACT", -35.321, 148.947, "2611"),
+  town("Pierces Creek", "ACT", -35.337, 148.94, "2611"),
+  town("Oaks Estate", "ACT", -35.342, 149.23, "2620"),
   town("Tharwa", "ACT", -35.512, 149.064, "2620"),
   town("Pialligo", "ACT", -35.303, 149.18, "2609"),
   town("Weston Creek", "ACT", -35.341, 149.052, "2611"),
@@ -55,6 +70,8 @@ const REGIONAL_TOWNS = [
   town("Kaleen", "ACT", -35.219, 149.105, "2617"),
 
   // QLD.
+  town("Gold Coast", "QLD", -28.0167, 153.4, "4217"),
+  town("Sunshine Coast", "QLD", -26.65, 153.0667, "4558"),
   town("Townsville", "QLD", -19.259, 146.817, "4810"),
   town("Cairns", "QLD", -16.9186, 145.7781, "4870"),
   town("Rockhampton", "QLD", -23.3789, 150.5135, "4700"),
@@ -77,8 +94,32 @@ const REGIONAL_TOWNS = [
   town("Roma", "QLD", -26.5734, 148.7875, "4455"),
   town("Mossman", "QLD", -16.462, 145.372, "4873"),
   town("Hervey Bay", "QLD", -25.288, 152.839, "4655"),
+  town("Thursday Island", "QLD", -10.584, 142.219, "4875"),
+  town("Magnetic Island", "QLD", -19.155, 146.849, "4819"),
+  town("Birdsville", "QLD", -25.899, 139.352, "4482"),
+  town("Winton", "QLD", -22.39, 143.038, "4735"),
+  town("Weipa", "QLD", -12.63, 141.879, "4874"),
+  town("Camooweal", "QLD", -19.922, 138.121, "4828"),
+  town("Palm Island", "QLD", -18.735, 146.58, "4816"),
+  town("Normanton", "QLD", -17.671, 141.077, "4890"),
+
+  // VIC.
+  town("Geelong", "VIC", -38.1499, 144.3617, "3220"),
+  town("Ballarat", "VIC", -37.5622, 143.8503, "3350"),
+  town("Bendigo", "VIC", -36.757, 144.2794, "3550"),
+  town("Shepparton", "VIC", -36.3805, 145.3987, "3630"),
+  town("Warrnambool", "VIC", -38.3833, 142.4833, "3280"),
+  town("Mildura", "VIC", -34.208, 142.1246, "3500"),
+  town("Wodonga", "VIC", -36.1218, 146.8881, "3690"),
+  town("Traralgon", "VIC", -38.1953, 146.5415, "3844"),
+  town("Bairnsdale", "VIC", -37.825, 147.63, "3875"),
+  town("Sale", "VIC", -38.106, 147.067, "3850"),
+  town("Horsham", "VIC", -36.7167, 142.2, "3400"),
+  town("Swan Hill", "VIC", -35.3378, 143.5544, "3585"),
+  town("Wilsons Promontory", "VIC", -39.03, 146.318, "3960", ["wilsons prom"]),
 
   // WA.
+  town("Fremantle", "WA", -32.056, 115.744, "6160"),
   town("Kalgoorlie", "WA", -30.747, 121.472, "6430"),
   town("Geraldton", "WA", -28.777, 114.614, "6530"),
   town("Broome", "WA", -17.961, 122.236, "6725"),
@@ -103,6 +144,12 @@ const REGIONAL_TOWNS = [
   town("Hyden", "WA", -32.449, 118.861, "6359"),
   town("Karijini", "WA", -22.391, 118.284, "6751"),
   town("Margaret River", "WA", -33.953, 115.073, "6285"),
+  town("Rottnest Island", "WA", -32.006, 115.512, "6161"),
+  town("Houtman Abrolhos", "WA", -28.719, 113.784, "6530"),
+  town("Meekatharra", "WA", -26.595, 118.493, "6642"),
+  town("Newman", "WA", -23.357, 119.735, "6753"),
+  town("Fitzroy Crossing", "WA", -18.195, 125.568, "6765"),
+  town("Eucla", "WA", -31.677, 128.885, "6443"),
 
   // SA.
   town("Mount Gambier", "SA", -37.829, 140.782, "5290"),
@@ -128,6 +175,43 @@ const REGIONAL_TOWNS = [
   town("Tanunda", "SA", -34.525, 138.959, "5352"),
   town("Wallaroo", "SA", -33.932, 137.625, "5556"),
   town("Wilpena Pound", "SA", -31.527, 138.62, "5434"),
+  town("Kangaroo Island", "SA", -35.775, 137.214, "5223"),
+  town("Kingscote", "SA", -35.655, 137.639, "5223"),
+  town("Penneshaw", "SA", -35.718, 137.94, "5222"),
+  town("Oodnadatta", "SA", -27.546, 135.445, "5734"),
+  town("Marla", "SA", -27.305, 133.62, "5724"),
+  town("Nullarbor Roadhouse", "SA", -31.449, 130.897, "5690", ["nullarbor"]),
+  town("Innamincka", "SA", -27.746, 140.738, "5731"),
+  town("Roxby Downs", "SA", -30.562, 136.895, "5725"),
+
+  // TAS.
+  town("Launceston", "TAS", -41.4332, 147.1441, "7250"),
+  town("Devonport", "TAS", -41.178, 146.351, "7310"),
+  town("Burnie", "TAS", -41.052, 145.906, "7320"),
+  town("Kingston", "TAS", -42.976, 147.309, "7050"),
+  town("Ulverstone", "TAS", -41.16, 146.17, "7315"),
+  town("Queenstown", "TAS", -42.0805, 145.5565, "7467"),
+  town("Sorell", "TAS", -42.782, 147.562, "7172"),
+  town("New Norfolk", "TAS", -42.7826, 147.0595, "7140"),
+  town("St Helens", "TAS", -41.32, 148.25, "7216"),
+  town("Smithton", "TAS", -40.842, 145.124, "7330"),
+  town("Bruny Island", "TAS", -43.365, 147.246, "7150"),
+  town("Cradle Mountain", "TAS", -41.684, 145.951, "7306"),
+
+  // NT.
+  town("Alice Springs", "NT", -23.698, 133.8807, "0870"),
+  town("Katherine", "NT", -14.465, 132.2635, "0850"),
+  town("Palmerston", "NT", -12.486, 130.983, "0830"),
+  town("Tennant Creek", "NT", -19.648, 134.191, "0860"),
+  town("Nhulunbuy", "NT", -12.182, 136.782, "0880"),
+  town("Jabiru", "NT", -12.671, 132.833, "0886"),
+  town("Yulara", "NT", -25.243, 130.989, "0872"),
+  town("Humpty Doo", "NT", -12.579, 131.101, "0836"),
+  town("Howard Springs", "NT", -12.493, 131.044, "0835"),
+  town("Uluru", "NT", -25.345, 131.036, "0872"),
+  town("Kakadu Visitor Centre", "NT", -12.671, 132.833, "0886", ["kakadu"]),
+  town("Litchfield National Park", "NT", -13.18, 130.789, "0845", ["litchfield"]),
+  town("Batchelor", "NT", -13.049, 131.029, "0845"),
 ];
 
 const REGIONAL_POIS = [
@@ -152,6 +236,11 @@ const REGIONAL_POIS = [
   poi("Moruya Airport", "NSW", "Moruya"),
   poi("Cowra Japanese Garden", "NSW", "Cowra"),
   poi("Armidale Airport", "NSW", "Armidale"),
+  poi("Newcastle Airport Williamtown", "NSW", "Newcastle", -32.795, 151.834),
+  poi("Wollongong Hospital", "NSW", "Wollongong"),
+  poi("Charles Sturt University Wagga Wagga", "NSW", "Wagga Wagga"),
+  poi("Stockland Green Hills Maitland", "NSW", "Newcastle", -32.762, 151.591),
+  poi("Narrabri District Hospital", "NSW", "Narrabri"),
 
   // ACT.
   poi("Tidbinbilla Nature Reserve", "ACT", "Tharwa"),
@@ -171,9 +260,14 @@ const REGIONAL_POIS = [
   poi("Calvary Public Hospital Bruce", "ACT", "Belconnen"),
   poi("University of Canberra Hospital", "ACT", "Belconnen"),
   poi("Canberra Nature Park Mount Taylor", "ACT", "Kambah"),
+  poi("Cotter Reserve ACT", "ACT", "Cotter"),
   poi("Tuggeranong Hyperdome", "ACT", "Greenway"),
   poi("EPIC Canberra", "ACT", "Lyneham"),
   poi("Australian Institute of Sport", "ACT", "Belconnen"),
+  poi("Canberra Hospital", "ACT", "Mawson", -35.345, 149.101),
+  poi("Westfield Belconnen", "ACT", "Belconnen"),
+  poi("Marketplace Gungahlin", "ACT", "Gungahlin"),
+  poi("Canberra Airport", "ACT", "Pialligo"),
 
   // QLD.
   poi("Australian Stockman's Hall of Fame Longreach", "QLD", "Longreach"),
@@ -196,6 +290,32 @@ const REGIONAL_POIS = [
   poi("Kingaroy Peanut Van", "QLD", "Kingaroy"),
   poi("Charters Towers Venus Gold Battery", "QLD", "Charters Towers"),
   poi("Bowen Big Mango", "QLD", "Bowen"),
+  poi("Sunshine Coast University Hospital", "QLD", "Sunshine Coast"),
+  poi("Gold Coast University Hospital", "QLD", "Gold Coast"),
+  poi("Townsville Airport", "QLD", "Townsville"),
+  poi("Cairns Airport", "QLD", "Cairns"),
+  poi("Stockland Rockhampton", "QLD", "Rockhampton"),
+
+  // VIC.
+  poi("Melbourne Cricket Ground", "VIC", "Melbourne", -37.8199, 144.9834),
+  poi("Flinders Street Station", "VIC", "Melbourne", -37.8183, 144.9671),
+  poi("Geelong Waterfront", "VIC", "Geelong"),
+  poi("Sovereign Hill Ballarat", "VIC", "Ballarat"),
+  poi("Bendigo Art Gallery", "VIC", "Bendigo"),
+  poi("Shepparton Art Museum", "VIC", "Shepparton"),
+  poi("Flagstaff Hill Maritime Village", "VIC", "Warrnambool"),
+  poi("Mildura Base Public Hospital", "VIC", "Mildura"),
+  poi("The Cube Wodonga", "VIC", "Wodonga"),
+  poi("Latrobe Regional Hospital", "VIC", "Traralgon"),
+  poi("Bairnsdale Regional Health Service", "VIC", "Bairnsdale"),
+  poi("Sale Botanic Gardens", "VIC", "Sale"),
+  poi("Horsham Town Hall", "VIC", "Horsham"),
+  poi("Swan Hill Pioneer Settlement", "VIC", "Swan Hill"),
+  poi("Wilsons Promontory Visitor Centre", "VIC", "Wilsons Promontory"),
+  poi("Avalon Airport Geelong", "VIC", "Geelong", -38.039, 144.469),
+  poi("Bendigo Health", "VIC", "Bendigo"),
+  poi("Federation University Mount Helen", "VIC", "Ballarat", -37.627, 143.891),
+  poi("Westfield Geelong", "VIC", "Geelong"),
 
   // WA.
   poi("Wave Rock Hyden", "WA", "Hyden"),
@@ -218,6 +338,10 @@ const REGIONAL_POIS = [
   poi("Port Hedland International Airport", "WA", "Port Hedland"),
   poi("Karratha Health Campus", "WA", "Karratha"),
   poi("Denmark Visitor Centre", "WA", "Denmark"),
+  poi("Busselton Margaret River Airport", "WA", "Margaret River", -33.688, 115.402),
+  poi("Mandurah Forum", "WA", "Mandurah"),
+  poi("Fiona Stanley Hospital", "WA", "Fremantle", -32.07, 115.844),
+  poi("Northam Hospital", "WA", "Northam"),
 
   // SA.
   poi("Naracoorte Caves National Park", "SA", "Naracoorte"),
@@ -240,10 +364,54 @@ const REGIONAL_POIS = [
   poi("Berri Hospital", "SA", "Berri"),
   poi("Port Pirie Regional Health Service", "SA", "Port Pirie"),
   poi("Moonta Mines Museum", "SA", "Moonta"),
+  poi("Mount Gambier Airport", "SA", "Mount Gambier"),
+  poi("University of South Australia Whyalla Campus", "SA", "Whyalla"),
+  poi("Murray Bridge Marketplace", "SA", "Murray Bridge"),
+  poi("Port Lincoln Hospital", "SA", "Port Lincoln"),
+
+  // TAS.
+  poi("Cataract Gorge Reserve", "TAS", "Launceston"),
+  poi("Devonport Airport", "TAS", "Devonport"),
+  poi("Makers Workshop Burnie", "TAS", "Burnie"),
+  poi("Kingston Beach", "TAS", "Kingston"),
+  poi("Leven Canyon Lookout", "TAS", "Ulverstone"),
+  poi("West Coast Wilderness Railway Queenstown", "TAS", "Queenstown"),
+  poi("Sorell Plaza", "TAS", "Sorell"),
+  poi("Willow Court New Norfolk", "TAS", "New Norfolk"),
+  poi("St Helens Visitor Information Centre", "TAS", "St Helens"),
+  poi("Smithton District Hospital", "TAS", "Smithton"),
+  poi("Bruny Island Ferry Terminal", "TAS", "Bruny Island"),
+  poi("Cradle Mountain Visitor Centre", "TAS", "Cradle Mountain"),
+  poi("Launceston General Hospital", "TAS", "Launceston"),
+  poi("Burnie Airport Wynyard", "TAS", "Burnie", -40.998, 145.731),
+  poi("Devonport Regional Gallery", "TAS", "Devonport"),
+  poi("Kingston Town Shopping Centre", "TAS", "Kingston"),
+
+  // NT.
+  poi("Alice Springs Hospital", "NT", "Alice Springs"),
+  poi("Katherine Hot Springs", "NT", "Katherine"),
+  poi("Palmerston Regional Hospital", "NT", "Palmerston"),
+  poi("Tennant Creek Hospital", "NT", "Tennant Creek"),
+  poi("Gove Airport Nhulunbuy", "NT", "Nhulunbuy"),
+  poi("Bowali Visitor Centre Jabiru", "NT", "Jabiru"),
+  poi("Ayers Rock Airport Yulara", "NT", "Yulara"),
+  poi("Humpty Doo Hotel", "NT", "Humpty Doo"),
+  poi("Howard Springs Nature Park", "NT", "Howard Springs"),
+  poi("Uluru-Kata Tjuta National Park", "NT", "Uluru"),
+  poi("Kakadu Visitor Centre", "NT", "Kakadu Visitor Centre"),
+  poi("Litchfield National Park", "NT", "Litchfield National Park"),
+  poi("Alice Springs Airport", "NT", "Alice Springs"),
+  poi("Katherine Hospital", "NT", "Katherine"),
+  poi("Yeperenye Shopping Centre", "NT", "Alice Springs"),
+  poi("Batchelor Butterfly Farm", "NT", "Batchelor"),
 ];
 
+const STATE_CODES = ["NSW", "ACT", "QLD", "WA", "VIC", "SA", "TAS", "NT"];
+const STATE_CODE_PATTERN = STATE_CODES.join("|");
+
 function regionalLocalGeocode(query, limit = 5) {
-  const needle = normalise(query);
+  const needles = regionalSearchNeedles(query);
+  const needle = needles[0] || "";
   if (needle.length < 3) return [];
   const state = detectStateCode(query);
   const rows = [];
@@ -254,7 +422,7 @@ function regionalLocalGeocode(query, limit = 5) {
   for (const place of [...REGIONAL_POIS, ...REGIONAL_TOWNS]) {
     if (!Number.isFinite(place.lat) || !Number.isFinite(place.lon)) continue;
     if (state && place.state !== state) continue;
-    const match = matchPlace(needle, place);
+    const match = matchPlace(needles, place);
     if (!match) continue;
     rows.push({
       score: match.score,
@@ -283,13 +451,16 @@ function regionalGeocodeHintStatus() {
 
 function streetFallback(query, state) {
   const text = String(query || "").trim().replace(/\s+/g, " ");
-  const pattern = /\b(?:\d+[a-z]?\s+)?([a-z][a-z\s'.-]+?\b(?:street|st|road|rd|avenue|ave|drive|dr|parade|pde|place|pl|terrace|highway|mall|court|close|vista|circuit|way|lane|ln))\b\s+(.+?)(?:\s+\b(NSW|ACT|QLD|WA|SA)\b|\s*$)/i;
+  const pattern = new RegExp(
+    `\\b(?:\\d+[a-z]?\\s+)?([a-z][a-z\\s'.-]+?\\b(?:street|st|road|rd|avenue|ave|drive|dr|parade|pde|place|pl|terrace|tce|highway|hwy|mall|court|ct|close|vista|circuit|cct|way|lane|ln|crescent|cres|boulevard|bvd|blvd|parkway|pkwy|pwy|esplanade|esp|square|sq))\\b\\s+(.+?)(?:\\s+\\b(${STATE_CODE_PATTERN})\\b|\\s*$)`,
+    "i",
+  );
   const match = pattern.exec(text);
   if (!match) return null;
   const streetName = titleCase(expandStreetType(match[1]));
   const localityText = match[2];
   const resolvedState = state || (match[3] ? match[3].toUpperCase() : "");
-  const town = findTown(localityText, resolvedState);
+  const town = findTownForStreetFallback(localityText, resolvedState);
   if (!town) return null;
   return {
     score: 6,
@@ -312,14 +483,39 @@ function findTown(value, state) {
   );
 }
 
-function matchPlace(needle, place) {
-  for (const text of place.searchTexts) {
-    if (needle === text) return { score: 0, confidence: "medium", matchType: "regional_exact" };
-    if (text.startsWith(needle)) return { score: 8, confidence: "medium", matchType: "regional_prefix" };
-    if (text.includes(needle)) return { score: 12, confidence: "medium", matchType: "regional_contains" };
-    if (needle.includes(text) && text.length >= 5) return { score: 18, confidence: "low", matchType: "regional_area_fallback" };
+function findTownForStreetFallback(value, state) {
+  const needle = normalise(value);
+  if (needle.length < 3) return null;
+  const candidates = state ? REGIONAL_TOWNS.filter((townRecord) => townRecord.state === state) : REGIONAL_TOWNS;
+  const exact = candidates.find((townRecord) =>
+    townRecord.searchTexts.some((text) => text === needle || needle.includes(text)),
+  );
+  if (exact) return exact;
+  const prefixMatches = candidates.filter((townRecord) =>
+    townRecord.searchTexts.some((text) => text.startsWith(needle)),
+  );
+  return prefixMatches.length === 1 ? prefixMatches[0] : null;
+}
+
+function matchPlace(needles, place) {
+  let best = null;
+  for (const needle of needles) {
+    for (const text of place.searchTexts) {
+      let match = null;
+      if (needle === text) match = { score: 0, confidence: "medium", matchType: "regional_exact" };
+      else if (text.startsWith(needle)) match = { score: 8, confidence: "medium", matchType: "regional_prefix" };
+      else if (text.includes(needle)) match = { score: 12, confidence: "medium", matchType: "regional_contains" };
+      else if (needle.includes(text) && text.length >= 5) {
+        match = {
+          score: place.kind === "regional_poi" ? 16 : 18,
+          confidence: "low",
+          matchType: "regional_area_fallback",
+        };
+      }
+      if (match && (!best || match.score < best.score)) best = match;
+    }
   }
-  return null;
+  return best;
 }
 
 function town(name, state, lat, lon, postcode = "", aliases = []) {
@@ -374,18 +570,53 @@ function regionalItem(label, lat, lon, kind, extra) {
 
 function detectStateCode(value) {
   const text = String(value || "").toUpperCase();
-  return ["NSW", "ACT", "QLD", "WA", "SA"].find((code) => new RegExp(`\\b${code}\\b`).test(text)) || "";
+  return STATE_CODES.find((code) => new RegExp(`\\b${code}\\b`).test(text)) || "";
+}
+
+function regionalSearchNeedles(query) {
+  const needle = normalise(query);
+  const withoutCountry = stripTerminalCountry(needle);
+  const withoutState = stripTerminalStateCode(withoutCountry);
+  const withoutGenericSuffix = stripGenericQuerySuffix(withoutState);
+  return [...new Set([needle, withoutCountry, withoutState, withoutGenericSuffix].filter((value) => value.length >= 3))];
+}
+
+function stripTerminalStateCode(value) {
+  return String(value || "").replace(/\b(nsw|act|qld|wa|vic|sa|tas|nt)\b$/i, "").trim();
+}
+
+function stripTerminalCountry(value) {
+  return String(value || "").replace(/\baustralia\b$/i, "").trim();
+}
+
+function stripGenericQuerySuffix(value) {
+  return String(value || "")
+    .replace(/\btown centre\b$/i, "")
+    .replace(/\bcity centre\b$/i, "")
+    .trim();
 }
 
 function expandStreetType(value) {
   return String(value || "")
+    .replace(/\bbvd\b/gi, "Boulevard")
+    .replace(/\bblvd\b/gi, "Boulevard")
+    .replace(/\bcct\b/gi, "Circuit")
+    .replace(/\bcr\b/gi, "Crescent")
+    .replace(/\bcres\b/gi, "Crescent")
+    .replace(/\bct\b/gi, "Court")
     .replace(/\bst\b/gi, "Street")
     .replace(/\brd\b/gi, "Road")
     .replace(/\bave\b/gi, "Avenue")
     .replace(/\bdr\b/gi, "Drive")
+    .replace(/\besp\b/gi, "Esplanade")
+    .replace(/\bhwy\b/gi, "Highway")
+    .replace(/\bpkwy\b/gi, "Parkway")
+    .replace(/\bpwy\b/gi, "Parkway")
     .replace(/\bpde\b/gi, "Parade")
     .replace(/\bpl\b/gi, "Place")
-    .replace(/\bln\b/gi, "Lane");
+    .replace(/\bln\b/gi, "Lane")
+    .replace(/\bsq\b/gi, "Square")
+    .replace(/\btce\b/gi, "Terrace");
 }
 
 function titleCase(value) {

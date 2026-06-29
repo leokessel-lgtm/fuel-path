@@ -1,0 +1,21 @@
+[Unit]
+Description=Fuel Path G-NAF address lookup API
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/fuel-path
+EnvironmentFile=/etc/fuel-path/gnaf-api.env
+ExecStart=/usr/bin/node /opt/fuel-path/scripts/oracle/gnaf-api-server.mjs
+Restart=always
+RestartSec=5
+User=fuelpath
+Group=fuelpath
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=full
+
+[Install]
+WantedBy=multi-user.target

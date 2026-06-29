@@ -1,0 +1,55 @@
+{
+  "status": "state_shard_failed_project_size_limit",
+  "decision": "neon_staged_validation_full_national_not_approved",
+  "date": "2026-06-29",
+  "target": "neon",
+  "sourceDocument": "docs/gnaf-hosted-storage-decision-2026-06-29.md",
+  "currentEvidence": {
+    "localSqliteGb": 41.83,
+    "localRows": 16900638,
+    "hostedPreviewRows": 80000,
+    "estimatedHostedStorageMinGb": 62.7,
+    "estimatedHostedStorageMaxGb": 125.5
+  },
+  "decisionScope": {
+    "previewLoadApproved": true,
+    "stateShardLoadApproved": false,
+    "nationalLoadApproved": false,
+    "publicExactAddressClaimsApproved": false,
+    "providerMigrationApproved": false
+  },
+  "stateShardAttempt": {
+    "state": "NSW",
+    "runId": "2026-06-29T02-52-32-960Z-NSW-shard",
+    "status": "failed",
+    "rowsLoadedBeforeFailure": 1655000,
+    "expectedRows": 5206855,
+    "failure": "could not extend file because project size limit (512 MB) has been exceeded",
+    "progressFile": "tmp/gnaf-raw-postgres-load-2026-06-29T02-52-32-960Z-NSW-shard.json",
+    "resultFile": "docs/gnaf-hosted-nsw-shard-load-result-2026-06-29.md"
+  },
+  "rollback": {
+    "status": "completed",
+    "runId": "rollback-preview-explicit-states-2026-06-29",
+    "rowsRestored": 80000,
+    "indexesRecreated": true,
+    "progressFile": "tmp/gnaf-raw-postgres-load-rollback-preview-explicit-states-2026-06-29.json",
+    "readinessAfterRollback": {
+      "ready": false,
+      "rowCount": 80000,
+      "missingIndexes": [],
+      "readinessProblems": [
+        "database_row_count_below_threshold"
+      ]
+    }
+  },
+  "requiredBeforeNationalLoad": [
+    "large_state_shard_loaded",
+    "hosted_readiness_passes_for_shard",
+    "representative_shard_benchmark_passes",
+    "p90_latency_accepted",
+    "national_monthly_cost_accepted",
+    "rollback_path_documented",
+    "FUEL_PATH_GNAF_STORAGE_REVIEW_CONFIRMED=1_set_explicitly"
+  ]
+}

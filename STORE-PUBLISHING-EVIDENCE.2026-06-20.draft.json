@@ -1,0 +1,26 @@
+{
+  "privacyContact": "",
+  "privacyPolicyUrl": "https://fuel-path.vercel.app/web-demo/privacy",
+  "privacyPolicySource": "web-demo/privacy.html",
+  "appStoreUrl": "",
+  "googlePlayUrl": "",
+  "privacyContactConfirmed": false,
+  "storeListingLinksConfirmed": false,
+  "applePrivacyReviewed": false,
+  "applePrivacyReviewReference": "",
+  "googleDataSafetyReviewed": false,
+  "googleDataSafetyReviewReference": "",
+  "providerLimitationsDisclosed": false,
+  "providerLimitationsDisclosureReference": "STORE-RELEASE-REVIEW-2026-06-20.md provider limitations disclosure review 2026-06-20",
+  "supportProcessReady": false,
+  "supportProcessReference": "STORE-RELEASE-REVIEW-2026-06-20.md support process review 2026-06-20",
+  "reviewedAt": "2026-06-20",
+  "reviewer": "Leo Kesselring",
+  "notes": [
+    "Draft release evidence from the 2026-06-20 readiness loop.",
+    "The privacy URL is stable, but the final monitored privacy/support contact is not present yet.",
+    "Provider limitation language exists in public privacy/demo copy, but final app-store listing copy does not exist yet, so providerLimitationsDisclosed remains false.",
+    "Support runbook structure is present, but contact, accountable owner and support review evidence are not ready.",
+    "Apple App Store and Google Play listing URLs are absent, so storeListingLinksConfirmed remains false."
+  ]
+}

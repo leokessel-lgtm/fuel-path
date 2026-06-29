@@ -38,7 +38,7 @@ Do not compete first as another fuel price map. Compete as a planner:
 | FuelWatch WA | Western Australia | Next-day fuel prices submitted by 2pm, published by 2:30pm and locked for 24 hours from 6am. This is excellent for "buy today or tomorrow" decisions. | Map-led. Discounts and fees are excluded. Route planning is not the core product. |
 | QLD fuel price reporting | Queensland | Open fuel price data via API and CSV. Government lists many apps that receive QLD data. | No single government app. Fragmented third-party UX creates room for a better planner. |
 | SA fuel price transparency scheme | South Australia | Retailers report to a central database within 30 minutes. Government uses approved third-party apps rather than its own app. | Fragmented. RAA is strong locally, but trip-level planning is still limited. |
-| Victoria Servo Saver | Victoria | Integrated into Service Victoria app. Mandatory retailer reporting, current price, tomorrow's price cap, opening hours, ad-free interface. | Current real-time data appears app-centred, with daily dataset access by request after publication. Recent reporting raised accuracy concerns during the 2026 fuel crisis. |
+| Victoria Servo Saver | Victoria | Integrated into Service Victoria app. Mandatory retailer reporting, current price, tomorrow's price cap, opening hours, ad-free interface. Service Victoria now lists a Servo Saver Public API for third-party access. | Public API/application path appears available, but Fuel Path still needs approved access, schema, licence, caching and attribution terms before adapter work. Recent reporting raised accuracy concerns during the 2026 fuel crisis. |
 | MyFuel NT | Northern Territory | Web app with mandatory reporting, real-time prices, fuel availability, list/map views and navigation. | Web-app only. Strong rural/remote planning need, but not a route-intelligence product. |
 
 Sources: [Service NSW FuelCheck](https://www.service.nsw.gov.au/referral/check-fuel-prices), [NSW Fuel API](https://api.nsw.gov.au/Product/Index/22), [FuelCheck TAS](https://cbos.tas.gov.au/topics/products-services/fuelchecktas-consumer), [WA FuelWatch](https://www.consumerprotection.wa.gov.au/fuelwatch-and-fuel-prices), [Queensland fuel price apps](https://www.treasury.qld.gov.au/policies-and-programs/fuel-in-queensland/fuel-price-apps-websites/), [SA real-time petrol pricing](https://cbs.sa.gov.au/news/real-time-petrol-pricing), [Victoria mandatory fuel price reporting](https://www.consumer.vic.gov.au/consumers-and-businesses/products-and-services/mandatory-fuel-price-reporting), [MyFuel NT](https://consumeraffairs.nt.gov.au/myfuel-nt).
@@ -197,7 +197,7 @@ Australian private motorists who already check fuel prices but find the process 
 2. TAS as a useful official-data extension through FuelCheck patterns.
 3. QLD and SA next if official/approved feeds are accessible.
 4. WA for "today versus tomorrow" planning because FuelWatch has a unique locked-price rule.
-5. VIC requires separate data access validation because the current official product is Servo Saver in Service Victoria and public dataset access appears delayed/request-based.
+5. VIC requires separate data access validation because the current official product is Servo Saver in Service Victoria and the public API still needs approved access, schema, licence, caching and attribution evidence before implementation.
 6. NT for regional mode, if the web data can be accessed reliably and lawfully.
 
 ### MVP features
@@ -248,4 +248,3 @@ The market has data, maps and discounts. It lacks a calm, trusted decision layer
 Fuel Path should not ask users to hunt through dots. It should say, in plain language:
 
 "For this trip, with your car and current tank, this is the best place to fuel. Here is why. Here is how much you actually save. Here is when to leave it alone."
-

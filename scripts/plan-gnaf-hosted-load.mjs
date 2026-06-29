@@ -226,11 +226,17 @@ function assess({ rawZip, sqlite, hosted, minAddressRows: minRows, storageReview
 
 function commandPlan(inputPath, storageReview, planRunId) {
   const input = path.relative(ROOT, inputPath);
+  const reviewPath = storageReview?.path || "docs/gnaf-hosted-storage-review-2026-06-29.json";
   const reviewArg = storageReview?.ok && storageReview.path ? ` --storage-review ${storageReview.path}` : "";
+  const stagedReviewArg = reviewPath ? ` --storage-review ${reviewPath}` : "";
   const progressPath = `tmp/gnaf-raw-postgres-load-${planRunId}.json`;
+  const shardProgressPath = `tmp/gnaf-raw-postgres-load-${planRunId}-NSW-shard.json`;
   const progressArg = ` --progress-json ${progressPath} --run-id ${planRunId}`;
   return {
     validationLoad: `npm run load:gnaf-raw-postgres -- --input ${input} --limit-per-state 1000`,
+    stateShardLoad: `npm run load:gnaf-raw-postgres -- --input ${input} --states NSW --reset --skip-indexes --allow-state-shard${stagedReviewArg} --progress-json ${shardProgressPath} --run-id ${planRunId}-NSW-shard`,
+    stateShardCreateIndexes: "npm run load:gnaf-raw-postgres -- --setup-only --create-indexes",
+    stateShardReadiness: "npm run check:gnaf-hosted:readiness",
     nationalLoad: `npm run load:gnaf-raw-postgres -- --input ${input} --reset --skip-indexes --allow-large-load${reviewArg}${progressArg}`,
     createIndexes: "npm run load:gnaf-raw-postgres -- --setup-only --create-indexes",
     readiness: "npm run check:gnaf-hosted:readiness",
@@ -289,7 +295,15 @@ Validation load:
 ${payload.commands.validationLoad}
 \`\`\`
 
-National load, after storage review:
+State-shard validation load:
+
+\`\`\`bash
+${payload.commands.stateShardLoad}
+${payload.commands.stateShardCreateIndexes}
+${payload.commands.stateShardReadiness}
+\`\`\`
+
+National load, after explicit full-load storage approval:
 
 \`\`\`bash
 ${payload.commands.nationalLoad}
@@ -328,19 +342,35 @@ function requiredStatesPresent(states) {
 }
 
 function latestStorageReview() {
-  const dir = path.join(ROOT, "tmp");
-  if (!fs.existsSync(dir)) return "";
+  const candidates = [];
   const regex = /^gnaf-hosted-storage-review-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z\.json$/;
-  const files = fs.readdirSync(dir)
-    .filter((name) => regex.test(name))
-    .map((name) => path.join("tmp", name))
-    .sort((left, right) => path.basename(right).localeCompare(path.basename(left)));
-  return files[0] || "";
+  const datedRegex = /^gnaf-hosted-storage-review-\d{4}-\d{2}-\d{2}\.json$/;
+  for (const dirName of ["tmp", "docs"]) {
+    const dir = path.join(ROOT, dirName);
+    if (!fs.existsSync(dir)) continue;
+    candidates.push(...fs.readdirSync(dir)
+      .filter((name) => regex.test(name) || datedRegex.test(name))
+      .map((name) => path.join(dirName, name)));
+  }
+  return candidates
+    .sort((left, right) => path.basename(right).localeCompare(path.basename(left)))[0] || "";
 }
 
 function readStorageReview(filePath, { estimatedHostedStorageGbRange }) {
   try {
     const review = JSON.parse(fs.readFileSync(path.resolve(ROOT, filePath), "utf8"));
+    if (review.decision === "neon_staged_validation_full_national_not_approved") {
+      return {
+        checked: true,
+        ok: false,
+        path: path.relative(ROOT, path.resolve(ROOT, filePath)),
+        status: review.status || "",
+        decision: review.decision,
+        reviewHostedStorageMaxGb: Number(review.currentEvidence?.estimatedHostedStorageMaxGb || 0),
+        currentHostedStorageMaxGb: Number(estimatedHostedStorageGbRange[1] || 0),
+        reason: "national_load_not_approved_staged_validation_only",
+      };
+    }
     const reviewMax = Number(review.estimates?.hostedStorageMaxGb || 0);
     const currentMax = Number(estimatedHostedStorageGbRange[1] || 0);
     const ok = review.status === "passed" &&

@@ -420,10 +420,15 @@ async function assessHostedNational(filePath) {
   const overall = report.summary?.overall || {};
   const address = report.summary?.byKind?.address || {};
   const poi = report.summary?.byKind?.poi || {};
+  const coverage = report.coverage?.requiredSlices || {};
   const failures = [];
   const blockers = [];
   const completeBenchmark = (overall.cases || 0) >= 900;
   if (!completeBenchmark) blockers.push("hosted_national_benchmark_incomplete");
+  if (completeBenchmark && coverage.allStatesRepresented !== true) failures.push("hosted_national_not_all_states_represented");
+  if (completeBenchmark && Number(coverage.numericAddressLikeRows || 0) < 600) failures.push("hosted_national_numeric_address_like_coverage_below_600");
+  if (completeBenchmark && Number(coverage.ruralOrRemoteAddressRows || 0) < 80) failures.push("hosted_national_rural_remote_coverage_below_80");
+  if (completeBenchmark && Number(coverage.unitOrBuildingAddressRows || 0) < 20) failures.push("hosted_national_unit_building_coverage_below_20");
   if (completeBenchmark && (address.finalTopRate || 0) < 1) failures.push("hosted_national_address_top_rate_below_1");
   if (completeBenchmark && (poi.finalTopRate || 0) < 0.98) failures.push("hosted_national_poi_top_rate_below_0_98");
   if (completeBenchmark && (!Number.isFinite(address.p90AnyChars) || address.p90AnyChars > 42)) failures.push("hosted_national_address_p90_chars_above_42");
@@ -441,6 +446,10 @@ async function assessHostedNational(filePath) {
       addressP90Chars: address.p90AnyChars ?? null,
       poiTopRate: poi.finalTopRate ?? null,
       poiP90Chars: poi.p90AnyChars ?? null,
+      allStatesRepresented: coverage.allStatesRepresented ?? null,
+      ruralOrRemoteAddressRows: coverage.ruralOrRemoteAddressRows ?? null,
+      unitOrBuildingAddressRows: coverage.unitOrBuildingAddressRows ?? null,
+      numericAddressLikeRows: coverage.numericAddressLikeRows ?? null,
     },
     note: "Launch-grade hosted precision benchmark across 600 real addresses and 300 POIs.",
   });

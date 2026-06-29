@@ -1,0 +1,30 @@
+{
+  "status": "decision_recorded",
+  "decision": "neon_staged_validation_full_national_not_approved",
+  "date": "2026-06-29",
+  "target": "neon",
+  "sourceDocument": "docs/gnaf-hosted-storage-decision-2026-06-29.md",
+  "currentEvidence": {
+    "localSqliteGb": 41.83,
+    "localRows": 16900638,
+    "hostedPreviewRows": 80000,
+    "estimatedHostedStorageMinGb": 62.7,
+    "estimatedHostedStorageMaxGb": 125.5
+  },
+  "decisionScope": {
+    "previewLoadApproved": true,
+    "stateShardLoadApproved": true,
+    "nationalLoadApproved": false,
+    "publicExactAddressClaimsApproved": false,
+    "providerMigrationApproved": false
+  },
+  "requiredBeforeNationalLoad": [
+    "large_state_shard_loaded",
+    "hosted_readiness_passes_for_shard",
+    "representative_shard_benchmark_passes",
+    "p90_latency_accepted",
+    "national_monthly_cost_accepted",
+    "rollback_path_documented",
+    "FUEL_PATH_GNAF_STORAGE_REVIEW_CONFIRMED=1_set_explicitly"
+  ]
+}

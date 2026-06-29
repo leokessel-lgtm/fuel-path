@@ -32,6 +32,7 @@ const MAX_ADDRESS_P90_CHARS = Number(args.maxAddressP90Chars || process.env.FUEL
 const MAX_POI_P90_CHARS = Number(args.maxPoiP90Chars || process.env.FUEL_PATH_HOSTED_BENCHMARK_MAX_POI_P90_CHARS || 12);
 const REQUEST_TIMEOUT_MS = Number(args.requestTimeoutMs || process.env.FUEL_PATH_HOSTED_BENCHMARK_REQUEST_TIMEOUT_MS || 8000);
 const PROGRESS_EVERY = Number(args.progressEvery || process.env.FUEL_PATH_HOSTED_BENCHMARK_PROGRESS_EVERY || 50);
+const PLAN_ONLY = Boolean(args.planOnly || process.env.FUEL_PATH_HOSTED_BENCHMARK_PLAN_ONLY === "1");
 const fetchCalls = {
   total: 0,
   gnafApi: 0,
@@ -45,6 +46,9 @@ if (!["module", "http"].includes(MODE)) {
 }
 if (MODE === "http" && !API_BASE) {
   throw new Error("Set --api-base or FUEL_PATH_API_BASE for hosted HTTP benchmark mode.");
+}
+if (PLAN_ONLY) {
+  await writePlanAndExit();
 }
 if (!fs.existsSync(ADDRESS_SQLITE)) {
   throw new Error(`Address benchmark SQLite does not exist: ${ADDRESS_SQLITE}`);
@@ -119,6 +123,7 @@ const payload = {
   fetchCalls,
   index: indexEvidence(ADDRESS_SQLITE),
   summary,
+  coverage: coverageSummary(rows),
   rows,
 };
 
@@ -532,6 +537,42 @@ function summarise(rows) {
   };
 }
 
+function coverageSummary(rows) {
+  const addressRows = rows.filter((row) => row.kind === "address");
+  const poiRows = rows.filter((row) => row.kind === "poi");
+  const byCategory = Object.fromEntries(
+    [...new Set(rows.map((row) => row.category || "unknown"))]
+      .sort()
+      .map((category) => [category, rows.filter((row) => (row.category || "unknown") === category).length]),
+  );
+  const byAddressFamily = Object.fromEntries(
+    [...new Set(addressRows.map((row) => row.addressFamily || "unknown"))]
+      .sort()
+      .map((family) => [family, addressRows.filter((row) => (row.addressFamily || "unknown") === family).length]),
+  );
+  const remoteAddressRows = addressRows.filter((row) => {
+    const label = normalise(`${row.query} ${row.expectedLabel} ${row.expectedLocality}`);
+    return /\b(alice springs|broome|coober pedy|karratha|kalgoorlie|katherine|tennant creek|longreach|mount gambier|queenstown|yulara|nhulunbuy|geraldton|albany|burnie|devonport|wodonga|traralgon|shepparton|tamworth|orange|wagga wagga)\b/.test(label);
+  });
+  const numericAddressLikeRows = addressRows.filter((row) => /\b\d+[a-z]?(?:-\d+[a-z]?)?\b/.test(normalise(row.query)));
+  return {
+    total: rows.length,
+    addressRows: addressRows.length,
+    poiRows: poiRows.length,
+    states: Object.fromEntries(SELECTED_STATES.map((state) => [state, rows.filter((row) => row.state === state).length])),
+    byCategory,
+    byAddressFamily,
+    requiredSlices: {
+      exactAddressRows: addressRows.length,
+      unitOrBuildingAddressRows: byAddressFamily.unit_or_building_address || 0,
+      ruralOrRemoteAddressRows: remoteAddressRows.length,
+      numericAddressLikeRows: numericAddressLikeRows.length,
+      poiRows: poiRows.length,
+      allStatesRepresented: SELECTED_STATES.every((state) => rows.some((row) => row.state === state)),
+    },
+  };
+}
+
 function summariseGroup(rows) {
   const topChars = rows.map((row) => row.firstTopMatchChars).filter(Number.isFinite);
   const anyChars = rows.map((row) => row.firstAnyMatchChars).filter(Number.isFinite);
@@ -583,8 +624,13 @@ function assertThresholds(summary, rows) {
   const failures = [];
   const address = summary.byKind.address || summariseGroup([]);
   const poi = summary.byKind.poi || summariseGroup([]);
+  const coverage = coverageSummary(rows);
   if (address.cases !== ADDRESS_COUNT) failures.push(`Expected ${ADDRESS_COUNT} address cases, got ${address.cases}.`);
   if (poi.cases !== POI_COUNT) failures.push(`Expected ${POI_COUNT} POI cases, got ${poi.cases}.`);
+  if (!coverage.requiredSlices.allStatesRepresented) failures.push("Hosted national benchmark did not represent all selected states.");
+  if (ADDRESS_COUNT >= 600 && coverage.requiredSlices.numericAddressLikeRows < 600) failures.push(`Expected 600 numeric-address-like rows, got ${coverage.requiredSlices.numericAddressLikeRows}.`);
+  if (ADDRESS_COUNT >= 600 && coverage.requiredSlices.ruralOrRemoteAddressRows < 80) failures.push(`Expected at least 80 rural/remote address rows, got ${coverage.requiredSlices.ruralOrRemoteAddressRows}.`);
+  if (ADDRESS_COUNT >= 600 && coverage.requiredSlices.unitOrBuildingAddressRows < 20) failures.push(`Expected at least 20 unit/building address rows, got ${coverage.requiredSlices.unitOrBuildingAddressRows}.`);
   if (address.finalTopRate < MIN_ADDRESS_TOP_RATE) failures.push(`Address top-match rate ${rateText(address.finalTopRate)} below ${rateText(MIN_ADDRESS_TOP_RATE)}.`);
   if (poi.finalTopRate < MIN_POI_TOP_RATE) failures.push(`POI top-match rate ${rateText(poi.finalTopRate)} below ${rateText(MIN_POI_TOP_RATE)}.`);
   if (address.p90AnyChars > MAX_ADDRESS_P90_CHARS) failures.push(`Address p90 chars ${address.p90AnyChars} above ${MAX_ADDRESS_P90_CHARS}.`);
@@ -600,6 +646,106 @@ function assertThresholds(summary, rows) {
       .map((row) => `${row.id} ${row.kind} ${row.query} -> ${row.finalTopLabel || row.result}`);
     throw new Error(`${failures.join(" ")}${examples.length ? ` Examples: ${examples.join(" | ")}` : ""}`);
   }
+}
+
+async function writePlanAndExit() {
+  const plan = {
+    runId: RUN_ID,
+    generatedAt: new Date().toISOString(),
+    status: "plan_only",
+    purpose: "Prepare launch-grade hosted national geocode evidence without calling the hosted API.",
+    mode: MODE,
+    apiBase: API_BASE || "<set with --api-base or FUEL_PATH_API_BASE>",
+    addressSqlite: ADDRESS_SQLITE,
+    requested: {
+      addresses: ADDRESS_COUNT,
+      pois: POI_COUNT,
+      states: SELECTED_STATES,
+      profile: PROFILE,
+      caseContext: CASE_CONTEXT,
+      caseContextRadiusKm: CASE_CONTEXT ? CASE_CONTEXT_RADIUS_KM : null,
+    },
+    thresholds: {
+      minAddressTopRate: MIN_ADDRESS_TOP_RATE,
+      minPoiTopRate: MIN_POI_TOP_RATE,
+      maxAddressP90Chars: MAX_ADDRESS_P90_CHARS,
+      maxPoiP90Chars: MAX_POI_P90_CHARS,
+      minRuralOrRemoteAddressRows: ADDRESS_COUNT >= 600 ? 80 : null,
+      minUnitOrBuildingAddressRows: ADDRESS_COUNT >= 600 ? 20 : null,
+      minNumericAddressLikeRows: ADDRESS_COUNT >= 600 ? 600 : null,
+    },
+    requiredEvidence: [
+      "600 address cases sampled from the national G-NAF SQLite.",
+      "300 POI cases sampled from regional hint records.",
+      "All selected states represented.",
+      "Address top-match rate is 100%.",
+      "POI top-match rate is at least 98%.",
+      "Address p90 chars-to-any-match is at most 42.",
+      "POI p90 chars-to-any-match is at most 12.",
+      "Rural/remote, unit/building and numeric-address-like coverage is present.",
+      "HTTP mode is used against the hosted app, not local module mode.",
+    ],
+    runCommand: [
+      "npm run test:geocode-hosted-national --",
+      "--mode http",
+      "--api-base https://fuel-path.vercel.app",
+      "--address-count 600",
+      "--poi-count 300",
+      "--profile rural-unit",
+      "--case-context",
+      "--delay-ms 250",
+    ].join(" "),
+    expectedOutputs: [
+      `tmp/geocode-hosted-national-benchmark-${RUN_ID}.json`,
+      `tmp/geocode-hosted-national-benchmark-${RUN_ID}.csv`,
+    ],
+    launchGate: "Run npm run summarise:lookup-release-evidence after the hosted benchmark and require the Hosted 900-case national benchmark gate to pass.",
+  };
+  await fsp.mkdir(path.join(ROOT, "tmp"), { recursive: true });
+  const jsonPath = `tmp/geocode-hosted-national-benchmark-plan-${RUN_ID}.json`;
+  const reportPath = `tmp/geocode-hosted-national-benchmark-plan-${RUN_ID}.md`;
+  await fsp.writeFile(path.join(ROOT, jsonPath), `${JSON.stringify(plan, null, 2)}\n`);
+  await fsp.writeFile(path.join(ROOT, reportPath), renderPlan(plan));
+  console.log(JSON.stringify({ runId: RUN_ID, jsonPath, reportPath, status: plan.status }, null, 2));
+  process.exit(0);
+}
+
+function renderPlan(plan) {
+  return `# Hosted 900-case national geocode benchmark plan
+
+Run ID: ${plan.runId}
+
+## Purpose
+
+Prepare launch-grade hosted national geocode evidence without calling the hosted API.
+
+## Required run
+
+\`\`\`bash
+${plan.runCommand}
+\`\`\`
+
+## Pass gates
+
+- 600 address cases and 300 POI cases.
+- All selected states represented: ${plan.requested.states.join(", ")}.
+- Address top-match rate: ${rateText(plan.thresholds.minAddressTopRate)}.
+- POI top-match rate: at least ${rateText(plan.thresholds.minPoiTopRate)}.
+- Address p90 chars-to-any-match: at most ${plan.thresholds.maxAddressP90Chars}.
+- POI p90 chars-to-any-match: at most ${plan.thresholds.maxPoiP90Chars}.
+- Rural/remote address rows: at least ${plan.thresholds.minRuralOrRemoteAddressRows}.
+- Unit/building address rows: at least ${plan.thresholds.minUnitOrBuildingAddressRows}.
+- Numeric-address-like rows: at least ${plan.thresholds.minNumericAddressLikeRows}.
+- HTTP mode must be used against the hosted app.
+
+## Evidence outputs
+
+- ${plan.expectedOutputs.join("\n- ")}
+
+## Launch gate
+
+${plan.launchGate}
+`;
 }
 
 function prefixesFor(query, kind = "") {

@@ -6,6 +6,8 @@ var/
 .git/
 .git-backups/
 .npm-cache/
+**/.npm-cache/
+.vercel/
 node_modules/
 **/node_modules/
 mobile-app/node_modules/

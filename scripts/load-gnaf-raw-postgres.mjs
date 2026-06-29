@@ -24,6 +24,7 @@ const setupOnly = Boolean(args.setupOnly);
 const createIndexes = Boolean(args.createIndexes);
 const skipLoadIndexes = Boolean(args.skipIndexes);
 const allowLargeLoad = Boolean(args.allowLargeLoad) || process.env.FUEL_PATH_ALLOW_LARGE_GNAF_LOAD === "true";
+const allowStateShard = Boolean(args.allowStateShard);
 const storageReviewPath = args.storageReview || process.env.FUEL_PATH_GNAF_STORAGE_REVIEW_JSON || "";
 const resumeProgressJsonPath = args.resumeProgressJson ? path.resolve(args.resumeProgressJson) : "";
 let progressJsonPath = args.progressJson ? path.resolve(args.progressJson) : "";
@@ -35,7 +36,9 @@ const completedStateSet = new Set(
     : [],
 );
 const unboundedLoad = !setupOnly && !limitPerState;
+const stateShardLoad = unboundedLoad && allowStateShard;
 const requiresLargeLoadControls = !dryRun && unboundedLoad && allowLargeLoad;
+const requiresStateShardControls = !dryRun && stateShardLoad;
 const startedAt = new Date().toISOString();
 const progress = {
   runId,
@@ -67,12 +70,31 @@ if (resumeProgressJsonPath && reset) {
 if (!dryRun && !connectionString) {
   throw new Error("FUEL_PATH_GNAF_DATABASE_URL is required unless --dry-run is used.");
 }
-if (!dryRun && unboundedLoad && !allowLargeLoad) {
+if (allowStateShard && states.length !== 1) {
+  throw new Error("--allow-state-shard may only be used with exactly one --states value.");
+}
+if (!dryRun && unboundedLoad && !allowLargeLoad && !allowStateShard) {
   throw new Error(
     [
       "Refusing an unbounded hosted G-NAF load.",
       "The full raw G-NAF import is roughly 17 million rows and can exceed free hosted database storage limits once indexed.",
-      "Use --limit-per-state for a controlled validation load, or pass --allow-large-load only after confirming the database plan and storage budget.",
+      "Use --limit-per-state for a controlled validation load, pass --allow-state-shard for one reviewed state shard, or pass --allow-large-load only after confirming the database plan and storage budget.",
+    ].join(" "),
+  );
+}
+if (requiresStateShardControls && !storageReviewAllowsStateShard(storageReviewPath)) {
+  throw new Error(
+    [
+      "Refusing an unbounded state-shard G-NAF load without a recorded staged-storage decision.",
+      "Pass --storage-review docs/gnaf-hosted-storage-review-2026-06-29.json or set FUEL_PATH_GNAF_STORAGE_REVIEW_JSON.",
+    ].join(" "),
+  );
+}
+if (requiresStateShardControls && !progressJsonPath) {
+  throw new Error(
+    [
+      "Refusing an unbounded state-shard G-NAF load without --progress-json.",
+      "Pass a writable progress JSON path so interrupted shard loads leave resumable operational evidence.",
     ].join(" "),
   );
 }
@@ -428,6 +450,7 @@ function parseArgs(values) {
     else if (value === "--create-indexes") parsed.createIndexes = true;
     else if (value === "--skip-indexes") parsed.skipIndexes = true;
     else if (value === "--allow-large-load") parsed.allowLargeLoad = true;
+    else if (value === "--allow-state-shard") parsed.allowStateShard = true;
     else if (value === "--storage-review") parsed.storageReview = values[++index];
     else if (value === "--progress-json") parsed.progressJson = values[++index];
     else if (value === "--resume-progress-json") parsed.resumeProgressJson = values[++index];
@@ -450,6 +473,18 @@ function storageReviewPassed(filePath) {
     return review.status === "passed" &&
       review.decision === "storage_cost_review_confirmed_for_oracle_always_free_national_load_attempt" &&
       review.assumptions?.target === "oracle_always_free_compute";
+  } catch {
+    return false;
+  }
+}
+
+function storageReviewAllowsStateShard(filePath) {
+  if (!filePath) return false;
+  try {
+    const review = JSON.parse(fs.readFileSync(path.resolve(filePath), "utf8"));
+    return review.decision === "neon_staged_validation_full_national_not_approved" &&
+      review.decisionScope?.stateShardLoadApproved === true &&
+      review.decisionScope?.nationalLoadApproved === false;
   } catch {
     return false;
   }

@@ -63,30 +63,85 @@ async function searchAddressIndex(query, limit = 5, options = {}) {
 
   const sqlitePath = configuredSqlitePath();
   if (sqlitePath) {
-    const sqliteResults = searchSqliteNeedles(needles, limit, searchContext);
+    const sqliteResults = filterLeadingUnitSlashAddressSuggestions(
+      searchSqliteNeedles(needles, limit, searchContext, rawQuery),
+      needle,
+      rawQuery,
+    );
     if (sqliteResults.length) return sqliteResults;
   }
 
   return mergeAddressSuggestions(needles.map((item) => searchSeedIndex(item.needle, limit)), limit);
 }
 
-function searchSqliteNeedles(needles, limit, searchContext) {
-  const groups = [];
-  for (const item of needles) {
-    const rows = searchSqliteIndex(item.needle, limit, searchContext);
-    groups.push(rows);
-    const merged = mergeAddressSuggestions(groups, limit);
-    if (shouldStopSqliteNeedleSearch(merged, item.needle, limit)) return merged;
+function filterLeadingUnitSlashAddressSuggestions(suggestions, needle, rawNeedle = null) {
+  const queryUnitIntent = queryLeadingUnitIntent(needle, rawNeedle);
+  if (!queryUnitIntent?.unitNumber) return suggestions;
+  const targetUnit = normalisedHouseNumberToken(queryUnitIntent.unitNumber);
+  const targetHouse = normalisedHouseNumberToken(queryUnitIntent.houseNumber || "");
+  if (!targetUnit) return suggestions;
+
+  const filtered = [];
+  for (const suggestion of suggestions) {
+    if (suggestion.provider !== "fuel_path_gnaf" || suggestion.type !== "address") {
+      filtered.push(suggestion);
+      continue;
+    }
+    const tokens = normaliseAddressText(suggestion.label).split(/\s+/).filter(Boolean);
+    const unitIndex = tokens.findIndex((token, index) =>
+      SQLITE_UNIT_TERMS.has(token) && normalisedHouseNumberToken(tokens[index + 1]) === targetUnit,
+    );
+    if (unitIndex < 0) continue;
+    if (!targetHouse) {
+      filtered.push(suggestion);
+      continue;
+    }
+    const hasTargetHouse = tokens.some((token, index) => {
+      if (index === unitIndex + 1) return false;
+      const rowHouse = normalisedHouseNumberToken(token);
+      return rowHouse && houseNumbersCompatible(targetHouse, rowHouse);
+    });
+    if (hasTargetHouse) filtered.push(suggestion);
   }
-  return mergeAddressSuggestions(groups, limit);
+  return filtered;
 }
 
-function shouldStopSqliteNeedleSearch(results, needle, limit) {
-  if (results.length >= limit) return true;
+function searchSqliteNeedles(needles, limit, searchContext, rawNeedle = "") {
+  const primaryNeedle = needles[0]?.needle || "";
+  const primaryRawNeedle = needles[0]?.rawNeedle || "";
+  const groups = [];
+  for (const item of needles) {
+    const rows = searchSqliteIndex(item.needle, limit, searchContext, item.rawNeedle || primaryRawNeedle);
+    groups.push(rows);
+    const merged = collapseAmbiguousUnitHouseResults(mergeAddressSuggestions(groups, limit), primaryNeedle, primaryRawNeedle);
+    if (shouldStopSqliteNeedleSearch(merged, item.needle, limit, item.rawNeedle || rawNeedle || primaryRawNeedle)) return merged;
+  }
+  return collapseAmbiguousUnitHouseResults(mergeAddressSuggestions(groups, limit), primaryNeedle, primaryRawNeedle);
+}
+
+function collapseAmbiguousUnitHouseResults(suggestions, primaryNeedle, rawNeedle = null) {
+  const queryUnitIntent = queryLeadingUnitIntent(primaryNeedle, rawNeedle);
+  if (!queryUnitIntent?.unitNumber || !queryUnitIntent?.houseNumber) return suggestions;
+  return suggestions.filter((suggestion) => {
+    if (!Number(suggestion.refineRequired || 0)) return true;
+    if (suggestion.suggestionType === "base_address") return false;
+    return suggestion.type !== "building";
+  });
+}
+
+function shouldStopSqliteNeedleSearch(results, needle, limit, rawNeedle = null) {
   const top = results[0];
-  if (!top || top.suggestionType !== "exact_address" || top.refineRequired === true) return false;
-  if (queryContainsUnitLikeToken(needle)) return true;
+  if (!top) return false;
+  if (queryHasUnitBuildingIntent(needle, rawNeedle) && !canStopUnitLikeNeedle(top)) return false;
+  if (results.length >= limit) {
+    return top.suggestionType === "exact_address" && !top.refineRequired && top.matchType === "exact_address";
+  }
+  if (top.suggestionType !== "exact_address" || top.refineRequired === true) return false;
   return shouldSearchLargeSqliteIndex(needle);
+}
+
+function canStopUnitLikeNeedle(top) {
+  return top.suggestionType === "exact_address" && !top.refineRequired && top.matchType === "exact_address";
 }
 
 async function searchApiIndex(rawQuery, needle, limit) {
@@ -157,7 +212,7 @@ async function searchPostgresIndex(needle, limit) {
       `;
     return rows
       .map((row) => ({ row, matchType: postgresMatchType(row, needle) }))
-      .filter(({ row, matchType }) => addressMatchQualityPass(row, needle, matchType))
+      .filter(({ row, matchType }) => addressMatchQualityPass(row, needle, matchType, rawNeedle))
       .map(({ row, matchType }) => addressRecordToSuggestion(row, matchType, 1000));
   } catch {
     return [];
@@ -173,26 +228,32 @@ function searchSeedIndex(needle, limit) {
     .map(({ record, matchType, score }) => addressRecordToSuggestion(record, matchType, score));
 }
 
-function searchSqliteIndex(needle, limit, searchContext = null) {
+function searchSqliteIndex(needle, limit, searchContext = null, rawNeedle = null) {
   const database = openSqliteIndex();
   if (!database) return [];
   const sqlitePath = configuredSqlitePath();
   if (sqliteHybridIndexAvailable(database)) {
-    const hybridResults = searchSqliteHybridIndex(database, needle, limit, searchContext);
+    const hybridResults = searchSqliteHybridIndex(database, needle, limit, searchContext, rawNeedle);
     if (hybridResults.length) return hybridResults;
   }
   if (isLargeSqliteIndex(sqlitePath) && !shouldSearchLargeSqliteIndex(needle)) return [];
 
   const terms = sqliteFtsTermsForNeedle(needle);
   if (!terms.length) return [];
+  const ftsTable = sqliteTableExists(database, "address_fts")
+    ? "address_fts"
+    : sqliteTableExists(database, "address_typeahead_fts")
+      ? "address_typeahead_fts"
+      : "";
+  if (!ftsTable) return [];
 
   try {
     const ftsQuery = terms.map((term) => `${escapeFtsTerm(term)}*`).join(" ");
     const expandedLimit = Math.max(Math.min(Number(limit) || 5, 20) * 8, 40);
     const statement = database.prepare(`
       SELECT ${sqliteAddressSelect(database)}
-      FROM address_fts
-      WHERE address_fts MATCH ?
+      FROM ${ftsTable}
+      WHERE ${ftsTable} MATCH ?
       ORDER BY rank
       LIMIT ?
     `);
@@ -205,17 +266,18 @@ function searchSqliteIndex(needle, limit, searchContext = null) {
       .map(({ row, matchType }) => addressRecordToSuggestion(row, matchType, addressIndexRank({ row, matchType }, needle)));
   } catch {
     try {
+      const fallbackSearchColumn = sqliteSchemaColumns(database, "addresses").has("search_text") ? "search_text" : "label";
       const statement = database.prepare(`
         SELECT ${sqliteAddressSelect(database)}
         FROM addresses
-        WHERE search_text LIKE ?
+        WHERE ${fallbackSearchColumn} LIKE ?
         ORDER BY LENGTH(label)
         LIMIT ?
       `);
       return statement
         .all(`%${needle}%`, limit)
         .map((row) => ({ row, matchType: sqliteMatchType(row, needle) }))
-        .filter(({ row, matchType }) => addressMatchQualityPass(row, needle, matchType))
+        .filter(({ row, matchType }) => addressMatchQualityPass(row, needle, matchType, rawNeedle))
         .sort((left, right) => addressIndexRank(right, needle) - addressIndexRank(left, needle) || left.row.label.length - right.row.label.length)
         .map(({ row, matchType }) => addressRecordToSuggestion(row, matchType, addressIndexRank({ row, matchType }, needle)));
     } catch {
@@ -224,94 +286,124 @@ function searchSqliteIndex(needle, limit, searchContext = null) {
   }
 }
 
-function searchSqliteHybridIndex(database, needle, limit, searchContext = null) {
-  if (queryContainsUnitLikeToken(needle)) {
+function searchSqliteHybridIndex(database, needle, limit, searchContext = null, rawNeedle = null) {
+  const leadingUnitSlash = queryLeadingUnitSlashNumbers(needle, rawNeedle);
+  if (queryContainsUnitLikeToken(needle) || leadingUnitSlash) {
     const unitLotIntent = queryUnitLotIntent(needle);
     const unitRangePrefixReady = unitLikeRangeQueryReadyForExactPrefix(needle);
+    const forceTypeaheadForUnitBuilding = shouldUseRebuiltTypeaheadForUnitOrBuildingQuery(needle, searchContext, rawNeedle);
     if (!unitLikeQueryReadyForTypeahead(needle) && !unitRangePrefixReady) return [];
     const exactUnitRows = searchSqliteExactUnitEntries(database, needle, limit);
     const safeExactUnitRows = filterRowsForUnitLotIntent(exactUnitRows, unitLotIntent);
-    if (safeExactUnitRows.length) return hybridRowsToSuggestions(safeExactUnitRows, needle, 960);
+    const safeExactUnitRowsForIntent = filterRowsForLeadingUnitSlashIntent(safeExactUnitRows, needle, rawNeedle);
+    if (safeExactUnitRowsForIntent.length) return hybridRowsToSuggestions(safeExactUnitRowsForIntent, needle, 960, rawNeedle);
     if (unitLikeQueryStartsWithUnitToken(needle)) {
       if (unitRangePrefixReady && !unitLikeQueryReadyForTypeahead(needle)) {
         const exactPrefixRows = searchSqlitePrefixEntries(database, needle, limit, searchContext, {
           includeTokenBoundaryPrefix: true,
           minPrefixLength: 12,
-        }).filter((row) => row.entry_type === "exact" && row.unit);
+        }, rawNeedle).filter((row) => row.entry_type === "exact" && row.unit);
         const safeExactPrefixRows = filterRowsForUnitLotIntent(exactPrefixRows, unitLotIntent);
-        if (safeExactPrefixRows.length && !prefixRowsAmbiguous(safeExactPrefixRows)) {
-          return hybridRowsToSuggestions(preferExactUnitPrefixRows(safeExactPrefixRows), needle, 940);
+        const safeExactPrefixRowsForIntent = filterRowsForLeadingUnitSlashIntent(safeExactPrefixRows, needle, rawNeedle);
+        if (safeExactPrefixRowsForIntent.length && !forceTypeaheadForUnitBuilding && !prefixRowsAmbiguous(safeExactPrefixRowsForIntent)) {
+          return hybridRowsToSuggestions(preferExactUnitPrefixRows(safeExactPrefixRowsForIntent), needle, 940, rawNeedle);
         }
         return [];
       }
-      const prefixRows = searchSqlitePrefixEntries(database, needle, limit, searchContext);
+      const prefixRows = searchSqlitePrefixEntries(database, needle, limit, searchContext, {}, rawNeedle);
       const useContextualPrefixRows = shouldUseContextualAmbiguousPrefixRows(needle, searchContext);
       const safePrefixRows = filterRowsForUnitLotIntent(prefixRows, unitLotIntent);
-      if (safePrefixRows.length && (!prefixRowsAmbiguous(safePrefixRows) || useContextualPrefixRows)) {
-        return hybridRowsToSuggestions(useContextualPrefixRows ? safePrefixRows : preferExactUnitPrefixRows(safePrefixRows), needle, 930);
+      const safePrefixRowsForIntent = filterRowsForLeadingUnitSlashIntent(safePrefixRows, needle, rawNeedle);
+      if (safePrefixRowsForIntent.length &&
+        !forceTypeaheadForUnitBuilding &&
+        (!prefixRowsAmbiguous(safePrefixRowsForIntent) || useContextualPrefixRows)) {
+        return hybridRowsToSuggestions(
+          useContextualPrefixRows ? safePrefixRowsForIntent : preferExactUnitPrefixRows(safePrefixRowsForIntent),
+          needle,
+          930,
+          rawNeedle,
+        );
       }
       if (unitRangePrefixReady) {
         const exactPrefixRows = searchSqlitePrefixEntries(database, needle, limit, searchContext, {
           includeTokenBoundaryPrefix: true,
-        }).filter((row) => row.entry_type === "exact" && row.unit);
+        }, rawNeedle).filter((row) => row.entry_type === "exact" && row.unit);
         const safeExactPrefixRows = filterRowsForUnitLotIntent(exactPrefixRows, unitLotIntent);
-        if (safeExactPrefixRows.length && !prefixRowsAmbiguous(safeExactPrefixRows)) {
-          return hybridRowsToSuggestions(preferExactUnitPrefixRows(safeExactPrefixRows), needle, 940);
+        const safeExactPrefixRowsForIntent = filterRowsForLeadingUnitSlashIntent(safeExactPrefixRows, needle, rawNeedle);
+        if (safeExactPrefixRowsForIntent.length && !forceTypeaheadForUnitBuilding && !prefixRowsAmbiguous(safeExactPrefixRowsForIntent)) {
+          return hybridRowsToSuggestions(preferExactUnitPrefixRows(safeExactPrefixRowsForIntent), needle, 940, rawNeedle);
         }
       }
     } else {
       const buildingUnitRows = searchSqliteBuildingUnitEntries(database, needle, limit, searchContext);
       const safeBuildingUnitRows = filterRowsForUnitLotIntent(buildingUnitRows, unitLotIntent);
-      if (safeBuildingUnitRows.length) return hybridRowsToSuggestions(safeBuildingUnitRows, needle, 960);
+      const safeBuildingUnitRowsForIntent = filterRowsForLeadingUnitSlashIntent(safeBuildingUnitRows, needle, rawNeedle);
+      if (safeBuildingUnitRowsForIntent.length) return hybridRowsToSuggestions(safeBuildingUnitRowsForIntent, needle, 960, rawNeedle);
       const buildingUnitRefineRows = searchSqliteBuildingUnitRefineEntries(database, needle, limit, searchContext);
-      if (buildingUnitRefineRows.length) return hybridRowsToSuggestions(buildingUnitRefineRows, needle, 940);
+      const buildingUnitRefineRowsForIntent = filterRowsForLeadingUnitSlashIntent(buildingUnitRefineRows, needle, rawNeedle);
+      if (buildingUnitRefineRowsForIntent.length) return hybridRowsToSuggestions(buildingUnitRefineRowsForIntent, needle, 940, rawNeedle);
       const embeddedUnitNeedle = embeddedUnitAddressCoreNeedle(needle);
       if (embeddedUnitNeedle) {
         const prefixRows = searchSqlitePrefixEntries(database, embeddedUnitNeedle, limit, searchContext, {
           minPrefixLength: 12,
-        });
+        }, rawNeedle);
         const useContextualPrefixRows = shouldUseContextualAmbiguousPrefixRows(embeddedUnitNeedle, searchContext);
         const safePrefixRows = filterRowsForUnitLotIntent(prefixRows, unitLotIntent);
-        if (safePrefixRows.length && (!prefixRowsAmbiguous(safePrefixRows) || useContextualPrefixRows)) {
-          return hybridRowsToSuggestions(useContextualPrefixRows ? safePrefixRows : preferExactUnitPrefixRows(safePrefixRows), needle, 930);
+        const safePrefixRowsForIntent = filterRowsForLeadingUnitSlashIntent(safePrefixRows, needle, rawNeedle);
+        if (safePrefixRowsForIntent.length &&
+          !forceTypeaheadForUnitBuilding &&
+          (!prefixRowsAmbiguous(safePrefixRowsForIntent) || useContextualPrefixRows)) {
+          return hybridRowsToSuggestions(
+            useContextualPrefixRows ? safePrefixRowsForIntent : preferExactUnitPrefixRows(safePrefixRowsForIntent),
+            needle,
+            930,
+            rawNeedle,
+          );
         }
       }
     }
-    const typeaheadRows = searchSqliteTypeaheadEntries(database, needle, limit, searchContext);
-    return hybridRowsToSuggestions(filterRowsForUnitLotIntent(typeaheadRows, unitLotIntent), needle);
+    const typeaheadRows = searchSqliteTypeaheadEntries(database, needle, limit, searchContext, rawNeedle);
+    const filteredTypeaheadRows = filterRowsForUnitLotIntent(typeaheadRows, unitLotIntent);
+    return hybridRowsToSuggestions(
+      filterRowsForLeadingUnitSlashIntent(filteredTypeaheadRows, needle, rawNeedle),
+      needle,
+      900,
+      rawNeedle,
+    );
   }
   if (!/^\d/.test(needle)) {
     if (queryStartsWithLotLikeToken(needle)) {
       const prefixRows = searchSqlitePrefixEntries(database, needle, limit, searchContext);
       if (prefixRows.length && (!prefixRowsAmbiguous(prefixRows) || shouldUseContextualAmbiguousPrefixRows(needle, searchContext))) {
-        return hybridRowsToSuggestions(prefixRows, needle, 950);
+        return hybridRowsToSuggestions(prefixRows, needle, 950, rawNeedle);
       }
     }
     const embeddedAddressCoreNeedle = embeddedNumberFirstAddressCoreNeedle(needle);
     if (embeddedAddressCoreNeedle) {
       const prefixRows = searchSqlitePrefixEntries(database, embeddedAddressCoreNeedle, limit, searchContext, {
         minPrefixLength: 8,
-      });
+      }, rawNeedle);
       if (prefixRows.length && (!prefixRowsAmbiguous(prefixRows) || shouldUseContextualAmbiguousPrefixRows(embeddedAddressCoreNeedle, searchContext))) {
-        return hybridRowsToSuggestions(prefixRows, needle, 950);
+        return hybridRowsToSuggestions(prefixRows, needle, 950, rawNeedle);
       }
     }
-    const typeaheadRows = searchSqliteTypeaheadEntries(database, needle, limit, searchContext);
-    return hybridRowsToSuggestions(typeaheadRows, needle);
+    const typeaheadRows = searchSqliteTypeaheadEntries(database, needle, limit, searchContext, rawNeedle);
+    return hybridRowsToSuggestions(typeaheadRows, needle, 900, rawNeedle);
   }
-  const prefixRows = searchSqlitePrefixEntries(database, needle, limit, searchContext);
+  const prefixRows = searchSqlitePrefixEntries(database, needle, limit, searchContext, {}, rawNeedle);
   if (prefixRows.length && (!prefixRowsAmbiguous(prefixRows) || shouldUseContextualAmbiguousPrefixRows(needle, searchContext))) {
-    return hybridRowsToSuggestions(prefixRows, needle, 950);
+    return hybridRowsToSuggestions(prefixRows, needle, 950, rawNeedle);
   }
-  const typeaheadRows = searchSqliteTypeaheadEntries(database, needle, limit, searchContext);
-  return hybridRowsToSuggestions(typeaheadRows, needle);
+  const typeaheadRows = searchSqliteTypeaheadEntries(database, needle, limit, searchContext, rawNeedle);
+  return hybridRowsToSuggestions(typeaheadRows, needle, 900, rawNeedle);
 }
 
-function hybridRowsToSuggestions(rows, needle, fallbackScore = 900) {
+function hybridRowsToSuggestions(rows, needle, fallbackScore = 900, rawNeedle = null) {
   const suggestions = [];
   const seen = new Set();
   for (const row of rows) {
-    if (!hybridRowQualityPass(row, needle)) continue;
+    if (!hybridRowQualityPass(row, needle, rawNeedle)) continue;
+    if (shouldSkipAmbiguousUnitStartExactRow(row, needle, rawNeedle)) continue;
     const record = hybridRowToAddressRecord(row);
     const suggestion = addressRecordToSuggestion(record, hybridMatchType(row, needle), Number(row.rank_weight || fallbackScore));
     const key = String(suggestion.providerId || suggestion.label);
@@ -322,17 +414,188 @@ function hybridRowsToSuggestions(rows, needle, fallbackScore = 900) {
   return suggestions;
 }
 
-function hybridRowQualityPass(row, needle) {
-  const unitSlash = queryLeadingUnitSlashNumbers(needle);
+function shouldSkipAmbiguousUnitStartExactRow(row, needle, rawNeedle = null) {
+  if (!queryHasUnitBuildingIntent(needle, rawNeedle)) return false;
+  const queryUnitIntent = queryLeadingUnitIntent(needle, rawNeedle);
+  const rowLabel = String(row?.address_label || row?.key_text || "");
+  const entryType = String(row?.entry_type || row?.suggestion_type || "");
+  if (queryUnitIntent?.unitNumber && queryUnitIntent?.houseNumber && entryType === "base_refine") {
+    return true;
+  }
+  if (Number(row?.refine_required || 0)) {
+    return Boolean(queryUnitIntent?.unitNumber);
+  }
+  if (entryType === "base_refine") return false;
+  if (queryHasUnitBuildingIntent(needle, rawNeedle) && !isRowUnitContextCompatible(rowLabel, row?.unit || "", queryUnitIntent)) {
+    return true;
+  }
+  if (queryUnitIntent) {
+    const rowUnitText = String(row?.unit || "").trim();
+    const rowUnitNumber = normalisedHouseNumberToken(rowUnitText || "");
+    if (rowUnitNumber && queryUnitIntent.unitNumber && !houseNumbersCompatible(queryUnitIntent.unitNumber, rowUnitNumber)) {
+      return true;
+    }
+    const rowLeadingUnit = labelLeadingUnitNumber(row?.address_label || row?.key_text || "");
+    if (!rowLeadingUnit) {
+      return true;
+    }
+    if (!houseNumbersCompatible(queryUnitIntent.unitNumber, rowLeadingUnit)) {
+      return true;
+    }
+    if (queryUnitIntent.houseNumber && !houseNumbersCompatible(queryUnitIntent.houseNumber, labelHouseNumber(row?.address_label || row?.key_text || ""))) {
+      return true;
+    }
+  }
+  const specificIntent = queryUnitStartSpecificIntent(needle);
+  if (specificIntent) {
+    if (!detectQueryStateCode(needle) && !detectQueryPostcode(needle)) {
+      const entryTypeForSpecificIntent = String(row?.entry_type || row?.suggestion_type || "");
+      if (entryTypeForSpecificIntent === "base_refine" || entryTypeForSpecificIntent === "base_address" || entryTypeForSpecificIntent === "building") {
+        return true;
+      }
+    }
+  }
+  const matchType = hybridMatchType(row, needle);
+  if (matchType !== "exact_address" && matchType !== "address_prefix") return false;
+  if (entryType === "building" || entryType === "base_address") return false;
+  if (labelHasLeadingUnit(row?.address_label || row?.key_text || "") && !queryUnitIntent?.unitNumber) return true;
+  return false;
+}
+
+function shouldUseRebuiltTypeaheadForUnitOrBuildingQuery(needle, searchContext = null, rawNeedle = null) {
+  if (!queryHasUnitBuildingIntent(needle, rawNeedle)) return false;
+  if (searchContext && Number.isFinite(searchContext.nearLat) && Number.isFinite(searchContext.nearLon)) return false;
+  if (unitLikeRangeQueryReadyForExactPrefix(needle)) return false;
+  return !queryHasExplicitLocationContext(needle);
+}
+
+function queryHasUnitBuildingIntent(needle, rawNeedle = null) {
+  if (queryLeadingUnitSlashNumbers(needle, rawNeedle)) return true;
+  return Boolean(queryLeadingUnitIntent(needle, rawNeedle));
+}
+
+function isRowUnitContextCompatible(rowLabel, rowUnitField, queryUnitIntent) {
+  const normalizedRowLabel = normaliseAddressText(rowLabel);
+  const rowUnitNumber = normalisedHouseNumberToken(String(rowUnitField || ""));
+  if (queryUnitIntent?.unitNumber) {
+    if (queryUnitIntent.houseNumber) {
+      const rowHouseNumber = queryLeadingHouseNumberFromLabel(rowLabel);
+      if (rowHouseNumber && !houseNumbersCompatible(queryUnitIntent.houseNumber, rowHouseNumber)) return false;
+    }
+    if (rowUnitNumber) {
+      if (!houseNumbersCompatible(queryUnitIntent.unitNumber, rowUnitNumber)) return false;
+      return true;
+    }
+    const rowLeadingUnit = labelLeadingUnitNumber(rowLabel || "");
+    if (rowLeadingUnit && houseNumbersCompatible(queryUnitIntent.unitNumber, rowLeadingUnit)) return true;
+    return false;
+  }
+  return normalizedRowLabel.includes(" unit ") || labelHasLeadingUnit(rowLabel);
+}
+
+function queryLeadingUnitIntent(needle, rawNeedle = null) {
+  const leadingUnitSlash = queryLeadingUnitSlashNumbers(needle, rawNeedle);
+  if (leadingUnitSlash) {
+    return { unitNumber: leadingUnitSlash.unitNumber, houseNumber: leadingUnitSlash.houseNumber };
+  }
+  const tokens = normaliseAddressText(needle).split(/\s+/).filter(Boolean);
+  if (!tokens.length) return null;
+  if (!SQLITE_UNIT_TERMS.has(tokens[0])) return null;
+  const unitNumber = normalisedUnitNumberToken(tokens[1]);
+  if (!unitNumber) return null;
+  if (tokens[0] === "site" && !/\d/.test(unitNumber)) return null;
+  const houseNumberIndex = firstStreetNumberIndexAfterUnit(tokens, 2);
+  const houseNumber = normalisedAddressNumberToken(houseNumberIndex > -1 ? tokens[houseNumberIndex] : "") || "";
+  return { unitNumber, houseNumber };
+}
+
+
+function queryUnitStartSpecificIntent(needle) {
+  const tokens = normaliseAddressText(needle).split(/\s+/).filter(Boolean);
+  const unitIndex = tokens.findIndex((token, index) => SQLITE_UNIT_TERMS.has(token) && normalisedUnitNumberToken(tokens[index + 1]));
+  if (unitIndex < 0) return false;
+  const afterUnit = tokens.slice(unitIndex + 2);
+  if (!afterUnit.length) return false;
+  const hasHouseNumber = normalisedAddressNumberToken(afterUnit[0]);
+  if (!hasHouseNumber) return false;
+  return afterUnit.some((token) => {
+    return token.length >= 2 &&
+      !normalisedAddressNumberToken(token) &&
+      !SQLITE_UNIT_TERMS.has(token) &&
+      !isStateCode(token) &&
+      !/^(?:nsw|act|qld|vic|wa|sa|tas|nt)$/.test(token) &&
+      !SQLITE_STREET_TYPE_TERMS.has(token);
+  });
+}
+
+function labelHasLeadingUnit(label) {
+  const text = String(label || "").trim();
+  if (!text) return false;
+  const tokens = normaliseAddressText(text).split(/\s+/).filter(Boolean);
+  return SQLITE_UNIT_TERMS.has(tokens[0]);
+}
+
+function prioritizeUnitIntentRows(rows, unitIntent, needle = "") {
+  if (!unitIntent || !rows.length) return rows;
+  const unitNeedle = normaliseAddressText(unitIntent.unitNumber || "");
+  const houseNeedle = normaliseAddressText(unitIntent.houseNumber || "");
+  const queryText = normaliseAddressText(needle);
+  return [...rows].sort((left, right) => {
+    const leftScore = unitIntentRowScore(left, unitNeedle, houseNeedle, queryText);
+    const rightScore = unitIntentRowScore(right, unitNeedle, houseNeedle, queryText);
+    if (leftScore !== rightScore) return rightScore - leftScore;
+    return Number(right.rank_weight || 0) - Number(left.rank_weight || 0) || String(left.address_label || left.key_text || "").length - String(right.address_label || right.key_text || "").length;
+  });
+}
+
+function unitIntentRowScore(row, unitNeedle, houseNeedle, queryText) {
+  let score = 0;
+  const addressLabel = normaliseAddressText(row?.address_label || row?.key_text || row?.search_text || "");
+  const rowUnit = normalisedUnitNumberToken(String(row?.unit || ""));
+  const rowHouse = normalisedHouseNumberToken(labelHouseNumber(addressLabel));
+  if (unitNeedle) {
+    if (rowUnit) {
+      score += houseNumbersCompatible(unitNeedle, rowUnit) ? 600 : -220;
+    } else if (labelHasLeadingUnit(addressLabel)) {
+      score += 20;
+    } else {
+      score -= 180;
+    }
+  }
+  if (houseNeedle) {
+    if (rowHouse) {
+      score += houseNumbersCompatible(houseNeedle, rowHouse) ? 360 : -140;
+    } else if (isRowUnitContextCompatible(addressLabel, row?.unit || "", { unitNumber: unitNeedle, houseNumber: houseNeedle })) {
+      score += 80;
+    }
+  }
+  if (queryText && addressLabel.includes(queryText)) {
+    score += 30;
+  }
+  return score;
+}
+
+function hybridRowQualityPass(row, needle, rawNeedle = null) {
+  const queryState = detectQueryStateCode(needle);
+  const rowState = String(row?.state || "").toUpperCase();
+  if (queryState && rowState && queryState !== rowState) return false;
+  const queryPostcode = detectQueryPostcode(needle);
+  if (queryPostcode && String(row?.postcode || "") && String(row.postcode) !== queryPostcode) return false;
+  const queryLocality = detectAddressLocality(needle);
+  const rowLocality = normaliseAddressText(row?.locality || "");
+  if (queryLocality && rowLocality && !localityTokenMatch(queryLocality, rowLocality)) return false;
+
+  const unitSlash = queryLeadingUnitSlashNumbers(needle, rawNeedle);
   if (unitSlash && labelUnitAndHouseMatch(row?.address_label || row?.key_text || "", unitSlash)) return true;
-  const queryHouseNumber = queryLeadingHouseNumber(needle);
+  const queryHouseNumber = queryLeadingHouseNumber(needle, rawNeedle) || queryEmbeddedHouseNumber(needle);
   if (!queryHouseNumber) return true;
   const rowHouseNumber = labelHouseNumber(row?.address_label || row?.key_text || "");
   if (!rowHouseNumber) return true;
   return houseNumbersCompatible(queryHouseNumber, rowHouseNumber);
 }
 
-function searchSqlitePrefixEntries(database, needle, limit, searchContext = null, options = {}) {
+function searchSqlitePrefixEntries(database, needle, limit, searchContext = null, options = {}, rawNeedle = null) {
+  const unitIntent = queryLeadingUnitIntent(needle, rawNeedle);
   const prefixes = options.includeTokenBoundaryPrefix
     ? [
         ...materialisedTokenBoundaryPrefixesForNeedle(needle, options.minPrefixLength),
@@ -413,7 +676,7 @@ function searchSqlitePrefixEntries(database, needle, limit, searchContext = null
     `).all(prefix, cappedLimit);
   };
   for (const prefix of [...new Set(prefixes)]) {
-    const rows = run(prefix);
+    const rows = prioritizeUnitIntentRows(run(prefix), unitIntent, needle);
     if (rows.length) return rows;
   }
   return [];
@@ -435,8 +698,11 @@ function materialisedTokenBoundaryPrefixesForNeedle(needle, minPrefixLength = 4)
     .filter((prefix) => prefix.length >= minPrefixLength);
 }
 
-function searchSqliteTypeaheadEntries(database, needle, limit, searchContext = null) {
-  const terms = normaliseAddressText(needle).split(/\s+/).filter(Boolean).slice(0, 8);
+function searchSqliteTypeaheadEntries(database, needle, limit, searchContext = null, rawNeedle = null) {
+  const unitIntent = queryLeadingUnitIntent(needle, rawNeedle);
+  const terms = queryContainsUnitLikeToken(needle)
+    ? [...new Set(sqliteFtsTermsForNeedle(needle))]
+    : normaliseAddressText(needle).split(/\s+/).filter(Boolean).slice(0, 8);
   if (!terms.length) return [];
   const ftsQuery = terms.map((term) => `${escapeFtsTerm(term)}*`).join(" ");
   const contextOrder = searchContext
@@ -461,7 +727,7 @@ function searchSqliteTypeaheadEntries(database, needle, limit, searchContext = n
         `% ${needle}%`,
         Math.max(1, Math.min(Number(limit) || 5, 20)),
       ];
-  return database.prepare(`
+  const rows = database.prepare(`
     SELECT
       e.entry_id,
       e.entry_type,
@@ -497,8 +763,10 @@ function searchSqliteTypeaheadEntries(database, needle, limit, searchContext = n
       rank,
       LENGTH(a.label),
       a.label
-    LIMIT ?
+      LIMIT ?
   `).all(...params);
+
+  return prioritizeUnitIntentRows(rows, unitIntent, needle);
 }
 
 function searchSqliteExactUnitEntries(database, needle, limit) {
@@ -811,14 +1079,48 @@ function hybridMatchType(row, needle) {
   return "address_token_overlap";
 }
 
-function queryLeadingHouseNumber(needle) {
+function queryLeadingHouseNumber(needle, rawNeedle = null) {
   const tokens = normaliseAddressText(needle).split(/\s+/).filter(Boolean);
   if (!tokens.length) return "";
+  const unitSlashNumbers = queryLeadingUnitSlashNumbers(needle, rawNeedle);
+  if (unitSlashNumbers) return unitSlashNumbers?.houseNumber || "";
   if (SQLITE_UNIT_TERMS.has(tokens[0])) return "";
   return normalisedHouseNumberToken(tokens[0]);
 }
 
-function queryLeadingUnitSlashNumbers(needle) {
+function queryLeadingHouseRange(needle, rawNeedle = null) {
+  const source = String(rawNeedle || needle || "");
+  const match = source.match(/^\s*(\d+\s*-\s*\d+)\b/i);
+  if (!match) return null;
+  return parseHouseRange(match[1]);
+}
+
+function queryEmbeddedHouseNumber(needle) {
+  const tokens = normaliseAddressText(needle).split(/\s+/).filter(Boolean);
+  if (!tokens.length) return "";
+  if (SQLITE_UNIT_TERMS.has(tokens[0])) return "";
+  for (let index = 0; index < tokens.length; index += 1) {
+    const token = tokens[index];
+    const previous = tokens[index - 1];
+    if (
+      previous &&
+      (isStateCode(previous) || previous === "lot" || SQLITE_UNIT_TERMS.has(previous))
+    ) {
+      continue;
+    }
+    const numberToken = normalisedHouseNumberToken(token);
+    if (!numberToken) continue;
+    if (numberToken.length < 3) continue;
+    if (/^\d{4}$/.test(numberToken)) continue;
+    return numberToken;
+  }
+  return "";
+}
+
+function queryLeadingUnitSlashNumbers(needle, rawNeedle = null) {
+  if (rawNeedle) {
+    if (!/^\s*\d+[a-z]?\s*\/\s*\d+[a-z]?/i.test(String(rawNeedle || ""))) return null;
+  }
   const tokens = normaliseAddressText(needle).split(/\s+/).filter(Boolean);
   if (!/^\d+$/.test(tokens[0] || "")) return null;
   const houseNumber = normalisedHouseNumberToken(tokens[1]);
@@ -830,6 +1132,12 @@ function queryLeadingHouseNumberFromLabel(label) {
   for (const part of String(label || "").split(",")) {
     const partTokens = normaliseAddressText(part).split(/\s+/).filter(Boolean);
     if (!partTokens.length) continue;
+    if (partTokens.length >= 3 && SQLITE_UNIT_TERMS.has(partTokens[0])) {
+      if (/^\d+[a-z]?$/.test(partTokens[1]) && /^\d+[a-z]?$/.test(partTokens[2])) {
+        return normalisedHouseNumberToken(partTokens[2]);
+      }
+      continue;
+    }
     if (SQLITE_UNIT_TERMS.has(partTokens[0])) continue;
     const houseNumber = normalisedHouseNumberToken(partTokens[0]);
     if (houseNumber) return houseNumber;
@@ -839,6 +1147,35 @@ function queryLeadingHouseNumberFromLabel(label) {
 
 function labelHouseNumber(label) {
   return queryLeadingHouseNumberFromLabel(label);
+}
+
+function labelHouseRange(label) {
+  const rawLabel = String(label || "").trim();
+  if (!rawLabel) return null;
+  for (const part of rawLabel.split(",").map((value) => value.trim()).filter(Boolean)) {
+    const match = part.match(/^\s*(\d+\s*-\s*\d+)\b/i);
+    if (match) {
+      const range = parseHouseRange(match[1]);
+      if (range) return range;
+    }
+  }
+  return null;
+}
+
+function parseHouseRange(value) {
+  const match = String(value || "").match(/^\s*(\d+)\s*-\s*(\d+)\s*$/);
+  if (!match) return null;
+  const from = Number.parseInt(match[1], 10);
+  const to = Number.parseInt(match[2], 10);
+  if (!Number.isFinite(from) || !Number.isFinite(to)) return null;
+  return {
+    from: Math.min(from, to),
+    to: Math.max(from, to),
+  };
+}
+
+function houseRangesOverlap(queryRange, rowRange) {
+  return queryRange.from <= rowRange.to && rowRange.from <= queryRange.to;
 }
 
 function labelUnitAndHouseMatch(label, unitSlash) {
@@ -1118,8 +1455,9 @@ const SQLITE_FTS_STOP_TERMS = new Set([
   "unit",
 ]);
 
-const SQLITE_UNIT_TERMS = new Set(["apartment", "apt", "flat", "level", "lvl", "office", "offc", "shop", "site", "suite", "townhouse", "unit"]);
-const SQLITE_BARE_UNIT_REFINE_TERMS = new Set(["apartment", "apt", "flat", "level", "lvl", "shop", "suite", "townhouse", "unit"]);
+const SQLITE_UNIT_TERMS = new Set(["apartment", "apt", "building", "duplex", "flat", "level", "lvl", "office", "offc", "shop", "site", "suite", "townhouse", "unit"]);
+const SQLITE_BUILDING_ALIAS_TERMS = new Set(["building", "blg", "bldg", "suite", "ste"]);
+const SQLITE_BARE_UNIT_REFINE_TERMS = new Set(["apartment", "apt", "building", "duplex", "flat", "level", "lvl", "shop", "suite", "townhouse", "unit"]);
 const SQLITE_LEVEL_MARKER_TERMS = new Set(["fl", "floor", "l", "level", "lvl"]);
 const SQLITE_STREET_TYPE_TERMS = new Set([
   "avenue",
@@ -1140,6 +1478,23 @@ const SQLITE_STREET_TYPE_TERMS = new Set([
   "street",
   "terrace",
   "way",
+]);
+const NON_LOCALITY_QUERY_SUFFIXES = new Set([
+  "airport",
+  "arena",
+  "beach",
+  "centre",
+  "center",
+  "hospital",
+  "interchange",
+  "mall",
+  "market",
+  "park",
+  "parkland",
+  "stadium",
+  "station",
+  "wharf",
+  "zoo",
 ]);
 
 function queryContainsUnitLikeToken(needle) {
@@ -1209,6 +1564,17 @@ function filterRowsForUnitLotIntent(rows, intent) {
   return rows.filter((row) => rowMatchesUnitLotIntent(row, intent));
 }
 
+function filterRowsForLeadingUnitSlashIntent(rows, needle, rawNeedle = null) {
+  const queryUnitIntent = queryLeadingUnitIntent(needle, rawNeedle);
+  if (!queryUnitIntent) return rows;
+  if (!queryUnitIntent.unitNumber && !queryUnitIntent.houseNumber) return rows;
+  return rows.filter((row) => isRowUnitContextCompatible(
+    String(row?.address_label || row?.search_text || row?.key_text || ""),
+    String(row?.unit || ""),
+    queryUnitIntent,
+  ));
+}
+
 function rowMatchesUnitLotIntent(row, intent) {
   const label = normaliseAddressText(row?.address_label || row?.label || "");
   if (!label.includes(`lot ${intent.lotNumber}`)) return false;
@@ -1238,20 +1604,69 @@ function detectQueryStateCode(needle) {
   return ["NSW", "ACT", "QLD", "VIC", "SA", "WA", "TAS", "NT", "OT"].find((code) => tokens.has(code)) || "";
 }
 
-function addressMatchQualityPass(row, needle, matchType) {
+function detectQueryPostcode(needle) {
+  const tokens = String(needle || "")
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((token) => token.toUpperCase());
+  let fallbackPostcode = "";
+  for (let index = tokens.length - 1; index >= 0; index -= 1) {
+    const postcode = tokens[index].replace(/[^A-Z0-9]/g, "");
+    if (!/^\d{4}$/.test(postcode)) continue;
+    if (index > 0 && isStateCode(tokens[index - 1])) return postcode;
+    fallbackPostcode = postcode;
+  }
+  return fallbackPostcode;
+}
+
+function queryHasExplicitLocationContext(needle) {
+  if (detectQueryPostcode(needle)) return true;
+  if (detectQueryStateCode(needle)) return true;
+  return Boolean(detectAddressLocality(needle));
+}
+
+function addressMatchQualityPass(row, needle, matchType, rawNeedle = null) {
   if (["exact_address", "address_prefix"].includes(matchType)) return true;
-  const unitSlash = queryLeadingUnitSlashNumbers(needle);
+  const unitSlash = queryLeadingUnitSlashNumbers(needle, rawNeedle);
   if (unitSlash && labelUnitAndHouseMatch(row?.label || row?.search_text || "", unitSlash)) return true;
-  const queryHouseNumber = queryLeadingHouseNumber(needle);
+  const queryHouseRange = queryLeadingHouseRange(needle, rawNeedle);
+  if (queryHouseRange) {
+    const rowHouseRange = labelHouseRange(row?.label || row?.search_text || "");
+    if (rowHouseRange && !houseRangesOverlap(queryHouseRange, rowHouseRange)) return false;
+  }
+  const queryHouseNumber = queryLeadingHouseNumber(needle, rawNeedle) || queryEmbeddedHouseNumber(needle);
   if (queryHouseNumber) {
     const rowHouseNumber = labelHouseNumber(row?.label || row?.search_text || "");
     if (rowHouseNumber && !houseNumbersCompatible(queryHouseNumber, rowHouseNumber)) return false;
   }
+  const queryState = detectQueryStateCode(needle);
+  const rowState = String(row?.state || "").toUpperCase();
+  if (queryState && rowState && queryState !== rowState) return false;
+  const queryPostcode = detectQueryPostcode(needle);
+  if (queryPostcode && String(row?.postcode || "") && String(row.postcode) !== queryPostcode) return false;
+  const queryLocality = detectAddressLocality(needle);
+  const rowLocality = normaliseAddressText(row?.locality || "");
+  if (queryLocality && rowLocality && !localityTokenMatch(queryLocality, rowLocality)) return false;
   const queryTokens = significantAddressTokens(needle);
   if (queryTokens.length < 3) return true;
   const rowTokens = new Set(significantAddressTokens(`${row?.search_text || ""} ${row?.label || ""}`));
   const overlap = queryTokens.filter((token) => rowTokens.has(token)).length;
-  return overlap >= Math.min(3, queryTokens.length);
+  const minimumOverlap = queryHouseRange && queryTokens.length <= 3 ? 2 : Math.min(3, queryTokens.length);
+  return overlap >= minimumOverlap;
+}
+
+function detectAddressLocality(needle) {
+  const text = String(needle || "").trim().replace(/\s+/g, " ");
+  const streetMatch = /\b(?:street|st|road|rd|avenue|ave|drive|dr|parade|pde|place|pl|terrace|highway|mall|court|close|vista|circuit|way|lane|ln)\b\s+(.+?)(?:\s+\b(NSW|ACT|QLD|WA|VIC|SA|TAS|NT)\b|\s*$)/i.exec(text);
+  if (streetMatch?.[1]) {
+    const locality = normaliseAddressText(streetMatch[1]);
+    return NON_LOCALITY_QUERY_SUFFIXES.has(locality) ? "" : locality;
+  }
+  return "";
+}
+
+function localityTokenMatch(left, right) {
+  return left === right || left.includes(right) || right.includes(left);
 }
 
 function addressIndexRank(candidate, needle) {
@@ -1337,7 +1752,7 @@ function addressDisplayMetadata(record, matchType) {
         ? "Building"
         : suggestionType === "exact_address" || matchType === "exact_address"
           ? "Exact address"
-          : "Address match",
+          : "Near address match",
     subtitle,
     suggestionType,
     title,
@@ -1377,8 +1792,32 @@ function normaliseAddressText(value) {
 }
 
 function addressSearchNeedles(rawQuery) {
-  const primary = normaliseAddressText(rawQuery);
-  const variants = queryUnitLotIntent(primary) ? [primary] : [primary, ...complexAddressNeedles(primary)];
+  const primary = normaliseLeadingUnitAliasNeedle(rawQuery);
+  const leadingUnitSlashNeedles = queryHasLeadingUnitSlashNeedleVariants(primary, rawQuery);
+  if (leadingUnitSlashNeedles.length && !queryUnitLotIntent(primary)) {
+    const variants = [...leadingUnitSlashNeedles, ...complexAddressNeedles(primary), primary];
+    const seen = new Set();
+    return variants
+      .map((needle) => normaliseAddressText(needle))
+      .filter((needle) => {
+        if (needle.length < 4 || seen.has(needle)) return false;
+        seen.add(needle);
+        return true;
+      })
+      .map((needle) => ({ needle, rawQuery: needle === primary ? String(rawQuery || "") : needle, rawNeedle: String(rawQuery || "") }));
+}
+
+function normaliseLeadingUnitAliasNeedle(rawQuery = "") {
+  const tokens = normaliseAddressText(rawQuery).split(/\s+/).filter(Boolean);
+  if (tokens.length < 2) return tokens.join(" ");
+  const [firstToken, secondToken] = tokens;
+  if (!SQLITE_BUILDING_ALIAS_TERMS.has(firstToken) || !normalisedUnitNumberToken(secondToken)) return tokens.join(" ");
+  tokens[0] = "unit";
+  return tokens.join(" ");
+}
+  const variants = queryUnitLotIntent(primary)
+    ? [primary, ...leadingUnitSlashNeedles]
+    : [primary, ...leadingUnitSlashNeedles, ...complexAddressNeedles(primary)];
   const seen = new Set();
   return variants
     .map((needle) => normaliseAddressText(needle))
@@ -1387,7 +1826,7 @@ function addressSearchNeedles(rawQuery) {
       seen.add(needle);
       return true;
     })
-    .map((needle) => ({ needle, rawQuery: needle === primary ? String(rawQuery || "") : needle }));
+      .map((needle) => ({ needle, rawQuery: needle === primary ? String(rawQuery || "") : needle, rawNeedle: String(rawQuery || "") }));
 }
 
 function complexAddressNeedles(needle) {
@@ -1406,6 +1845,15 @@ function complexAddressNeedles(needle) {
     if (shouldSearchLargeSqliteIndex(candidate)) variants.push(candidate);
   }
   return variants;
+}
+
+function queryHasLeadingUnitSlashNeedleVariants(needle, rawNeedle = null) {
+  const unitSlash = queryLeadingUnitSlashNumbers(needle, rawNeedle);
+  if (!unitSlash) return [];
+  const tokens = String(needle || "").split(/\s+/).filter(Boolean);
+  const remainder = tokens.slice(2).join(" ");
+  if (!remainder) return [];
+  return [`unit ${unitSlash.unitNumber} ${unitSlash.houseNumber} ${remainder}`];
 }
 
 function mergeAddressSuggestions(groups, limit) {

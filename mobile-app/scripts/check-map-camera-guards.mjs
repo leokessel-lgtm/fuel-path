@@ -12,6 +12,7 @@ const decisionEvidencePanel = read("src/components/DecisionEvidencePanel.tsx");
 const discountWalletCard = read("src/components/DiscountWalletCard.tsx");
 const quickPlaceShortcuts = read("src/components/QuickPlaceShortcuts.tsx");
 const routeAddressSuggestions = read("src/components/RouteAddressSuggestions.tsx");
+const locationSuggestionDisplay = read("src/utils/locationSuggestionDisplay.ts");
 const savedCommuteShortcuts = read("src/components/SavedCommuteShortcuts.tsx");
 const planRouteSheet = read("src/components/PlanRouteSheet.tsx");
 const planRouteEditorCard = read("src/components/PlanRouteEditorCard.tsx");
@@ -25,6 +26,7 @@ const routeAddressSuggestionHook = read("src/hooks/useRouteAddressSuggestions.ts
 const theme = read("src/theme.ts");
 const nearbyScreen = read("src/screens/NearbyScreen.tsx");
 const planScreen = read("src/screens/PlanScreen.tsx");
+const planScreenUtils = read("src/screens/PlanScreen.utils.ts");
 const accountScreen = read("src/screens/AccountScreen.tsx");
 const stationRow = read("src/components/StationRow.tsx");
 const brandBadge = read("src/components/BrandBadge.tsx");
@@ -46,6 +48,7 @@ const androidMapSmoke = read("scripts/native-android-map-smoke.mjs");
 const androidPreviewSmoke = read("scripts/native-android-preview-smoke.mjs");
 const androidPerformanceSummary = read("scripts/native-android-performance-summary.mjs");
 const androidMapsKeyFix = read("scripts/android-maps-key-fix-packet.mjs");
+const routeScoring = read("../api/_routeScoring.js");
 
 const checks = [
   {
@@ -102,10 +105,10 @@ const checks = [
   {
     label: "web station markers stay price-first and density limited",
     ok:
-      webMap.includes("const maxPriceMarkers = 22;") &&
-      webMap.includes("const maxExtraPriceMarkers = 28;") &&
-      webMap.includes("const markerGridSize = 108;") &&
-      webMap.includes("const minClusterStationCount = 4;") &&
+      webMap.includes("const maxPriceMarkers = 14;") &&
+      webMap.includes("const maxExtraPriceMarkers = 18;") &&
+      webMap.includes("const markerGridSize = 132;") &&
+      webMap.includes("const minClusterStationCount = 3;") &&
       webMap.includes("fuel-path-marker-cluster") &&
       webMap.includes("lowest ${cluster.minPrice.toFixed(1)} c/L") &&
       webMap.includes('<span class="fuel-path-marker-price">') &&
@@ -136,12 +139,15 @@ const checks = [
       webMap.includes("const routeStationCameraPoints = routeEndpoints") &&
       webMap.includes("...routeStationCameraPoints") &&
       webMap.includes("const fitCameraPoints = routeEndpoints ? [...fitPoints, ...routeStationCameraPoints] : cameraPoints") &&
-      webMap.includes("map.panTo([selected.station.lat, selected.station.lon]") &&
-      webMap.includes("map.panTo([item.station.lat, item.station.lon]") &&
+      webMap.includes("map.panInside([selected.station.lat, selected.station.lon]") &&
+      webMap.includes("map.panInside([item.station.lat, item.station.lon]") &&
+      webMap.includes("map.panInside([selectedCharger.lat, selectedCharger.lon]") &&
+      webMap.includes("map.panInside([charger.lat, charger.lon]") &&
       !webMap.includes('`${item.station.name} - ${item.adjustedCpl.toFixed(1)} c/L`') &&
       webMap.includes("nearestStationsForCamera(stations, centre, 12)") &&
       webMap.includes("showCentreMarker ? 15 : 14") &&
       webMap.includes(".filter((items) => items.length >= minClusterStationCount)") &&
+      webMap.includes("transform: translateY(-4px);") &&
       !webMap.includes("transform: scale(1.12)") &&
       !webMap.includes(".fuel-path-marker-cluster::after"),
   },
@@ -179,8 +185,8 @@ const checks = [
   {
     label: "native station markers stay price-first and density limited",
     ok:
-      nativeMap.includes("const maxPriceMarkers = 24;") &&
-      nativeMap.includes("const markerGridSize = 108;") &&
+      nativeMap.includes("const maxPriceMarkers = 18;") &&
+      nativeMap.includes("const markerGridSize = 132;") &&
       nativeMap.includes("styles.pinBrand") &&
       nativeMap.includes("styles.pinPointer") &&
       nativeMap.includes("borderTopColor: colors.white") &&
@@ -231,15 +237,17 @@ const checks = [
       !appShell.includes('fontWeight: "900"'),
   },
   {
-    label: "nearby collapsed sheet hides notice cards from map view",
+    label: "nearby station sheet removes non-actionable notice cards",
     ok:
       nearbyScreen.includes("NearbyStationSheet") &&
-      nearbyStationSheet.includes("sheetExpanded && stationNotice && stations.length"),
+      !nearbyStationSheet.includes("sheetExpanded && stationNotice && stations.length") &&
+      !nearbyStationSheet.includes("styles.noticeCard") &&
+      !nearbyStationSheet.includes("noticeText"),
   },
   {
     label: "nearby map selection clears sort highlight and uses row-style selected card",
     ok:
-      nearbyScreen.includes("const [sortMode, setSortMode] = useState<NearbySortMode | undefined>(defaultNearbySortMode);") &&
+      nearbyScreen.includes("const [sortMode, setSortMode] = useState<NearbySortMode | undefined>(undefined);") &&
       nearbyScreen.includes("setSortMode(undefined);") &&
       nearbyStationSheet.includes("sortMode?: NearbySortMode;") &&
       nearbyStationSheet.includes("styles.selectedPriceTile") &&
@@ -270,10 +278,12 @@ const checks = [
       !decisionEvidence.includes("formatUpdatedAt"),
   },
   {
-    label: "nearby expanded station list removes duplicate selected card and reaches higher",
+    label: "nearby expanded station list removes duplicate selected card and grows upward",
     ok:
       nearbyStationSheet.includes("{selected && !sheetExpanded ? (") &&
-      nearbyStationSheet.includes('height: "78%"') &&
+      nearbyStationSheet.includes("sheetExpanded: {") &&
+      nearbyStationSheet.includes("top: 140") &&
+      nearbyStationSheet.includes("bottom: 8") &&
       !nearbyStationSheet.includes("sheetExpanded={sheetExpanded}") &&
       !nearbyStationSheet.includes("selected,\n  sheetExpanded,"),
   },
@@ -309,7 +319,7 @@ const checks = [
     ok:
       planScreen.includes("const [routeStarted, setRouteStarted] = useState(false);") &&
       planScreen.includes("const defaultPlanCentre: MapPoint") &&
-      planScreen.includes('label: "Sylvania NSW 2224"') &&
+      planScreen.includes('label: "Perth CBD WA 6000"') &&
       planScreen.includes("showCentreMarker={Boolean(fromPoint)}") &&
       planScreen.includes("setRouteStarted(true);") &&
       planScreen.includes("setRouteStarted(false);") &&
@@ -335,53 +345,49 @@ const checks = [
       planRouteSheet.includes("Show route panel"),
   },
   {
-    label: "plan recommendation explains best value versus cheapest closest and safest",
+    label: "plan recommendation keeps the route result simple",
     ok:
-      planScreen.includes("routeDecisionAlternatives") &&
       planRouteSheet.includes("DecisionEvidencePanel") &&
       planRouteSheet.includes("BrandBadge") &&
       planRouteSheet.includes("recommendationPriceTile") &&
       planRouteSheet.includes("recommendationStationName") &&
       planRouteSheet.includes("recommendationRouteValue") &&
-      planRouteSheet.includes("recommendationDetourPill") &&
-      planScreen.includes("cheapestTradeOffExplanation") &&
-      decisionEvidencePanel.includes("Decision trade-offs") &&
-      decisionEvidencePanel.includes("decisionAlternativeLabel") &&
-      decisionEvidencePanel.includes('decisionAlternative("Cheapest"') &&
-      decisionEvidencePanel.includes('decisionAlternative("Closest"') &&
-      decisionEvidencePanel.includes('decisionAlternative("Safest"') &&
-      decisionEvidencePanel.includes("No range/open warning") &&
-      decisionEvidencePanel.includes("tradeOffItemSelected") &&
-      decisionEvidencePanel.includes("Cheapest also wins because") &&
-      decisionEvidencePanel.includes("but nets") &&
-      decisionEvidencePanel.includes("detour fuel"),
+      !decisionEvidencePanel.includes("Decision trade-offs") &&
+      !planScreen.includes("routeDecisionAlternatives") &&
+      !planScreen.includes("cheapestTradeOffExplanation"),
   },
   {
-    label: "plan evidence exposes detour fuel and time cost",
+    label: "plan evidence shows four compact route decision metrics",
     ok:
       types.includes("detourFuelLitres?: number") &&
       types.includes("timeCost?: number") &&
       types.includes("netAfterDetourAndTimeCost?: number") &&
-      planScreen.includes("detourFuelLitres") &&
+      (planScreen.includes("detourFuelLitres") || planScreenUtils.includes("detourFuelLitres")) &&
       decisionEvidencePanel.includes("decisionSummary?.economics") &&
-      decisionEvidencePanel.includes('label="Fuel used"') &&
+      decisionEvidencePanel.includes('label="Pump"') &&
+      decisionEvidencePanel.includes('label="Your price"') &&
+      decisionEvidencePanel.includes('label="Best price by"') &&
+      decisionEvidencePanel.includes('label="Detour"') &&
+      decisionEvidencePanel.includes("routeComparisonCpl") &&
+      decisionEvidencePanel.includes("savingCpl.toFixed(1)} c/L") &&
+      !decisionEvidencePanel.includes('label="Fuel used"') &&
       !decisionEvidencePanel.includes('label="Time cost"') &&
-      !decisionEvidencePanel.includes('label="After time"') &&
-      decisionEvidencePanel.includes("detourFuel.toFixed(1)"),
+      !decisionEvidencePanel.includes('label="After time"'),
   },
   {
-    label: "plan uses lightweight saving and detour preferences in scoring",
+    label: "plan uses internal smart detour scoring without user decision controls",
     ok:
-      types.includes("minSavingDollars: number") &&
-      types.includes("maxDetourMinutes: number") &&
-      preferencesStore.includes("minSavingDollars: 5") &&
-      preferencesStore.includes("maxDetourMinutes: 8") &&
-      fuelPathApi.includes("minSavingDollars") &&
-      fuelPathApi.includes("maxDetourMinutes") &&
-      planScreen.includes("preferences.minSavingDollars") &&
-      planScreen.includes("preferences.maxDetourMinutes") &&
-      backendAlerts.includes("commute.minSavingDollars ?? preferences.minSavingDollars") &&
-      backendAlerts.includes("commute.maxDetourMinutes ?? preferences.maxDetourMinutes"),
+      routeScoring.includes("ASSUMED_ROUTE_FILL_LITRES = 40") &&
+      routeScoring.includes("SMART_MAX_DETOUR_MINUTES = 30") &&
+      routeScoring.includes("smartDetourLimitMinutesForSaving") &&
+      routeScoring.includes("savingsDetourLabel") &&
+      routeScoring.includes("Small savings detour") &&
+      routeScoring.includes("Strong savings detour") &&
+      !fuelPathApi.includes("minSavingDollars,") &&
+      !fuelPathApi.includes("maxDetourMinutes,") &&
+      !planScreen.includes("preferences.minSavingDollars") &&
+      !planScreen.includes("preferences.maxDetourMinutes") &&
+      !accountScreen.includes("DecisionRuleCard"),
   },
   {
     label: "plan route requests ignore stale success and error responses after edits",
@@ -394,8 +400,8 @@ const checks = [
       planScreen.includes("requestId !== routeRequestIdRef.current") &&
       planScreen.includes("editVersionAtStart !== routeEditVersionRef.current") &&
       planScreen.includes("routeEditVersionRef.current += 1;") &&
-      planScreen.includes("setRouteEndpoints(undefined);") &&
-      planScreen.includes("setRoutePoints([]);") &&
+      planScreen.includes("setRouteData(emptyRoute);") &&
+      planScreen.includes("setRouteData((current) => ({ ...current, points: [] }))") &&
       planScreen.includes("setResult(null);"),
   },
   {
@@ -454,18 +460,15 @@ const checks = [
       weeklyReportCard.includes("Policy brands:"),
   },
   {
-    label: "saved route alerts expose per-route saving detour and tank rules",
+    label: "saved route alerts avoid per-route decision rule controls",
     ok:
-      types.includes("tankThresholdPercent: number") &&
       accountScreen.includes("SavedRouteAlertsCard") &&
-      savedRouteAlertsCard.includes("RouteAlertRuleSelector") &&
-      savedRouteAlertsCard.includes("ruleKey=\"minSavingDollars\"") &&
-      savedRouteAlertsCard.includes("ruleKey=\"maxDetourMinutes\"") &&
-      savedRouteAlertsCard.includes("ruleKey=\"tankThresholdPercent\"") &&
-      appShell.includes("updateCommuteAlertRule") &&
-      backendAlerts.includes("commute.minSavingDollars") &&
-      backendAlerts.includes("commute.maxDetourMinutes") &&
-      backendAlerts.includes("commute.tankThresholdPercent") &&
+      !savedRouteAlertsCard.includes("RouteAlertRuleSelector") &&
+      !savedRouteAlertsCard.includes("ruleKey=\"minSavingDollars\"") &&
+      !savedRouteAlertsCard.includes("ruleKey=\"maxDetourMinutes\"") &&
+      !savedRouteAlertsCard.includes("ruleKey=\"tankThresholdPercent\"") &&
+      !appShell.includes("onUpdateCommuteAlertRule") &&
+      decisionEvidence.includes("smart detour rules") &&
       decisionEvidence.includes("one alert per run"),
   },
   {
@@ -530,7 +533,7 @@ const checks = [
       planScreen.includes('routeInputPrecisionHint("destination", toLabel)') &&
       planScreen.includes('routeInputPrecisionHint("start", from)') &&
       planScreen.includes('routeInputPrecisionHint("destination", to)') &&
-      planScreen.includes("&& !routePrecisionHint") &&
+      planScreen.includes("!routePrecisionHint") &&
       fuelPathApi.includes("addressLikeQuery(label)") &&
       fuelPathApi.includes("weakAutoRouteLocation(suggestions[0])") &&
       fuelPathApi.includes("Choose a suggestion to confirm this address, or add suburb or postcode.") &&
@@ -567,7 +570,7 @@ const checks = [
     label: "location evidence stays available while route suggestions stay clean",
     ok:
       locationEvidence.includes("Exact address") &&
-      locationEvidence.includes("Address match") &&
+      locationEvidence.includes("Near address match") &&
       locationEvidence.includes("Suburb/area") &&
       locationEvidence.includes("External lookup") &&
       locationEvidence.includes("Lookup limited") &&
@@ -584,16 +587,16 @@ const checks = [
       !planRouteEditorCard.includes("selectedLocationEvidence") &&
       !routeAddressSuggestions.includes("LocationEvidenceChip") &&
       !routeAddressSuggestions.includes("suggestionNeedsPrecisionDetail") &&
-      routeAddressSuggestions.includes("titleConsumesStreetNumber(parts)") &&
-      routeAddressSuggestions.includes("isStreetNumberFragment") &&
+      locationSuggestionDisplay.includes("titleConsumesStreetNumber(parts)") &&
+      locationSuggestionDisplay.includes("isStreetNumberFragment") &&
       savedPlaceEditor.includes("<LocationEvidenceChip") &&
       savedPlaceEditor.includes("point={suggestion}") &&
       savedPlaceEditor.includes("suggestionNeedsPrecisionDetail(suggestion)") &&
       fuelPathApi.includes("rankLocationSuggestions") &&
       fuelPathApi.includes("addressSuggestionScore") &&
-      fuelPathApi.includes('return "Needs confirmation";') &&
-      fuelPathApi.includes('return "Street/road";') &&
-      fuelPathApi.includes('return "Suburb/area";') &&
+      fuelPathApi.includes('"Needs confirmation"') &&
+      fuelPathApi.includes('"Street/road"') &&
+      fuelPathApi.includes('"Suburb/area"') &&
       !routeAddressSuggestions.includes("${point.sourceLabel} | ${place}") &&
       !nearbyLocationSearch.includes("${point.sourceLabel} | ${place}") &&
       !savedPlaceEditor.includes("${point.sourceLabel} | ${place}"),
@@ -606,8 +609,8 @@ const checks = [
       nearbyLocationSearch.includes("styles.inputShell") &&
       nearbyLocationSearch.includes("styles.currentLocationButton") &&
       nearbyLocationSearch.includes("locationInputWithIcon") &&
-      nearbyLocationSearch.includes("titleConsumesStreetNumber(parts)") &&
-      nearbyLocationSearch.includes("isStreetNumberFragment") &&
+      locationSuggestionDisplay.includes("titleConsumesStreetNumber(parts)") &&
+      locationSuggestionDisplay.includes("isStreetNumberFragment") &&
       !nearbyLocationSearch.includes("LocationEvidenceChip") &&
       !nearbyLocationSearch.includes("lookupResultEvidence") &&
       !nearbyLocationSearch.includes("suggestionNeedsPrecisionDetail"),

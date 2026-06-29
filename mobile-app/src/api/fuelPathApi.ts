@@ -1,6 +1,8 @@
 import { API_BASE_URL } from "../config";
 import {
   FuelCode,
+  EvChargerResponse,
+  EvPowerMode,
   MapPoint,
   NearbyResponse,
   RegionCapability,
@@ -30,6 +32,27 @@ type RouteResponse = {
   distanceKm: number;
   durationMin: number;
   points: MapPoint[];
+};
+
+export type FuelProviderStatus = {
+  selection: string;
+  capabilityLabels: RegionCapabilityStatus[];
+  capabilitySummary: Partial<Record<RegionCapabilityStatus, number>>;
+  capabilities: RegionCapability[];
+};
+
+export type EvChargingStatus = {
+  provider: string;
+  configured: boolean;
+  capability: string;
+  defaultProvider: string;
+  providerSelection: string;
+  apiNinjasConfigured: boolean;
+  openChargeMapConfigured: boolean;
+  realTimeAvailability: boolean;
+  liveAvailabilityClaimsAllowed: boolean;
+  coverage: string;
+  warning: string;
 };
 
 type LookupReadiness = {
@@ -95,6 +118,7 @@ export async function getApiStatus() {
       capabilitySummary: Partial<Record<RegionCapabilityStatus, number>>;
       capabilities: RegionCapability[];
     };
+    evCharging?: EvChargingStatus;
     geocoding?: {
       activeProvider: string;
       activeMode: string;
@@ -135,6 +159,69 @@ export async function getNearbyStations({
   );
 }
 
+export async function getNearbyEvChargers({
+  centre,
+  radiusKm = 12,
+  limit = 80,
+  connectors = [],
+  powerMode = "",
+  minPowerKw = 0,
+  provider = "api_ninjas",
+}: {
+  centre: MapPoint;
+  radiusKm?: number;
+  limit?: number;
+  connectors?: string[];
+  powerMode?: EvPowerMode;
+  minPowerKw?: number;
+  provider?: "open_charge_map" | "openweb_ninja" | "api_ninjas" | "plugshare" | "here" | "mapbox" | "tomtom" | "network_partner";
+}) {
+  return fetchJson<EvChargerResponse>(
+    `/api/ev-chargers?${query({
+      provider,
+      lat: centre.lat,
+      lon: centre.lon,
+      label: centre.label,
+      radiusKm,
+      limit,
+      connectors: connectors.join(","),
+      powerMode,
+      minPowerKw,
+    })}`,
+  );
+}
+
+export async function getRouteEvFallbackChargers({
+  connectors = [],
+  limit = 3,
+  radiusKm = 18,
+  route,
+}: {
+  connectors?: string[];
+  limit?: number;
+  radiusKm?: number;
+  route: RouteResponse;
+}) {
+  return fetchJson<EvChargerResponse>("/api/ev-chargers", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      connectors,
+      limit,
+      mode: "route_fallback",
+      radiusKm,
+      route: {
+        id: "native-ev-route",
+        name: "Native EV planned route",
+        provider: route.provider,
+        points: compactPoints(route.points),
+      },
+    }),
+  });
+}
+
 export async function geocodeAddress(label: string, sessionToken?: string, context?: LocationSearchContext) {
   const suggestions = await searchLocations(label, 1, sessionToken, context);
   if (!suggestions[0]) {
@@ -157,16 +244,18 @@ export async function searchLocations(label: string, limit = 5, sessionToken?: s
 
   let payload: GeocodeResponse;
   try {
-    payload = await fetchJson<GeocodeResponse>(
-      `/api/geocode?${query({
+    payload = await fetchJson<GeocodeResponse>("/api/geocode", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
         q: label,
         limit,
         sessionToken,
         nearLat: context?.near?.lat,
         nearLon: context?.near?.lon,
         nearRadiusKm: context?.nearRadiusKm,
-      })}`,
-    );
+      }),
+    });
   } catch (error) {
     throw new Error(locationLookupErrorMessage(error));
   }
@@ -250,7 +339,8 @@ function lookupSourceLabel(provider?: string, matchType?: string, lookupStatus?:
   const addressLike = addressLikeQuery(queryText);
   if (provider === "fuel_path_gnaf") {
     if (matchType === "exact_address") return "Exact address";
-    return "Address match";
+    if (matchType === "building_refine" || type === "building") return "Building";
+    return "Near address match";
   }
   if (provider === "fuel_path_hint" || provider === "fuel_path_regional_gazetteer") {
     if (type === "street" || addressLike) return "Street/road";
@@ -276,7 +366,8 @@ function addressLikeQuery(value: string) {
 
 function weakAutoRouteLocation(point: MapPoint) {
   if (point.refineRequired || point.type === "building") return true;
-  if (point.provider === "fuel_path_gnaf" && point.type === "address") return false;
+  if (point.provider === "fuel_path_gnaf" && point.type === "address" && point.matchType === "exact_address") return false;
+  if (point.provider === "fuel_path_gnaf") return true;
   if (point.sourceLabel === "Needs confirmation") return true;
   if (point.sourceLabel === "Street/road") return true;
   if (point.provider === "google" || point.provider === "addressr" || point.provider === "nominatim") return false;
@@ -301,15 +392,11 @@ export async function scoreRoute({
   approvedPolicyBrands = [],
   fuel,
   eligibleDiscounts,
-  maxDetourMinutes,
-  minSavingDollars,
   route,
 }: {
   approvedPolicyBrands?: string[];
   fuel: FuelCode;
   eligibleDiscounts: string[];
-  maxDetourMinutes: number;
-  minSavingDollars: number;
   route: RouteResponse;
 }) {
   const policyBrands = approvedPolicyBrands.map((brand) => brand.trim()).filter(Boolean);
@@ -329,9 +416,6 @@ export async function scoreRoute({
         points: compactPoints(route.points),
       },
       fuel,
-      minSavingDollars,
-      maxDetourMinutes,
-      tankLitres: 55,
       tankPercent: 45,
       economy: 8.2,
       reserveKm: 35,

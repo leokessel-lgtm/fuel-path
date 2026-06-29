@@ -7,7 +7,10 @@ const {
 
 const SAMPLE_NOW = new Date("2026-06-13T08:00:00+10:00");
 const RECOMMENDATION_MAX_PRICE_AGE_HOURS = 48;
-const TIME_COST_DOLLARS_PER_MINUTE = 0.08;
+const ASSUMED_ROUTE_FILL_LITRES = 40;
+const SMART_HARD_REJECT_SAVING_DOLLARS = 1.5;
+const SMART_MAX_DETOUR_MINUTES = 30;
+const TIME_COST_DOLLARS_PER_MINUTE = 0.15;
 const OFFICIAL_LIVE_PRICE_SOURCES = new Set([
   "api_nsw_fuelcheck",
   "api_qld_fuelprices",
@@ -167,7 +170,7 @@ function scoreRouteForCorridor({ source, route, stations, fuel, tankLitres, tank
     .map((station) => Number(station.prices?.[fuel]))
     .filter(validPumpPriceCpl);
   const baselineCpl = median(availablePrices);
-  const fillLitres = Math.max(5, tankLitres * (1 - tankPercent / 100));
+  const fillLitres = ASSUMED_ROUTE_FILL_LITRES;
   const tankRangeKm = ((tankLitres * (tankPercent / 100)) / economy) * 100;
   let staleExcludedCandidates = 0;
 
@@ -187,31 +190,23 @@ function scoreRouteForCorridor({ source, route, stations, fuel, tankLitres, tank
     const detourFuelLitres = (detourKm * economy) / 100;
     const detourCost = detourFuelLitres * (adjustedCpl / 100);
     const netSaving = fillLitres * ((baselineCpl - adjustedCpl) / 100) - detourCost;
-    const reachable = tankRangeKm >= routeDistanceInfo.distanceAlongRouteKm + routeDistanceInfo.distanceToRouteKm + reserveKm;
-    const [freshPenalty, freshWarning] = freshnessPenalty(station.updatedAt, now, station.source);
-    const matchesSavingRule = netSaving >= minSavingDollars;
-    const matchesDetourRule = detourMinutes <= maxDetourMinutes;
+    const reachable = true;
+    const [, freshWarning] = freshnessPenalty(station.updatedAt, now, station.source);
+    const smartDetourLimitMinutes = smartDetourLimitMinutesForSaving(netSaving);
+    const matchesSavingRule = netSaving > SMART_HARD_REJECT_SAVING_DOLLARS;
+    const matchesDetourRule = detourMinutes <= smartDetourLimitMinutes;
     const matchesDecisionRule = matchesSavingRule && matchesDetourRule && reachable && station.openNow !== false;
-    if (
-      !isOfficialLivePriceSource(station.source) &&
-      priceAgeHours(station.updatedAt, now) > RECOMMENDATION_MAX_PRICE_AGE_HOURS
-    ) {
-      staleExcludedCandidates += 1;
-      continue;
-    }
-
     const warnings = [];
     if (discount) warnings.push(`discount applied: ${discount.label}`);
     if (station.membershipRequired) warnings.push("membership-only price included");
     if (station.openNow === false) warnings.push("station marked closed");
-    if (!reachable) warnings.push(`range risk: needs ${(routeDistanceInfo.distanceAlongRouteKm + routeDistanceInfo.distanceToRouteKm + reserveKm).toFixed(1)} km including reserve`);
-    if (!matchesSavingRule) warnings.push(`below $${minSavingDollars} saving rule`);
-    if (!matchesDetourRule) warnings.push(`above ${maxDetourMinutes} min detour rule`);
+    if (!matchesSavingRule) warnings.push("small saving after detour fuel");
+    if (!matchesDetourRule) warnings.push(`above ${smartDetourLimitMinutes} min smart detour for this saving`);
     if (freshWarning) warnings.push(freshWarning);
 
     const preferencePenalty = (matchesSavingRule ? 0 : 15) + (matchesDetourRule ? 0 : 15);
     const timeCost = detourMinutes * TIME_COST_DOLLARS_PER_MINUTE;
-    const score = netSaving - timeCost - freshPenalty - preferencePenalty - (reachable ? 0 : 100) - (station.openNow === false ? 100 : 0);
+    const score = netSaving - timeCost - preferencePenalty - (station.openNow === false ? 100 : 0);
     candidates.push({
       station: stationPayload(station, { fuel }),
       fuel,
@@ -224,6 +219,7 @@ function scoreRouteForCorridor({ source, route, stations, fuel, tankLitres, tank
       detourMinutes: round(detourMinutes, 1),
       detourFuelLitres: round(detourFuelLitres, 2),
       detourCost: round(detourCost, 2),
+      smartDetourLimitMinutes,
       timeCost: round(timeCost, 2),
       netAfterDetourAndTimeCost: round(netSaving - timeCost, 2),
       fillLitres: round(fillLitres, 1),
@@ -240,7 +236,7 @@ function scoreRouteForCorridor({ source, route, stations, fuel, tankLitres, tank
     });
   }
 
-  candidates.sort((left, right) => right.score - left.score);
+  candidates.sort(routeRecommendationOrder);
   const timingAdvice = routeTimingAdvice(candidates[0], { minSavingDollars, maxDetourMinutes, fillLitres });
   return {
     candidates,
@@ -304,7 +300,7 @@ function routeDecisionSummary(candidates, timingAdvice, context = {}) {
     reason: timingAdvice.reason || routeDecisionReason(best),
     stationCode: best.station.stationCode,
     stationName: best.station.name,
-    economics: decisionEconomics(best, context),
+    economics: decisionEconomics(best, { ...context, candidates }),
     decisionRule: {
       minSavingDollars: context.minSavingDollars,
       maxDetourMinutes: context.maxDetourMinutes,
@@ -336,11 +332,11 @@ function planDecisionAction(action) {
 
 function planDecisionLabel(timingAdvice, best) {
   if (timingAdvice.label) return timingAdvice.label;
-  return Number(best.netSaving || 0) > 0 ? "Fill now" : "Skip for now";
+  return savingsDetourLabel(Number(best.netSaving || 0));
 }
 
 function routeDecisionReason(candidate) {
-  return `${candidate.station.name} nets ${formatMoney(candidate.netSaving)} after ${Number(candidate.detourMinutes || 0).toFixed(1)} min detour.`;
+  return `${candidate.station.name} is ${candidate.adjustedCpl.toFixed(1)} c/L after wallet with a ${Number(candidate.detourMinutes || 0).toFixed(1)} min detour.`;
 }
 
 function decisionAlternative(kind, label, candidate, note, selectedCandidate) {
@@ -360,10 +356,13 @@ function decisionAlternative(kind, label, candidate, note, selectedCandidate) {
   };
 }
 
-function decisionEconomics(candidate, { baselineCpl, fillLitres } = {}) {
+function decisionEconomics(candidate, { baselineCpl, fillLitres, candidates = [] } = {}) {
+  const comparisonCpl = nextBestViableComparisonCpl(candidate, candidates);
   const grossFuelSaving = Number(fillLitres || 0) * ((Number(baselineCpl || 0) - Number(candidate.adjustedCpl || 0)) / 100);
   return {
     baselineCpl: round(baselineCpl, 1),
+    comparisonCpl: Number.isFinite(comparisonCpl) ? round(comparisonCpl, 1) : undefined,
+    comparisonKind: Number.isFinite(comparisonCpl) ? "next_best_viable" : "none",
     pumpCpl: candidate.pumpCpl,
     adjustedCpl: candidate.adjustedCpl,
     fillLitres: candidate.fillLitres,
@@ -379,8 +378,40 @@ function decisionEconomics(candidate, { baselineCpl, fillLitres } = {}) {
   };
 }
 
+function nextBestViableComparisonCpl(selectedCandidate, candidates = []) {
+  const selectedCode = selectedCandidate?.station?.stationCode;
+  const selectedPrice = Number(selectedCandidate?.adjustedCpl);
+  const alternatives = candidates
+    .filter((candidate) => candidate?.station?.stationCode !== selectedCode)
+    .filter((candidate) => candidate.station?.openNow !== false)
+    .filter((candidate) => candidate.reachable !== false)
+    .filter((candidate) => candidate.matchesDecisionRule !== false)
+    .map((candidate) => Number(candidate.adjustedCpl))
+    .filter(Number.isFinite)
+    .filter((price) => !Number.isFinite(selectedPrice) || price >= selectedPrice)
+    .sort((left, right) => left - right);
+  return alternatives[0];
+}
+
+function routeRecommendationOrder(left, right) {
+  const leftPriority = routeRecommendationPriority(left);
+  const rightPriority = routeRecommendationPriority(right);
+  if (leftPriority !== rightPriority) return leftPriority - rightPriority;
+  if (left.adjustedCpl !== right.adjustedCpl) return left.adjustedCpl - right.adjustedCpl;
+  if (left.detourMinutes !== right.detourMinutes) return left.detourMinutes - right.detourMinutes;
+  return right.score - left.score;
+}
+
+function routeRecommendationPriority(candidate) {
+  return candidate.station?.openNow !== false &&
+    candidate.reachable !== false &&
+    candidate.matchesDecisionRule !== false
+    ? 0
+    : 1;
+}
+
 function routeValueSummary(candidate) {
-  return `${formatMoney(candidate.netSaving)} net, ${Number(candidate.detourMinutes || 0).toFixed(1)} min detour`;
+  return `${candidate.adjustedCpl.toFixed(1)} c/L, ${Number(candidate.detourMinutes || 0).toFixed(1)} min detour`;
 }
 
 function safetySummary(candidate) {
@@ -411,7 +442,7 @@ function minBy(values, scorer) {
   return values.reduce((best, item) => (scorer(item) < scorer(best) ? item : best), values[0]);
 }
 
-function routeTimingAdvice(candidate, { minSavingDollars = 5, maxDetourMinutes = 8, fillLitres = 0 } = {}) {
+function routeTimingAdvice(candidate, { minSavingDollars = SMART_HARD_REJECT_SAVING_DOLLARS, maxDetourMinutes = SMART_MAX_DETOUR_MINUTES, fillLitres = 0 } = {}) {
   if (!candidate) {
     return {
       action: "no_cycle_signal",
@@ -423,6 +454,8 @@ function routeTimingAdvice(candidate, { minSavingDollars = 5, maxDetourMinutes =
 
   const saving = Number(candidate.netSaving || 0);
   const detourMinutes = Number(candidate.detourMinutes || 0);
+  const smartDetourLimitMinutes = smartDetourLimitMinutesForSaving(saving);
+  const label = savingsDetourLabel(saving);
   if (candidate.reachable === false) {
     return {
       action: "range_first",
@@ -431,38 +464,46 @@ function routeTimingAdvice(candidate, { minSavingDollars = 5, maxDetourMinutes =
       reason: `${candidate.station?.name || "This stop"} has range risk. Choose a closer stop before chasing price.`,
     };
   }
-  if (detourMinutes > maxDetourMinutes) {
+  if (detourMinutes > smartDetourLimitMinutes) {
     return {
       action: "skip_detour",
       visible: true,
-      label: "Skip this detour",
-      reason: `${candidate.station?.name || "This stop"} is above your ${maxDetourMinutes} min detour rule.`,
+      label,
+      reason: `Probably not worth it: saves ${formatMoney(saving)} after ${detourMinutes.toFixed(1)} min.`,
     };
   }
   const waitCue = lockedTomorrowWaitCue(candidate, { fillLitres, minSavingDollars });
   if (waitCue) return waitCue;
-  if (saving < minSavingDollars) {
+  if (saving <= SMART_HARD_REJECT_SAVING_DOLLARS) {
     return {
       action: "skip_detour",
       visible: true,
-      label: "Skip for now",
-      reason: `${candidate.station?.name || "This stop"} saves ${formatMoney(saving)}, below your ${formatMoney(minSavingDollars)} rule.`,
+      label,
+      reason: `Probably not worth it: saves ${formatMoney(saving)} after ${detourMinutes.toFixed(1)} min.`,
+    };
+  }
+  if (saving < 2) {
+    return {
+      action: "fill_today_with_detour",
+      visible: true,
+      label,
+      reason: "Only worth it if you are already passing nearby.",
     };
   }
   if (detourMinutes <= 0.1) {
     return {
       action: "fill_today_on_route",
       visible: true,
-      label: "Fill today on this route",
-      reason: `${candidate.station?.name || "This stop"} is good value with only ${detourMinutes.toFixed(1)} min detour.`,
+      label,
+      reason: `Suggested stop is on the route and saves ${formatMoney(saving)}.`,
     };
   }
-  if (saving >= minSavingDollars) {
+  if (saving > SMART_HARD_REJECT_SAVING_DOLLARS) {
     return {
       action: "fill_today_with_detour",
       visible: true,
-      label: "Fill today, but check the detour",
-      reason: `${candidate.station?.name || "This stop"} saves about ${formatMoney(saving)} after ${detourMinutes.toFixed(1)} min detour.`,
+      label,
+      reason: `Suggested detour adds ${detourMinutes.toFixed(1)} min and saves ${formatMoney(saving)}.`,
     };
   }
   return {
@@ -495,9 +536,27 @@ function lockedTomorrowWaitCue(candidate, { fillLitres = 0, minSavingDollars = 5
 
 function normaliseDecisionRule({ minSavingDollars, maxDetourMinutes }) {
   return {
-    minSavingDollars: boundedNumber(minSavingDollars, 1, 25, 5),
-    maxDetourMinutes: boundedNumber(maxDetourMinutes, 1, 30, 8),
+    minSavingDollars: SMART_HARD_REJECT_SAVING_DOLLARS,
+    maxDetourMinutes: SMART_MAX_DETOUR_MINUTES,
   };
+}
+
+function smartDetourLimitMinutesForSaving(saving) {
+  const value = Number(saving || 0);
+  if (value <= SMART_HARD_REJECT_SAVING_DOLLARS) return 3;
+  if (value < 5) return 5;
+  if (value < 10) return 10;
+  if (value < 20) return 18;
+  return SMART_MAX_DETOUR_MINUTES;
+}
+
+function savingsDetourLabel(saving) {
+  const value = Number(saving || 0);
+  if (value < 2) return "Small savings detour";
+  if (value < 5) return "Medium savings detour";
+  if (value < 10) return "Good savings detour";
+  if (value < 20) return "Great savings detour";
+  return "Strong savings detour";
 }
 
 function boundedNumber(value, min, max, fallback) {

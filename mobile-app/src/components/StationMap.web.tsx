@@ -4,16 +4,19 @@ import type * as Leaflet from "leaflet";
 
 import { brandStyleForStation } from "../data/brandAssets";
 import { colors, mapSkin, radii } from "../theme";
-import { MapPoint, StationViewModel } from "../types";
+import { EvCharger, MapPoint, StationViewModel } from "../types";
 
 const LEAFLET_CSS_ID = "fuel-path-leaflet-css";
 const LEAFLET_CUSTOM_CSS_ID = "fuel-path-leaflet-custom-css";
 const maxStationMarkers = 240;
-const maxPriceMarkers = 22;
-const maxExtraPriceMarkers = 28;
+const maxPriceMarkers = 14;
+const maxExtraPriceMarkers = 18;
 const maxClusterMarkers = 24;
-const markerGridSize = 108;
-const minClusterStationCount = 4;
+const markerGridSize = 132;
+const minClusterStationCount = 3;
+const mixedEnergyMaxPriceMarkers = 8;
+const mixedEnergyMaxExtraPriceMarkers = 12;
+const mixedEnergyMarkerGridSize = 190;
 
 type ClusterMarker = {
   count: number;
@@ -31,9 +34,12 @@ type CameraInsets = {
 
 export function StationMap({
   centre,
+  chargers = [],
   stations,
+  selectedChargerId,
   selectedStationCode,
   onSelect,
+  onSelectCharger,
   onViewportStationsChange,
   onMapSearchAreaChange,
   cameraFocusKey,
@@ -44,9 +50,12 @@ export function StationMap({
   userLocation,
 }: {
   centre: MapPoint;
+  chargers?: EvCharger[];
   stations: StationViewModel[];
+  selectedChargerId?: string;
   selectedStationCode?: string;
   onSelect: (stationCode: string) => void;
+  onSelectCharger?: (chargerId: string) => void;
   onViewportStationsChange?: (stationCodes: string[]) => void;
   onMapSearchAreaChange?: (area: { centre: MapPoint; radiusKm: number }) => void;
   cameraFocusKey?: string;
@@ -129,6 +138,7 @@ export function StationMap({
     const cameraStations = showCentreMarker
       ? nearestStationsForCamera(stations, centre, 12)
       : stations.slice(0, maxStationMarkers);
+    const cameraChargers = chargers.slice(0, 16);
     const routeStationCameraPoints = routeEndpoints
       ? stations
           .slice(0, maxPriceMarkers)
@@ -145,6 +155,7 @@ export function StationMap({
       : [
           [centre.lat, centre.lon] as [number, number],
           ...cameraStations.map((item) => [item.station.lat, item.station.lon] as [number, number]),
+          ...cameraChargers.map((charger) => [charger.lat, charger.lon] as [number, number]),
         ];
     const cameraContextKey = routeEndpoints
       ? [
@@ -191,6 +202,7 @@ export function StationMap({
       stations.slice(0, maxStationMarkers),
       map.getBounds(),
       selectedStationCode,
+      chargers.length > 0,
     );
 
     markerGroups.clusterMarkers.forEach((cluster) => {
@@ -244,8 +256,9 @@ export function StationMap({
               ...leafletPadding(activeInsets),
             });
           } else {
-            map.panTo([item.station.lat, item.station.lon], {
+            map.panInside([item.station.lat, item.station.lon], {
               animate: true,
+              ...leafletPadding(activeInsets),
             });
           }
         });
@@ -257,6 +270,39 @@ export function StationMap({
       });
       markerLayer.addLayer(marker);
       fitPoints.push([item.station.lat, item.station.lon]);
+    });
+
+    chargers.slice(0, maxStationMarkers).forEach((charger) => {
+      const selected = charger.id === selectedChargerId;
+      const marker = L.marker([charger.lat, charger.lon], {
+        icon: L.divIcon({
+          className: "",
+          html: evChargerMarkerHtml(charger, selected),
+          iconAnchor: [24, 54],
+          iconSize: [48, 54],
+          tooltipAnchor: [0, -56],
+        }),
+        alt: "",
+        keyboard: false,
+        riseOnHover: true,
+        zIndexOffset: selected ? 760 : 620,
+      });
+      marker.on("click", () => {
+        onSelectCharger?.(charger.id);
+        runProgrammaticMapMove(programmaticMoveRef, map, () => {
+          map.panInside([charger.lat, charger.lon], {
+            animate: true,
+            ...leafletPadding(activeInsets),
+          });
+        });
+      });
+      marker.bindTooltip(charger.name, {
+        className: "fuel-path-marker-tooltip",
+        direction: "top",
+        offset: [0, -6],
+      });
+      markerLayer.addLayer(marker);
+      fitPoints.push([charger.lat, charger.lon]);
     });
 
     const fitCameraPoints = routeEndpoints ? [...fitPoints, ...routeStationCameraPoints] : cameraPoints;
@@ -272,16 +318,23 @@ export function StationMap({
       lastFitKeyRef.current = fitKey;
     } else {
       const selected = stations.find((item) => item.station.stationCode === selectedStationCode);
-      if (selected && !userMovedMapRef.current) {
+      const selectedCharger = chargers.find((charger) => charger.id === selectedChargerId);
+      if ((selected || selectedCharger) && !userMovedMapRef.current) {
         runProgrammaticMapMove(programmaticMoveRef, map, () => {
-          if (routeEndpoints) {
+          if (selected && routeEndpoints) {
             map.panInside([selected.station.lat, selected.station.lon], {
               animate: true,
               ...leafletPadding(activeInsets),
             });
-          } else {
-            map.panTo([selected.station.lat, selected.station.lon], {
+          } else if (selected) {
+            map.panInside([selected.station.lat, selected.station.lon], {
               animate: true,
+              ...leafletPadding(activeInsets),
+            });
+          } else if (selectedCharger) {
+            map.panInside([selectedCharger.lat, selectedCharger.lon], {
+              animate: true,
+              ...leafletPadding(activeInsets),
             });
           }
         });
@@ -329,12 +382,15 @@ export function StationMap({
     onViewportStationsChange,
     onMapSearchAreaChange,
     cameraFocusKey,
+    chargers,
     showCentreMarker,
     routeEndpoints,
     routePoints,
     cameraInsets,
+    selectedChargerId,
     selectedStationCode,
     stations,
+    onSelectCharger,
     userLocation,
   ]);
 
@@ -417,7 +473,7 @@ function markerHtml(item: StationViewModel, selected: boolean) {
         style.initials,
       )}</span>`;
   return `
-    <div class="fuel-path-marker${selected ? " is-selected" : ""}" aria-hidden="true">
+    <div class="fuel-path-marker${selected ? " is-selected" : ""}" data-station-code="${escapeHtml(item.station.stationCode)}" aria-hidden="true">
       <span class="fuel-path-marker-price">${item.adjustedCpl.toFixed(1)}</span>
       <span class="fuel-path-marker-brand">${logo}</span>
     </div>
@@ -433,15 +489,31 @@ function clusterMarkerHtml(cluster: ClusterMarker) {
   `;
 }
 
+function evChargerMarkerHtml(charger: EvCharger, selected: boolean) {
+  const label = charger.maxPowerKw ? `${Math.round(charger.maxPowerKw)}kW` : "";
+  return `
+    <div class="fuel-path-ev-marker${selected ? " is-selected" : ""}" aria-label="${escapeHtml(
+      charger.name,
+    )}">
+      <span class="fuel-path-ev-marker-code">⚡</span>
+      ${label ? `<span class="fuel-path-ev-marker-label">${escapeHtml(label)}</span>` : ""}
+    </div>
+  `;
+}
+
 function visibleMarkerGroups(
   stations: StationViewModel[],
   bounds: Leaflet.LatLngBounds,
   selectedStationCode?: string,
+  hasEvMarkers = false,
 ) {
   const protectedCodes = protectedStationCodes(stations, selectedStationCode);
   const priceCells = new Set<string>();
   const clusterGroups = new Map<string, StationViewModel[]>();
   const priceMarkers: StationViewModel[] = [];
+  const priceLimit = hasEvMarkers ? mixedEnergyMaxPriceMarkers : maxPriceMarkers;
+  const extraPriceLimit = hasEvMarkers ? mixedEnergyMaxExtraPriceMarkers : maxExtraPriceMarkers;
+  const gridSize = hasEvMarkers ? mixedEnergyMarkerGridSize : markerGridSize;
 
   const ranked = [...stations].sort((left, right) => {
     const leftProtected = protectedCodes.has(left.station.stationCode) ? 0 : 1;
@@ -453,12 +525,12 @@ function visibleMarkerGroups(
   });
 
   for (const item of ranked) {
-    const cell = markerCell(item, bounds, markerGridSize);
+    const cell = markerCell(item, bounds, gridSize);
     const protectedMarker = protectedCodes.has(item.station.stationCode);
 
     if (
       protectedMarker ||
-      (priceMarkers.length < maxPriceMarkers && !priceCells.has(cell))
+      (priceMarkers.length < priceLimit && !priceCells.has(cell))
     ) {
       priceMarkers.push(item);
       priceCells.add(cell);
@@ -475,7 +547,7 @@ function visibleMarkerGroups(
     .filter((items) => items.length < minClusterStationCount)
     .flat()
     .sort((left, right) => markerPriorityScore(left) - markerPriorityScore(right))
-    .slice(0, Math.max(0, maxExtraPriceMarkers - priceMarkers.length));
+    .slice(0, Math.max(0, extraPriceLimit - priceMarkers.length));
   priceMarkers.push(...extraPriceMarkers);
 
   const clusterMarkers = overflowGroups
@@ -508,6 +580,9 @@ function clusterMarkerForItems(items: StationViewModel[]): ClusterMarker {
 function protectedStationCodes(stations: StationViewModel[], selectedStationCode?: string) {
   const codes = new Set<string>();
   if (selectedStationCode) codes.add(selectedStationCode);
+  for (const item of stations.slice(0, 4)) {
+    codes.add(item.station.stationCode);
+  }
   const cheapest = minBy(stations, (item) => item.adjustedCpl);
   const closest = minBy(stations, (item) => item.distanceKm);
   const bestValue = minBy(stations, markerPriorityScore);
@@ -736,7 +811,11 @@ function ensureLeafletStyles() {
       }
       .fuel-path-marker.is-selected {
         border-color: ${colors.black};
-        box-shadow: 0 10px 22px rgba(17, 20, 18, 0.28);
+        box-shadow:
+          0 0 0 4px rgba(255, 255, 255, 0.9),
+          0 0 0 7px rgba(255, 106, 61, 0.72),
+          0 12px 26px rgba(17, 20, 18, 0.32);
+        transform: translateY(-4px);
       }
       .fuel-path-marker.is-selected::after {
         border-top-color: ${colors.white};
@@ -836,6 +915,53 @@ function ensureLeafletStyles() {
         color: ${colors.greenSoft};
         font-size: 11px;
         font-weight: 800;
+      }
+      .fuel-path-ev-marker {
+        align-items: center;
+        background: ${colors.blue};
+        border: 2px solid ${colors.blue};
+        border-radius: 18px;
+        box-shadow: 0 10px 22px rgba(45, 95, 154, 0.32);
+        box-sizing: border-box;
+        color: #ffd166;
+        display: flex;
+        flex-direction: column;
+        height: 46px;
+        justify-content: center;
+        position: relative;
+        width: 48px;
+      }
+      .fuel-path-ev-marker::after {
+        border-left: 6px solid transparent;
+        border-right: 6px solid transparent;
+        border-top: 9px solid ${colors.blue};
+        bottom: -9px;
+        box-sizing: border-box;
+        content: "";
+        height: 0;
+        left: 50%;
+        position: absolute;
+        transform: translateX(-50%);
+        width: 0;
+      }
+      .fuel-path-ev-marker.is-selected {
+        background: ${colors.black};
+        border-color: ${colors.black};
+        color: #ffd166;
+        box-shadow: 0 10px 22px rgba(45, 95, 154, 0.34);
+      }
+      .fuel-path-ev-marker.is-selected::after {
+        border-top-color: ${colors.black};
+      }
+      .fuel-path-ev-marker-code {
+        font-size: 16px;
+        font-weight: 900;
+        line-height: 18px;
+      }
+      .fuel-path-ev-marker-label {
+        font-size: 12px;
+        font-weight: 900;
+        line-height: 14px;
       }
       .fuel-path-location-pin {
         background: ${colors.ink};

@@ -11,16 +11,21 @@ import { tomorrowPriceView } from "../utils/pricing";
 import { BrandBadge } from "./BrandBadge";
 
 export function StationRow({
+  hideWhyLine = false,
   item,
+  rankReason,
   selected,
   onPress,
 }: {
+  hideWhyLine?: boolean;
   item: StationViewModel;
+  rankReason?: string;
   selected: boolean;
   onPress: () => void;
 }) {
   const tomorrow = tomorrowPriceView(item);
   const attentionCue = stationAttentionCue(item);
+  const showAttentionCue = attentionCue && attentionCue.label !== stationOpenLabel(item.station.openNow);
   const fuelLabel = item.fuel || "fuel";
   return (
     <Pressable
@@ -52,6 +57,16 @@ export function StationRow({
         <Text numberOfLines={1} style={styles.evidence}>
           {stationEvidenceLine(item)}
         </Text>
+        {rankReason ? (
+          <Text numberOfLines={1} style={styles.rankReason}>
+            {rankReason}
+          </Text>
+        ) : null}
+        {hideWhyLine ? null : (
+          <Text numberOfLines={1} style={styles.whyLine}>
+            {stationWhyLine(item)}
+          </Text>
+        )}
         {item.discountCpl ? (
           <Text numberOfLines={1} style={styles.discount}>
             Confirmed: {item.discountLabel}
@@ -65,7 +80,7 @@ export function StationRow({
         <View style={styles.actionDistancePill}>
           <Text style={styles.actionDistanceText}>{item.distanceKm.toFixed(1)} km</Text>
         </View>
-        {attentionCue ? (
+        {showAttentionCue ? (
           <Text
             numberOfLines={1}
             style={[
@@ -92,6 +107,12 @@ export function StationRow({
       </View>
     </Pressable>
   );
+}
+
+function stationWhyLine(item: StationViewModel) {
+  const priceKind = item.discountCpl ? "your adjusted price" : "pump price";
+  const fuel = item.fuel || "fuel";
+  return `${fuel} ${priceKind}, ${item.distanceKm.toFixed(1)} km away`;
 }
 
 function stationRowAccessibilityLabel(item: StationViewModel) {
@@ -174,6 +195,18 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontSize: 10,
     fontWeight: "400",
+    marginTop: 2,
+  },
+  rankReason: {
+    color: colors.greenDark,
+    fontSize: 10,
+    fontWeight: "900",
+    marginTop: 2,
+  },
+  whyLine: {
+    color: colors.ink,
+    fontSize: 10,
+    fontWeight: "700",
     marginTop: 2,
   },
   discount: {

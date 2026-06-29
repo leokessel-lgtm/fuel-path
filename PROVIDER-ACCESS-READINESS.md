@@ -1,6 +1,6 @@
 # Provider Access Readiness
 
-Last checked: 20 June 2026, Australia/Sydney.
+Last checked: 26 June 2026, Australia/Sydney.
 
 ## Summary
 
@@ -8,9 +8,9 @@ Last checked: 20 June 2026, Australia/Sydney.
 | --- | --- | --- | --- |
 | NSW/ACT | FuelCheck through API.NSW Fuel API | Internal live adapter implemented; public production is fail-closed until authority-specific terms are confirmed | Confirm API.NSW/FuelCheck NSW/ACT usage, caching, attribution and commercial consumer-app terms, then set `FUEL_PATH_NSW_ACT_USAGE_TERMS_CONFIRMED=1`. |
 | QLD | Fuel Prices Direct Outbound API | Internal live adapter implemented; public production is fail-closed until licence acceptance and obligations are confirmed | Complete/confirm publisher or data-consumer sign-up, accept the Fuel Price Data Licence Terms of Service, add required attribution/disclaimer handling, then set `FUEL_PATH_QLD_USAGE_TERMS_CONFIRMED=1`. |
-| VIC | Service Victoria Servo Saver Public API | Pending access/schema | Apply for Servo Saver Public API access and capture approved schema, licence, caching and attribution terms before adapter work. |
+| VIC | Service Victoria Servo Saver Public API | Live adapter implemented, production env configured, terms/evidence attested | Keep live smoke and terms evidence current. |
 | TAS | FuelCheck TAS through API.NSW Fuel API v2 | Internal live adapter implemented; public production is fail-closed until authority-specific terms are confirmed | Confirm API.NSW/FuelCheck TAS usage, caching, attribution and commercial consumer-app terms, then set `FUEL_PATH_TAS_USAGE_TERMS_CONFIRMED=1`. |
-| NT | MyFuel NT web app publishes real-time fuel data | Access path unknown | Contact NT Consumer Affairs for API/data access and permitted reuse terms. |
+| NT | MyFuel NT web app publishes real-time fuel data; NTG Open Data publishes historical daily datasets | Historical developer access confirmed; no confirmed official real-time REST API contract | Use NTG Open Data for historical analytics. For live consumer-app prices, choose between requesting NT Consumer Affairs/MyFuel NT reuse terms and schema, or contracting a commercial aggregator such as Check Petrol for live NT retail prices and outages. |
 
 ## Production Usage Gates
 
@@ -28,6 +28,32 @@ Regression coverage:
 - `production TAS source fails closed until usage terms are confirmed`
 - `provider terms readiness blocks public launch when configured terms are missing`
 - `provider terms readiness passes when configured provider terms are confirmed`
+
+## VIC Servo Saver runtime/deployment checklist
+
+When VIC is credentialed but schema work is not finished, Fuel Path must stay in configured-only mode.
+
+- Local setup:
+  - `VIC_SERVO_SAVER_API_BASE_URL=https://api.fuel.service.vic.gov.au/open-data/v1`
+  - `VIC_SERVO_SAVER_API_KEY=<api-key-from-service-victoria>`
+- Vercel deployment setup:
+  - Add both variables in the production and preview environments:
+    - `VIC_SERVO_SAVER_API_BASE_URL`
+    - `VIC_SERVO_SAVER_API_KEY`
+  - Keep values in Vercel secret/config UI only; never commit secrets in markdown or status JSON.
+  - Redeploy and run a status smoke before public-live release.
+
+Smoke check:
+
+```sh
+curl -sS https://fuel-path.vercel.app/api/status | jq '.fuelProviders.apiVicConfigured, .fuelProviders.vicStatus, .fuelProviders.capabilities[] | select(.region == "VIC")'
+```
+
+Expected with VIC credentials set but no VIC adapter:
+
+- `fuelProviders.apiVicConfigured` is `true`
+- `fuelProviders.vicStatus` is `configured_pending_adapter_schema`
+- VIC capability entry shows `capability: "pending_access"`
 
 Release gate:
 
@@ -55,6 +81,32 @@ Public live-price claims remain blocked when:
 
 - NSW/ACT, QLD or TAS credentials are configured but terms flags are missing.
 - terms flags are set but written evidence has not been attested.
+
+### NT MyFuel
+
+Current evidence:
+
+- MyFuel NT is the NT Government consumer surface for real-time retail fuel prices.
+- The NTG Open Data portal publishes MyFuel NT historical daily fuel price datasets, usually as monthly/yearly XLSX files.
+- Historical developer/data-analysis access is confirmed through NTG Open Data downloads.
+- No direct official public REST API contract has been confirmed for Fuel Path live NT retail prices.
+- Scraping the MyFuel NT consumer app is not approved as a Fuel Path production integration path.
+- A third-party commercial aggregator such as Check Petrol may be a viable live-feed path only after contract, licence, coverage, outage fields, cache/rate limits, attribution and redistribution terms are confirmed.
+
+Current product behaviour:
+
+- NT remains `pending_access` in `/api/status`.
+- `source=nt` is accepted as an explicit source request but returns an empty pending-access context until an approved live provider exists.
+- NT must not be included in national live-coverage claims.
+- Historical NT datasets are suitable for analytics/back-testing imports only, not route-time live price recommendations.
+
+Required before NT can become live:
+
+- Confirm chosen live provider path: official NT/MyFuel reuse approval or commercial aggregator contract.
+- Record API/schema documentation, fuel-code mapping, station identity model and outage/availability fields if used.
+- Record licence, caching, rate-limit, attribution and commercial consumer-app terms.
+- Add server-side credential handling only; no client-side provider tokens.
+- Add normalisation tests, routing tests, live smoke checks for Darwin, Palmerston, Katherine, Alice Springs, Tennant Creek and remote/outage cases.
 
 After the completed evidence file has passed the release gate, set the runtime attestation flag with the release environment values:
 
@@ -129,12 +181,15 @@ Required before setting `FUEL_PATH_TAS_USAGE_TERMS_CONFIRMED=1`:
 
 ## VIC Servo Saver
 
-Official finding, refreshed 20 June 2026:
+Official finding, refreshed 26 June 2026:
 
 - Service Victoria now lists a Servo Saver Public API for digital access to Victorian fuel price data for third-party apps, researchers and tools.
 - Consumer Affairs Victoria says fuel price information is published on Servo Saver and that retailers must report price changes within 30 minutes.
 - Consumer Affairs Victoria also says tomorrow cap submissions are due between 8:30 am and 2 pm and published on Servo Saver by 4 pm.
 - Servo Saver prices are standard pump prices before discounts or loyalty offers.
+- Service Victoria API base path is now documented as `https://api.fuel.service.vic.gov.au/open-data/v1`.
+- Service Victoria confirmed API access via the Fuel Program email on 26 June 2026 and provided approval details for Fuel Path setup.
+- Public Open Data calls currently require `x-consumer-id` and `x-transactionid` headers, plus a normal User-Agent.
 
 Implementation gate:
 
@@ -227,22 +282,28 @@ Leo
 Official finding:
 
 - MyFuel NT publishes all fuel price data in real time through its official web app.
-- The official NT page does not confirm a public API contract.
+- NTG Open Data publishes historical daily MyFuel NT price datasets as downloadable XLSX files.
+- Historical datasets are appropriate for analytics/back-testing, not live consumer recommendations.
+- The official NT surfaces reviewed do not confirm a direct public REST API contract for live feeds.
+- Commercial aggregator APIs may provide live NT data every 30 to 180 minutes, but need contract and terms review before integration.
 - NT Consumer Affairs lists `consumer@nt.gov.au`, `08 8999 1999` and `1800 019 319` for general enquiries.
 
 Implementation gate:
 
-- Do not scrape or reverse-engineer the web app for production. Confirm a permitted API/data access path first.
+- Do not scrape or reverse-engineer the web app for production.
+- Use NTG Open Data only for historical analytics/back-testing imports unless live-use terms are separately confirmed.
+- Confirm a permitted live API/data access path before enabling NT route-time recommendations.
 
 Paste-ready ask:
 
 ```text
 Hello NT Consumer Affairs team,
 
-I am building Fuel Path, an Australian route-based fuel decision app. Could you confirm whether MyFuel NT fuel price data is available to third-party apps through an API, data feed or approved dataset process?
+I am building Fuel Path, an Australian route-based fuel decision app. I can see NTG Open Data provides historical MyFuel NT datasets. Could you confirm whether live or near-real-time MyFuel NT fuel price data is available to third-party apps through an API, data feed or approved reuse process?
 
 I am seeking:
-- permitted access method for live or regularly updated station fuel prices
+- permitted access method for live or regularly updated station fuel prices, if available
+- whether historical NTG Open Data datasets may be used for analytics/back-testing
 - response schema or sample data
 - usage, caching, attribution and redistribution terms
 - whether commercial consumer-app use is permitted

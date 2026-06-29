@@ -9,6 +9,10 @@ const dryRun = Boolean(args.dryRun);
 const forcedPlanSmoke = Boolean(args.planSmoke || process.env.FUEL_PATH_RUN_PLAN_FIELD_SMOKE === "1");
 const skippedPlanSmoke = Boolean(args.noPlanSmoke || process.env.FUEL_PATH_RUN_PLAN_FIELD_SMOKE === "0");
 const includePlanStress = Boolean(args.planStress || process.env.FUEL_PATH_RUN_PLAN_FIELD_STRESS === "1");
+const includePlanRouteStress = Boolean(args.planRouteStress || process.env.FUEL_PATH_RUN_PLAN_ROUTE_STRESS === "1");
+const includePlanBrowserStress = Boolean(args.planBrowserStress || process.env.FUEL_PATH_RUN_PLAN_BROWSER_STRESS === "1");
+const includePlanVisualSnapshots = Boolean(args.planVisualSnapshots || process.env.FUEL_PATH_RUN_PLAN_VISUAL_SNAPSHOTS === "1");
+const includePlanLiveApiStress = Boolean(args.planLiveApiStress || process.env.FUEL_PATH_RUN_PLAN_LIVE_API_STRESS === "1");
 const autoPlanSmokeReachable = forcedPlanSmoke || skippedPlanSmoke
   ? false
   : await isPlanSmokeReachable();
@@ -32,6 +36,18 @@ const steps = [
   ...(includePlanStress
     ? [command("rendered Plan-field stress", "npm", ["run", "stress:plan-fields"], { cwd: path.join(ROOT, "mobile-app") })]
     : []),
+  ...(includePlanRouteStress
+    ? [command("Plan route recommendation stress", "npm", ["run", "test:plan-route-recommendations:local"])]
+    : []),
+  ...(includePlanBrowserStress
+    ? [command("Plan route browser click stress", "npm", ["run", "test:plan-route-browser-clicks"])]
+    : []),
+  ...(includePlanVisualSnapshots
+    ? [command("Plan route visual snapshots", "npm", ["run", "test:plan-route-visual-snapshots"])]
+    : []),
+  ...(includePlanLiveApiStress
+    ? [command("Plan route live API stress", "npm", ["run", "test:plan-route-live-api"])]
+    : []),
   command("lookup release summary", "npm", ["run", "summarise:lookup-release-evidence"]),
 ];
 
@@ -47,6 +63,18 @@ if (!includePlanSmoke) {
 if (!includePlanStress) {
   console.log("Skipping rendered Plan-field stress: optional deep check. Pass --plan-stress after starting the local Expo web app on port 8081.");
 }
+if (!includePlanRouteStress) {
+  console.log("Skipping Plan route recommendation stress: optional deep check. Pass --plan-route-stress to include it.");
+}
+if (!includePlanBrowserStress) {
+  console.log("Skipping Plan route browser click stress: optional deep check. Pass --plan-browser-stress to include it.");
+}
+if (!includePlanVisualSnapshots) {
+  console.log("Skipping Plan route visual snapshots: optional visual evidence. Pass --plan-visual-snapshots to include it.");
+}
+if (!includePlanLiveApiStress) {
+  console.log("Skipping Plan route live API stress: optional live-provider check. Pass --plan-live-api-stress to include it.");
+}
 
 for (const step of steps) {
   await runStep(step);
@@ -59,6 +87,10 @@ console.log(JSON.stringify({
   planSmokeMode,
   includedPlanStress: includePlanStress,
   planStressMode: includePlanStress ? "forced" : "skipped",
+  includedPlanRouteStress: includePlanRouteStress,
+  includedPlanBrowserStress: includePlanBrowserStress,
+  includedPlanVisualSnapshots: includePlanVisualSnapshots,
+  includedPlanLiveApiStress: includePlanLiveApiStress,
   steps: steps.map((step) => ({
     name: step.name,
     cwd: path.relative(ROOT, step.cwd) || ".",
@@ -108,6 +140,10 @@ function parseArgs(values) {
     if (value === "--plan-smoke") parsed.planSmoke = true;
     if (value === "--no-plan-smoke") parsed.noPlanSmoke = true;
     if (value === "--plan-stress") parsed.planStress = true;
+    if (value === "--plan-route-stress") parsed.planRouteStress = true;
+    if (value === "--plan-browser-stress") parsed.planBrowserStress = true;
+    if (value === "--plan-visual-snapshots") parsed.planVisualSnapshots = true;
+    if (value === "--plan-live-api-stress") parsed.planLiveApiStress = true;
   }
   return parsed;
 }

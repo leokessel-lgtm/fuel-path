@@ -163,7 +163,7 @@ The app should represent all Australian states and territories as first-class re
 | ACT | Covered through API.NSW FuelCheck feed | Keep visible as ACT capability, confirm permitted usage terms |
 | QLD | Live provider adapter validated | Confirm licence/usage constraints before public/commercial launch |
 | WA | Live FuelWatch statewide v2 implemented | Monitor request budget, regional smoke coverage and tomorrow-price UX |
-| VIC | Pending Servo Saver API/dataset access | Implement adapter after approved access, schema and usage terms are available |
+| VIC | Access confirmed; schema/terms pending | Implement adapter after approved schema, licence, caching and attribution terms are captured |
 | SA | Live provider adapter validated | Configure production token server-side before live SA prices appear |
 | TAS | API.NSW Fuel API v2 path confirmed | Validate v2 payloads with approved credentials, then implement adapter |
 | NT | Pending access path | Confirm MyFuel NT API/data access and usage terms before implementation |

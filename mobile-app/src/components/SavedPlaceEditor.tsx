@@ -242,7 +242,9 @@ function shortPlaceMeta(point: MapPoint) {
 }
 
 function suggestionNeedsPrecisionDetail(point: MapPoint) {
-  return point.sourceLabel === "Needs confirmation" || point.sourceLabel === "Street/road";
+  return point.sourceLabel === "Needs confirmation" ||
+    point.sourceLabel === "Street/road" ||
+    point.sourceLabel === "Near address match";
 }
 
 const styles = StyleSheet.create({

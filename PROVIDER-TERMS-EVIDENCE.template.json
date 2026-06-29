@@ -1,7 +1,7 @@
 {
   "notes": [
     "Copy this template to a private evidence file before setting provider production terms flags.",
-    "Use concrete dated references that name the relevant source family, such as fuelcheck-api-nsw-approval-email-YYYY-MM-DD, qld-fuel-prices-licence-acceptance-record-YYYY-MM-DD, fuelcheck-tas-terms-review-ticket-YYYY-MM-DD or provider-terms-note-YYYY-MM-DD. Reference dates must not be in the future, older than the recorded termsAcceptedAt date, or older than 90 days by default. Any custom provider-terms freshness window is capped at 365 days.",
+    "Use concrete dated references that name the relevant source family, such as fuelcheck-api-nsw-approval-email-YYYY-MM-DD, qld-fuel-prices-licence-acceptance-record-YYYY-MM-DD, fuelcheck-tas-terms-review-ticket-YYYY-MM-DD, service-victoria-servo-saver-api-approval-email-YYYY-MM-DD or provider-terms-note-YYYY-MM-DD. Reference dates must not be in the future, older than the recorded termsAcceptedAt date, or older than 90 days by default. Any custom provider-terms freshness window is capped at 365 days.",
     "Each ready region must include evidenceSource pointing to a private local note or exported approval record beside this JSON. The source file must contain the reference date and matching provider family. Do not store API keys, tokens, bearer values or client secrets in evidence files.",
     "After the completed evidence file passes check:provider-terms, set FUEL_PATH_PROVIDER_TERMS_EVIDENCE_CONFIRMED=1 in the runtime environment so /api/status publicClaims can reflect the attested state.",
     "Template values intentionally remain false so public live-price claims stay blocked."
@@ -53,6 +53,34 @@
       "attributionDisclaimerReady": false,
       "attributionDisclaimerWording": "",
       "commercialConsumerAppUseConfirmed": false,
+      "termsAcceptedAt": "",
+      "evidenceReference": "",
+      "evidenceSource": ""
+    },
+    "VIC": {
+      "servoSaverApiAccessApproved": false,
+      "servoSaverTermsAccepted": false,
+      "cachingDurationConfirmed": false,
+      "cachingDurationMinutes": 0,
+      "attributionDisclaimerReady": false,
+      "attributionDisclaimerWording": "",
+      "commercialConsumerAppUseConfirmed": false,
+      "termsAcceptedAt": "",
+      "evidenceReference": "",
+      "evidenceSource": ""
+    },
+    "NT": {
+      "providerPathConfirmed": false,
+      "providerName": "",
+      "apiAccessApproved": false,
+      "providerTermsAccepted": false,
+      "cachingDurationConfirmed": false,
+      "cachingDurationMinutes": 0,
+      "rateLimitConfirmed": false,
+      "attributionDisclaimerReady": false,
+      "attributionDisclaimerWording": "",
+      "commercialConsumerAppUseConfirmed": false,
+      "outageAvailabilityUseConfirmed": false,
       "termsAcceptedAt": "",
       "evidenceReference": "",
       "evidenceSource": ""

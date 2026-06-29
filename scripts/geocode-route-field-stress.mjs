@@ -32,6 +32,7 @@ const ENDPOINTS = [
   ep("syd-airport", "NSW", "Sydney Airport NSW", ["sydney airport", "nsw"], "airport"),
   ep("sylvania-addr", "NSW", "66B Easton Avenue Sylvania NSW 2224", ["easton", "sylvania", "nsw"], "address"),
   ep("artarmon-typo", "NSW", "Artamon NSW", ["artarmon", "nsw"], "typo"),
+  ep("moree", "NSW", "Moree NSW", ["moree", "nsw"], "remote"),
 
   ep("canberra", "ACT", "Canberra ACT", ["canberra", "act"], "capital"),
   ep("canberra-centre", "ACT", "Canberra Centre ACT", ["canberra centre"], "poi"),
@@ -50,18 +51,21 @@ const ENDPOINTS = [
   ep("brisbane", "QLD", "Brisbane CBD QLD", ["brisbane", "qld"], "capital"),
   ep("gold-coast", "QLD", "Gold Coast QLD", ["gold coast", "qld"], "regional"),
   ep("sunshine-coast", "QLD", "Sunshine Coast QLD", ["sunshine coast", "qld"], "regional"),
+  ep("longreach", "QLD", "Longreach QLD", ["longreach", "qld"], "remote"),
   ep("cairns", "QLD", "Cairns QLD", ["cairns", "qld"], "regional"),
   ep("townsville", "QLD", "Townsville QLD", ["townsville", "qld"], "regional"),
   ep("toowoomba", "QLD", "Toowoomba QLD", ["toowoomba", "qld"], "regional"),
   ep("bris-airport", "QLD", "Brisbane Airport QLD", ["brisbane airport"], "airport"),
+  ep("mount-isa", "QLD", "Mount Isa QLD", ["mount isa", "qld"], "remote"),
 
   ep("perth", "WA", "Perth CBD WA", ["perth", "wa"], "capital"),
   ep("fremantle", "WA", "Fremantle WA", ["fremantle", "wa"], "regional"),
   ep("bunbury", "WA", "Bunbury WA", ["bunbury", "wa"], "regional"),
   ep("geraldton", "WA", "Geraldton WA", ["geraldton", "wa"], "regional"),
   ep("kalgoorlie", "WA", "Kalgoorlie WA", ["kalgoorlie", "wa"], "regional"),
-  ep("broome", "WA", "Broome WA", ["broome", "wa"], "regional"),
+  ep("broome", "WA", "Broome WA", ["broome", "wa"], "remote"),
   ep("perth-airport", "WA", "Perth Airport WA", ["perth airport"], "airport"),
+  ep("newman", "WA", "Newman WA", ["newman", "wa"], "remote"),
 
   ep("adelaide", "SA", "Adelaide CBD SA", ["adelaide", "sa"], "capital"),
   ep("mount-gambier", "SA", "Mount Gambier SA", ["mount gambier", "sa"], "regional"),
@@ -69,6 +73,7 @@ const ENDPOINTS = [
   ep("whyalla", "SA", "Whyalla SA", ["whyalla", "sa"], "regional"),
   ep("coober-pedy", "SA", "Coober Pedy SA", ["coober pedy", "sa"], "remote"),
   ep("rundle", "SA", "Rundle Mall Adelaide SA", ["rundle mall"], "poi"),
+  ep("port-lincoln", "SA", "Port Lincoln SA", ["port lincoln", "sa"], "remote"),
 
   ep("hobart", "TAS", "Hobart CBD TAS", ["hobart", "tas"], "capital"),
   ep("launceston", "TAS", "Launceston TAS", ["launceston", "tas"], "regional"),
@@ -77,7 +82,8 @@ const ENDPOINTS = [
   ep("hobart-airport", "TAS", "Hobart Airport TAS", ["hobart airport"], "airport"),
 
   ep("darwin", "NT", "Darwin CBD NT", ["darwin", "nt"], "capital"),
-  ep("alice", "NT", "Alice Springs NT", ["alice springs", "nt"], "regional"),
+  ep("alice", "NT", "Alice Springs NT", ["alice springs", "nt"], "remote"),
+  ep("tennant", "NT", "Tennant Creek NT", ["tennant", "nt"], "remote"),
   ep("katherine", "NT", "Katherine NT", ["katherine", "nt"], "regional"),
   ep("palmerston", "NT", "Palmerston NT", ["palmerston", "nt"], "regional"),
   ep("darwin-airport", "NT", "Darwin Airport NT", ["darwin airport"], "airport"),
@@ -270,14 +276,30 @@ function buildRoutePairs(items, count) {
 function rank(payload, endpoint) {
   const suggestions = payload.suggestions || [];
   for (let index = 0; index < suggestions.length; index += 1) {
-    const label = suggestions[index].label || "";
-    if (endpoint.expected.every((token) => labelHas(label, token))) return index + 1;
-    const hasKeyToken = endpoint.expected.some((token) => !isStateToken(token) && normalise(token).length >= 4 && labelHas(label, token));
+    const suggestion = suggestions[index];
+    const label = suggestion.label || "";
+    if (endpoint.expected.every((token) => suggestionLabelHas(label, suggestion, token))) return index + 1;
+    const hasKeyToken = endpoint.expected.some(
+      (token) => !isStateToken(token) && normalise(token).length >= 4 && labelHas(label, token),
+    );
     const stateToken = endpoint.expected.find(isStateToken);
-    const stateOk = !stateToken || labelHas(label, stateToken);
+    const stateOk = !stateToken || suggestionLabelHas(label, suggestion, stateToken);
     if (hasKeyToken && stateOk && endpoint.type !== "address") return index + 1;
   }
   return null;
+}
+
+function suggestionLabelHas(label, suggestion, token) {
+  return labelHas(label, token) || suggestionHasStateToken(suggestion, token);
+}
+
+function suggestionHasStateToken(suggestion, token) {
+  const state = normalise(suggestion?.state || "");
+  if (!state) return false;
+  if (STATE_SYNONYMS[normalise(token)]) {
+    return STATE_SYNONYMS[normalise(token)].includes(state);
+  }
+  return state === normalise(token);
 }
 
 function labelHas(label, token) {

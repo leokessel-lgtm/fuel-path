@@ -16,14 +16,18 @@ const LIMIT = Number(process.env.FUEL_PATH_ROUTE_EXACT_ADDRESS_LIMIT || 5);
 const MIN_PREFIX_CHARS = Number(process.env.FUEL_PATH_ROUTE_EXACT_ADDRESS_MIN_PREFIX || 3);
 const ROUTE_PAIR_COUNT = Number(process.env.FUEL_PATH_ROUTE_EXACT_ADDRESS_PAIRS || 100);
 const MAX_FIXTURE_P90_CHARS = Number(process.env.FUEL_PATH_ROUTE_EXACT_ADDRESS_MAX_P90 || 34);
+const ROUTE_EXACT_ASSERT_CASE_IDS = new Set(EXACT_ADDRESS_CASES.map((item) => item.id));
 const providerFetchCalls = [];
 
 installProviderFailure();
 
 const { geocode } = require("../api/_backend");
 
-const fixture = await buildFixtureIndex(EXACT_ADDRESS_CASES);
-const currentConfigured = await runPass("current_configured", {});
+const STRESS_CASES = buildRouteExactStressCases(EXACT_ADDRESS_CASES);
+const ASSERT_CASE_COUNT = EXACT_ADDRESS_CASES.length;
+
+const fixture = await buildFixtureIndex(STRESS_CASES);
+const currentConfigured = await runPass("current_configured", { requiredCaseIds: ROUTE_EXACT_ASSERT_CASE_IDS });
 const fixtureGnaf = await withEnv(
   {
     FUEL_PATH_GNAF_API_URL: "",
@@ -31,12 +35,13 @@ const fixtureGnaf = await withEnv(
     FUEL_PATH_GNAF_SQLITE_PATH: fixture.sqlitePath,
     FUEL_PATH_GNAF_DATABASE_URL: "",
   },
-  async () => runPass("fixture_gnaf_route_fields", { requireExact: true }),
+  async () => runPass("fixture_gnaf_route_fields", { requireExact: true, requiredCaseIds: ROUTE_EXACT_ASSERT_CASE_IDS }),
 );
 
 const summary = {
   runId: RUN_ID,
-  caseCount: EXACT_ADDRESS_CASES.length,
+  assertCaseCount: ASSERT_CASE_COUNT,
+  caseCount: STRESS_CASES.length,
   routePairCount: ROUTE_PAIR_COUNT,
   currentConfigured: currentConfigured.summary,
   fixtureGnaf: fixtureGnaf.summary,
@@ -65,22 +70,37 @@ assertPass(summary);
 async function runPass(passName, options = {}) {
   const beforeFetchCalls = providerFetchCalls.length;
   const endpoints = [];
-  for (const item of EXACT_ADDRESS_CASES) {
+  for (const item of STRESS_CASES) {
     endpoints.push(await assessEndpoint(passName, item));
   }
   const afterFetchCalls = providerFetchCalls.length;
+  const requiredEndpoints = options.requiredCaseIds
+    ? endpoints.filter((item) => options.requiredCaseIds.has(item.id))
+    : endpoints;
   const routePairs = buildRoutePairs(endpoints, ROUTE_PAIR_COUNT);
+  const requiredRoutePairs = options.requiredCaseIds
+    ? buildRoutePairs(requiredEndpoints, ROUTE_PAIR_COUNT)
+    : routePairs;
   const charValues = endpoints.map((row) => row.firstExactChars).filter(Number.isFinite);
+  const requiredCharValues = requiredEndpoints.map((row) => row.firstExactChars).filter(Number.isFinite);
   const pairCharValues = routePairs.map((pair) => pair.totalChars).filter(Number.isFinite);
   const exactTop = endpoints.filter((row) => row.finalExactRank === 1).length;
+  const exactTopRequired = requiredEndpoints.filter((row) => row.finalExactRank === 1).length;
   const exactAny = endpoints.filter((row) => row.finalExactRank).length;
+  const exactAnyRequired = requiredEndpoints.filter((row) => row.finalExactRank).length;
+  const requiredPairCharValues = requiredRoutePairs.map((pair) => pair.totalChars).filter(Number.isFinite);
   const summary = {
     passName,
     endpoints: endpoints.length,
+    requiredEndpoints: requiredEndpoints.length,
     routePairs: routePairs.length,
+    requiredRoutePairs: requiredRoutePairs.length,
     exactPrefixReady: endpoints.filter((row) => row.firstExactChars).length,
+    requiredExactPrefixReady: requiredEndpoints.filter((row) => row.firstExactChars).length,
     exactFinalTop: exactTop,
+    requiredExactFinalTop: exactTopRequired,
     exactFinalAny: exactAny,
+    requiredExactFinalAny: exactAnyRequired,
     providerCalls: afterFetchCalls - beforeFetchCalls,
     charsNeeded: {
       min: charValues.length ? Math.min(...charValues) : null,
@@ -90,6 +110,14 @@ async function runPass(passName, options = {}) {
       average: charValues.length ? Number((charValues.reduce((sum, value) => sum + value, 0) / charValues.length).toFixed(1)) : null,
       nonExact: endpoints.filter((row) => !row.firstExactChars).length,
     },
+    requiredCharsNeeded: {
+      min: requiredCharValues.length ? Math.min(...requiredCharValues) : null,
+      median: percentile(requiredCharValues, 50),
+      p90: percentile(requiredCharValues, 90),
+      max: requiredCharValues.length ? Math.max(...requiredCharValues) : null,
+      average: requiredCharValues.length ? Number((requiredCharValues.reduce((sum, value) => sum + value, 0) / requiredCharValues.length).toFixed(1)) : null,
+      nonExact: requiredEndpoints.filter((row) => !row.firstExactChars).length,
+    },
     routePairs: {
       uniquePairs: new Set(routePairs.map((pair) => `${pair.from}->${pair.to}`)).size,
       bothExactPrefixReady: routePairs.filter((pair) => pair.ready).length,
@@ -98,6 +126,15 @@ async function runPass(passName, options = {}) {
       totalCharsMedian: percentile(pairCharValues, 50),
       totalCharsP90: percentile(pairCharValues, 90),
       totalCharsMax: pairCharValues.length ? Math.max(...pairCharValues) : null,
+    },
+    requiredRoutePairsStats: {
+      uniquePairs: new Set(requiredRoutePairs.map((pair) => `${pair.from}->${pair.to}`)).size,
+      bothExactPrefixReady: requiredRoutePairs.filter((pair) => pair.ready).length,
+      bothExactFullReady: requiredRoutePairs.filter((pair) => pair.fullReady).length,
+      oneOrMoreMissingExact: requiredRoutePairs.filter((pair) => !pair.ready).length,
+      totalCharsMedian: percentile(requiredPairCharValues, 50),
+      totalCharsP90: percentile(requiredPairCharValues, 90),
+      totalCharsMax: requiredPairCharValues.length ? Math.max(...requiredPairCharValues) : null,
     },
     byState: groupSummary(endpoints, "state"),
     byCategory: groupSummary(endpoints, "category"),
@@ -134,7 +171,6 @@ async function assessEndpoint(passName, item) {
       query: prefix,
       limit: LIMIT,
       sessionToken: `${passName}-${RUN_ID}-${item.id}`,
-      provider: "nominatim",
     });
     elapsedMs += Date.now() - started;
     prefixesTested += 1;
@@ -152,7 +188,6 @@ async function assessEndpoint(passName, item) {
     query: item.query,
     limit: LIMIT,
     sessionToken: `${passName}-${RUN_ID}-${item.id}-full`,
-    provider: "nominatim",
   });
   elapsedMs += Date.now() - started;
   finalSuggestions = Array.isArray(finalPayload?.suggestions) ? finalPayload.suggestions : [];
@@ -235,6 +270,25 @@ async function buildFixtureIndex(items) {
     { cwd: ROOT, stdio: "ignore" },
   );
   return { dir, inputPath, sqlitePath };
+}
+
+function buildRouteExactStressCases(items) {
+  const extraCases = [];
+  const unitAliasPrefixes = ["Building", "Suite", "Bldg", "Blg", "Ste"];
+  for (const item of items) {
+    const isRemoteUnit = item.category.includes("unit") && item.category.includes("remote");
+    if (!isRemoteUnit) continue;
+    for (const prefix of unitAliasPrefixes) {
+      const aliasKey = prefix.toLowerCase().replace(/[^a-z0-9]+/g, "");
+      extraCases.push({
+        ...item,
+        id: `${item.id}-${aliasKey}-prefix`,
+        category: `unit-remote-${aliasKey}-prefix`,
+        query: `${prefix} ${item.flatNumber}, ${item.number} ${item.streetName} ${item.streetType} ${item.locality} ${item.state} ${item.postcode}`,
+      });
+    }
+  }
+  return [...items, ...extraCases];
 }
 
 async function withEnv(env, callback) {
@@ -346,23 +400,23 @@ function markdownCell(value) {
 
 function assertPass(summary) {
   const failures = [];
-  if (summary.fixtureGnaf.exactPrefixReady !== summary.caseCount) {
-    failures.push(`Expected ${summary.caseCount}/${summary.caseCount} fixture exact prefixes, got ${summary.fixtureGnaf.exactPrefixReady}`);
+  if (summary.fixtureGnaf.requiredExactPrefixReady !== summary.assertCaseCount) {
+    failures.push(`Expected ${summary.assertCaseCount}/${summary.assertCaseCount} fixture exact prefixes on required cases, got ${summary.fixtureGnaf.requiredExactPrefixReady}`);
   }
-  if (summary.fixtureGnaf.exactFinalTop !== summary.caseCount) {
-    failures.push(`Expected ${summary.caseCount}/${summary.caseCount} fixture final top exact matches, got ${summary.fixtureGnaf.exactFinalTop}`);
+  if (summary.fixtureGnaf.requiredExactFinalTop !== summary.assertCaseCount) {
+    failures.push(`Expected ${summary.assertCaseCount}/${summary.assertCaseCount} fixture final top exact matches on required cases, got ${summary.fixtureGnaf.requiredExactFinalTop}`);
   }
   if (summary.fixtureGnaf.providerCalls !== 0) {
     failures.push(`Expected fixture route field pass to avoid provider calls, got ${summary.fixtureGnaf.providerCalls}`);
   }
-  if (summary.fixtureGnaf.charsNeeded.p90 > MAX_FIXTURE_P90_CHARS) {
-    failures.push(`Expected fixture exact-address p90 chars <= ${MAX_FIXTURE_P90_CHARS}, got ${summary.fixtureGnaf.charsNeeded.p90}`);
+  if (summary.fixtureGnaf.requiredCharsNeeded.p90 > MAX_FIXTURE_P90_CHARS) {
+    failures.push(`Expected fixture required exact-address p90 chars <= ${MAX_FIXTURE_P90_CHARS}, got ${summary.fixtureGnaf.requiredCharsNeeded.p90}`);
   }
-  if (summary.fixtureGnaf.routePairs.bothExactPrefixReady !== summary.routePairCount) {
-    failures.push(`Expected ${summary.routePairCount}/${summary.routePairCount} fixture route pairs exact-prefix ready, got ${summary.fixtureGnaf.routePairs.bothExactPrefixReady}`);
+  if (summary.fixtureGnaf.requiredRoutePairsStats.bothExactPrefixReady !== summary.routePairCount) {
+    failures.push(`Expected ${summary.routePairCount}/${summary.routePairCount} fixture route-pair exact-prefix ready on required cases, got ${summary.fixtureGnaf.requiredRoutePairsStats.bothExactPrefixReady}`);
   }
-  if (summary.fixtureGnaf.routePairs.uniquePairs !== summary.routePairCount) {
-    failures.push(`Expected ${summary.routePairCount}/${summary.routePairCount} unique fixture route pairs, got ${summary.fixtureGnaf.routePairs.uniquePairs}`);
+  if (summary.fixtureGnaf.requiredRoutePairsStats.uniquePairs !== summary.routePairCount) {
+    failures.push(`Expected ${summary.routePairCount}/${summary.routePairCount} unique fixture route pairs on required cases, got ${summary.fixtureGnaf.requiredRoutePairsStats.uniquePairs}`);
   }
   if (failures.length) throw new Error(failures.join("; "));
 }

@@ -51,6 +51,16 @@ export function stationSourceLabel(source?: string) {
   return "Source unknown";
 }
 
+export function stationProviderLabel(source?: string) {
+  const value = String(source || "").toLowerCase();
+  if (value.includes("vic")) return "Servo Saver";
+  if (value.includes("fuelcheck") || value.includes("nsw") || value.includes("tas")) return "FuelCheck";
+  if (value.includes("qld")) return "Queensland Fuel Prices";
+  if (value.includes("wa")) return "FuelWatch";
+  if (value.includes("sa")) return "SA Fuel Pricing";
+  return "";
+}
+
 export function stationFreshness(station: Station, now = new Date()) {
   if (!station.updatedAt) {
     return {
@@ -117,10 +127,12 @@ export function stationAttentionCue(item: StationViewModel): StationConfidence |
 export function stationEvidenceLine(item: StationViewModel) {
   const timestamp = stationTimestampLine(item.station);
   const confidence = stationConfidence(item);
+  const provider = stationProviderLabel(item.station.source);
+  const sourceLine = provider ? `${provider} | ${timestamp}` : timestamp;
   if (confidence.label === "Live price" || confidence.label === "Updated recently") {
-    return timestamp;
+    return sourceLine;
   }
-  return `${timestamp} | ${confidence.label}`;
+  return `${sourceLine} | ${confidence.label}`;
 }
 
 export function stationTimestampLine(station: Station, now = new Date()) {
@@ -184,15 +196,18 @@ export function routeValueCue(item: StationViewModel) {
   const saving = Number(item.netSaving || 0);
   const detour = Number(item.detourMinutes || 0);
   if (saving >= 1) {
-    return `Net ${formatMoney(saving)} after ${detour.toFixed(1)} min detour.`;
+    return `Saves ${formatMoney(saving)} after ${detour.toFixed(1)} min detour.`;
   }
-  return `Not worth detour: net ${formatMoney(saving)} after ${detour.toFixed(1)} min.`;
+  return `Probably not worth it: saves ${formatMoney(saving)} after ${detour.toFixed(1)} min.`;
 }
 
 export function routeOutcomeLabel(item: StationViewModel) {
-  if ((item.netSaving || 0) >= 4) return "Best value";
-  if ((item.netSaving || 0) >= 1) return "Worth checking";
-  return "Not worth detour";
+  const saving = Number(item.netSaving || 0);
+  if (saving < 2) return "Small savings detour";
+  if (saving < 5) return "Medium savings detour";
+  if (saving < 10) return "Good savings detour";
+  if (saving < 20) return "Great savings detour";
+  return "Strong savings detour";
 }
 
 export function predictionDisciplineCue(item: StationViewModel) {
@@ -214,7 +229,7 @@ export function alertGateSummary(notificationPermission: NotificationPermissionS
 
 export function commuteAlertRuleLine(commute: SavedCommute) {
   if (!commute.alertEnabled) return "No alert checks while this route is off.";
-  const routeRule = `Checks from ${commute.tankThresholdPercent}% tank, $${commute.minSavingDollars}+ saving and ${commute.maxDetourMinutes} min max detour.`;
+  const routeRule = "Checks route value with smart detour rules and fresh price data.";
   if (commute.alertStatus === "backend_synced") {
     return `${routeRule} Backend also checks freshness, duplicate cooldown and one alert per run.`;
   }

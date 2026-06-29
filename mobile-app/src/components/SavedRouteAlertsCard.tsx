@@ -4,10 +4,6 @@ import { colors, radii, shadow, spacing, surfaces, typeScale, typography } from 
 import { NotificationPermissionState, SavedCommute } from "../types";
 import { alertGateSummary, commuteAlertRuleLine } from "../utils/decisionEvidence";
 
-const MIN_SAVING_OPTIONS = [3, 5, 8, 12];
-const MAX_DETOUR_OPTIONS = [3, 5, 8, 12];
-const TANK_THRESHOLD_OPTIONS = [25, 45, 65, 80];
-
 export function SavedRouteAlertsCard({
   alertSyncingCommuteId,
   notificationMessage,
@@ -16,7 +12,6 @@ export function SavedRouteAlertsCard({
   onRemoveCommute,
   onRequestNotifications,
   onToggleCommuteAlert,
-  onUpdateCommuteAlertRule,
 }: {
   alertSyncingCommuteId: string | null;
   notificationMessage: string;
@@ -25,11 +20,6 @@ export function SavedRouteAlertsCard({
   onRemoveCommute: (commuteId: string) => void;
   onRequestNotifications: () => void;
   onToggleCommuteAlert: (commuteId: string) => void;
-  onUpdateCommuteAlertRule: (
-    commuteId: string,
-    key: "minSavingDollars" | "maxDetourMinutes" | "tankThresholdPercent",
-    value: number,
-  ) => void;
 }) {
   const notificationsReady = notificationPermission === "granted";
   const notificationButtonLabel = notificationsReady
@@ -118,38 +108,6 @@ export function SavedRouteAlertsCard({
               >
                 <Text style={styles.alertRemoveButtonText}>Remove</Text>
               </Pressable>
-              <View style={styles.routeRulePanel}>
-                <RouteAlertRuleSelector
-                  commuteId={commute.id}
-                  disabled={alertSyncingCommuteId === commute.id}
-                  label="Saving"
-                  options={MIN_SAVING_OPTIONS}
-                  renderValue={(value) => `$${value}`}
-                  ruleKey="minSavingDollars"
-                  selected={commute.minSavingDollars}
-                  onSelect={onUpdateCommuteAlertRule}
-                />
-                <RouteAlertRuleSelector
-                  commuteId={commute.id}
-                  disabled={alertSyncingCommuteId === commute.id}
-                  label="Detour"
-                  options={MAX_DETOUR_OPTIONS}
-                  renderValue={(value) => `${value} min`}
-                  ruleKey="maxDetourMinutes"
-                  selected={commute.maxDetourMinutes}
-                  onSelect={onUpdateCommuteAlertRule}
-                />
-                <RouteAlertRuleSelector
-                  commuteId={commute.id}
-                  disabled={alertSyncingCommuteId === commute.id}
-                  label="Tank"
-                  options={TANK_THRESHOLD_OPTIONS}
-                  renderValue={(value) => `${value}%`}
-                  ruleKey="tankThresholdPercent"
-                  selected={commute.tankThresholdPercent}
-                  onSelect={onUpdateCommuteAlertRule}
-                />
-              </View>
             </View>
           ))}
         </View>
@@ -160,60 +118,6 @@ export function SavedRouteAlertsCard({
           </Text>
         </View>
       )}
-    </View>
-  );
-}
-
-function RouteAlertRuleSelector({
-  commuteId,
-  disabled,
-  label,
-  onSelect,
-  options,
-  renderValue,
-  ruleKey,
-  selected,
-}: {
-  commuteId: string;
-  disabled: boolean;
-  label: string;
-  onSelect: (
-    commuteId: string,
-    key: "minSavingDollars" | "maxDetourMinutes" | "tankThresholdPercent",
-    value: number,
-  ) => void;
-  options: number[];
-  renderValue: (value: number) => string;
-  ruleKey: "minSavingDollars" | "maxDetourMinutes" | "tankThresholdPercent";
-  selected: number;
-}) {
-  return (
-    <View style={styles.routeRuleGroup}>
-      <Text style={styles.routeRuleLabel}>{label}</Text>
-      <View style={styles.routeRuleOptions}>
-        {options.map((value) => {
-          const active = value === selected;
-          return (
-            <Pressable
-              accessibilityLabel={`${label} alert rule ${renderValue(value)}`}
-              accessibilityRole="button"
-              accessibilityState={{ disabled, selected: active }}
-              disabled={disabled}
-              key={`${commuteId}:${ruleKey}:${value}`}
-              onPress={() => onSelect(commuteId, ruleKey, value)}
-              style={[
-                styles.routeRuleOption,
-                active && styles.routeRuleOptionSelected,
-                disabled && styles.routeRuleOptionDisabled,
-              ]}
-            >
-              <Text style={[styles.routeRuleOptionText, active && styles.routeRuleOptionTextSelected]}>
-                {renderValue(value)}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
     </View>
   );
 }
@@ -371,54 +275,6 @@ const styles = StyleSheet.create({
     color: colors.red,
     fontSize: typeScale.caption,
     fontWeight: "600",
-  },
-  routeRulePanel: {
-    borderTopColor: colors.line,
-    borderTopWidth: 1,
-    flexBasis: "100%",
-    gap: spacing.sm,
-    paddingTop: spacing.sm,
-  },
-  routeRuleGroup: {
-    gap: spacing.xs,
-  },
-  routeRuleLabel: {
-    color: colors.ink,
-    fontSize: 10,
-    fontWeight: "700",
-    textTransform: "uppercase",
-  },
-  routeRuleOptions: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing.xs,
-  },
-  routeRuleOption: {
-    alignItems: "center",
-    backgroundColor: colors.white,
-    borderColor: colors.line,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    justifyContent: "center",
-    minHeight: 32,
-    minWidth: 58,
-    paddingHorizontal: spacing.sm,
-  },
-  routeRuleOptionSelected: {
-    backgroundColor: colors.greenSoft,
-    borderColor: colors.green,
-  },
-  routeRuleOptionDisabled: {
-    opacity: 0.65,
-  },
-  routeRuleOptionText: {
-    color: colors.muted,
-    fontSize: 11,
-    fontWeight: "600",
-  },
-  routeRuleOptionTextSelected: {
-    color: colors.greenDark,
-    fontWeight: "700",
   },
   emptyAlert: {
     ...surfaces.softPanel,

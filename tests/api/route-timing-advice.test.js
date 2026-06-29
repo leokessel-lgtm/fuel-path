@@ -3,7 +3,7 @@ const test = require("node:test");
 
 const { scoreRoute } = require("../../api/_backend");
 
-test("route timing advice promotes fill today when route value is strong and on-route", () => {
+test("route timing advice uses simple savings-detour labels when route value is strong and on-route", () => {
   const scored = scoreRoute({
     source: "sample",
     route: routeFixture(),
@@ -25,12 +25,12 @@ test("route timing advice promotes fill today when route value is strong and on-
 
   assert.equal(scored.context.timingAdvice.action, "fill_today_on_route");
   assert.equal(scored.context.timingAdvice.visible, true);
-  assert.equal(scored.context.timingAdvice.label, "Fill today on this route");
-  assert.match(scored.context.timingAdvice.reason, /Metro Sylvania/);
+  assert.equal(scored.context.timingAdvice.label, "Great savings detour");
+  assert.match(scored.context.timingAdvice.reason, /on the route and saves/);
   assert.equal(scored.context.decisionSummary.action, "fill_on_route");
   assert.equal(scored.context.decisionSummary.stationName, "Metro Sylvania");
-  assert.equal(scored.context.decisionSummary.decisionRule.minSavingDollars, 5);
-  assert.equal(scored.context.decisionSummary.decisionRule.maxDetourMinutes, 8);
+  assert.equal(scored.context.decisionSummary.decisionRule.minSavingDollars, 1.5);
+  assert.equal(scored.context.decisionSummary.decisionRule.maxDetourMinutes, 30);
   assert.equal(scored.context.decisionSummary.economics.netSavingAfterDetourFuel, scored.candidates[0].netSaving);
   assert.equal(scored.context.decisionSummary.economics.detourFuelLitres, scored.candidates[0].detourFuelLitres);
   assert.equal(scored.context.decisionSummary.economics.detourCost, scored.candidates[0].detourCost);
@@ -39,7 +39,7 @@ test("route timing advice promotes fill today when route value is strong and on-
     scored.context.decisionSummary.economics.netSavingAfterDetourFuelAndTime,
     scored.candidates[0].netAfterDetourAndTimeCost,
   );
-  assert.equal(scored.context.decisionSummary.economics.timeCostDollarsPerMinute, 0.08);
+  assert.equal(scored.context.decisionSummary.economics.timeCostDollarsPerMinute, 0.15);
   assert.equal(scored.context.decisionSummary.alternatives.length, 4);
   assert.deepEqual(
     scored.context.decisionSummary.alternatives.map((item) => item.kind),
@@ -58,7 +58,7 @@ test("route timing advice promotes fill today when route value is strong and on-
   assert.equal("lon" in scored.candidates[0].station.provenance, false);
 });
 
-test("route timing advice explains detour when fill value is still worth checking", () => {
+test("route timing advice uses simple savings-detour labels when fill value is still worth checking", () => {
   const scored = scoreRoute({
     source: "sample",
     route: routeFixture(),
@@ -80,8 +80,8 @@ test("route timing advice explains detour when fill value is still worth checkin
 
   assert.equal(scored.context.timingAdvice.action, "fill_today_with_detour");
   assert.equal(scored.context.timingAdvice.visible, true);
-  assert.equal(scored.context.timingAdvice.label, "Fill today, but check the detour");
-  assert.match(scored.context.timingAdvice.reason, /after \d+\.\d min detour/);
+  assert.equal(scored.context.timingAdvice.label, "Good savings detour");
+  assert.match(scored.context.timingAdvice.reason, /adds \d+\.\d min and saves/);
   assert.equal(scored.context.decisionSummary.action, "fill_now");
 });
 
@@ -122,7 +122,7 @@ test("route decision summary explains why cheapest is not always the recommendat
   );
 });
 
-test("route timing advice tells the user to skip when route value is below their rule", () => {
+test("route timing advice keeps low route value as a small savings detour", () => {
   const scored = scoreRoute({
     source: "sample",
     route: routeFixture(),
@@ -144,11 +144,11 @@ test("route timing advice tells the user to skip when route value is below their
 
   assert.equal(scored.context.timingAdvice.action, "skip_detour");
   assert.equal(scored.context.timingAdvice.visible, true);
-  assert.equal(scored.context.timingAdvice.label, "Skip for now");
-  assert.match(scored.context.timingAdvice.reason, /below your \$5\.00 rule/);
+  assert.equal(scored.context.timingAdvice.label, "Small savings detour");
+  assert.match(scored.context.timingAdvice.reason, /Probably not worth it/);
   assert.equal(scored.candidates[0].matchesDecisionRule, false);
-  assert.equal(scored.context.minSavingDollars, 5);
-  assert.equal(scored.context.maxDetourMinutes, 8);
+  assert.equal(scored.context.minSavingDollars, 1.5);
+  assert.equal(scored.context.maxDetourMinutes, 30);
 });
 
 test("route timing advice can recommend waiting only on locked official tomorrow prices", () => {
@@ -233,7 +233,7 @@ test("route timing advice does not recommend waiting from demo tomorrow prices",
   assert.equal(scored.candidates[0].station.provenance.futurePriceAvailable, true);
 });
 
-test("route timing advice tells the user range first when every candidate is beyond reserve", () => {
+test("route scoring does not add hidden fuel range rejection without a real range signal", () => {
   const scored = scoreRoute({
     source: "sample",
     route: routeFixture(),
@@ -256,16 +256,14 @@ test("route timing advice tells the user range first when every candidate is bey
   });
 
   assert.equal(scored.candidates.length > 0, true);
-  assert.equal(scored.candidates[0].reachable, false);
-  assert.equal(scored.context.timingAdvice.action, "range_first");
+  assert.equal(scored.candidates[0].reachable, true);
+  assert.equal(scored.context.timingAdvice.action, "fill_today_on_route");
   assert.equal(scored.context.timingAdvice.visible, true);
-  assert.equal(scored.context.timingAdvice.label, "Range-first");
-  assert.match(scored.context.timingAdvice.reason, /range risk/);
-  assert.equal(scored.context.decisionSummary.action, "range_first");
-  assert.equal(scored.context.decisionSummary.alternatives.find((item) => item.kind === "safest")?.note, "Range risk");
+  assert.notEqual(scored.context.decisionSummary.action, "range_first");
+  assert.notEqual(scored.context.decisionSummary.alternatives.find((item) => item.kind === "safest")?.note, "Range risk");
 });
 
-test("route timing advice respects max detour preference before recommending a saving", () => {
+test("route timing advice ignores removed user max-detour preference and uses smart detour rules", () => {
   const scored = scoreRoute({
     source: "sample",
     route: routeFixture(),
@@ -287,13 +285,13 @@ test("route timing advice respects max detour preference before recommending a s
     includeClosed: false,
   });
 
-  assert.equal(scored.context.timingAdvice.action, "skip_detour");
+  assert.equal(scored.context.timingAdvice.action, "fill_today_with_detour");
   assert.equal(scored.context.timingAdvice.visible, true);
-  assert.match(scored.context.timingAdvice.reason, /above your 1 min detour rule/);
-  assert.equal(scored.candidates[0].matchesDecisionRule, false);
+  assert.match(scored.context.timingAdvice.reason, /Suggested detour adds/);
+  assert.equal(scored.candidates[0].matchesDecisionRule, true);
   assert.equal(
     scored.candidates[0].warnings.some((warning) => warning.includes("above 1 min detour rule")),
-    true,
+    false,
   );
 });
 
@@ -360,7 +358,7 @@ test("route scoring does not recommend stations missing the requested fuel grade
   assert.equal(scored.context.stationsInCorridor, 0);
 });
 
-test("route scoring excludes stale non-official sample prices from recommendations", () => {
+test("route scoring keeps stale prices rankable but carries a warning", () => {
   const scored = scoreRoute({
     source: "sample",
     route: routeFixture(),
@@ -383,8 +381,12 @@ test("route scoring excludes stale non-official sample prices from recommendatio
     includeClosed: false,
   });
 
-  assert.equal(scored.context.staleExcludedCandidates, 1);
-  assert.equal(scored.candidates.some((candidate) => candidate.station.stationCode === "stale-cheap"), false);
+  assert.equal(scored.context.staleExcludedCandidates, 0);
+  assert.equal(scored.candidates.some((candidate) => candidate.station.stationCode === "stale-cheap"), true);
+  assert.equal(
+    scored.candidates.find((candidate) => candidate.station.stationCode === "stale-cheap")?.warnings.some((warning) => /price is/i.test(warning)),
+    true,
+  );
   assert.equal(scored.candidates.some((candidate) => candidate.station.stationCode === "fresh-mid"), true);
 });
 

@@ -1,5 +1,5 @@
 import { StatusBar } from "expo-status-bar";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   StatusBar as NativeStatusBar,
   Pressable,
@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 
+import { getApiStatus, EvChargingStatus, FuelProviderStatus } from "./src/api/fuelPathApi";
 import { AccountScreen } from "./src/screens/AccountScreen";
 import { NearbyScreen } from "./src/screens/NearbyScreen";
 import { PlanScreen } from "./src/screens/PlanScreen";
@@ -64,17 +65,23 @@ function TabIcon({ tab, selected }: { tab: TabKey; selected: boolean }) {
 }
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<TabKey>("plan");
+  const [activeTab, setActiveTab] = useState<TabKey>("nearby");
+  const [evChargingStatus, setEvChargingStatus] = useState<EvChargingStatus>();
+  const [fuelProviderStatus, setFuelProviderStatus] = useState<FuelProviderStatus>();
   const {
     clearNamedPlace,
     preferences,
     saveNamedPlace,
     toggleDiscount,
     toggleDiscountRedemption,
+    toggleEvConnector,
     toggleFuelPolicy,
     togglePolicyBrand,
     updateDecisionRule,
     updateFuel,
+    updateHomeChargingAccess,
+    updateVehicleProfile,
+    updateVehicleEnergyType,
   } = useAppPreferences();
   const {
     addRecentLocation,
@@ -100,13 +107,28 @@ export default function App() {
     savedCommutes,
     setSavedCommutes,
   });
+  useEffect(() => {
+    let active = true;
+    getApiStatus()
+      .then((status) => {
+        if (active) {
+          setEvChargingStatus(status.evCharging);
+          setFuelProviderStatus(status.fuelProviders);
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const hasVehicle = Boolean(preferences.vehicleName.trim() || preferences.vehicleRego.trim());
   const vehicleInitials = hasVehicle
     ? (preferences.vehicleRego || preferences.vehicleName).trim().slice(0, 2).toUpperCase()
     : "+";
   const vehicleDetail = preferences.vehicleName
-    ? `${preferences.fuel} | ${preferences.vehicleName}`
-    : preferences.fuel;
+    ? `${vehicleEnergyLabel(preferences.vehicleEnergyType)} | ${vehicleProfileShortLabel(preferences)}`
+    : vehicleProfileShortLabel(preferences);
 
   return (
     <SafeAreaProvider>
@@ -164,6 +186,10 @@ export default function App() {
               notificationPermission={notificationPermission}
               alertSyncingCommuteId={alertSyncingCommuteId}
               onFuelChange={updateFuel}
+              onHomeChargingAccessChange={updateHomeChargingAccess}
+              onToggleEvConnector={toggleEvConnector}
+              onVehicleProfileChange={updateVehicleProfile}
+              onVehicleEnergyTypeChange={updateVehicleEnergyType}
               onRequestNotifications={requestNotifications}
               onClearNamedPlace={clearNamedPlace}
               onSaveNamedPlace={saveNamedPlace}
@@ -171,8 +197,6 @@ export default function App() {
               onToggleDiscountRedemption={toggleDiscountRedemption}
               onToggleFuelPolicy={toggleFuelPolicy}
               onTogglePolicyBrand={togglePolicyBrand}
-              onUpdateDecisionRule={updateDecisionRule}
-              onUpdateCommuteAlertRule={updateCommuteAlertRule}
               onToggleCommuteAlert={toggleCommuteAlert}
               onRemoveCommute={removeCommute}
               savedCommutes={savedCommutes}
@@ -204,6 +228,32 @@ export default function App() {
       </SafeAreaView>
     </SafeAreaProvider>
   );
+}
+
+function vehicleEnergyLabel(value: string) {
+  if (value === "electric") return "EV";
+  if (value === "hybrid") return "Hybrid";
+  if (value === "diesel") return "Diesel";
+  return "Fuel";
+}
+
+function vehicleProfileShortLabel(preferences: {
+  evConnectors?: string[];
+  evRangeKm?: number;
+  fuel: string;
+  fuelTankLitres?: number;
+  vehicleEnergyType?: string;
+}) {
+  if (preferences.vehicleEnergyType === "electric") {
+    const connectors = preferences.evConnectors?.length ? preferences.evConnectors.join("/") : "Connectors not set";
+    return preferences.evRangeKm ? `${preferences.evRangeKm} km | ${connectors}` : connectors;
+  }
+  if (preferences.vehicleEnergyType === "hybrid") {
+    const ev = preferences.evConnectors?.length ? ` + ${preferences.evConnectors.join("/")}` : "";
+    const range = preferences.evRangeKm ? ` | ${preferences.evRangeKm} km EV` : "";
+    return `${preferences.fuel}${range}${ev}`;
+  }
+  return preferences.fuel;
 }
 
 const styles = StyleSheet.create({

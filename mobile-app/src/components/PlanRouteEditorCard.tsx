@@ -1,8 +1,9 @@
+import { useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { colors, radii, shadow, spacing, surfaces, typeScale, typography } from "../theme";
-import { FuelCode, MapPoint, SavedCommute } from "../types";
-import { FuelSelector } from "./FuelSelector";
+import { EvConnector, FuelCode, MapPoint, SavedCommute, VehicleEnergyType } from "../types";
+import { NearbyEnergyChoice, NearbyEnergySelector } from "./NearbyEvControls";
 import { QuickPlace, QuickPlaceShortcuts } from "./QuickPlaceShortcuts";
 import { AddressSuggestions } from "./RouteAddressSuggestions";
 import { SavedCommuteShortcuts } from "./SavedCommuteShortcuts";
@@ -10,6 +11,7 @@ import { SavedCommuteShortcuts } from "./SavedCommuteShortcuts";
 export function PlanRouteEditorCard({
   activeAddressField,
   canPlanRoute,
+  evConnectors,
   fuel,
   from,
   fromSuggestions,
@@ -31,15 +33,20 @@ export function PlanRouteEditorCard({
   recentLocationsCount,
   routePrecisionHint,
   routeError,
+  routePlanningBlocked,
   savedCommutes,
   showPlanningShortcuts,
   suggestionsError,
   suggestionsLoading,
   to,
   toSuggestions,
+  vehicleEnergyType,
+  vehicleRouteNotice,
+  vehicleSummary,
 }: {
   activeAddressField: "from" | "to" | null;
   canPlanRoute: boolean;
+  evConnectors: EvConnector[];
   fuel: FuelCode;
   from: string;
   fromSuggestions: MapPoint[];
@@ -61,27 +68,40 @@ export function PlanRouteEditorCard({
   recentLocationsCount: number;
   routePrecisionHint: string;
   routeError: string;
+  routePlanningBlocked: boolean;
   savedCommutes: SavedCommute[];
   showPlanningShortcuts: boolean;
   suggestionsError: string;
   suggestionsLoading: "from" | "to" | null;
   to: string;
   toSuggestions: MapPoint[];
+  vehicleEnergyType: VehicleEnergyType;
+  vehicleRouteNotice: string;
+  vehicleSummary: string;
 }) {
+  const showFuelSelector = vehicleEnergyType !== "electric";
+  const [fuelSelectorOpen, setFuelSelectorOpen] = useState(false);
+  const selectedConnectors = evConnectors.length ? evConnectors.join(", ") : "connector not set";
+  const handleEnergyChange = (value: NearbyEnergyChoice) => {
+    setFuelSelectorOpen(false);
+    if (value !== "EV") onFuelChange(value);
+  };
+  const primaryLabel =
+    vehicleEnergyType === "electric"
+      ? loading
+        ? "Checking..."
+        : "Check route range"
+      : loading
+        ? "Planning..."
+        : "Plan route";
+
   return (
     <View style={styles.searchCard}>
       <Text style={styles.eyebrow}>Plan trip</Text>
-      {showPlanningShortcuts ? (
-        <SavedCommuteShortcuts savedCommutes={savedCommutes} onSelect={onSelectSavedCommute} />
-      ) : null}
-      {showPlanningShortcuts ? (
-        <QuickPlaceShortcuts
-          places={quickPlaces}
-          onClearRecents={onClearRecentLocations}
-          onRemoveRecent={onRemoveRecentLocation}
-          onSelect={onSelectQuickPlace}
-          showClearRecents={Boolean(recentLocationsCount)}
-        />
+      {vehicleRouteNotice ? (
+        <View style={styles.routeNoticeCard}>
+          <Text style={styles.routeNoticeText}>{vehicleRouteNotice}</Text>
+        </View>
       ) : null}
       <View style={styles.inputRow}>
         <View style={styles.inputShell}>
@@ -142,7 +162,16 @@ export function PlanRouteEditorCard({
           />
         ) : null}
       </View>
-      <FuelSelector value={fuel} onChange={onFuelChange} />
+      {showFuelSelector ? (
+        <NearbyEnergySelector
+          eyebrow="Plan with"
+          includeEv={false}
+          onChange={handleEnergyChange}
+          onToggleOpen={() => setFuelSelectorOpen((current) => !current)}
+          open={fuelSelectorOpen}
+          value={fuel}
+        />
+      ) : null}
       {routePrecisionHint ? (
         <Text style={styles.routePrecisionHint}>{routePrecisionHint}</Text>
       ) : null}
@@ -154,16 +183,14 @@ export function PlanRouteEditorCard({
       <Pressable
         accessibilityLabel="Plan route"
         accessibilityRole="button"
-        disabled={!canPlanRoute || loading}
+        disabled={!canPlanRoute || loading || routePlanningBlocked}
         onPress={onPlanRoute}
         style={[
           styles.primaryButton,
-          (!canPlanRoute || loading) && styles.primaryButtonDisabled,
+          (!canPlanRoute || loading || routePlanningBlocked) && styles.primaryButtonDisabled,
         ]}
       >
-        <Text style={styles.primaryButtonText}>
-          {loading ? "Planning..." : "Plan route"}
-        </Text>
+        <Text style={styles.primaryButtonText}>{routePlanningBlocked ? "Route charging coming soon" : primaryLabel}</Text>
       </Pressable>
     </View>
   );
@@ -180,6 +207,51 @@ const styles = StyleSheet.create({
   eyebrow: {
     ...typography.eyebrow,
     textTransform: "uppercase",
+  },
+  vehicleSummaryCard: {
+    alignItems: "center",
+    backgroundColor: colors.greenSoft,
+    borderColor: colors.green,
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: spacing.sm,
+    justifyContent: "space-between",
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  vehicleSummaryLabel: {
+    color: colors.muted,
+    fontSize: typeScale.micro,
+    fontWeight: "700",
+    textTransform: "uppercase",
+  },
+  vehicleSummaryValue: {
+    color: colors.ink,
+    fontSize: typeScale.caption,
+    fontWeight: "800",
+  },
+  connectorSummary: {
+    color: colors.greenDark,
+    flexShrink: 1,
+    fontSize: typeScale.micro,
+    fontWeight: "800",
+    textAlign: "right",
+    textTransform: "uppercase",
+  },
+  routeNoticeCard: {
+    backgroundColor: colors.panel,
+    borderColor: colors.line,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  routeNoticeText: {
+    color: colors.muted,
+    fontSize: typeScale.caption,
+    fontWeight: "600",
+    lineHeight: 18,
   },
   inputRow: {
     gap: spacing.sm,

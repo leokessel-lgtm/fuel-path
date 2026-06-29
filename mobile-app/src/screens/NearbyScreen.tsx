@@ -1,35 +1,47 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Linking,
-  Platform,
   StyleSheet,
   View,
 } from "react-native";
 
-import { geocodeAddress, getNearbyStations } from "../api/fuelPathApi";
-import { FuelSelector } from "../components/FuelSelector";
+import { geocodeAddress } from "../api/fuelPathApi";
 import { NearbyLocationSearch } from "../components/NearbyLocationSearch";
-import {
-  defaultNearbySortMode,
-  NearbySortMode,
-  NearbyStationSheet,
-} from "../components/NearbyStationSheet";
+import { NearbyCombinedPanel } from "../components/NearbyCombinedPanel";
+import { NearbyFuelPanel } from "../components/NearbyFuelPanel";
+import { NearbySortMode } from "../components/NearbyStationSheet";
 import { StationMap } from "../components/StationMap";
 import { useNearbyLocationSearch } from "../hooks/useNearbyLocationSearch";
+import { useNearbyResults } from "../hooks/useNearbyResults";
 import { getCurrentMapPoint, getGrantedCurrentMapPoint } from "../services/currentLocation";
-import { spacing } from "../theme";
-import { AppPreferences, FuelCode, MapPoint, StationViewModel } from "../types";
-import { sortStations, stationPriceView } from "../utils/pricing";
+import { colors, radii, shadow, spacing, surfaces, typeScale, typography } from "../theme";
+import { AppPreferences, EvCharger, EvConnector, EvPowerMode, FuelCode, MapPoint, NearbySheetSnap, StationViewModel } from "../types";
+import {
+  EvChargerPanel,
+  NearbyEnergyChoice,
+  NearbyEnergySelector,
+  NearbyMode,
+} from "../components/NearbyEvControls";
+import { sortStations } from "../utils/pricing";
+import {
+  combinedNearbyNotice,
+  distanceKm,
+  openDirections,
+  preferredNearbyMode,
+  sameStationCodes,
+  shortLocationLabel,
+  toggleConnectorFilter,
+} from "./NearbyScreen.utils";
 
 const defaultNearbyCentre: MapPoint = {
-  lat: -34.0114122,
-  lon: 151.0993847,
-  label: "66B Easton Ave, Sylvania NSW 2224",
+  lat: -31.9523123,
+  lon: 115.861309,
+  label: "Perth CBD WA 6000",
 };
 const defaultNearbyRadiusKm = 8;
 const minMapSearchRadiusKm = 10;
 const emptyMapRetryRadiusKm = 32;
 const maxMapSearchRadiusKm = 90;
+const nearbyCameraInsets = { top: 170, right: 18, bottom: 330, left: 18 };
 
 type MapSearchArea = {
   centre: MapPoint;
@@ -43,7 +55,6 @@ export function NearbyScreen({
   preferences: AppPreferences;
   onFuelChange: (fuel: FuelCode) => void;
 }) {
-  const [stations, setStations] = useState<StationViewModel[]>([]);
   const [centre, setCentre] = useState<MapPoint>(defaultNearbyCentre);
   const [currentLocation, setCurrentLocation] = useState<MapPoint>();
   const [nearbyRadiusKm, setNearbyRadiusKm] = useState(defaultNearbyRadiusKm);
@@ -51,17 +62,48 @@ export function NearbyScreen({
   const [selectedCode, setSelectedCode] = useState<string>();
   const [selectionDismissed, setSelectionDismissed] = useState(false);
   const [visibleStationCodes, setVisibleStationCodes] = useState<string[]>([]);
-  const [sortMode, setSortMode] = useState<NearbySortMode | undefined>(defaultNearbySortMode);
-  const [sheetExpanded, setSheetExpanded] = useState(false);
+  const [sortMode, setSortMode] = useState<NearbySortMode | undefined>(undefined);
+  const [sheetSnap, setSheetSnap] = useState<NearbySheetSnap>("browse");
   const previousSortMode = useRef<NearbySortMode | undefined>(sortMode);
-  const [loading, setLoading] = useState(true);
   const [resolvingLocation, setResolvingLocation] = useState(false);
-  const [error, setError] = useState("");
-  const [stationNotice, setStationNotice] = useState("");
+  const [nearbyMode, setNearbyMode] = useState<NearbyMode>(() => preferredNearbyMode(preferences));
+  const [evConnectors, setEvConnectors] = useState<EvConnector[]>(preferences.evConnectors || []);
+  const [evPowerMode, setEvPowerMode] = useState<EvPowerMode>("");
+  const [energySelectorOpen, setEnergySelectorOpen] = useState(false);
+  const sheetExpanded = sheetSnap === "full";
+  const setSheetExpanded = (expanded: boolean) => {
+    setSheetSnap(expanded ? "full" : "browse");
+  };
+  const setNearbyModeAndBrowse = (mode: NearbyMode) => {
+    setNearbyMode(mode);
+    setSheetSnap("browse");
+  };
+  const selectedEnergy: NearbyEnergyChoice = nearbyMode === "ev" ? "EV" : preferences.fuel;
+  const changeSelectedEnergy = (value: NearbyEnergyChoice) => {
+    setEnergySelectorOpen(false);
+    setSelectedCode(undefined);
+    setSelectionDismissed(false);
+    setSheetSnap("browse");
+    if (value === "EV") {
+      setNearbyMode("ev");
+      return;
+    }
+    onFuelChange(value);
+    setNearbyMode("fuel");
+    setSortMode(undefined);
+  };
   const locationSearchContext = useMemo(
     () => ({ near: centre, nearRadiusKm: Math.max(nearbyRadiusKm, minMapSearchRadiusKm) }),
     [centre, nearbyRadiusKm],
   );
+  const { chargers, error, evNotice, loading, stationNotice, stations } = useNearbyResults({
+    centre,
+    evConnectors,
+    evPowerMode,
+    nearbyMode,
+    nearbyRadiusKm,
+    preferences,
+  });
   const {
     addRecentLocation,
     clearLocationSearch,
@@ -78,74 +120,6 @@ export function NearbyScreen({
     updateLocationQuery,
   } = useNearbyLocationSearch(locationSearchContext);
 
-  useEffect(() => {
-    let active = true;
-    getGrantedCurrentMapPoint()
-      .then((nextCentre) => {
-        if (active) {
-          setCurrentLocation(nextCentre);
-          setCentre(nextCentre);
-          setCameraFocusVersion((current) => current + 1);
-        }
-      })
-      .catch(() => undefined);
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    let active = true;
-    setLoading(true);
-    setError("");
-    setStationNotice("");
-    async function loadStations() {
-      const response = await getNearbyStations({
-        fuel: preferences.fuel,
-        centre,
-        radiusKm: nearbyRadiusKm,
-        limit: stationLimitForRadius(nearbyRadiusKm),
-      });
-      let notice = stationContextNotice(response.context);
-      let priced = response.stations
-        .map((station) => stationPriceView(station, preferences.fuel, preferences))
-        .filter((item): item is StationViewModel => Boolean(item));
-      if (!priced.length && nearbyRadiusKm < emptyMapRetryRadiusKm) {
-        const retryResponse = await getNearbyStations({
-          fuel: preferences.fuel,
-          centre,
-          radiusKm: emptyMapRetryRadiusKm,
-          limit: stationLimitForRadius(emptyMapRetryRadiusKm),
-        });
-        notice = stationContextNotice(retryResponse.context) || notice;
-        priced = retryResponse.stations
-          .map((station) => stationPriceView(station, preferences.fuel, preferences))
-          .filter((item): item is StationViewModel => Boolean(item));
-      }
-      if (!priced.length && !notice) {
-        notice = `No ${preferences.fuel} prices found around ${centre.label}.`;
-      }
-      return { notice, priced };
-    }
-
-    loadStations()
-      .then(({ notice, priced }) => {
-        if (!active) return;
-        setStations(priced);
-        setStationNotice(notice);
-        setSelectedCode(undefined);
-        setSelectionDismissed(false);
-      })
-      .catch((err: Error) => {
-        if (active) setError(err.message);
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, [centre, nearbyRadiusKm, preferences]);
 
   const applyLocationSearch = async () => {
     const query = locationQuery.trim();
@@ -166,8 +140,8 @@ export function NearbyScreen({
       addRecentLocation(nextCentre);
       clearLocationSearch();
       resetAddressSessionToken();
-      setSheetExpanded(false);
-      setSortMode(defaultNearbySortMode);
+      setSheetSnap("browse");
+      setSortMode(undefined);
     } catch (err) {
       setLocationError(err instanceof Error ? err.message : "Could not find that location");
     } finally {
@@ -187,8 +161,8 @@ export function NearbyScreen({
       setLocationQuery("");
       clearLocationSearch();
       resetAddressSessionToken();
-      setSheetExpanded(false);
-      setSortMode(defaultNearbySortMode);
+      setSheetSnap("browse");
+      setSortMode(undefined);
     } catch (err) {
       setLocationError(err instanceof Error ? err.message : "Current location is not available.");
     } finally {
@@ -196,11 +170,11 @@ export function NearbyScreen({
     }
   };
 
-  const handleViewportStationsChange = useCallback((stationCodes: string[]) => {
+  const handleViewportStationsChange = (stationCodes: string[]) => {
     setVisibleStationCodes((current) =>
       sameStationCodes(current, stationCodes) ? current : stationCodes,
     );
-  }, []);
+  };
 
   const handleMapSearchAreaChange = useCallback((area: MapSearchArea) => {
     const nextRadiusKm = Math.max(
@@ -228,8 +202,8 @@ export function NearbyScreen({
     setCameraFocusVersion((current) => current + 1);
     setLocationQuery(location.label);
     clearLocationSearch();
-    setSheetExpanded(false);
-    setSortMode(defaultNearbySortMode);
+    setSheetSnap("browse");
+    setSortMode(undefined);
   };
 
   const selectLocationSuggestion = (location: MapPoint) => {
@@ -245,8 +219,8 @@ export function NearbyScreen({
     addRecentLocation(nextCentre);
     clearLocationSearch();
     resetAddressSessionToken();
-    setSheetExpanded(false);
-    setSortMode(defaultNearbySortMode);
+    setSheetSnap("browse");
+    setSortMode(undefined);
   };
 
   const visibleStationSet = useMemo(() => new Set(visibleStationCodes), [visibleStationCodes]);
@@ -262,20 +236,12 @@ export function NearbyScreen({
     [listSourceStations, sortMode],
   );
   const selected = stations.find((item) => item.station.stationCode === selectedCode);
+  const selectedCharger = chargers.find((item) => item.id === selectedCode) || chargers[0];
   const selectedPlaceActive = locationQuery.trim().length > 0 && locationQuery.trim() === centre.label;
-  const nearbyCameraInsets = useMemo(
-    () => ({
-      top: 170,
-      right: 18,
-      bottom: 150,
-      left: 18,
-    }),
-    [],
-  );
 
   const handleSortPress = (nextSortMode: NearbySortMode) => {
     setSortMode(nextSortMode);
-    setSheetExpanded(true);
+    setSheetSnap("full");
     setSelectionDismissed(false);
   };
 
@@ -283,7 +249,13 @@ export function NearbyScreen({
     setSelectedCode(stationCode);
     setSortMode(undefined);
     setSelectionDismissed(false);
-    setSheetExpanded(false);
+    setSheetSnap("peek");
+  }, []);
+
+  const handleMapChargerSelect = useCallback((chargerId: string) => {
+    setSelectedCode(chargerId);
+    setSelectionDismissed(false);
+    setSheetSnap("peek");
   }, []);
 
   const handleListStationSelect = useCallback((stationCode: string) => {
@@ -298,24 +270,15 @@ export function NearbyScreen({
 
   const handleNavigateToStation = useCallback(async (item: StationViewModel) => {
     const { station } = item;
-    const label = encodeURIComponent(station.address || station.name);
-    const lat = Number(station.lat);
-    const lon = Number(station.lon);
-    const url =
-      Platform.OS === "ios"
-        ? `http://maps.apple.com/?daddr=${lat},${lon}&q=${label}`
-        : Platform.OS === "android"
-          ? `geo:0,0?q=${lat},${lon}(${label})`
-          : `https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}&travelmode=driving`;
-
     try {
-      await Linking.openURL(url);
+      await openDirections(station.lat, station.lon, station.address || station.name);
     } catch {
       setLocationError("Could not open maps for this station.");
     }
   }, []);
 
   useEffect(() => {
+    if (nearbyMode !== "fuel") return;
     if (!sortedStations.length) {
       setSelectedCode(undefined);
       return;
@@ -327,21 +290,20 @@ export function NearbyScreen({
       return;
     }
     if (selectionDismissed && !selectedCode) return;
-    const sortChanged = previousSortMode.current !== sortMode;
     previousSortMode.current = sortMode;
-    if (sortChanged || !selectedCode || !selectedExists) {
-      setSelectedCode(sortedStations[0].station.stationCode);
-    }
-  }, [selectedCode, selectionDismissed, sortMode, sortedStations, stations]);
+  }, [nearbyMode, selectedCode, selectionDismissed, sortMode, sortedStations, stations]);
 
   return (
     <View style={styles.screen}>
       <View style={styles.mapLayer}>
         <StationMap
           centre={centre}
-          stations={stations}
+          chargers={nearbyMode === "fuel" ? [] : chargers}
+          stations={nearbyMode === "ev" ? [] : stations}
+          selectedChargerId={nearbyMode === "fuel" ? undefined : selectedCode}
           selectedStationCode={selectedCode}
           onSelect={handleMapStationSelect}
+          onSelectCharger={handleMapChargerSelect}
           onViewportStationsChange={handleViewportStationsChange}
           onMapSearchAreaChange={handleMapSearchAreaChange}
           cameraFocusKey={`nearby-${cameraFocusVersion}`}
@@ -366,85 +328,89 @@ export function NearbyScreen({
           resolvingLocation={resolvingLocation}
           suggestionsLoading={suggestionsLoading}
         />
-        <FuelSelector value={preferences.fuel} onChange={onFuelChange} />
+        <NearbyEnergySelector
+          onChange={changeSelectedEnergy}
+          onToggleOpen={() => setEnergySelectorOpen((current) => !current)}
+          open={energySelectorOpen}
+          value={selectedEnergy}
+        />
       </View>
 
-      <NearbyStationSheet
-        error={error}
-        loading={loading}
-        onCloseSelectedStation={handleCloseSelectedStation}
-        onNavigateToStation={handleNavigateToStation}
-        onSelectStation={handleListStationSelect}
-        onSortPress={handleSortPress}
-        onToggleExpanded={setSheetExpanded}
-        selected={selected}
-        selectedCode={selectedCode}
-        sheetExpanded={sheetExpanded}
-        sortedStations={sortedStations}
-        sortMode={sortMode}
-        stationNotice={stationNotice}
-        stations={stations}
-      />
+      {nearbyMode === "fuel" ? (
+        <NearbyFuelPanel
+          error={error}
+          loading={loading}
+          onCloseSelectedStation={handleCloseSelectedStation}
+          onNavigateToStation={handleNavigateToStation}
+          onSelectStation={handleListStationSelect}
+          onSortPress={handleSortPress}
+          onSnapChange={setSheetSnap}
+          onToggleExpanded={setSheetExpanded}
+          selected={selected}
+          selectedCode={selectedCode}
+          sheetSnap={sheetSnap}
+          sheetExpanded={sheetExpanded}
+          sortedStations={sortedStations}
+          sortMode={sortMode}
+          stationNotice={stationNotice}
+          stations={stations}
+        />
+      ) : nearbyMode === "both" ? (
+        <NearbyCombinedPanel
+          chargers={chargers}
+          connectors={evConnectors}
+          error={error}
+          evNotice={evNotice}
+          loading={loading}
+          mode={nearbyMode}
+          onCloseSelection={handleCloseSelectedStation}
+          onExpandSearch={() => setNearbyRadiusKm((current) => Math.min(maxMapSearchRadiusKm, Math.max(current * 2, emptyMapRetryRadiusKm)))}
+          onFuelChange={onFuelChange}
+          onModeChange={setNearbyModeAndBrowse}
+          onNavigateToCharger={(charger) => openDirections(charger.lat, charger.lon, charger.name)}
+          onPowerModeChange={setEvPowerMode}
+          onSelectCharger={handleMapChargerSelect}
+          onSelectStation={handleListStationSelect}
+          onToggleConnector={(connector) => setEvConnectors((current) => toggleConnectorFilter(current, connector))}
+          onToggleExpanded={setSheetExpanded}
+          onSnapChange={setSheetSnap}
+          powerMode={evPowerMode}
+          preferences={preferences}
+          selectedCharger={selectedCharger}
+          selectedCode={selectedCode}
+          selectedStation={selected}
+          sheetSnap={sheetSnap}
+          sheetExpanded={sheetExpanded}
+          sortedStations={sortedStations}
+          stationNotice={combinedNearbyNotice(stationNotice, evNotice, chargers.length)}
+        />
+      ) : (
+        <EvChargerPanel
+          chargers={chargers}
+          connectors={evConnectors}
+          error={error}
+          loading={loading}
+          notice={evNotice}
+          onClearConnectorFilters={() => setEvConnectors([])}
+          onClearPowerMode={() => setEvPowerMode("")}
+          onCloseSelectedCharger={handleCloseSelectedStation}
+          onExpandSearch={() => setNearbyRadiusKm((current) => Math.min(maxMapSearchRadiusKm, Math.max(current * 2, emptyMapRetryRadiusKm)))}
+          onNavigate={(charger) => openDirections(charger.lat, charger.lon)}
+          onSelectCharger={handleMapChargerSelect}
+          onToggleExpanded={setSheetExpanded}
+          onSnapChange={setSheetSnap}
+          selectedCharger={selectedCharger}
+          selectedChargerId={selectedCode}
+          sheetSnap={sheetSnap}
+          sheetExpanded={sheetExpanded}
+          onPowerModeChange={setEvPowerMode}
+          onToggleConnector={(connector) => setEvConnectors((current) => toggleConnectorFilter(current, connector))}
+          powerMode={evPowerMode}
+          chargingPreference={preferences.evChargingPreference}
+        />
+      )}
     </View>
   );
-}
-
-function sameStationCodes(left: string[], right: string[]) {
-  if (left.length !== right.length) return false;
-  for (let index = 0; index < left.length; index += 1) {
-    if (left[index] !== right[index]) return false;
-  }
-  return true;
-}
-
-function distanceKm(left: MapPoint, right: MapPoint) {
-  const radiusKm = 6371;
-  const dLat = toRad(right.lat - left.lat);
-  const dLon = toRad(right.lon - left.lon);
-  const lat1 = toRad(left.lat);
-  const lat2 = toRad(right.lat);
-  const hav =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
-  return 2 * radiusKm * Math.asin(Math.sqrt(hav));
-}
-
-function toRad(value: number) {
-  return (value * Math.PI) / 180;
-}
-
-function stationLimitForRadius(radiusKm: number) {
-  if (radiusKm >= 60) return 420;
-  if (radiusKm >= 35) return 320;
-  if (radiusKm >= 20) return 240;
-  return 160;
-}
-
-function shortLocationLabel(query: string, resolvedLabel: string) {
-  if (query.length <= 42) return query;
-  return resolvedLabel.split(",").slice(0, 3).join(",").trim() || query;
-}
-
-function stationContextNotice(context: {
-  warning?: string;
-  capability?: string;
-  regionCapabilities?: Array<{ region: string; capability: string; blocker?: string }>;
-}) {
-  if (context.warning) return context.warning;
-  const limited = context.regionCapabilities?.find((item) =>
-    ["limited", "pending_access", "fallback", "unsupported"].includes(item.capability),
-  );
-  if (!limited) return "";
-  if (limited.capability === "pending_access") {
-    return `${limited.region} live prices are not enabled yet. ${limited.blocker || ""}`.trim();
-  }
-  if (limited.capability === "limited") {
-    return `${limited.region} live coverage is limited. Confirm freshness before driving.`;
-  }
-  if (limited.capability === "fallback") {
-    return `Using fallback data for ${limited.region}. Do not treat it as a live price recommendation.`;
-  }
-  return "No live fuel provider covers this area yet.";
 }
 
 const styles = StyleSheet.create({
@@ -452,8 +418,7 @@ const styles = StyleSheet.create({
     flex: 1,
     overflow: "hidden",
   },
-  mapLayer: {
-    bottom: 0,
+  mapLayer: { bottom: 0,
     left: 0,
     position: "absolute",
     right: 0,
@@ -465,6 +430,6 @@ const styles = StyleSheet.create({
     position: "absolute",
     right: spacing.md,
     top: spacing.md,
-    zIndex: 5,
+    zIndex: 20,
   },
 });

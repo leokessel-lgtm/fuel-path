@@ -6,11 +6,7 @@ import {
   View,
 } from "react-native";
 
-import { geocodeAddress, getRoute, scoreRoute } from "../api/fuelPathApi";
-import {
-  cheapestTradeOffExplanation,
-  routeDecisionAlternatives,
-} from "../components/DecisionEvidencePanel";
+import { geocodeAddress, getRoute, getRouteEvFallbackChargers, scoreRoute } from "../api/fuelPathApi";
 import { PlanRouteEditorCard } from "../components/PlanRouteEditorCard";
 import { PlanRouteSheet } from "../components/PlanRouteSheet";
 import { QuickPlace } from "../components/QuickPlaceShortcuts";
@@ -21,17 +17,30 @@ import { getCurrentMapPoint } from "../services/currentLocation";
 import { colors, radii, shadow, spacing, surfaces, typeScale, typography } from "../theme";
 import {
   AppPreferences,
+  EvCharger,
   FuelCode,
   MapPoint,
   SavedCommute,
-  ScoreCandidate,
   ScoreResponse,
   StationViewModel,
-  RouteTimingAdvice,
 } from "../types";
 import { eligibleDiscountIds } from "../utils/discountRedemptions";
-import { stationPriceView } from "../utils/pricing";
 import { routeCameraInsets as resolveRouteCameraInsets } from "../utils/routeCameraInsets";
+import {
+  commuteName,
+  displayLocationLabel,
+  routeCandidateToStation,
+  routeContextNotice,
+  routeContextStationToView,
+  routeRecommendationCopy,
+  sameSavedCommuteRoute,
+  shortPointName,
+  uniqueStations,
+  vehiclePlanNotice,
+  vehiclePlanSummary,
+  vehicleRouteCapacityNotice,
+  vehicleRouteRangeNotice,
+} from "./PlanScreen.utils";
 
 type PlanScreenProps = {
   preferences: AppPreferences;
@@ -54,10 +63,15 @@ type LoadRouteOptions = {
 };
 
 const defaultPlanCentre: MapPoint = {
-  lat: -34.0158,
-  lon: 151.1054,
-  label: "Sylvania NSW 2224",
+  lat: -31.9523123,
+  lon: 115.861309,
+  label: "Perth CBD WA 6000",
 };
+
+const emptyRoute = { endpoints: undefined, points: [], distanceKm: null } as { endpoints?: { from: MapPoint; to: MapPoint }; points: MapPoint[]; distanceKm: number | null };
+const emptyEvFallback = { chargers: [], loading: false, error: "" } as { chargers: EvCharger[]; loading: boolean; error: string };
+const evRoutePlanningUnavailable =
+  "EV route charging is not available yet. Use Nearby EV charging for compatible chargers while route charger planning is added.";
 
 export function PlanScreen({
   recentLocations = [],
@@ -75,8 +89,8 @@ export function PlanScreen({
   const [toPoint, setToPoint] = useState<MapPoint>();
   const [result, setResult] = useState<ScoreResponse | null>(null);
   const [routeStarted, setRouteStarted] = useState(false);
-  const [routeEndpoints, setRouteEndpoints] = useState<{ from: MapPoint; to: MapPoint }>();
-  const [routePoints, setRoutePoints] = useState<MapPoint[]>([]);
+  const [routeData, setRouteData] = useState(emptyRoute);
+  const [evFallback, setEvFallback] = useState(emptyEvFallback);
   const [selectedCode, setSelectedCode] = useState<string>();
   const [loading, setLoading] = useState(false);
   const [locatingFrom, setLocatingFrom] = useState(false);
@@ -115,6 +129,9 @@ export function PlanScreen({
   const approvedPolicyBrands = preferences.fuelPolicyEnabled
     ? preferences.approvedPolicyBrands
     : [];
+  const routePlanningBlocked = false;
+  const vehicleSummary = vehiclePlanSummary(preferences);
+  const vehicleRouteNotice = vehiclePlanNotice(preferences.vehicleEnergyType);
 
   const loadRoute = async ({
     collapseOnSuccess = true,
@@ -143,12 +160,12 @@ export function PlanScreen({
       setRouteControlsCollapsed(false);
       return;
     }
-
     const requestId = routeRequestIdRef.current + 1;
     const editVersionAtStart = routeEditVersionRef.current;
     routeRequestIdRef.current = requestId;
     setRouteStarted(true);
     setLoading(true);
+    setEvFallback(emptyEvFallback);
     setError("");
     clearAddressSuggestionError();
     setActiveAddressField(null);
@@ -165,12 +182,50 @@ export function PlanScreen({
           nearRadiusKm: 80,
         }));
       const route = await getRoute(resolvedFromPoint, resolvedToPoint);
+      if (preferences.vehicleEnergyType === "electric") {
+        let fallbackChargers: EvCharger[] = [];
+        let fallbackError = "";
+        setEvFallback((current) => ({ ...current, loading: true, error: "" }));
+        try {
+          const fallbackResponse = await getRouteEvFallbackChargers({
+            connectors: preferences.evConnectors,
+            route,
+          });
+          fallbackChargers = fallbackResponse.chargers;
+        } catch (fallbackErr) {
+          fallbackError = fallbackErr instanceof Error
+            ? fallbackErr.message
+            : "Could not load EV fallback chargers.";
+        } finally {
+          setEvFallback((current) => ({ ...current, loading: false }));
+        }
+        if (
+          requestId !== routeRequestIdRef.current ||
+          editVersionAtStart !== routeEditVersionRef.current
+        ) {
+          return;
+        }
+        setFromPoint(resolvedFromPoint);
+        setToPoint(resolvedToPoint);
+        setFrom(displayLocationLabel(resolvedFromPoint, fromLabel));
+        setTo(displayLocationLabel(resolvedToPoint, toLabel));
+        setRouteData({ endpoints: { from: resolvedFromPoint, to: resolvedToPoint }, points: route.points, distanceKm: route.distanceKm });
+        setEvFallback({ chargers: fallbackChargers, loading: false, error: fallbackError });
+        setResult(null);
+        setSelectedCode(undefined);
+        onAddRecentLocation?.(resolvedFromPoint);
+        onAddRecentLocation?.(resolvedToPoint);
+        setStationPanelOpen(false);
+        setRouteSheetMinimised(false);
+        setRouteControlsCollapsed(collapseOnSuccess);
+        resetAddressSessionToken("from");
+        resetAddressSessionToken("to");
+        return;
+      }
       const score = await scoreRoute({
         approvedPolicyBrands,
         fuel: preferences.fuel,
         eligibleDiscounts: eligiblePreferenceDiscounts,
-        maxDetourMinutes: preferences.maxDetourMinutes,
-        minSavingDollars: preferences.minSavingDollars,
         route,
       });
       if (
@@ -183,8 +238,8 @@ export function PlanScreen({
       setToPoint(resolvedToPoint);
       setFrom(displayLocationLabel(resolvedFromPoint, fromLabel));
       setTo(displayLocationLabel(resolvedToPoint, toLabel));
-      setRouteEndpoints({ from: resolvedFromPoint, to: resolvedToPoint });
-      setRoutePoints(route.points);
+      setRouteData({ endpoints: { from: resolvedFromPoint, to: resolvedToPoint }, points: route.points, distanceKm: route.distanceKm });
+      setEvFallback(emptyEvFallback);
       setResult(score);
       setSelectedCode(score.recommendations[0]?.station.stationCode);
       onAddRecentLocation?.(resolvedFromPoint);
@@ -201,8 +256,8 @@ export function PlanScreen({
       ) {
         return;
       }
-      setRouteEndpoints(undefined);
-      setRoutePoints([]);
+      setRouteData(emptyRoute);
+      setEvFallback(emptyEvFallback);
       setResult(null);
       setRouteControlsCollapsed(false);
       setStationPanelOpen(false);
@@ -218,8 +273,8 @@ export function PlanScreen({
   const markRouteEdited = () => {
     routeEditVersionRef.current += 1;
     setRouteStarted(false);
-    setRouteEndpoints(undefined);
-    setRoutePoints([]);
+    setRouteData(emptyRoute);
+    setEvFallback(emptyEvFallback);
     setResult(null);
     setSelectedCode(undefined);
     setError("");
@@ -319,7 +374,17 @@ export function PlanScreen({
   };
 
   useEffect(() => {
-    if (!routeEndpoints) return;
+    if (!routeData.endpoints) return;
+    if (routePlanningBlocked) {
+      setResult(null);
+      setRouteData((current) => ({ ...current, points: [] }));
+      setSelectedCode(undefined);
+      setStationPanelOpen(false);
+      setRouteSheetMinimised(false);
+      setRouteControlsCollapsed(false);
+      setError(evRoutePlanningUnavailable);
+      return;
+    }
     loadRoute({ collapseOnSuccess: routeControlsCollapsed });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -327,8 +392,9 @@ export function PlanScreen({
     approvedPolicyBrands.join("|"),
     preferences.fuelPolicyEnabled,
     preferences.fuel,
-    preferences.maxDetourMinutes,
-    preferences.minSavingDollars,
+    preferences.evConnectors.join("|"),
+    preferences.evRangeKm,
+    preferences.vehicleEnergyType,
   ]);
 
   const routeRecommendations = useMemo(
@@ -350,59 +416,48 @@ export function PlanScreen({
   const best = candidates[0];
   const selected = mapStations.find((item) => item.station.stationCode === selectedCode) || best;
   const backendDecisionSummary = result?.context.decisionSummary;
-  const decisionAlternatives = useMemo(
-    () => routeDecisionAlternatives(candidates, backendDecisionSummary),
-    [backendDecisionSummary, candidates],
-  );
-  const cheapestExplanation = useMemo(
-    () => backendDecisionSummary?.whyNotCheapest || cheapestTradeOffExplanation(candidates),
-    [backendDecisionSummary?.whyNotCheapest, candidates],
-  );
   const routePrecisionHint =
     (!fromPoint && from.trim() ? routeInputPrecisionHint("start", from) : "") ||
     (!toPoint && to.trim() ? routeInputPrecisionHint("destination", to) : "");
-  const canPlanRoute = Boolean((fromPoint || from.trim()) && (toPoint || to.trim()) && !routePrecisionHint);
-  const showPlanningShortcuts = routeStarted;
-  const quickPlaces = useMemo(
-    () =>
-      [
-        preferences.homeLocation
-          ? { key: "home", kind: "home", label: "Home", point: preferences.homeLocation }
-          : null,
-        preferences.workLocation
-          ? { key: "work", kind: "work", label: "Work", point: preferences.workLocation }
-          : null,
-        ...recentLocations.slice(0, 4).map((point, index) => ({
-          key: `recent-${index}-${point.lat}-${point.lon}`,
-          kind: "recent",
-          label: shortPointName(point),
-          point,
-        })),
-      ].filter((item): item is QuickPlace => Boolean(item)),
-    [preferences.homeLocation, preferences.workLocation, recentLocations],
+  const canPlanRoute = Boolean(
+    (fromPoint || from.trim()) &&
+      (toPoint || to.trim()) &&
+      !routePrecisionHint,
   );
+  const showPlanningShortcuts = routeStarted;
+  const quickPlaces = [
+    preferences.homeLocation ? { key: "home", kind: "home", label: "Home", point: preferences.homeLocation } : null,
+    preferences.workLocation ? { key: "work", kind: "work", label: "Work", point: preferences.workLocation } : null,
+    ...recentLocations.slice(0, 4).map((point, index) => ({
+      key: `recent-${index}-${point.lat}-${point.lon}`,
+      kind: "recent",
+      label: shortPointName(point),
+      point,
+    })),
+  ].filter((item): item is QuickPlace => Boolean(item));
   const recommendationCopy = best
     ? routeRecommendationCopy(best, result?.context.timingAdvice)
     : null;
-  const routeNotice = result ? routeContextNotice(result.context) : "";
+  const routeNotice = result
+    ? [routeContextNotice(result.context), vehicleRouteCapacityNotice(preferences, routeData.distanceKm)]
+        .filter(Boolean)
+        .join(" ")
+    : vehicleRouteRangeNotice(preferences, routeData.distanceKm);
   const policyNotice = preferences.fuelPolicyEnabled
     ? `Policy mode active: ${preferences.approvedPolicyBrands.join(", ")} only.`
     : "";
+  const currentRouteEndpoints = routeData.endpoints;
   const currentRouteSaved = Boolean(
-    routeEndpoints &&
+    currentRouteEndpoints &&
       savedCommutes.some((commute) =>
-        sameSavedCommuteRoute(commute, routeEndpoints, preferences.fuel),
+        sameSavedCommuteRoute(commute, currentRouteEndpoints, preferences.fuel),
       ),
   );
-  const routeCameraInsets = useMemo(
-    () =>
-      resolveRouteCameraInsets({
-        routeControlsCollapsed,
-        routeSheetMinimised,
-        stationPanelOpen,
-      }),
-    [routeControlsCollapsed, routeSheetMinimised, stationPanelOpen],
-  );
+  const routeCameraInsets = resolveRouteCameraInsets({
+    routeControlsCollapsed,
+    routeSheetMinimised,
+    stationPanelOpen,
+  });
   const routeSummary = `${from} to ${to}`;
   const handleStationSelect = (stationCode: string) => {
     setSelectedCode(stationCode);
@@ -411,12 +466,12 @@ export function PlanScreen({
   };
 
   const handleSaveCurrentCommute = () => {
-    if (!routeEndpoints) return;
+    if (!routeData.endpoints) return;
     onSaveCommute({
-      from: routeEndpoints.from,
+      from: routeData.endpoints.from,
       fuel: preferences.fuel,
-      name: commuteName(routeEndpoints.from, routeEndpoints.to),
-      to: routeEndpoints.to,
+      name: commuteName(routeData.endpoints.from, routeData.endpoints.to),
+      to: routeData.endpoints.to,
     });
   };
 
@@ -424,19 +479,21 @@ export function PlanScreen({
     <View style={styles.screen}>
       <View style={styles.mapLayer}>
         <StationMap
-          centre={routeEndpoints?.from || fromPoint || defaultPlanCentre}
+          centre={routeData.endpoints?.from || fromPoint || defaultPlanCentre}
           stations={mapStations}
           selectedStationCode={selectedCode}
           onSelect={handleStationSelect}
-          routeEndpoints={routeEndpoints}
-          routePoints={routePoints}
+          routeEndpoints={routeData.endpoints}
+          routePoints={routeData.points}
           cameraInsets={routeCameraInsets}
+          chargers={preferences.vehicleEnergyType === "electric" ? evFallback.chargers : []}
+          selectedChargerId={preferences.vehicleEnergyType === "electric" ? evFallback.chargers[0]?.id : undefined}
           showCentreMarker={Boolean(fromPoint)}
         />
       </View>
 
       <View style={[styles.topControls, !routeStarted && styles.topControlsOnly]}>
-        {routeControlsCollapsed && routeEndpoints && !error ? (
+        {routeControlsCollapsed && routeData.endpoints && !error ? (
           <Pressable
             accessibilityLabel="Edit planned route"
             accessibilityRole="button"
@@ -449,7 +506,7 @@ export function PlanScreen({
                 {routeSummary}
               </Text>
               <Text numberOfLines={1} style={styles.routeSummaryMeta}>
-                {preferences.vehicleName || preferences.vehicleRego || "Vehicle"} | {preferences.fuel}
+                {vehicleSummary}
                 {preferences.fuelPolicyEnabled ? " | Policy" : ""}
               </Text>
             </View>
@@ -459,6 +516,7 @@ export function PlanScreen({
           <PlanRouteEditorCard
             activeAddressField={activeAddressField}
             canPlanRoute={canPlanRoute}
+            evConnectors={preferences.evConnectors}
             fuel={preferences.fuel}
             from={from}
             fromSuggestions={fromSuggestions}
@@ -480,12 +538,16 @@ export function PlanScreen({
             recentLocationsCount={recentLocations.length}
             routePrecisionHint={routePrecisionHint}
             routeError={!routeStarted ? error : ""}
+            routePlanningBlocked={routePlanningBlocked}
             savedCommutes={savedCommutes}
             showPlanningShortcuts={showPlanningShortcuts}
             suggestionsError={suggestionsError}
             suggestionsLoading={suggestionsLoading}
             to={to}
             toSuggestions={toSuggestions}
+            vehicleEnergyType={preferences.vehicleEnergyType}
+            vehicleRouteNotice={vehicleRouteNotice}
+            vehicleSummary={vehicleSummary}
           />
         )}
       </View>
@@ -494,12 +556,15 @@ export function PlanScreen({
         <PlanRouteSheet
           best={best}
           candidates={candidates}
-          cheapestExplanation={cheapestExplanation}
           currentRouteSaved={currentRouteSaved}
-          decisionAlternatives={decisionAlternatives}
           decisionSummary={backendDecisionSummary}
+          emptyRouteTitle={preferences.vehicleEnergyType === "electric" ? "Route range check" : undefined}
+          evFallbackChargers={evFallback.chargers}
+          evFallbackError={evFallback.error}
+          evFallbackLoading={evFallback.loading}
           error={error}
           loading={loading}
+          loadingLabel={preferences.vehicleEnergyType === "electric" ? "Checking route range..." : undefined}
           onMinimise={() => setRouteSheetMinimised(true)}
           onRestore={() => setRouteSheetMinimised(false)}
           onSaveCommute={handleSaveCurrentCommute}
@@ -508,176 +573,20 @@ export function PlanScreen({
           policyActive={preferences.fuelPolicyEnabled}
           policyNotice={policyNotice}
           recommendationCopy={recommendationCopy}
-          routeEndpointsPresent={Boolean(routeEndpoints)}
+          routeEndpointsPresent={Boolean(routeData.endpoints)}
           routeNotice={routeNotice}
           routeSheetMinimised={routeSheetMinimised}
           routeSummary={routeSummary}
           selected={selected}
           selectedCode={selectedCode}
+          showStopsList={false}
           stationPanelOpen={stationPanelOpen}
+          stopsTitle="Suggested fuel stops"
           statusCapability={result?.context.capability}
         />
       ) : null}
     </View>
   );
-}
-
-function routeCandidateToStation(candidate: ScoreCandidate, index: number): StationViewModel {
-  return {
-    station: candidate.station,
-    pumpCpl: Number(candidate.pumpCpl),
-    adjustedCpl: Number(candidate.adjustedCpl),
-    discountCpl: Number(candidate.discountCpl || 0),
-    discountLabel: candidate.discountLabel || candidate.discountLabels?.join(", "),
-    possibleLowerCpl: candidate.possibleLowerCpl,
-    possibleLowerLabel: candidate.possibleLowerLabel,
-    possibleLowerDisclosure: candidate.possibleLowerDisclosure,
-    possibleDiscountCpl: candidate.possibleDiscountCpl,
-    distanceKm: Number(candidate.distanceToRouteKm || candidate.distanceKm || 0),
-    fuel: candidate.fuel,
-    netSaving: Number(candidate.netSaving || 0),
-    detourMinutes: Number(candidate.detourMinutes || 0),
-    detourFuelLitres: Number(candidate.detourFuelLitres || 0),
-    detourCost: Number(candidate.detourCost || 0),
-    timeCost: Number(candidate.timeCost || 0),
-    netAfterDetourAndTimeCost: Number(candidate.netAfterDetourAndTimeCost || 0),
-    rank: index + 1,
-    reachable: candidate.reachable,
-    warnings: candidate.warnings || [],
-    matchesDecisionRule: candidate.matchesDecisionRule,
-  };
-}
-
-function routeContextStationToView(
-  station: ScoreResponse["contextStations"][number],
-  preferences: AppPreferences,
-): StationViewModel | null {
-  const view = stationPriceView(station, preferences.fuel, preferences);
-  if (!view) return null;
-  const contextStation = station as typeof station & {
-    distanceToRouteKm?: number;
-    distanceAlongRouteKm?: number;
-  };
-  return {
-    ...view,
-    distanceKm: Number(contextStation.distanceToRouteKm || view.distanceKm || 0),
-  };
-}
-
-function uniqueStations(stations: StationViewModel[]) {
-  const seen = new Set<string>();
-  return stations.filter((item) => {
-    const code = item.station.stationCode;
-    if (seen.has(code)) return false;
-    seen.add(code);
-    return true;
-  });
-}
-
-function routeRecommendationCopy(
-  best: StationViewModel,
-  timingAdvice?: RouteTimingAdvice,
-) {
-  if (timingAdvice?.visible && usefulTimingAdvice(timingAdvice)) {
-    return {
-      title: timingAdvice.label || timingAdviceLabel(timingAdvice.action),
-      reason: timingAdvice.reason || routeValueReason(best),
-    };
-  }
-
-  const saving = Number(best.netSaving || 0);
-  if (saving >= 1) {
-    return {
-      title: "Best value stop",
-      reason: routeValueReason(best),
-    };
-  }
-  return {
-    title: "Not worth detour",
-    reason: `Best value is ${best.station.name}, but the detour is unlikely to save money.`,
-  };
-}
-
-function usefulTimingAdvice(timingAdvice: RouteTimingAdvice) {
-  return [
-    "fill_today_on_route",
-    "fill_today_with_detour",
-    "wait_if_can",
-    "range_first",
-    "skip_detour",
-  ].includes(timingAdvice.action);
-}
-
-function timingAdviceLabel(action: RouteTimingAdvice["action"]) {
-  if (action === "fill_today_on_route") return "Fill today on this route";
-  if (action === "fill_today_with_detour") return "Fill today, but check the detour";
-  if (action === "wait_if_can") return "Wait if you can";
-  if (action === "range_first") return "Range-first";
-  if (action === "skip_detour") return "Skip this detour";
-  return "";
-}
-
-function routeValueReason(best: StationViewModel) {
-  const saving = Number(best.netSaving || 0);
-  const detourMinutes = Number(best.detourMinutes || 0);
-  if (detourMinutes > 0.05) {
-    return `${best.station.name} saves about ${formatMoney(saving)} after ${detourMinutes.toFixed(1)} min detour.`;
-  }
-  return `${best.station.name} saves about ${formatMoney(saving)} on this route.`;
-}
-function formatMoney(value: number) {
-  const sign = value < 0 ? "-" : "";
-  return `${sign}$${Math.abs(value).toFixed(2)}`;
-}
-
-function routeContextNotice(context: ScoreResponse["context"]) {
-  if (context.warning) return context.warning;
-  const limited = context.regionCapabilities?.find((item) =>
-    ["limited", "pending_access", "fallback", "unsupported"].includes(item.capability),
-  );
-  if (!limited) return "";
-  if (limited.capability === "pending_access") {
-    return `${limited.region} live prices are not enabled yet. ${limited.blocker || ""}`.trim();
-  }
-  if (limited.capability === "limited") {
-    return `${limited.region} live coverage is limited. Confirm freshness before driving.`;
-  }
-  if (limited.capability === "fallback") {
-    return `Using fallback data for ${limited.region}. Do not treat it as a live price recommendation.`;
-  }
-  return "No live fuel provider covers this route yet.";
-}
-
-function displayLocationLabel(point: MapPoint, fallback: string) {
-  const label = point.label || fallback;
-  const parts = label.split(",").map((part) => part.trim()).filter(Boolean);
-  return parts.slice(0, 3).join(", ") || fallback;
-}
-
-function commuteName(from: MapPoint, to: MapPoint) {
-  return `${shortPointName(from)} to ${shortPointName(to)}`;
-}
-
-function shortPointName(point: MapPoint) {
-  return point.label.split(",")[0]?.trim() || point.label;
-}
-
-function sameSavedCommuteRoute(
-  commute: SavedCommute,
-  endpoints: { from: MapPoint; to: MapPoint },
-  fuel: FuelCode,
-) {
-  return (
-    commute.fuel === fuel &&
-    closeCoordinate(commute.from.lat, endpoints.from.lat) &&
-    closeCoordinate(commute.from.lon, endpoints.from.lon) &&
-    closeCoordinate(commute.to.lat, endpoints.to.lat) &&
-    closeCoordinate(commute.to.lon, endpoints.to.lon)
-  );
-}
-
-function closeCoordinate(left: number, right: number) {
-  return Math.abs(left - right) < 0.0002;
 }
 
 const styles = StyleSheet.create({

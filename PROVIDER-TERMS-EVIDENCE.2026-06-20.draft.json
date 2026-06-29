@@ -3,7 +3,8 @@
     "Draft provider terms evidence from the 2026-06-20 readiness loop.",
     "This file intentionally keeps provider readiness false until Fuel Path has provider-specific approval, accepted terms, cache limits, attribution wording and commercial consumer-app use evidence.",
     "Current public source review is recorded in PROVIDER-TERMS-REVIEW-2026-06-20.md, but that review is not equivalent to accepted provider terms.",
-    "Do not use this file to enable public live-price claims."
+    "Do not use this file to enable public live-price claims.",
+    "VIC access was granted by email on 2026-06-25. Leo confirmed Service Victoria Servo Saver Terms and Acceptable Use policy agreement on 2026-06-27. A redacted evidence note records the conservative 5-minute Fuel Path cache policy, CC BY 4.0 attribution wording, non-endorsement disclaimer and commercial consumer-app acceptable-use constraints."
   ],
   "regions": {
     "NSW": {
@@ -55,6 +56,18 @@
       "termsAcceptedAt": "",
       "evidenceReference": "PROVIDER-TERMS-REVIEW-2026-06-20.md FuelCheck TAS source review 2026-06-20",
       "evidenceSource": "PROVIDER-TERMS-REVIEW-2026-06-20.md"
+    },
+    "VIC": {
+      "servoSaverApiAccessApproved": true,
+      "servoSaverTermsAccepted": true,
+      "cachingDurationConfirmed": true,
+      "cachingDurationMinutes": 5,
+      "attributionDisclaimerReady": true,
+      "attributionDisclaimerWording": "Fuel price data from Service Victoria Servo Saver, licensed under CC BY 4.0. Service Victoria does not endorse Fuel Path. Prices may change; confirm before driving.",
+      "commercialConsumerAppUseConfirmed": true,
+      "termsAcceptedAt": "2026-06-27",
+      "evidenceReference": "service-victoria-servo-saver-terms-commercial-attribution-cache-note-2026-06-27",
+      "evidenceSource": "docs/provider-terms/service-victoria-servo-saver-terms-acceptance-2026-06-27.md"
     }
   }
 }

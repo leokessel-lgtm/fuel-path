@@ -1,6 +1,5 @@
 import { ScrollView, StyleSheet } from "react-native";
 
-import { DecisionRuleCard } from "../components/DecisionRuleCard";
 import { DiscountWalletCard } from "../components/DiscountWalletCard";
 import { PolicyModeCard } from "../components/PolicyModeCard";
 import { SavedPlacesCard } from "../components/SavedPlacesCard";
@@ -8,13 +7,7 @@ import { SavedRouteAlertsCard } from "../components/SavedRouteAlertsCard";
 import { VehicleFuelCard } from "../components/VehicleFuelCard";
 import { WeeklyReportCard } from "../components/WeeklyReportCard";
 import { spacing } from "../theme";
-import {
-  AppPreferences,
-  FuelCode,
-  MapPoint,
-  NotificationPermissionState,
-  SavedCommute,
-} from "../types";
+import { AccountScreenProps } from "./AccountScreen.types";
 
 export function AccountScreen({
   alertSyncingCommuteId,
@@ -23,6 +16,10 @@ export function AccountScreen({
   savedCommutes,
   preferences,
   onFuelChange,
+  onHomeChargingAccessChange,
+  onToggleEvConnector,
+  onVehicleProfileChange,
+  onVehicleEnergyTypeChange,
   onClearNamedPlace,
   onRequestNotifications,
   onSaveNamedPlace,
@@ -32,39 +29,16 @@ export function AccountScreen({
   onToggleDiscountRedemption,
   onToggleFuelPolicy,
   onTogglePolicyBrand,
-  onUpdateCommuteAlertRule,
-  onUpdateDecisionRule,
-}: {
-  alertSyncingCommuteId: string | null;
-  notificationMessage: string;
-  notificationPermission: NotificationPermissionState;
-  savedCommutes: SavedCommute[];
-  preferences: AppPreferences;
-  onFuelChange: (fuel: FuelCode) => void;
-  onClearNamedPlace: (kind: "home" | "work") => void;
-  onRequestNotifications: () => void;
-  onSaveNamedPlace: (kind: "home" | "work", point: MapPoint) => void;
-  onRemoveCommute: (commuteId: string) => void;
-  onToggleCommuteAlert: (commuteId: string) => void;
-  onToggleDiscount: (discountId: string) => void;
-  onToggleDiscountRedemption: (discountId: string) => void;
-  onToggleFuelPolicy: () => void;
-  onTogglePolicyBrand: (brand: string) => void;
-  onUpdateCommuteAlertRule: (
-    commuteId: string,
-    key: "minSavingDollars" | "maxDetourMinutes" | "tankThresholdPercent",
-    value: number,
-  ) => void;
-  onUpdateDecisionRule: (key: "minSavingDollars" | "maxDetourMinutes", value: number) => void;
-}) {
+}: AccountScreenProps) {
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <VehicleFuelCard preferences={preferences} onFuelChange={onFuelChange} />
-
-      <DecisionRuleCard
-        maxDetourMinutes={preferences.maxDetourMinutes}
-        minSavingDollars={preferences.minSavingDollars}
-        onUpdateDecisionRule={onUpdateDecisionRule}
+      <VehicleFuelCard
+        preferences={preferences}
+        onFuelChange={onFuelChange}
+        onHomeChargingAccessChange={onHomeChargingAccessChange}
+        onToggleEvConnector={onToggleEvConnector}
+        onVehicleProfileChange={onVehicleProfileChange}
+        onVehicleEnergyTypeChange={onVehicleEnergyTypeChange}
       />
 
       <SavedPlacesCard
@@ -95,7 +69,6 @@ export function AccountScreen({
         onRemoveCommute={onRemoveCommute}
         onRequestNotifications={onRequestNotifications}
         onToggleCommuteAlert={onToggleCommuteAlert}
-        onUpdateCommuteAlertRule={onUpdateCommuteAlertRule}
       />
 
       <WeeklyReportCard preferences={preferences} savedCommutes={savedCommutes} />

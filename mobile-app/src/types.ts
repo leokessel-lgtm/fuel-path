@@ -2,10 +2,29 @@ export type FuelCode = "E10" | "U91" | "P95" | "P98" | "DL" | "PDL";
 
 export type FuelPathTab = "plan" | "nearby" | "account";
 
+export type NearbySheetSnap = "peek" | "browse" | "full";
+
+export type EvConnector = "CCS2" | "CHADEMO" | "TYPE2" | "TESLA" | "NACS";
+
+export type EvPowerMode = "" | "ac" | "dc_fast" | "ultra_fast";
+
+export type VehicleEnergyType = "petrol" | "diesel" | "hybrid" | "electric";
+
+export type HomeChargingAccess = "unknown" | "yes" | "no";
+
+export type EvChargingPreference = "balanced" | "cheap" | "fast" | "reliable" | "nearby";
+
 export type AppPreferences = {
   vehicleName: string;
   vehicleRego: string;
+  vehicleEnergyType: VehicleEnergyType;
   fuel: FuelCode;
+  evConnectors: EvConnector[];
+  fuelTankLitres: number;
+  evBatteryKwh: number;
+  evRangeKm: number;
+  homeChargingAccess: HomeChargingAccess;
+  evChargingPreference: EvChargingPreference;
   minSavingDollars: number;
   maxDetourMinutes: number;
   fuelPolicyEnabled: boolean;
@@ -183,6 +202,8 @@ export type RouteDecisionSummary = {
   whyNotCheapest?: string;
   economics?: {
     baselineCpl?: number;
+    comparisonCpl?: number;
+    comparisonKind?: "next_best_viable" | "none";
     pumpCpl?: number;
     adjustedCpl?: number;
     fillLitres?: number;
@@ -237,6 +258,75 @@ export type NearbyResponse = {
     warning?: string;
   };
   stations: Station[];
+};
+
+export type EvChargerConnection = {
+  connector: string;
+  connectorLabel: string;
+  powerKw?: number;
+  currentType?: string;
+  quantity?: number;
+  status?: string;
+  operational?: boolean;
+};
+
+export type EvCharger = {
+  id: string;
+  name: string;
+  operator: string;
+  address?: string;
+  suburb?: string;
+  lat: number;
+  lon: number;
+  distanceKm: number;
+  distanceAlongRouteKm?: number;
+  routeDetourDistanceKm?: number;
+  routeDistanceKm?: number;
+  routeDetourProvider?: string;
+  routeDetourSource?: "route_engine" | "straight_line_estimate";
+  routeDetourWarning?: string;
+  routeDetourMinutes?: number;
+  detourMinutes?: number;
+  connectors: string[];
+  connections: EvChargerConnection[];
+  maxPowerKw?: number;
+  powerBand: "ac" | "dc_fast" | "ultra_fast" | "unknown";
+  availability: "unknown" | "unavailable";
+  availabilityLabel: string;
+  pricing?: string;
+  updatedAt?: string;
+  source: string;
+  provenance: string;
+};
+
+export type EvChargerResponse = {
+  context: {
+    provider: string;
+    source: string;
+    capability: "prototype" | "pending_commercial_access";
+    radiusKm: number;
+    centre: MapPoint;
+    filters: {
+      connectors: string[];
+      minPowerKw: number;
+      powerMode: EvPowerMode;
+    };
+    chargerCount: number;
+    returnedCount: number;
+    generatedAt: string;
+    cacheHit?: boolean;
+    cacheAgeSeconds?: number;
+    cacheMode?: string;
+    degraded?: boolean;
+    warning?: string;
+    provenance: {
+      source: string;
+      label: string;
+      licence: string;
+      realTimeAvailability: boolean;
+    };
+  };
+  chargers: EvCharger[];
 };
 
 export type ScoreCandidate = StationViewModel & {

@@ -219,9 +219,19 @@ test("complex unit queries produce address-core search needles", () => {
   const needles = addressSearchNeedles(
     "Adina Serviced Apartments Canberra James Court Unit 77 74 Northbourne Ave Braddon ACT",
   ).map((item) => item.needle);
+  const buildingAliasNeedles = addressSearchNeedles("Building 5, 34 South Coast Highway, Karratha WA 6714").map((item) => item.needle);
+  const suiteAliasNeedles = addressSearchNeedles("Suite 2, 22 Paterson Street Tennant Creek NT 0860").map((item) => item.needle);
+  const bldgAliasNeedles = addressSearchNeedles("Bldg 2, 22 Paterson Street Tennant Creek NT 0860").map((item) => item.needle);
+  const blgAliasNeedles = addressSearchNeedles("Blg 2, 12 Hutchison Street Coober Pedy SA 5723").map((item) => item.needle);
+  const steAliasNeedles = addressSearchNeedles("Ste 3, 15 Wonga Street Longreach QLD 4730").map((item) => item.needle);
 
   assert.ok(needles.includes("unit 77 74 northbourne avenue braddon act"));
   assert.ok(needles.includes("74 northbourne avenue braddon act"));
+  assert.ok(buildingAliasNeedles.includes("unit 5 34 south coast highway karratha wa 6714"));
+  assert.ok(suiteAliasNeedles.includes("unit 2 22 paterson street tennant creek nt 0860"));
+  assert.ok(bldgAliasNeedles.includes("unit 2 22 paterson street tennant creek nt 0860"));
+  assert.ok(blgAliasNeedles.includes("unit 2 12 hutchison street coober pedy sa 5723"));
+  assert.ok(steAliasNeedles.includes("unit 3 15 wonga street longreach qld 4730"));
 });
 
 test("large G-NAF SQLite searches skip broad prefixes and drop noisy address tokens", async () => {
@@ -897,9 +907,12 @@ test("lot and range exact labels materialise compact prefix rows", async () => {
 
     const lotSuggestions = await searchAddressIndex("Lot 2 Ca", 3);
     const rangeSuggestions = await searchAddressIndex("112-120 Sp", 3);
+    const spacedRangeSuggestions = await searchAddressIndex("112 - 120 Sp", 3);
     const unitLotSuggestions = await searchAddressIndex("Unit 4 Lot 141 Elleway", 3);
     const prematureUnitRangeSuggestions = await searchAddressIndex("Unit 7 267", 3);
     const unitRangeSuggestions = await searchAddressIndex("Unit 7 267-269", 3);
+    const spacedUnitRangeSuggestionsWithNoHyphen = await searchAddressIndex("Unit 7 267 269", 3);
+    const spacedUnitRangeSuggestions = await searchAddressIndex("Unit 7 267 - 269", 3);
 
     assert.ok(lotPrefixRows.count >= 1);
     assert.ok(rangePrefixRows.count >= 1);
@@ -907,10 +920,13 @@ test("lot and range exact labels materialise compact prefix rows", async () => {
     assert.ok(unitRangePrefixRows.count >= 1);
     assert.equal(lotSuggestions[0].label, "Lot 2, Cassowary Street, Longreach QLD 4730");
     assert.equal(rangeSuggestions[0].label, "112-120 Spoonbill Street, Longreach QLD 4730");
+    assert.equal(spacedRangeSuggestions[0].label, "112-120 Spoonbill Street, Longreach QLD 4730");
     assert.equal(unitLotSuggestions[0].label, "Unit 4, Lot 141, Elleway Drive, Coober Pedy SA 5723");
     assert.equal(unitLotSuggestions[0].refineRequired, false);
     assert.deepEqual(prematureUnitRangeSuggestions, []);
     assert.equal(unitRangeSuggestions[0].label, "Unit 7, 267-269 Esplanade, Cairns North QLD 4870");
+    assert.equal(spacedUnitRangeSuggestionsWithNoHyphen[0].label, "Unit 7, 267-269 Esplanade, Cairns North QLD 4870");
+    assert.equal(spacedUnitRangeSuggestions[0].label, "Unit 7, 267-269 Esplanade, Cairns North QLD 4870");
     assert.equal(unitRangeSuggestions[0].refineRequired, false);
   });
 });

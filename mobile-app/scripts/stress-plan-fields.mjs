@@ -24,6 +24,7 @@ const endpoints = [
   ep("syd-airport", "Sydney Airport NSW", -33.9399, 151.1753, "NSW", "airport", "Sydney Airport, Mascot NSW 2020"),
   ep("sylvania-addr", "66B Easton Avenue Sylvania NSW 2224", -34.0128, 151.1033, "NSW", "address", "66B Easton Avenue, Sylvania NSW 2224"),
   ep("artarmon-typo", "Artamon NSW", -33.8089, 151.1842, "NSW", "typo", "Artarmon NSW 2064"),
+  ep("moree", "Moree NSW", -29.4639, 149.843, "NSW", "remote"),
   ep("canberra", "Canberra ACT", -35.2809, 149.13, "ACT", "capital"),
   ep("canberra-centre", "Canberra Centre ACT", -35.2792, 149.1326, "ACT", "poi"),
   ep("braddon", "Braddon ACT", -35.2705, 149.135, "ACT", "suburb"),
@@ -39,31 +40,46 @@ const endpoints = [
   ep("brisbane", "Brisbane CBD QLD", -27.4698, 153.0251, "QLD", "capital"),
   ep("gold-coast", "Gold Coast QLD", -28.0167, 153.4, "QLD", "regional"),
   ep("sunshine-coast", "Sunshine Coast QLD", -26.65, 153.0667, "QLD", "regional"),
+  ep("longreach", "Longreach QLD", -23.44, 144.25, "QLD", "remote"),
+  ep("longreach-unit", "Unit 3, 15 Wonga Street, Longreach QLD 4730", -23.44, 144.25, "QLD", "unit-address", "3/15 Wonga Street, Longreach QLD 4730"),
+  ep("longreach-unit-2", "Unit 9, 16 Wonga Street, Longreach QLD 4730", -23.44, 144.25, "QLD", "unit-address", "9/16 Wonga Street Longreach QLD 4730"),
   ep("cairns", "Cairns QLD", -16.9203, 145.771, "QLD", "regional"),
   ep("townsville", "Townsville QLD", -19.2589, 146.8169, "QLD", "regional"),
   ep("toowoomba", "Toowoomba QLD", -27.5598, 151.9507, "QLD", "regional"),
+  ep("mount-isa", "Mount Isa QLD", -20.7268, 139.4955, "QLD", "remote"),
   ep("bris-airport", "Brisbane Airport QLD", -27.3942, 153.1218, "QLD", "airport"),
   ep("perth", "Perth CBD WA", -31.9523, 115.8613, "WA", "capital"),
   ep("fremantle", "Fremantle WA", -32.0569, 115.7439, "WA", "regional"),
   ep("bunbury", "Bunbury WA", -33.3271, 115.6414, "WA", "regional"),
   ep("geraldton", "Geraldton WA", -28.7774, 114.6149, "WA", "regional"),
   ep("kalgoorlie", "Kalgoorlie WA", -30.7479, 121.4728, "WA", "regional"),
-  ep("broome", "Broome WA", -17.9644, 122.2304, "WA", "regional"),
+  ep("broome", "Broome WA", -17.9644, 122.2304, "WA", "remote"),
+  ep("broome-remote", "18 Robinson Street, Broome WA 6725", -17.961, 122.236, "WA", "remote"),
+  ep("broome-unit", "Unit 7, 18 Robinson Street, Broome WA 6725", -17.961, 122.236, "WA", "unit-address", "7/18 Robinson Street, Broome WA 6725"),
+  ep("broome-unit-2", "Unit 1, 19 Robinson Street, Broome WA 6725", -17.9608, 122.2351, "WA", "unit-address", "1/19 Robinson Street, Broome WA 6725"),
+  ep("newman", "Newman WA", -23.36, 119.74, "WA", "remote"),
   ep("perth-airport", "Perth Airport WA", -31.9403, 115.9669, "WA", "airport"),
   ep("adelaide", "Adelaide CBD SA", -34.9285, 138.6007, "SA", "capital"),
   ep("mount-gambier", "Mount Gambier SA", -37.8284, 140.7804, "SA", "regional"),
+  ep("coober-unit", "Unit 2, 12 Hutchison Street, Coober Pedy SA 5723", -29.0139, 134.7544, "SA", "unit-address", "2/12 Hutchison Street, Coober Pedy SA 5723"),
+  ep("coober-unit-2", "Unit 4, 24 Hutchison Street, Coober Pedy SA 5723", -29.0141, 134.7539, "SA", "unit-address", "4/24 Hutchison Street, Coober Pedy SA 5723"),
   ep("port-augusta", "Port Augusta SA", -32.4952, 137.7894, "SA", "regional"),
   ep("whyalla", "Whyalla SA", -33.0333, 137.5833, "SA", "regional"),
   ep("coober-pedy", "Coober Pedy SA", -29.0139, 134.7544, "SA", "remote"),
   ep("rundle", "Rundle Mall Adelaide SA", -34.9228, 138.6037, "SA", "poi"),
+  ep("port-lincoln", "Port Lincoln SA", -34.7244, 135.8618, "SA", "remote"),
   ep("hobart", "Hobart CBD TAS", -42.8821, 147.3272, "TAS", "capital"),
   ep("launceston", "Launceston TAS", -41.4332, 147.1441, "TAS", "regional"),
   ep("devonport", "Devonport TAS", -41.1769, 146.3515, "TAS", "regional"),
   ep("burnie", "Burnie TAS", -41.0529, 145.9063, "TAS", "regional"),
   ep("hobart-airport", "Hobart Airport TAS", -42.8361, 147.5103, "TAS", "airport"),
+  ep("strahan", "Strahan TAS", -42.1584, 145.355, "TAS", "remote"),
   ep("darwin", "Darwin CBD NT", -12.4634, 130.8456, "NT", "capital"),
-  ep("alice", "Alice Springs NT", -23.698, 133.8807, "NT", "regional"),
+  ep("alice", "Alice Springs NT", -23.698, 133.8807, "NT", "remote"),
+  ep("alice-remote-unit", "Unit 2, 6 Gunya Place, Alice Springs NT 0870", -23.697, 133.881, "NT", "unit-address", "2/6 Gunya Place, Alice Springs NT 0870"),
+  ep("tennant-remote-unit", "Unit 2, 22 Paterson Street, Tennant Creek NT 0860", -19.649, 134.191, "NT", "unit-address", "2/22 Paterson Street Tennant Creek NT 0860"),
   ep("katherine", "Katherine NT", -14.4652, 132.2635, "NT", "regional"),
+  ep("tennant-unit", "Unit 2, 22 Paterson Street, Tennant Creek NT 0860", -19.648, 134.191, "NT", "unit-address", "2/22 Paterson Street, Tennant Creek NT 0860"),
   ep("palmerston", "Palmerston NT", -12.486, 130.9833, "NT", "regional"),
   ep("darwin-airport", "Darwin Airport NT", -12.4147, 130.8811, "NT", "airport"),
 ];
@@ -142,10 +158,11 @@ if (summary.endpointCoverage !== endpoints.length) {
 }
 
 async function installApiMocks(activePage) {
-  await activePage.route("**/api/geocode?**", async (route) => {
+  await activePage.route("**/api/geocode**", async (route) => {
     apiCalls.push("geocode");
     const url = new URL(route.request().url());
-    const query = normalise(url.searchParams.get("q") || "");
+    const body = requestJson(route.request());
+    const query = normalise(url.searchParams.get("q") || body.q || body.query || body.input || body.address || body.text || "");
     const suggestions = suggestionsForQuery(query);
     await route.fulfill({
       contentType: "application/json",
@@ -191,6 +208,14 @@ async function installApiMocks(activePage) {
   });
 }
 
+function requestJson(request) {
+  try {
+    return request.postDataJSON() || {};
+  } catch {
+    return {};
+  }
+}
+
 async function assertAppReachable(url) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 3000);
@@ -209,6 +234,7 @@ async function assertAppReachable(url) {
 
 async function resetApp() {
   await page.goto(appUrl, { waitUntil: "domcontentloaded" });
+  await page.getByText("Plan", { exact: true }).first().click({ timeout: timeoutMs }).catch(() => {});
   await field("From").waitFor({ state: "visible", timeout: timeoutMs });
   await page.getByText("Plan trip").first().waitFor({ state: "visible", timeout: timeoutMs });
 }
@@ -242,7 +268,7 @@ async function recordCase(name, callback, pair) {
 
 async function selectEndpoint(label, endpoint) {
   await fillField(label, endpoint.query);
-  const suggestion = page.getByRole("button", { name: new RegExp(`Use ${escapeRegExp(endpoint.label)}`, "i") }).first();
+  const suggestion = page.getByText(new RegExp(escapeRegExp(primarySuggestionLabel(endpoint.label)), "i"), { exact: false }).first();
   await suggestion.waitFor({ state: "visible", timeout: timeoutMs });
   await suggestion.click();
 }
@@ -250,13 +276,14 @@ async function selectEndpoint(label, endpoint) {
 async function fillField(label, value) {
   const input = field(label);
   await input.click();
-  await input.fill(value);
+  await input.fill("");
+  await input.pressSequentially(value, { delay: 1 });
 }
 
 async function submitRouteAndAssertResults() {
   await page.getByRole("button", { name: "Plan route" }).click();
-  await page.getByText("Recommendation", { exact: true }).first().waitFor({ state: "visible", timeout: timeoutMs });
-  await page.getByText("Suggested fuel stops", { exact: true }).first().waitFor({ state: "visible", timeout: timeoutMs });
+  await page.getByText("Metro Bexley", { exact: true }).first().waitFor({ state: "visible", timeout: timeoutMs });
+  await page.getByText("Why this stop", { exact: true }).first().waitFor({ state: "visible", timeout: timeoutMs });
 }
 
 async function assertButtonEnabled(name) {
@@ -274,6 +301,8 @@ async function assertButtonEnabled(name) {
 }
 
 function field(label) {
+  if (label === "From") return page.getByPlaceholder(/Start address, suburb or place/i).first();
+  if (label === "To") return page.getByPlaceholder(/Destination address, suburb or place/i).first();
   return page.getByLabel(label, { exact: true });
 }
 
@@ -407,6 +436,14 @@ function normalise(value) {
 
 function escapeRegExp(value) {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function primarySuggestionLabel(label) {
+  return String(label)
+    .split(",")[0]
+    .replace(/\b(NSW|VIC|QLD|WA|SA|TAS|ACT|NT)\b.*$/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function renderReport(summary, rows) {

@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { ReactNode, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Platform,
@@ -11,7 +11,7 @@ import {
 } from "react-native";
 
 import { colors, radii, shadow, spacing, surfaces, typeScale, typography } from "../theme";
-import { StationViewModel } from "../types";
+import { NearbySheetSnap, StationViewModel } from "../types";
 import {
   predictionDisciplineCue,
   stationAttentionCue,
@@ -25,6 +25,7 @@ import { StationRow } from "./StationRow";
 export type NearbySortMode = "distance" | "price" | "value";
 
 export const defaultNearbySortMode: NearbySortMode = "value";
+const nearbySheetBottomOffset = 8;
 const sheetDragActivatePx = 8;
 const sheetExpandDragPx = -60;
 const sheetCollapseDragPx = 70;
@@ -47,14 +48,17 @@ export function NearbyStationSheet({
   onNavigateToStation,
   onSelectStation,
   onSortPress,
+  onSnapChange,
   onToggleExpanded,
   selected,
   selectedCode,
+  sheetSnap,
   sheetExpanded,
   sortedStations,
   sortMode,
   stationNotice,
   stations,
+  topControls,
 }: {
   error: string;
   loading: boolean;
@@ -62,43 +66,57 @@ export function NearbyStationSheet({
   onNavigateToStation: (station: StationViewModel) => void;
   onSelectStation: (stationCode: string) => void;
   onSortPress: (sortMode: NearbySortMode) => void;
+  onSnapChange?: (snap: NearbySheetSnap) => void;
   onToggleExpanded: (expanded: boolean) => void;
   selected?: StationViewModel;
   selectedCode?: string;
+  sheetSnap?: NearbySheetSnap;
   sheetExpanded: boolean;
   sortedStations: StationViewModel[];
   sortMode?: NearbySortMode;
   stationNotice: string;
   stations: StationViewModel[];
+  topControls?: ReactNode;
 }) {
   const [dragOffsetY, setDragOffsetY] = useState(0);
   const dragStartYRef = useRef(0);
   const dragMovedRef = useRef(false);
   const suppressNextPressRef = useRef(false);
+  const activeSnap = sheetSnap || (sheetExpanded ? "full" : "browse");
+  const isPeek = activeSnap === "peek";
+  const isFull = activeSnap === "full";
+
+  const requestSnap = (snap: NearbySheetSnap) => {
+    if (onSnapChange) {
+      onSnapChange(snap);
+      return;
+    }
+    onToggleExpanded(snap === "full");
+  };
 
   const settleSheetDrag = (dy: number, toggleOnTap = true) => {
     setDragOffsetY(0);
     if (toggleOnTap && !dragMovedRef.current && Math.abs(dy) < sheetDragActivatePx) {
-      onToggleExpanded(!sheetExpanded);
+      requestSnap(nextSnap(activeSnap));
       return;
     }
     if (dy > sheetDismissDragPx) {
       if (selected && !sheetExpanded) onCloseSelectedStation();
-      onToggleExpanded(false);
+      requestSnap("browse");
       return;
     }
     if (dy > sheetCollapseDragPx) {
-      onToggleExpanded(false);
+      requestSnap(isFull ? "browse" : "peek");
       return;
     }
     if (dy < sheetExpandDragPx) {
-      onToggleExpanded(true);
+      requestSnap(isPeek ? "browse" : "full");
     }
   };
   const updateDragOffset = (pageY: number) => {
     const dy = pageY - dragStartYRef.current;
     dragMovedRef.current = dragMovedRef.current || Math.abs(dy) > sheetDragActivatePx;
-    setDragOffsetY(clampSheetDrag(dy, sheetExpanded));
+    setDragOffsetY(clampSheetDrag(dy, isFull));
     return dy;
   };
   const finishWebDrag = (pageY: number) => {
@@ -147,7 +165,7 @@ export function NearbyStationSheet({
     <View
       style={[
         styles.sheet,
-        sheetExpanded ? styles.sheetExpanded : styles.sheetCollapsed,
+        isFull ? styles.sheetExpanded : isPeek ? styles.sheetPeek : styles.sheetCollapsed,
         dragOffsetY !== 0 && { transform: [{ translateY: dragOffsetY }] },
       ]}
     >
@@ -161,7 +179,7 @@ export function NearbyStationSheet({
               suppressNextPressRef.current = false;
               return;
             }
-            onToggleExpanded(!sheetExpanded);
+            requestSnap(nextSnap(activeSnap));
           }}
           onResponderGrant={(event) => {
             dragStartYRef.current = responderPageY(event);
@@ -181,17 +199,18 @@ export function NearbyStationSheet({
         >
           <View style={styles.grabber} />
         </Pressable>
-        {sheetExpanded ? (
+        {isFull ? (
           <Pressable
             accessibilityLabel="Show map"
             accessibilityRole="button"
             hitSlop={10}
-            onPress={() => onToggleExpanded(false)}
+            onPress={() => requestSnap("browse")}
             style={styles.mapButton}
           >
             <Text style={styles.mapButtonText}>Map</Text>
           </Pressable>
-        ) : selected ? (
+        ) : null}
+        {!isFull && selected ? (
           <Pressable
             accessibilityLabel="Close selected station"
             accessibilityRole="button"
@@ -227,20 +246,21 @@ export function NearbyStationSheet({
 
       {!loading && !error ? (
         <>
-          {sheetExpanded && stationNotice && stations.length ? (
-            <View style={styles.noticeCard}>
-              <Text style={styles.noticeText}>{stationNotice}</Text>
-            </View>
-          ) : null}
+          {topControls && !isPeek ? <View style={styles.topControls}>{topControls}</View> : null}
           {selected && !sheetExpanded ? (
-            <SelectedStationCard
-              onNavigate={() => onNavigateToStation(selected)}
-              selected={selected}
-            />
+            <>
+              {!isPeek ? (
+                <Text numberOfLines={1} style={styles.peekHint}>Browse view. Full list for more.</Text>
+              ) : null}
+              <SelectedStationCard
+                onNavigate={() => onNavigateToStation(selected)}
+                selected={selected}
+              />
+            </>
           ) : null}
-          <View style={styles.sortRow}>
+          {(isFull || !selected || selected) ? <View style={styles.sortRow}>
             {nearbySortOptions.map((option) => {
-              const selectedSort = sortMode === option.key;
+              const selectedSort = !selected && sortMode === option.key;
               return (
                 <Pressable
                   accessibilityLabel={option.accessibilityLabel}
@@ -254,7 +274,7 @@ export function NearbyStationSheet({
                 </Pressable>
               );
             })}
-          </View>
+          </View> : null}
           {sheetExpanded ? (
             <ScrollView
               style={styles.list}
@@ -285,6 +305,12 @@ function clampSheetDrag(value: number, sheetExpanded: boolean) {
   const min = sheetExpanded ? -24 : -190;
   const max = sheetExpanded ? 220 : 180;
   return Math.max(min, Math.min(max, value));
+}
+
+function nextSnap(activeSnap: NearbySheetSnap): NearbySheetSnap {
+  if (activeSnap === "peek") return "browse";
+  if (activeSnap === "browse") return "full";
+  return "browse";
 }
 
 function SelectedStationCard({
@@ -389,8 +415,8 @@ const styles = StyleSheet.create({
     ...shadow.float,
     ...surfaces.floating,
     borderRadius: radii.xxl,
-    gap: spacing.md,
-    bottom: spacing.sm,
+    gap: spacing.sm,
+    bottom: nearbySheetBottomOffset,
     left: spacing.md,
     padding: spacing.md,
     position: "absolute",
@@ -398,11 +424,17 @@ const styles = StyleSheet.create({
     zIndex: 6,
   },
   sheetCollapsed: {
-    maxHeight: 305,
+    maxHeight: 275,
+    overflow: "hidden",
+  },
+  sheetPeek: {
+    bottom: 18,
+    maxHeight: 205,
     overflow: "hidden",
   },
   sheetExpanded: {
-    height: "78%",
+    bottom: 8,
+    top: 140,
   },
   sheetHeader: {
     alignItems: "center",
@@ -423,10 +455,23 @@ const styles = StyleSheet.create({
     position: "absolute",
     right: 0,
   },
+  listButton: {
+    backgroundColor: colors.black,
+    borderRadius: radii.pill,
+    left: 0,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    position: "absolute",
+  },
   mapButtonText: {
     color: colors.greenDark,
     fontSize: 11,
     fontWeight: "600",
+  },
+  listButtonText: {
+    color: colors.white,
+    fontSize: 11,
+    fontWeight: "800",
   },
   grabber: {
     alignSelf: "center",
@@ -439,19 +484,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: spacing.xs,
   },
-  noticeCard: {
-    backgroundColor: "#fff7ed",
-    borderColor: "#fed7aa",
-    borderRadius: radii.md,
-    borderWidth: 1,
-    marginBottom: spacing.sm,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+  topControls: {
+    marginBottom: spacing.xs,
   },
-  noticeText: {
-    color: colors.amber,
+  peekHint: {
+    color: colors.muted,
     fontSize: typeScale.caption,
-    fontWeight: "500",
+    fontWeight: "700",
+    lineHeight: 18,
   },
   sortButton: {
     alignItems: "center",

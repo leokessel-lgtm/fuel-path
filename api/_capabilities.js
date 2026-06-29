@@ -48,7 +48,9 @@ const ACT_BOUNDS = {
 };
 const CAPABILITY_LABELS = ["live", "limited", "pending_access", "fallback", "unsupported"];
 const REGION_ORDER = ["NSW", "ACT", "QLD", "WA", "VIC", "SA", "TAS", "NT"];
-const TERMS_GATED_PUBLIC_REGIONS = ["NSW", "ACT", "QLD", "TAS"];
+const TERMS_GATED_PUBLIC_REGIONS = ["NSW", "ACT", "QLD", "VIC", "TAS"];
+const NT_MYFUEL_ACCESS_PATH =
+  "Historical developer access is available through NTG Open Data monthly/yearly MyFuel NT XLSX datasets. No direct official public REST API contract is confirmed for live feeds. MyFuel NT exposes real-time consumer prices through the NT Government web app. Live app coverage needs NT Consumer Affairs/API reuse permission or a contracted third-party aggregator such as Check Petrol.";
 const NSW_VIC_BORDER_POINTS = [
   { lon: 141.0, lat: -34.0 },
   { lon: 142.2, lat: -34.18 },
@@ -78,7 +80,7 @@ function hasWaProvider() {
 }
 
 function hasVicCredentials() {
-  return Boolean(process.env.VIC_SERVO_SAVER_API_BASE_URL && process.env.VIC_SERVO_SAVER_API_KEY);
+  return Boolean(process.env.VIC_SERVO_SAVER_API_KEY);
 }
 
 function hasTasUsageTermsConfirmed() {
@@ -115,6 +117,12 @@ function hasQldLiveAccess() {
 
 function hasAnyLiveCredentials() {
   return hasLiveCredentials() || hasQldCredentials() || hasSaCredentials() || hasWaProvider() || hasVicCredentials();
+}
+
+function vicNextAction() {
+  return hasVicCredentials()
+    ? "Track VIC Servo Saver terms and attribution evidence; route this provider through normal launch checks."
+    : "Apply for Servo Saver Public API access and capture the approved schema, licence, caching and attribution terms.";
 }
 
 function fuelProviderCapabilityMatrix() {
@@ -186,14 +194,15 @@ function fuelProviderCapabilityMatrix() {
       region: "VIC",
       name: "Victoria",
       provider: "api_vic_servo_saver",
-      capability: "pending_access",
+      capability: hasVicCredentials() ? "live" : "pending_access",
       configured: hasVicCredentials(),
-      coverage: "VIC Servo Saver Public API planned.",
-      accessPath: "Service Victoria lists a Servo Saver Public API for third-party fuel price access; live adapter requires approved API access, schema, licence, caching and attribution terms.",
+      coverage: "Victoria fuel prices and station metadata from the Service Victoria Servo Saver Open API.",
+      accessPath:
+        "Service Victoria lists a Servo Saver Open API for third-party fuel price access; public use should follow the published service terms and cache strategy.",
       blocker: hasVicCredentials()
-        ? "VIC Servo Saver adapter needs the approved API schema before live prices can be enabled."
+        ? ""
         : "VIC Servo Saver API access is not configured.",
-      nextAction: "Apply for Servo Saver Public API access and capture the approved schema, licence, caching and attribution terms.",
+      nextAction: vicNextAction(),
     }),
     capabilityEntry({
       region: "SA",
@@ -229,10 +238,10 @@ function fuelProviderCapabilityMatrix() {
       provider: "api_nt_myfuel",
       capability: "pending_access",
       configured: false,
-      coverage: "MyFuel NT publishes real-time fuel prices through its official web app.",
-      accessPath: "No public API contract is confirmed; NT Consumer Affairs contact is the current access path.",
-      blocker: "NT MyFuel data/API access path and usage terms need confirmation before implementation.",
-      nextAction: "Contact NT Consumer Affairs to request API/data access, schema, usage, caching and attribution terms.",
+      coverage: "MyFuel NT publishes real-time fuel prices through the NT Government consumer web app; NTG Open Data provides historical daily datasets for developer/data-analysis use, not a live REST feed.",
+      accessPath: NT_MYFUEL_ACCESS_PATH,
+      blocker: "NT has no confirmed official real-time API contract for Fuel Path.",
+      nextAction: "Choose one path: request NT Consumer Affairs/MyFuel NT reuse terms and schema, or evaluate a contracted commercial aggregator such as Check Petrol for live NT prices.",
     }),
   ];
 }
@@ -486,6 +495,7 @@ function pointInProviderCoverage(provider, point) {
   if (provider === "vic") return pointInVic(point);
   if (provider === "sa") return pointInSa(point);
   if (provider === "tas") return pointInTas(point);
+  if (provider === "nt") return pointInNt(point);
   return false;
 }
 

@@ -1,25 +1,26 @@
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { colors, radii, shadow, spacing, surfaces, typeScale, typography } from "../theme";
-import { ScoreResponse, StationViewModel } from "../types";
+import { EvCharger, ScoreResponse, StationViewModel } from "../types";
 import { stationTimestampLine } from "../utils/decisionEvidence";
 import { tomorrowPriceView } from "../utils/pricing";
 import { BrandBadge } from "./BrandBadge";
-import {
-  DecisionAlternative,
-  DecisionEvidencePanel,
-} from "./DecisionEvidencePanel";
+import { DecisionEvidencePanel } from "./DecisionEvidencePanel";
 import { StationRow } from "./StationRow";
+import { openDirections } from "../screens/NearbyScreen.utils";
 
 export function PlanRouteSheet({
   best,
   candidates,
-  cheapestExplanation,
   currentRouteSaved,
-  decisionAlternatives,
   decisionSummary,
   error,
+  emptyRouteTitle,
+  evFallbackChargers,
+  evFallbackError,
+  evFallbackLoading,
   loading,
+  loadingLabel,
   onMinimise,
   onSaveCommute,
   onSelectStation,
@@ -34,17 +35,22 @@ export function PlanRouteSheet({
   routeSummary,
   selected,
   selectedCode,
+  showStopsList,
   stationPanelOpen,
+  stopsTitle,
   statusCapability,
 }: {
   best?: StationViewModel;
   candidates: StationViewModel[];
-  cheapestExplanation: string;
   currentRouteSaved: boolean;
-  decisionAlternatives: DecisionAlternative[];
   decisionSummary?: ScoreResponse["context"]["decisionSummary"];
   error: string;
+  emptyRouteTitle?: string;
+  evFallbackChargers?: EvCharger[];
+  evFallbackError?: string;
+  evFallbackLoading?: boolean;
   loading: boolean;
+  loadingLabel?: string;
   onMinimise: () => void;
   onRestore: () => void;
   onSaveCommute: () => void;
@@ -59,7 +65,9 @@ export function PlanRouteSheet({
   routeSummary: string;
   selected?: StationViewModel;
   selectedCode?: string;
+  showStopsList?: boolean;
   stationPanelOpen: boolean;
+  stopsTitle?: string;
   statusCapability?: string;
 }) {
   const bestTomorrow = best ? tomorrowPriceView(best) : null;
@@ -112,6 +120,7 @@ export function PlanRouteSheet({
           </View>
           {stationPanelOpen && selected ? (
             <StationDetailPanel
+              onNavigate={() => openDirections(selected.station.lat, selected.station.lon, selected.station.address || selected.station.name)}
               onShowStops={onShowStops}
               selected={selected}
               selectedTomorrow={selectedTomorrow}
@@ -121,12 +130,15 @@ export function PlanRouteSheet({
               best={best}
               bestTomorrow={bestTomorrow}
               candidates={candidates}
-              cheapestExplanation={cheapestExplanation}
               currentRouteSaved={currentRouteSaved}
-              decisionAlternatives={decisionAlternatives}
               decisionSummary={decisionSummary}
               error={error}
+              emptyRouteTitle={emptyRouteTitle}
+              evFallbackChargers={evFallbackChargers}
+              evFallbackError={evFallbackError}
+              evFallbackLoading={evFallbackLoading}
               loading={loading}
+              loadingLabel={loadingLabel}
               onSaveCommute={onSaveCommute}
               onSelectStation={onSelectStation}
               policyActive={policyActive}
@@ -135,6 +147,8 @@ export function PlanRouteSheet({
               routeEndpointsPresent={routeEndpointsPresent}
               routeNotice={routeNotice}
               selectedCode={selectedCode}
+              showStopsList={showStopsList}
+              stopsTitle={stopsTitle}
               statusCapability={statusCapability}
             />
           )}
@@ -145,10 +159,12 @@ export function PlanRouteSheet({
 }
 
 function StationDetailPanel({
+  onNavigate,
   onShowStops,
   selected,
   selectedTomorrow,
 }: {
+  onNavigate: () => void;
   onShowStops: () => void;
   selected: StationViewModel;
   selectedTomorrow: ReturnType<typeof tomorrowPriceView>;
@@ -156,12 +172,7 @@ function StationDetailPanel({
   return (
     <View style={styles.stationDetailPanel}>
       <View style={styles.sheetHeaderRow}>
-        <View>
-          <Text style={styles.eyebrow}>Station detail</Text>
-          <Text numberOfLines={1} style={styles.selectedTitle}>
-            {selected.station.name}
-          </Text>
-        </View>
+        <View />
         <Pressable
           accessibilityLabel="Show suggested fuel stops"
           accessibilityRole="button"
@@ -171,7 +182,7 @@ function StationDetailPanel({
           <Text style={styles.textButtonLabel}>Stops</Text>
         </Pressable>
       </View>
-      <StationRow item={selected} selected onPress={() => {}} />
+      <StationRow hideWhyLine item={selected} selected onPress={onNavigate} />
       <View style={styles.stationFacts}>
         <View style={styles.factPill}>
           <Text style={styles.factLabel}>Pump</Text>
@@ -183,7 +194,7 @@ function StationDetailPanel({
         </View>
         <View style={styles.factPill}>
           <Text style={styles.factLabel}>Saving</Text>
-          <Text style={styles.factValue}>{formatMoney(selected.netSaving || 0)}</Text>
+          <Text style={styles.factValue}>{priceSavingCpl(selected).toFixed(1)} c/L</Text>
         </View>
         <View style={styles.factPill}>
           <Text style={styles.factLabel}>Detour</Text>
@@ -214,12 +225,15 @@ function RouteResultsPanel({
   best,
   bestTomorrow,
   candidates,
-  cheapestExplanation,
   currentRouteSaved,
-  decisionAlternatives,
   decisionSummary,
   error,
+  emptyRouteTitle,
+  evFallbackChargers = [],
+  evFallbackError = "",
+  evFallbackLoading = false,
   loading,
+  loadingLabel,
   onSaveCommute,
   onSelectStation,
   policyActive,
@@ -228,17 +242,22 @@ function RouteResultsPanel({
   routeEndpointsPresent,
   routeNotice,
   selectedCode,
+  showStopsList = true,
+  stopsTitle = "Suggested fuel stops",
   statusCapability,
 }: {
   best?: StationViewModel;
   bestTomorrow: ReturnType<typeof tomorrowPriceView>;
   candidates: StationViewModel[];
-  cheapestExplanation: string;
   currentRouteSaved: boolean;
-  decisionAlternatives: DecisionAlternative[];
   decisionSummary?: ScoreResponse["context"]["decisionSummary"];
   error: string;
+  emptyRouteTitle?: string;
+  evFallbackChargers?: EvCharger[];
+  evFallbackError?: string;
+  evFallbackLoading?: boolean;
   loading: boolean;
+  loadingLabel?: string;
   onSaveCommute: () => void;
   onSelectStation: (stationCode: string) => void;
   policyActive: boolean;
@@ -247,20 +266,22 @@ function RouteResultsPanel({
   routeEndpointsPresent: boolean;
   routeNotice: string;
   selectedCode?: string;
+  showStopsList?: boolean;
+  stopsTitle?: string;
   statusCapability?: string;
 }) {
-  const recommendationSaving =
-    best?.netSaving || decisionSummary?.economics?.netSavingAfterDetourFuel || 0;
+  const recommendationSavingCpl = best ? routeSavingCpl(best, decisionSummary) : 0;
   const recommendationDetour =
     best?.detourMinutes || decisionSummary?.economics?.detourMinutes || 0;
   const recommendationFuel = best?.fuel || "fuel";
+  const routeOutcomeNotice = routeRecommendationNotice(routeNotice, recommendationSavingCpl, recommendationDetour);
 
   return (
     <>
       {loading ? (
         <View style={styles.loadingRow}>
           <ActivityIndicator color={colors.green} />
-          <Text style={styles.muted}>Scoring live route prices...</Text>
+          <Text style={styles.muted}>{loadingLabel || "Scoring live route prices..."}</Text>
         </View>
       ) : null}
       {error ? (
@@ -273,7 +294,7 @@ function RouteResultsPanel({
         <>
           {routeNotice ? (
             <View style={styles.noticeCard}>
-              <Text style={styles.noticeText}>{routeNotice}</Text>
+              <Text style={styles.noticeText}>{routeOutcomeNotice}</Text>
             </View>
           ) : null}
           {policyNotice ? (
@@ -298,24 +319,25 @@ function RouteResultsPanel({
                   {best.station.name}
                 </Text>
               </View>
-              <Text style={styles.eyebrow}>Recommendation</Text>
               <Text numberOfLines={2} style={styles.compactDecisionTitle}>
-                {recommendationCopy?.title}
+                {recommendationTitle(recommendationCopy?.title, recommendationSavingCpl)}
               </Text>
-              <Text numberOfLines={1} style={styles.compactReason}>
-                {recommendationCopy?.reason}
+              <Text numberOfLines={1} style={styles.compactSavingLine}>
+                Best price by {recommendationSavingCpl.toFixed(1)} c/L
               </Text>
             </View>
             <View style={styles.recommendationRouteValue}>
-              <Text style={styles.recommendationMetricLabel}>Saving</Text>
-              <Text style={styles.recommendationMetricValue}>
-                {formatMoney(recommendationSaving)}
-              </Text>
-              <View style={styles.recommendationDetourPill}>
-                <Text style={styles.recommendationDetourText}>
-                  {recommendationDetour.toFixed(1)} min
-                </Text>
-              </View>
+              <Pressable
+                accessibilityLabel={`Navigate to ${best.station.name}`}
+                accessibilityRole="button"
+                onPress={(event) => {
+                  event.stopPropagation();
+                  openDirections(best.station.lat, best.station.lon, best.station.address || best.station.name);
+                }}
+                style={styles.recommendationNavigateButton}
+              >
+                <Text style={styles.recommendationNavigateText}>↗</Text>
+              </Pressable>
               {bestTomorrow ? (
                 <Text
                   numberOfLines={1}
@@ -331,23 +353,28 @@ function RouteResultsPanel({
             </View>
           </Pressable>
           <DecisionEvidencePanel
-            alternatives={decisionAlternatives}
             candidate={best}
             capability={statusCapability}
-            cheapestExplanation={cheapestExplanation}
             decisionSummary={decisionSummary}
           />
         </>
       ) : null}
       {!loading && !error && routeEndpointsPresent && !best ? (
         <View style={styles.emptyRouteState}>
-          <Text style={styles.decisionTitle}>No fuel stops found</Text>
+          <Text style={styles.decisionTitle}>{emptyRouteTitle || "No fuel stops found"}</Text>
           <Text style={styles.muted}>
             {routeNotice ||
               (policyActive
                 ? "Route found, but no approved brands match this fuel, freshness and open-station settings."
                 : "Route found, but no eligible stations match this fuel, freshness and open-station settings.")}
           </Text>
+          {!showStopsList ? (
+            <EvFallbackPanel
+              chargers={evFallbackChargers}
+              error={evFallbackError}
+              loading={evFallbackLoading}
+            />
+          ) : null}
         </View>
       ) : null}
       {!loading && !error && !routeEndpointsPresent ? (
@@ -359,48 +386,163 @@ function RouteResultsPanel({
         </View>
       ) : null}
 
-      <View style={styles.sheetHeaderRow}>
-        <Text style={styles.selectedTitle}>Suggested fuel stops</Text>
-        {routeEndpointsPresent ? (
-          <Pressable
-            accessibilityLabel={currentRouteSaved ? "Route already saved" : "Save commute"}
-            accessibilityRole="button"
-            disabled={currentRouteSaved}
-            onPress={onSaveCommute}
-            style={[
-              styles.textButton,
-              currentRouteSaved && styles.textButtonDisabled,
-            ]}
+      {showStopsList ? (
+        <>
+          <View style={styles.sheetHeaderRow}>
+            <Text style={styles.selectedTitle}>{stopsTitle}</Text>
+            {routeEndpointsPresent ? (
+              <Pressable
+                accessibilityLabel={currentRouteSaved ? "Route already saved" : "Save commute"}
+                accessibilityRole="button"
+                disabled={currentRouteSaved}
+                onPress={onSaveCommute}
+                style={[
+                  styles.textButton,
+                  currentRouteSaved && styles.textButtonDisabled,
+                ]}
+              >
+                <Text style={styles.textButtonLabel}>
+                  {currentRouteSaved ? "Saved" : "Save"}
+                </Text>
+              </Pressable>
+            ) : (
+              <Text style={styles.muted}>Tap for detail</Text>
+            )}
+          </View>
+          <ScrollView
+            contentContainerStyle={styles.stopsListContent}
+            showsVerticalScrollIndicator
+            style={styles.stopsList}
           >
-            <Text style={styles.textButtonLabel}>
-              {currentRouteSaved ? "Saved" : "Save"}
-            </Text>
-          </Pressable>
-        ) : (
-          <Text style={styles.muted}>Tap for detail</Text>
-        )}
-      </View>
-      <ScrollView
-        contentContainerStyle={styles.stopsListContent}
-        showsVerticalScrollIndicator
-        style={styles.stopsList}
-      >
-        {candidates.map((item) => (
-          <StationRow
-            item={item}
-            key={item.station.stationCode}
-            selected={item.station.stationCode === selectedCode}
-            onPress={() => onSelectStation(item.station.stationCode)}
-          />
-        ))}
-      </ScrollView>
+            {candidates.map((item) => (
+              <StationRow
+                item={item}
+                key={item.station.stationCode}
+                selected={item.station.stationCode === selectedCode}
+                onPress={() => onSelectStation(item.station.stationCode)}
+              />
+            ))}
+          </ScrollView>
+        </>
+      ) : null}
     </>
   );
 }
 
-function formatMoney(value: number) {
-  const sign = value < 0 ? "-" : "";
-  return `${sign}$${Math.abs(value).toFixed(2)}`;
+function priceSavingCpl(item: StationViewModel) {
+  return Math.max(0, Number(item.pumpCpl || 0) - Number(item.adjustedCpl || 0));
+}
+
+function routeSavingCpl(item: StationViewModel, decisionSummary?: ScoreResponse["context"]["decisionSummary"]) {
+  const routeComparisonCpl = Number(decisionSummary?.economics?.comparisonCpl);
+  if (Number.isFinite(routeComparisonCpl) && routeComparisonCpl > 0) {
+    return Math.max(0, routeComparisonCpl - Number(item.adjustedCpl || 0));
+  }
+  return priceSavingCpl(item);
+}
+
+function recommendationTitle(fallback: string | undefined, savingCpl: number) {
+  if (!Number.isFinite(savingCpl) || savingCpl <= 0) return "Best route price";
+  if (savingCpl < 2) return "Small savings detour";
+  if (savingCpl < 5) return "Medium savings detour";
+  if (savingCpl < 10) return "Good savings detour";
+  if (savingCpl < 20) return "Great savings detour";
+  return fallback || "Strong savings detour";
+}
+
+function routeRecommendationNotice(routeNotice: string, savingCpl: number, detourMinutes: number) {
+  const routeDistance = routeNotice.match(/^Route is about [^.]+\./)?.[0] || routeNotice;
+  if (!Number.isFinite(savingCpl)) return routeDistance;
+  const detour = Number(detourMinutes || 0);
+  const savingText = savingCpl > 0
+    ? `and is best by ${savingCpl.toFixed(1)} c/L`
+    : "and is the best route price found";
+  if (detour > 0.05) {
+    return `${routeDistance} Suggested stop adds a ${detour.toFixed(1)} min detour ${savingText}.`;
+  }
+  return `${routeDistance} Suggested stop is on the route ${savingText}.`;
+}
+
+function EvFallbackPanel({
+  chargers,
+  error,
+  loading,
+}: {
+  chargers: EvCharger[];
+  error: string;
+  loading: boolean;
+}) {
+  if (loading) {
+    return <Text style={styles.fallbackMeta}>Looking for compatible fallback chargers...</Text>;
+  }
+  if (error) {
+    return <Text style={styles.fallbackMeta}>Fallback charger lookup failed. Use Nearby or your charging network app before driving.</Text>;
+  }
+  if (!chargers.length) {
+    return <Text style={styles.fallbackMeta}>No compatible fallback chargers found near sampled route points in directory data.</Text>;
+  }
+  return (
+    <View style={styles.fallbackPanel}>
+      <View style={styles.sheetHeaderRow}>
+        <Text style={styles.fallbackTitle}>Charging fallback</Text>
+        <Text style={styles.fallbackBadge}>Directory data</Text>
+      </View>
+      <Text style={styles.fallbackMeta}>
+        Compatible chargers near sampled route points. Detour time is route-estimated where available, otherwise a rough straight-line fallback. Confirm tariff, access and live bay status in the network app.
+      </Text>
+      {chargers.map((charger) => (
+        <View key={charger.id} style={styles.fallbackRow}>
+          <View style={styles.fallbackPowerTile}>
+            {charger.maxPowerKw ? (
+              <>
+                <Text style={styles.fallbackPowerValue}>{Math.round(charger.maxPowerKw)}</Text>
+                <Text style={styles.fallbackPowerUnit}>kW</Text>
+              </>
+            ) : (
+              <>
+                <Text style={styles.fallbackPowerUnknown}>Power</Text>
+                <Text style={styles.fallbackPowerUnit}>unknown</Text>
+              </>
+            )}
+          </View>
+          <View style={styles.fallbackMain}>
+            <Text numberOfLines={1} style={styles.fallbackName}>{charger.name}</Text>
+            <Text numberOfLines={1} style={styles.fallbackMeta}>
+              {chargerConnectorSummary(charger)} | {chargerRouteDistanceLabel(charger)}
+            </Text>
+            <Text numberOfLines={1} style={styles.fallbackTrust}>{charger.availabilityLabel}</Text>
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function chargerConnectorSummary(charger: EvCharger) {
+  if (charger.connectors.length) return charger.connectors.join(" | ");
+  const labels = charger.connections
+    .map((connection) => connection.connectorLabel)
+    .filter(Boolean)
+    .slice(0, 2);
+  return labels.length ? labels.join(" | ") : "Connector unknown";
+}
+
+function chargerRouteDistanceLabel(charger: EvCharger) {
+  const routeDistance = charger.routeDistanceKm;
+  const detourDistance = charger.routeDetourDistanceKm;
+  if (typeof routeDistance === "number" && Number.isFinite(routeDistance)) {
+    const minutes = charger.routeDetourMinutes;
+    const timeLabel = typeof minutes === "number" && Number.isFinite(minutes)
+      ? charger.routeDetourSource === "route_engine"
+        ? `, est ${minutes} min return`
+        : `, rough ${minutes} min return`
+      : "";
+    const distanceLabel = typeof detourDistance === "number" && Number.isFinite(detourDistance)
+      ? `est ${detourDistance.toFixed(1)} km detour`
+      : `approx ${routeDistance.toFixed(1)} km off route`;
+    return `${distanceLabel}${timeLabel}`;
+  }
+  return `${charger.distanceKm.toFixed(1)} km from sampled route point`;
 }
 
 const styles = StyleSheet.create({
@@ -417,10 +559,10 @@ const styles = StyleSheet.create({
     zIndex: 6,
   },
   resultsSheet: {
-    height: 280,
+    maxHeight: 430,
   },
   stationSheet: {
-    height: 260,
+    maxHeight: 430,
   },
   sheetMinimised: {
     height: 74,
@@ -529,10 +671,10 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     marginTop: 2,
   },
-  compactReason: {
+  compactSavingLine: {
     color: colors.greenDark,
     fontSize: typeScale.caption,
-    fontWeight: "500",
+    fontWeight: "700",
     marginTop: 2,
   },
   emptyRouteState: {
@@ -541,11 +683,88 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
     padding: spacing.md,
   },
+  fallbackPanel: {
+    gap: spacing.xs,
+    marginTop: spacing.sm,
+  },
+  fallbackTitle: {
+    color: colors.ink,
+    fontSize: typeScale.caption,
+    fontWeight: "900",
+  },
+  fallbackBadge: {
+    backgroundColor: colors.blueSoft,
+    borderRadius: radii.pill,
+    color: colors.blue,
+    fontSize: 10,
+    fontWeight: "800",
+    overflow: "hidden",
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+  },
+  fallbackRow: {
+    alignItems: "center",
+    backgroundColor: colors.white,
+    borderColor: colors.line,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: spacing.sm,
+    padding: spacing.xs,
+  },
+  fallbackPowerTile: {
+    alignItems: "center",
+    backgroundColor: colors.blueSoft,
+    borderRadius: radii.sm,
+    justifyContent: "center",
+    minHeight: 44,
+    width: 52,
+  },
+  fallbackPowerValue: {
+    color: colors.blue,
+    fontSize: typeScale.body,
+    fontWeight: "900",
+    lineHeight: 18,
+  },
+  fallbackPowerUnknown: {
+    color: colors.blue,
+    fontSize: 9,
+    fontWeight: "900",
+    lineHeight: 12,
+    textTransform: "uppercase",
+  },
+  fallbackPowerUnit: {
+    color: colors.muted,
+    fontSize: 9,
+    fontWeight: "800",
+    textTransform: "uppercase",
+  },
+  fallbackMain: {
+    flex: 1,
+    minWidth: 0,
+  },
+  fallbackName: {
+    color: colors.ink,
+    fontSize: typeScale.caption,
+    fontWeight: "800",
+  },
+  fallbackMeta: {
+    color: colors.muted,
+    fontSize: typeScale.caption,
+    fontWeight: "500",
+    lineHeight: 17,
+  },
+  fallbackTrust: {
+    color: colors.amber,
+    fontSize: 10,
+    fontWeight: "800",
+    marginTop: 1,
+  },
   recommendationRouteValue: {
     alignItems: "center",
     flexShrink: 0,
     gap: 3,
-    minWidth: 58,
+    minWidth: 48,
   },
   recommendationMetricLabel: {
     color: colors.muted,
@@ -559,6 +778,14 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "900",
     lineHeight: 16,
+  },
+  recommendationSavingSource: {
+    color: colors.muted,
+    fontSize: 9,
+    fontWeight: "700",
+    lineHeight: 11,
+    maxWidth: 76,
+    textAlign: "center",
   },
   recommendationDetourPill: {
     alignItems: "center",
@@ -574,6 +801,20 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontSize: 11,
     fontWeight: "800",
+  },
+  recommendationNavigateButton: {
+    alignItems: "center",
+    backgroundColor: colors.black,
+    borderRadius: radii.pill,
+    height: 38,
+    justifyContent: "center",
+    width: 38,
+  },
+  recommendationNavigateText: {
+    color: colors.white,
+    fontSize: 21,
+    fontWeight: "800",
+    lineHeight: 22,
   },
   sheetHeaderRow: {
     alignItems: "center",

@@ -116,7 +116,7 @@ function buildProviderTermsReadiness(capabilities, evidenceState = { provided: f
 
 function providerEvidenceBlockers(regions, evidenceState) {
   const gatedRegions = regions.filter((entry) =>
-    ["NSW", "ACT", "QLD", "TAS"].includes(entry.region) &&
+    ["NSW", "ACT", "QLD", "VIC", "TAS"].includes(entry.region) &&
     entry.configured &&
     entry.capability === "live"
   );
@@ -171,6 +171,20 @@ function regionEvidenceReady(region, evidenceState) {
       evidenceSourceReady(region, entry, evidenceState),
     ].every(Boolean);
   }
+  if (region === "VIC") {
+    return [
+      entry.servoSaverApiAccessApproved,
+      entry.servoSaverTermsAccepted,
+      entry.cachingDurationConfirmed,
+      entry.attributionDisclaimerReady,
+      entry.commercialConsumerAppUseConfirmed,
+      concreteDate(entry.termsAcceptedAt),
+      concretePositiveNumber(entry.cachingDurationMinutes),
+      providerAttributionReady(region, entry.attributionDisclaimerWording),
+      concreteEvidenceReference(region, entry.evidenceReference, entry.termsAcceptedAt),
+      evidenceSourceReady(region, entry, evidenceState),
+    ].every(Boolean);
+  }
   return false;
 }
 
@@ -203,7 +217,7 @@ function resolveEvidenceSourcePath(sourcePath, evidenceState) {
 
 function containsProviderSecret(value) {
   const text = String(value || "");
-  return /NSW_FUEL_API_(?:KEY|SECRET)\s*[:=]|QLD_FUEL_API_TOKEN\s*[:=]|client[_-]?secret\s*[:=]|api[_-]?secret\s*[:=]|bearer\s+[a-z0-9._~/-]{12,}/i.test(text);
+  return /NSW_FUEL_API_(?:KEY|SECRET)\s*[:=]|QLD_FUEL_API_TOKEN\s*[:=]|VIC_SERVO_SAVER_API_KEY\s*[:=]|x-consumer-id\s*[:=]|client[_-]?secret\s*[:=]|api[_-]?secret\s*[:=]|bearer\s+[a-z0-9._~/-]{12,}/i.test(text);
 }
 
 function concreteEvidenceReference(region, value, termsAcceptedAt = "") {
@@ -226,6 +240,9 @@ function providerEvidenceReferenceMatches(region, value) {
   if (region === "NSW" || region === "ACT" || region === "TAS") {
     return /fuelcheck|fuel[-_\s]?check|api[-_.\s]?nsw/i.test(text);
   }
+  if (region === "VIC") {
+    return /servo[-_\s]?saver|service[-_\s]?victoria|service\.vic\.gov\.au/i.test(text);
+  }
   return false;
 }
 
@@ -240,6 +257,9 @@ function providerAttributionReady(region, value) {
   if (region === "QLD") return /qld fuel prices|queensland fuel prices|fuel prices/i.test(text);
   if (region === "NSW" || region === "ACT" || region === "TAS") {
     return /fuelcheck|api\.?nsw/i.test(text);
+  }
+  if (region === "VIC") {
+    return /servo saver|service victoria|service\.vic\.gov\.au/i.test(text);
   }
   return false;
 }
@@ -305,6 +325,21 @@ function confirmationChecklist(termsBlocked) {
         requiredEvidence: [
           "API.NSW Fuel API subscription/access approved for Fuel Path",
           "authority-specific FuelCheck NSW/ACT usage terms accepted",
+          "terms acceptance date recorded",
+          "allowed caching duration recorded in minutes",
+          "required attribution/disclaimer wording recorded",
+          "commercial consumer-app use confirmed",
+        ],
+      };
+    }
+    if (entry.region === "VIC") {
+      return {
+        region: entry.region,
+        provider: entry.provider,
+        flag: "FUEL_PATH_PROVIDER_TERMS_EVIDENCE_CONFIRMED=1 after evidence review",
+        requiredEvidence: [
+          "Service Victoria Servo Saver Open API access approved for Fuel Path",
+          "Servo Saver API terms and acceptable-use policy reviewed and accepted",
           "terms acceptance date recorded",
           "allowed caching duration recorded in minutes",
           "required attribution/disclaimer wording recorded",

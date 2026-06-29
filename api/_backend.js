@@ -73,6 +73,7 @@ const {
   waRegionPlanForArea,
   waTomorrowPriceAvailable,
 } = createWaFuelWatchAdapter({ decorateStation: stationWithDiscountRules });
+const { createVicServoSaverAdapter } = require("./_vicServoSaverProvider");
 const {
   loadLiveQldStations,
   loadLiveSaStations,
@@ -85,6 +86,7 @@ const {
   normaliseNswPayload,
   normaliseTasPayload,
 } = createNswFuelCheckAdapter({ decorateStation: stationWithDiscountRules });
+const { loadLiveVicStations } = createVicServoSaverAdapter({ decorateStation: stationWithDiscountRules });
 const { geocode, geocodeProviderStatus } = createGeocoder({
   fetchJson,
   loadStationData,
@@ -255,13 +257,6 @@ async function fetchJson(url, { data, headers = {}, timeoutMs = 12000 } = {}) {
   }
 }
 
-async function loadLiveVicStations() {
-  if (!hasVicCredentials()) {
-    throw new Error("VIC Servo Saver API access is not configured. Apply for API access before enabling live VIC prices.");
-  }
-  throw new Error("VIC Servo Saver API adapter needs the approved API schema before it can be enabled.");
-}
-
 function stationBrandText(station) {
   return `${station.brand || ""} ${station.name || ""}`.toLowerCase();
 }
@@ -293,6 +288,21 @@ async function loadLiveStationsForArea({ forceRefresh = false, points = [], radi
   const providers = requestedProviders || liveProviderKeysForArea(points, radiusKm);
   const regionCapabilities = capabilitiesForPoints(points);
   if (!providers.length) {
+    return {
+      stations: [],
+      source: "unsupported_region",
+      provider: "unsupported_region",
+      capability: primaryCapability(regionCapabilities),
+      regionCapabilities,
+      cacheHit: false,
+      cacheAgeSeconds: 0,
+      cacheMode: "none",
+      degraded: false,
+      providerHealth: {},
+      warning: capabilityWarning(regionCapabilities),
+    };
+  }
+  if (providers.length === 1 && providers[0] === "nt") {
     return {
       stations: [],
       source: "unsupported_region",
@@ -525,14 +535,14 @@ async function loadStationData({ requestedSource = "auto", forceRefresh = false,
 
 function resolveSource(source) {
   const value = source === "auto" || !source ? (hasAnyLiveCredentials() || !sampleSourceAllowed() ? "live" : "sample") : source;
-  if (!["live", "sample", "nsw", "qld", "wa", "vic", "sa", "tas"].includes(value)) {
-    throw new Error("source must be live, sample, nsw, qld, wa, vic, sa, tas or auto");
+  if (!["live", "sample", "nsw", "qld", "wa", "vic", "sa", "tas", "nt"].includes(value)) {
+    throw new Error("source must be live, sample, nsw, qld, wa, vic, sa, tas, nt or auto");
   }
   return value;
 }
 
 function providerFromSource(source) {
-  return ["nsw", "qld", "wa", "vic", "sa", "tas"].includes(source) ? source : "";
+  return ["nsw", "qld", "wa", "vic", "sa", "tas", "nt"].includes(source) ? source : "";
 }
 
 function pointFromQuery(req, prefix) {

@@ -53,7 +53,7 @@ test("national capability matrix covers every Australian state and territory", (
       );
       assert.match(
         capabilities.find((item) => item.region === "NT")?.accessPath || "",
-        /No public API contract is confirmed/,
+        /Historical developer access is available.*No direct official public REST API contract is confirmed/s,
       );
       assert.deepEqual(capabilitySummary(capabilities), { live: 6, pending_access: 2 });
     },
@@ -66,6 +66,24 @@ test("point capabilities distinguish pending national regions from unsupported a
   assert.equal(capabilitiesForPoints([{ lat: -42.8821, lon: 147.3272 }])[0]?.region, "TAS");
   assert.equal(capabilitiesForPoints([{ lat: -12.4634, lon: 130.8456 }])[0]?.region, "NT");
   assert.equal(capabilitiesForPoints([{ lat: 0, lon: 0 }])[0]?.capability, "unsupported");
+});
+
+test("VIC capability uses default Servo Saver base URL when only the API key is configured", () => {
+  withEnv(
+    {
+      VIC_SERVO_SAVER_API_BASE_URL: "",
+      VIC_SERVO_SAVER_API_KEY: "test-vic-key",
+    },
+    () => {
+      const capabilities = fuelProviderCapabilityMatrix();
+      const vic = capabilities.find((item) => item.region === "VIC");
+
+      assert.equal(vic?.capability, "live");
+      assert.equal(vic?.configured, true);
+      assert.match(vic?.nextAction || "", /terms and attribution evidence/);
+      assert.deepEqual(liveProviderKeysForArea([{ lat: -37.8136, lon: 144.9631 }], 8), ["vic"]);
+    },
+  );
 });
 
 test("status endpoint exposes the national capability contract", async () => {
@@ -123,6 +141,70 @@ test("status endpoint keeps provider and map secrets out of diagnostic payloads"
   );
 });
 
+test("status and station responses use live VIC Servo Saver when credentials are configured", async () => {
+  await withEnv(
+    {
+      VIC_SERVO_SAVER_API_BASE_URL: "https://api.fuel.service.vic.gov.au/open-data/v1",
+      VIC_SERVO_SAVER_API_KEY: "test-vic-key",
+      FUEL_PATH_PRODUCTION_HARDENING: "1",
+    },
+    async () => {
+      const mockFetch = installFetchMock((url) => {
+        const parsed = new URL(String(url));
+        const path = parsed.pathname.replace(/^\/+/, "/");
+        if (path === "/open-data/v1/fuel/reference-data/brands") {
+          return jsonResponse(vicBrandsPayload());
+        }
+        if (path === "/open-data/v1/fuel/reference-data/types") {
+          return jsonResponse(vicTypePayload());
+        }
+        if (path === "/open-data/v1/fuel/reference-data/stations") {
+          return jsonResponse(vicStationsPayload());
+        }
+        if (path === "/open-data/v1/fuel/prices") {
+          return jsonResponse(vicPricePayload());
+        }
+        throw new Error(`Unexpected VIC endpoint: ${path}`);
+      });
+
+      try {
+        const status = await callStatus();
+        const vic = status.payload.fuelProviders.capabilities.find((item) => item.region === "VIC");
+
+        assert.equal(status.payload.fuelProviders.apiVicConfigured, true);
+        assert.equal(status.payload.fuelProviders.vicStatus, "configured_live");
+        assert.equal(vic?.capability, "live");
+        assert.equal(vic?.configured, true);
+        assert.equal(status.payload.fuelProviders.publicClaims.publicLivePriceClaimsAllowed, false);
+        assert.equal(status.payload.fuelProviders.publicClaims.blockers.includes("vic_terms_evidence_not_attested"), true);
+        assert.equal(status.payload.fuelProviders.publicClaims.evidenceRequired.includes("VIC"), true);
+
+        const vicStations = await loadStationData({
+          requestedSource: "vic",
+          points: [{ lat: -37.8136, lon: 144.9631 }],
+          radiusKm: 8,
+          fuels: ["U91", "DL"],
+          forceRefresh: true,
+        });
+
+        assert.equal(vicStations.source, "api_vic");
+        assert.equal(vicStations.provider, "api_vic");
+        assert.equal(vicStations.capability, "live");
+        assert.equal(vicStations.degraded, false);
+        assert.equal(vicStations.stations.length, 1);
+        assert.equal(vicStations.stations[0].stationCode, "VIC-901");
+        assert.equal(vicStations.stations[0].source, "api_vic_servo_saver");
+        assert.equal(vicStations.stations[0].prices.DL, 188.4);
+        assert.equal(vicStations.stations[0].prices.U91, 204.5);
+        assert.equal(vicStations.stations[0].suburb, "Southbank");
+        assert.equal(mockFetch.calls.length, 4);
+      } finally {
+        mockFetch.restore();
+      }
+    },
+  );
+});
+
 test("status endpoint separates technical live access from public live-price claim readiness", async () => {
   await withEnv(
     {
@@ -134,6 +216,7 @@ test("status endpoint separates technical live access from public live-price cla
       FUEL_PATH_QLD_USAGE_TERMS_CONFIRMED: "",
       FUEL_PATH_TAS_USAGE_TERMS_CONFIRMED: "",
       FUEL_PATH_PROVIDER_TERMS_EVIDENCE_CONFIRMED: "",
+      VIC_SERVO_SAVER_API_KEY: "",
     },
     async () => {
       const response = await callStatus();
@@ -160,6 +243,7 @@ test("status endpoint separates technical live access from public live-price cla
       FUEL_PATH_QLD_USAGE_TERMS_CONFIRMED: "1",
       FUEL_PATH_TAS_USAGE_TERMS_CONFIRMED: "1",
       FUEL_PATH_PROVIDER_TERMS_EVIDENCE_CONFIRMED: "",
+      VIC_SERVO_SAVER_API_KEY: "",
     },
     async () => {
       const response = await callStatus();
@@ -197,6 +281,39 @@ test("status endpoint allows public live-price claims only when provider terms e
       assert.deepEqual(claims.blockers, []);
       assert.deepEqual(claims.evidenceRequired, []);
       assert.equal(claims.evidenceAttested, true);
+      assert.equal(response.payload.releaseReadiness.publicBeta.blockers.includes("provider_terms_evidence"), false);
+    },
+  );
+});
+
+test("status endpoint includes VIC in public live-price claim evidence gating", async () => {
+  await withEnv(
+    {
+      VIC_SERVO_SAVER_API_KEY: "test-vic-key",
+      FUEL_PATH_PROVIDER_TERMS_EVIDENCE_CONFIRMED: "",
+    },
+    async () => {
+      const response = await callStatus();
+      const claims = response.payload.fuelProviders.publicClaims;
+
+      assert.equal(claims.status, "blocked");
+      assert.equal(claims.publicLivePriceClaimsAllowed, false);
+      assert.equal(claims.blockers.includes("vic_terms_evidence_not_attested"), true);
+      assert.equal(claims.evidenceRequired.includes("VIC"), true);
+    },
+  );
+
+  await withEnv(
+    {
+      VIC_SERVO_SAVER_API_KEY: "test-vic-key",
+      FUEL_PATH_PROVIDER_TERMS_EVIDENCE_CONFIRMED: "1",
+    },
+    async () => {
+      const response = await callStatus();
+      const claims = response.payload.fuelProviders.publicClaims;
+
+      assert.equal(claims.blockers.includes("vic_terms_evidence_not_attested"), false);
+      assert.equal(claims.evidenceRequired.includes("VIC"), false);
     },
   );
 });
@@ -487,6 +604,28 @@ test("pending national regions return explicit capability context", async () => 
   assert.match(data.warning, /SA in the national provider matrix/);
 });
 
+test("forced NT source returns explicit pending-access context instead of pretending live coverage", async () => {
+  const response = await callStations({
+    source: "nt",
+    lat: -12.4634,
+    lon: 130.8456,
+    label: "Darwin NT",
+    fuel: "U91",
+    radiusKm: 8,
+    limit: 5,
+  });
+
+  assert.equal(response.status, 200);
+  assert.equal(response.payload.context.source, "unsupported_region");
+  assert.equal(response.payload.context.provider, "unsupported_region");
+  assert.equal(response.payload.context.capability, "pending_access");
+  assert.equal(response.payload.context.stationCount, 0);
+  assert.equal(response.payload.stations.length, 0);
+  assert.equal(response.payload.context.regionCapabilities[0].region, "NT");
+  assert.equal(response.payload.context.regionCapabilities[0].provider, "api_nt_myfuel");
+  assert.match(response.payload.context.warning, /NT in the national provider matrix/);
+});
+
 test("sample fallback marks data as fallback capability", async () => {
   const data = await loadStationData({
     requestedSource: "sample",
@@ -501,7 +640,13 @@ test("sample fallback marks data as fallback capability", async () => {
 });
 
 test("production hardening disables demo fallback responses", async () => {
-  await withEnv({ FUEL_PATH_PRODUCTION_HARDENING: "1", FUEL_PATH_ALLOW_SAMPLE_SOURCE: "" }, async () => {
+  await withEnv(
+    {
+      FUEL_PATH_PRODUCTION_HARDENING: "1",
+      FUEL_PATH_ALLOW_SAMPLE_SOURCE: "",
+      VIC_SERVO_SAVER_API_KEY: "",
+    },
+    async () => {
     const sample = await loadStationData({
       requestedSource: "sample",
       points: [{ lat: -33.8688, lon: 151.2093 }],
@@ -521,7 +666,8 @@ test("production hardening disables demo fallback responses", async () => {
     assert.equal(liveUnavailable.stations.length, 0);
     assert.equal(liveUnavailable.degraded, true);
     assert.match(liveUnavailable.warning, /VIC Servo Saver API access is not configured/);
-  });
+    },
+  );
 });
 
 test("unsupported station handler response stays explicit", async () => {
@@ -554,6 +700,7 @@ test("forced provider outside coverage returns explicit JSON instead of throwing
     { source: "qld", lat: -33.86, lon: 151.2, expectedProvider: "qld" },
     { source: "wa", lat: -33.86, lon: 151.2, expectedProvider: "wa" },
     { source: "sa", lat: -33.86, lon: 151.2, expectedProvider: "sa" },
+    { source: "nt", lat: -33.86, lon: 151.2, expectedProvider: "nt" },
     { source: "nsw", lat: -27.4698, lon: 153.0251, expectedProvider: "nsw" },
   ];
 
@@ -577,19 +724,21 @@ test("forced provider outside coverage returns explicit JSON instead of throwing
 });
 
 test("forced VIC provider failure returns fallback JSON instead of throwing", async () => {
-  const response = await callStations({
-    source: "vic",
-    lat: -37.8136,
-    lon: 144.9631,
-    fuel: "U91",
-    radiusKm: 8,
-    limit: 5,
-  });
+  await withEnv({ VIC_SERVO_SAVER_API_KEY: "" }, async () => {
+    const response = await callStations({
+      source: "vic",
+      lat: -37.8136,
+      lon: 144.9631,
+      fuel: "U91",
+      radiusKm: 8,
+      limit: 5,
+    });
 
-  assert.equal(response.status, 200);
-  assert.equal(response.payload.context.source, "sample_fallback");
-  assert.equal(response.payload.context.provider, "public_demo_snapshot");
-  assert.match(response.payload.context.warning, /VIC Servo Saver API access is not configured/);
+    assert.equal(response.status, 200);
+    assert.equal(response.payload.context.source, "sample_fallback");
+    assert.equal(response.payload.context.provider, "public_demo_snapshot");
+    assert.match(response.payload.context.warning, /VIC Servo Saver API access is not configured/);
+  });
 });
 
 function callStations(query) {
@@ -654,6 +803,79 @@ function tasNearbyPayload() {
         priceunit: "litre",
         lastupdated: "2026-06-19 04:45:08",
         state: "TAS",
+      },
+    ],
+  };
+}
+
+function vicBrandsPayload() {
+  return [
+    {
+      BrandId: "B-SHELL",
+      brandName: "Shell",
+      name: "Shell",
+    },
+  ];
+}
+
+function vicTypePayload() {
+  return {
+    fuelTypes: [
+      {
+        FuelTypeId: "DIE",
+        name: "DSL",
+      },
+      {
+        FuelTypeId: "ULP",
+        name: "Unleaded 91",
+      },
+    ],
+  };
+}
+
+function vicStationsPayload() {
+  return {
+    stations: [
+      {
+        id: "901",
+        name: "Southbank Hub",
+        address: "1 Bourke Street, Southbank VIC 3006",
+        latitude: -37.8231,
+        longitude: 144.964,
+      },
+    ],
+  };
+}
+
+function vicPricePayload() {
+  return {
+    fuelPriceDetails: [
+      {
+        fuelStation: {
+          id: "901",
+          stationId: "901",
+          name: "Southbank Hub",
+          brandId: "B-SHELL",
+          address: "1 Bourke Street, Southbank VIC 3006",
+          location: {
+            latitude: -37.8231,
+            longitude: 144.964,
+          },
+        },
+        fuelPrices: [
+          {
+            fuelType: "DIE",
+            price: 188.4,
+            updatedAt: "2026-06-25T08:22:00Z",
+            isAvailable: true,
+          },
+          {
+            fuelType: "U91",
+            price: 204.5,
+            updatedAt: "2026-06-25T08:22:00Z",
+            isAvailable: true,
+          },
+        ],
       },
     ],
   };

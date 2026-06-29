@@ -5,7 +5,14 @@ import {
   loadPreferences,
   persistPreferences,
 } from "../services/preferencesStore";
-import { AppPreferences, FuelCode, MapPoint } from "../types";
+import {
+  AppPreferences,
+  EvConnector,
+  FuelCode,
+  HomeChargingAccess,
+  MapPoint,
+  VehicleEnergyType,
+} from "../types";
 import { isDiscountRedeemedToday } from "../utils/discountRedemptions";
 
 export function useAppPreferences() {
@@ -31,6 +38,47 @@ export function useAppPreferences() {
 
   const updateFuel = useCallback((fuel: FuelCode) => {
     setPreferences((current) => ({ ...current, fuel }));
+  }, []);
+
+  const updateVehicleEnergyType = useCallback((vehicleEnergyType: VehicleEnergyType) => {
+    setPreferences((current) => {
+      if (vehicleEnergyType === "diesel" && current.fuel !== "DL" && current.fuel !== "PDL") {
+        return { ...current, fuel: "DL", vehicleEnergyType };
+      }
+      if (vehicleEnergyType === "petrol" && (current.fuel === "DL" || current.fuel === "PDL")) {
+        return { ...current, fuel: "U91", vehicleEnergyType };
+      }
+      return { ...current, vehicleEnergyType };
+    });
+  }, []);
+
+  const toggleEvConnector = useCallback((connector: EvConnector) => {
+    setPreferences((current) => {
+      const selected = new Set(current.evConnectors || []);
+      if (selected.has(connector)) {
+        selected.delete(connector);
+      } else {
+        selected.add(connector);
+      }
+      return {
+        ...current,
+        evConnectors: Array.from(selected),
+      };
+    });
+  }, []);
+
+  const updateVehicleProfile = useCallback((
+    updates: Partial<Pick<
+      AppPreferences,
+      "evBatteryKwh" | "evRangeKm" | "fuelTankLitres" | "homeChargingAccess"
+        | "evChargingPreference"
+    >>,
+  ) => {
+    setPreferences((current) => ({ ...current, ...updates }));
+  }, []);
+
+  const updateHomeChargingAccess = useCallback((homeChargingAccess: HomeChargingAccess) => {
+    setPreferences((current) => ({ ...current, homeChargingAccess }));
   }, []);
 
   const updateDecisionRule = useCallback((
@@ -131,7 +179,11 @@ export function useAppPreferences() {
     toggleDiscountRedemption,
     toggleFuelPolicy,
     togglePolicyBrand,
+    toggleEvConnector,
     updateDecisionRule,
     updateFuel,
+    updateHomeChargingAccess,
+    updateVehicleProfile,
+    updateVehicleEnergyType,
   };
 }

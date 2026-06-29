@@ -439,6 +439,9 @@ function buildSearchText(record, label, keyValues = []) {
 function buildTypeaheadEntries({ id, label, structure, display, keys }) {
   const unit = unitText(structure);
   const baseSignature = keys.baseKey || normaliseAddressText(label);
+  const buildingPrefixKey = structure.buildingName
+    ? [normaliseAddressText(structure.buildingName), keys.baseKey].filter(Boolean).join(" ")
+    : keys.baseKey;
   const entries = [
     {
       entryId: `${id}:exact:label`,
@@ -470,6 +473,7 @@ function buildTypeaheadEntries({ id, label, structure, display, keys }) {
     });
   }
   if (keys.baseKey && structure.buildingName && !unit) {
+    const buildingPrefixKey = [normaliseAddressText(structure.buildingName), keys.baseKey].filter(Boolean).join(" ");
     const street = [structure.number || (structure.lot ? `Lot ${structure.lot}` : ""), structure.street].filter(Boolean).join(" ");
     const place = [structure.locality, structure.state, structure.postcode].filter(Boolean).join(" ");
     entries.push({
@@ -478,7 +482,7 @@ function buildTypeaheadEntries({ id, label, structure, display, keys }) {
       displayTitle: null,
       displaySubtitle: null,
       keyText: [normaliseAddressText(structure.buildingName), street, place].filter(Boolean).join(" "),
-      prefixKey: normaliseAddressText(structure.buildingName),
+      prefixKey: buildingPrefixKey,
       baseSignature,
       entryType: "exact",
       refineRequired: false,
@@ -496,8 +500,8 @@ function buildTypeaheadEntries({ id, label, structure, display, keys }) {
       label: [baseTitle, baseSubtitle].filter(Boolean).join(", "),
       displayTitle: baseTitle,
       displaySubtitle: baseSubtitle,
-      keyText: [normaliseAddressText(structure.buildingName), keys.baseKey].filter(Boolean).join(" "),
-      prefixKey: normaliseAddressText(structure.buildingName) || keys.baseKey,
+      keyText: buildingPrefixKey,
+      prefixKey: buildingPrefixKey,
       baseSignature,
       entryType: "base_refine",
       refineRequired: true,

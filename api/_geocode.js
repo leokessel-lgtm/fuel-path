@@ -272,7 +272,7 @@ function createGeocoder({ fetchJson, loadStationData }) {
   const PARTIAL_STREET_QUERY_PATTERN = /^(\d+[a-z]?\s+[a-z][a-z\s'-]{2,})$/i;
   const STREET_TYPE_EXPANSIONS = ["street", "road", "avenue", "drive", "parade", "place", "lane", "way"];
   const SQLITE_STREET_LIKE_TERMS = new Set(["ave", "avenue", "boulevard", "circuit", "court", "cres", "crescent", "drive", "dr", "highway", "lane", "ln", "parade", "pde", "place", "pl", "road", "rd", "street", "st", "terrace", "way"]);
-  const SQLITE_UNIT_LIKE_TERMS = new Set(["apartment", "apt", "flat", "level", "lot", "office", "shop", "suite", "townhouse", "unit"]);
+  const SQLITE_UNIT_LIKE_TERMS = new Set(["apartment", "apt", "building", "duplex", "flat", "level", "lot", "office", "shop", "suite", "townhouse", "unit"]);
   const STATION_QUERY_TERMS = [
     "7 eleven",
     "ampol",
@@ -861,10 +861,14 @@ function createGeocoder({ fetchJson, loadStationData }) {
       };
     }
     const addressLookupLimit = safeSearchContext ? Math.max(limit * 4, 20) : limit;
+    const requiresExactAddress = requiresExactAddressLookup(query);
     const rawAddressSuggestions = shouldSkipAddressIndex(query, addressIndex)
       ? []
       : await searchAddressIndex(query, addressLookupLimit, { searchContext: safeSearchContext });
     const addressSuggestions = filterSafeAddressSuggestions(query, rawAddressSuggestions);
+    const strictAddressSuggestions = requiresExactAddress
+      ? filterExactAddressSuggestionsForExactQuery(query, addressSuggestions)
+      : addressSuggestions;
     const hintSuggestions = localHintGeocode(query, limit);
     const strongHintSuggestions = hintSuggestions.filter(isStrongLocalHintSuggestion);
     const weakHintSuggestions = hintSuggestions.filter((item) => !isStrongLocalHintSuggestion(item));
@@ -875,7 +879,7 @@ function createGeocoder({ fetchJson, loadStationData }) {
     const localSuggestions = rankLocalSuggestions(
       query,
       [
-        ...addressSuggestions,
+        ...strictAddressSuggestions,
         ...strongHintSuggestions,
         ...regionalLocalGeocode(query, limit),
         ...weakHintSuggestions,
@@ -886,7 +890,9 @@ function createGeocoder({ fetchJson, loadStationData }) {
     );
     let providerSuggestions = [];
     let providerWarning = "";
-    if (!hasExactAddressSuggestion(addressSuggestions) && !hasStrongLocalSuggestion(localSuggestions) && !shouldSuppressExternalGeocode(query, localSuggestions)) {
+    const strongLocalFallback = requiresExactAddress ? false : hasStrongLocalSuggestion(localSuggestions);
+    const hasExactAddress = hasExactAddressSuggestion(requiresExactAddress ? strictAddressSuggestions : addressSuggestions);
+    if (!hasExactAddress && !strongLocalFallback && !shouldSuppressExternalGeocode(query, localSuggestions)) {
       try {
         providerSuggestions = await withProviderRetries(
           selectedProvider,
@@ -915,10 +921,21 @@ function createGeocoder({ fetchJson, loadStationData }) {
     if (!providerWarning && hasUsefulLocalFallback(query, localSuggestions)) {
       providerWarning = "Using local address fallback without external geocoding.";
     }
+    const exactLocalAddressMatches = localSuggestions.filter((item) =>
+      item?.provider === "fuel_path_gnaf" && item?.type === "address" && item?.matchType === "exact_address",
+    );
+    const nonExactLocalSuggestions = localSuggestions.filter((item) => !
+      exactLocalAddressMatches.some((exactItem) => geocodeSuggestionKey(exactItem) === geocodeSuggestionKey(item))
+    );
     const suggestions =
       selectedProvider === "nominatim"
         ? mergeGeocodeSuggestions([...localSuggestions, ...providerSuggestions], limit)
-        : mergeGeocodeSuggestions([...localSuggestions, ...providerSuggestions, ...addressSuggestions], limit);
+        : mergeGeocodeSuggestions([
+          ...(requiresExactAddress ? exactLocalAddressMatches : localSuggestions),
+          ...providerSuggestions,
+          ...(requiresExactAddress ? nonExactLocalSuggestions : []),
+          ...(requiresExactAddress ? strictAddressSuggestions : addressSuggestions),
+        ], limit);
     const lookupStatus = suggestions.length
       ? providerWarning
         ? "local_fallback"
@@ -978,8 +995,83 @@ function createGeocoder({ fetchJson, loadStationData }) {
     );
   }
 
+  function filterExactAddressSuggestionsForExactQuery(query, suggestions) {
+    if (!requiresExactAddressLookup(query)) return suggestions;
+    const exactNeedles = exactAddressNeedleCandidates(query);
+    if (!exactNeedles.length) {
+      return suggestions.filter((item) =>
+        item?.provider === "fuel_path_gnaf" && item?.matchType === "exact_address"
+      );
+    }
+    return suggestions
+      .filter((item) => {
+        if (item?.provider !== "fuel_path_gnaf" || item?.type !== "address") return false;
+        if (item?.matchType === "exact_address") return true;
+        return exactAddressNeedleMatch(item?.label || "", exactNeedles);
+      })
+      .map((item) => {
+        if (item.matchType === "exact_address") return item;
+        return { ...item, matchType: "exact_address" };
+      });
+  }
+
   function filterSafeAddressSuggestions(query, suggestions) {
     return suggestions.filter((item) => safeAddressSuggestion(query, item));
+  }
+
+  function exactAddressNeedleCandidates(query) {
+    const normalised = normaliseSearchText(query);
+    const candidates = new Set();
+    const slashMatch = String(query || "").match(/^\s*(\d+[a-z]?)\s*\/\s*(\d+[a-z]?)\b/i);
+    const unitSlash = slashMatch ? { unitNumber: normaliseSearchText(slashMatch[1]), houseNumber: normaliseSearchText(slashMatch[2]) } : null;
+    const addNeedle = (value) => {
+      const needle = normaliseSearchText(value);
+      if (!isStrongExactNeedle(needle)) return;
+      const normalisedNeedle = normaliseAddressNeedleForUnitAlias(needle);
+      candidates.add(needle);
+      candidates.add(normalisedNeedle);
+    };
+    addNeedle(normalised);
+    if (unitSlash) {
+      const tokens = normalised.split(/\s+/).filter(Boolean);
+      const remainder = tokens.slice(2).join(" ");
+      addNeedle(`unit ${unitSlash.unitNumber} ${unitSlash.houseNumber}${remainder ? ` ${remainder}` : ""}`);
+    }
+    return [...candidates];
+  }
+
+  function exactAddressNeedleMatch(label, needles) {
+    const labelText = normaliseSearchText(label);
+    if (!labelText || !needles.length) return false;
+    return needles.some((needle) => {
+      const normalizedNeedle = normaliseAddressNeedleForUnitAlias(needle);
+      return labelText === needle ||
+        labelText.includes(needle) ||
+        labelText === normalizedNeedle ||
+        labelText.includes(normalizedNeedle) ||
+        addressLabelSubstantiallyStartsWithQuery(needle, label) ||
+        addressLabelSubstantiallyStartsWithQuery(normalizedNeedle, label);
+    });
+  }
+
+  function isStrongExactNeedle(needle) {
+    if (!needle) return false;
+    const tokens = needle.split(/\s+/).filter(Boolean);
+    if (tokens.length < 3) return false;
+    if (!/\d/.test(needle)) return false;
+    if (/\bunit\b/.test(needle)) return true;
+    return /(?:\bstreet\b|\bst\b|\broad\b|\brd\b|\bavenue\b|\bave\b|\bdrive\b|\bdr\b|\bparade\b|\bpde\b|\bplace\b|\bpl\b|\blane\b|\bln\b|\bway\b|\bcres\b|\bcrescent\b|\bcourt\b|\bct\b|\bhighway\b|\bhwy\b)/i.test(needle);
+  }
+
+  function normaliseAddressNeedleForUnitAlias(value) {
+    let current = String(value || "").trim().toLowerCase();
+    const unitAliasPattern = /^(?:\b(?:unit|flat|apart|apartment|lot|level|lvl|shop|suite|townhouse|site|office|offc|building|duplex)\b\s*[,/\\-]?\s*)+/i;
+    while (unitAliasPattern.test(current)) {
+      const next = current.replace(unitAliasPattern, "").trim();
+      if (next === current) break;
+      current = next;
+    }
+    return normaliseSearchText(current);
   }
 
   function safeAddressSuggestion(query, item) {
@@ -1035,10 +1127,11 @@ function createGeocoder({ fetchJson, loadStationData }) {
 
   function shouldSkipAddressIndex(query, addressIndex) {
     if (addressIndex?.apiConfigured) return false;
+    if (requiresExactAddressLookup(query)) return false;
     const queryStateCode = detectStateCode(query);
     const queryLocality = detectQueryLocality(query);
     const queryNeedle = normaliseSearchText(query);
-    const hasUnitLikeSignal = /\b(?:unit|flat|apart|apartment|lot|level|lvl|shop|suite|townhouse|site|office|offc|building|base)\b/.test(queryNeedle);
+    const hasUnitLikeSignal = /\b(?:unit|flat|apart|apartment|lot|level|lvl|shop|suite|townhouse|site|office|offc|building|base|duplex)\b/.test(queryNeedle);
     const placeIntentSignal = hasPlaceIntent(queryNeedle);
     const queryTokens = queryNeedle.split(" ").filter(Boolean);
     return (
@@ -1053,11 +1146,27 @@ function createGeocoder({ fetchJson, loadStationData }) {
   function addressLikeQuery(query) {
     const needle = normaliseSearchText(query);
     if (!needle) return false;
-    if (/\b(?:unit|flat|unit|apart|apartment|lot|level|lvl|shop|suite|townhouse|site|office|offc|building)\b/.test(needle)) return true;
+    if (/\b(?:unit|flat|unit|apart|apartment|lot|level|lvl|shop|suite|townhouse|site|office|offc|building|duplex)\b/.test(needle)) return true;
     const containsHouseNumber = /\b\d+[a-z]?(?:-\d+[a-z]?)?\b/.test(needle);
     const containsStreetToken = /\b(?:street|st|road|rd|avenue|ave|drive|dr|parade|pde|place|pl|terrace|highway|mall|court|close|vista|circuit|way|lane|ln)\b/.test(needle);
     if (containsHouseNumber && (containsStreetToken || queryHasPostcode(query))) return true;
     return containsHouseNumber && hasExplicitUppercaseStateCode(query) && containsStreetToken;
+  }
+
+  function requiresExactAddressLookup(query) {
+    const text = normaliseSearchText(query);
+    if (!text) return false;
+    if (hasSensitiveAddressContext(query) || isPostalAddressQuery(query)) return false;
+    const hasHouseNumber = /\b\d+[a-z]?(?:-\d+[a-z]?)?\b/.test(text);
+    const hasStreetToken = /\b(?:street|st|road|rd|avenue|ave|drive|dr|pde|parade|place|pl|lane|ln|court|ct|cres|crescent|way)\b/.test(text);
+    const hasLocalityContext = Boolean(detectQueryLocality(query));
+    const hasExplicitAddressContext = queryHasPostcode(query) || hasExplicitUppercaseStateCode(query);
+    const unitIntentQuery = /(^|\s)\d+[a-z]?\s*\/\s*\d+[a-z]?\b/i.test(String(query || ""));
+    const hasUnitOrBuildingPrefix = /\b(?:unit|flat|apart|apartment|lot|level|lvl|shop|suite|townhouse|site|office|offc|building|duplex)\b/.test(text);
+    if (unitIntentQuery) return true;
+    if (!hasHouseNumber || (!hasStreetToken && !hasUnitOrBuildingPrefix)) return false;
+    if (hasExplicitAddressContext || hasLocalityContext || queryHasUnitAddressProgress(text, query)) return true;
+    return false;
   }
 
   function isPlaceWordAddressSignal(query) {
@@ -1295,9 +1404,12 @@ function createGeocoder({ fetchJson, loadStationData }) {
     if (label === needle) score -= 36;
     else if (label.startsWith(needle)) score -= 18;
     else if (label.includes(needle)) score -= 4;
-    if (!refineRequired && unitIntent === "specific" && labelMatchesUnitIntent(query, item?.label)) score -= 35;
+    const unitLabelMatches = unitIntent === "specific" && labelMatchesUnitIntent(query, item?.label);
+    if (!refineRequired && unitIntent === "specific") {
+      score += unitLabelMatches ? -35 : 35;
+    }
     if (refineRequired) {
-      const unitAddressProgress = queryHasUnitAddressProgress(needle);
+      const unitAddressProgress = queryHasUnitAddressProgress(query, query);
       if (unitIntent !== "specific" && !unitAddressProgress) score += 55;
       else if (unitAddressProgress) score += 12;
       else if (unitIntent === "specific") score += 6;
@@ -1365,9 +1477,10 @@ function createGeocoder({ fetchJson, loadStationData }) {
   function unitIntentConfidence(query) {
     const text = normaliseSearchText(query);
     if (/^\d+\s+\d+\b/.test(text)) return "specific";
-    const match = text.match(/\b(?:apartment|apt|flat|level|lvl|office|offc|shop|suite|townhouse|unit)\s+([a-z0-9-]+)\b/);
+    if (queryHasSlashUnitAddress(query)) return "specific";
+    const match = text.match(/\b(?:apartment|apt|flat|level|lvl|office|offc|shop|suite|townhouse|unit|duplex|building)\s+([a-z0-9-]+)\b/);
     if (!match) return "none";
-    if (queryHasUnitAddressProgress(text)) return "specific";
+    if (queryHasUnitAddressProgress(text, query)) return "specific";
     return match[1].length >= 2 ? "specific" : "partial";
   }
 
@@ -1375,9 +1488,10 @@ function createGeocoder({ fetchJson, loadStationData }) {
     return /^\d+[a-z]?(?:-\d+[a-z]?)?\b/.test(normaliseSearchText(needle));
   }
 
-  function queryHasUnitAddressProgress(needle) {
+  function queryHasUnitAddressProgress(needle, rawNeedle = needle) {
     const text = normaliseSearchText(needle);
-    const match = text.match(/\b(?:unit|flat|apartment|apt|lot|level|lvl|office|offc|shop|suite|townhouse|site|building)\b/);
+    if (/\d+[a-z]?\s*\/\s*\d+[a-z]?\b/i.test(String(rawNeedle || ""))) return true;
+    const match = text.match(/\b(?:unit|flat|apartment|apt|lot|level|lvl|office|offc|shop|suite|townhouse|site|building|duplex|building)\b/);
     if (!match) return false;
     const suffix = text.slice(match.index + match[0].length).trim();
     const numbers = suffix.match(/\b\d+[a-z]?(?:-\d+[a-z]?)?\b/g) || [];
@@ -1389,20 +1503,45 @@ function createGeocoder({ fetchJson, loadStationData }) {
   function labelMatchesUnitIntent(query, label) {
     const queryText = normaliseSearchText(query);
     const labelText = normaliseSearchText(label);
-    const slashMatch = queryText.match(/^(\d+)\s+\d+\b/);
-    if (slashMatch && new RegExp(`\\b(?:apartment|apt|flat|office|offc|shop|suite|townhouse|unit)\\s+${slashMatch[1]}\\b`).test(labelText)) {
+    const slashMatch = String(query || "").match(/^\s*(\d+[a-z]?)\s*\/\s*(\d+[a-z]?)\b/i);
+    if (slashMatch) {
+      const unitNumber = normaliseUnitLikeNumber(slashMatch[1]);
+      const houseNumber = normaliseUnitLikeNumber(slashMatch[2]);
+      const compactNeedle = `${unitNumber} ${houseNumber}`;
+      const tokens = labelText.split(/\s+/).filter(Boolean);
+      const unitIndex = tokens.findIndex((token) => token === unitNumber);
+      if (unitIndex >= 0 && tokens.includes(houseNumber)) return true;
+      if (labelText.includes(compactNeedle)) return true;
+    }
+    if (slashMatch && new RegExp(`\\b(?:apartment|apt|flat|office|offc|shop|suite|townhouse|unit|duplex|building)\\s+${normaliseUnitLikeTokenForRegex(slashMatch[1])}\\b`).test(labelText)) {
       return true;
     }
-    const unitMatch = queryText.match(/\b(apartment|apt|flat|office|offc|shop|suite|townhouse|unit)\s+([a-z0-9-]+)\b/);
+    const unitMatch = queryText.match(/\b(?:unit|flat|apartment|apt|lot|level|lvl|shop|suite|townhouse|site|office|offc|duplex|building)\s+([a-z0-9-]+)\b/);
     if (!unitMatch) return false;
-    const unitLabelMatch = new RegExp(`\\b${unitMatch[1]}\\s+${unitMatch[2]}\\b`);
+    const unitLabelMatch = new RegExp(`\\b(?:unit|flat|apartment|apt|lot|level|lvl|shop|suite|townhouse|site|office|offc|duplex|building)\\s+${normaliseUnitLikeTokenForRegex(unitMatch[1])}\\b`);
     if (unitLabelMatch.test(labelText)) return true;
-    const unitPrefixPattern = new RegExp(`^\\s*${unitMatch[2]}\\b|\\b${unitMatch[2]}\\b\\s*,`);
+    const unitPrefixPattern = new RegExp(`^\\s*${normaliseUnitLikeTokenForRegex(unitMatch[1])}\\b|\\b${normaliseUnitLikeTokenForRegex(unitMatch[1])}\\b\\s*,`);
     return unitPrefixPattern.test(labelText);
   }
 
   function labelHasExplicitUnit(labelText) {
-    return /\b(?:apartment|apt|flat|office|offc|shop|suite|townhouse|unit)\s+[a-z0-9-]+\b/.test(labelText);
+    return /\b(?:apartment|apt|flat|office|offc|shop|suite|townhouse|unit|duplex|building)\s+[a-z0-9-]+\b/.test(normaliseSearchText(labelText));
+  }
+
+  function queryHasSlashUnitAddress(query) {
+    return /^\d+[a-z]?\s*\/\s*\d+[a-z]?\b/.test(String(query || ""));
+  }
+
+  function normaliseUnitLikeNumber(value) {
+    const match = String(value || "").toLowerCase().match(/^(\d+)([a-z]?)$/);
+    if (!match) return "";
+    return `${match[1]}${match[2] || ""}`;
+  }
+
+  function normaliseUnitLikeTokenForRegex(value) {
+    return String(value || "")
+      .toLowerCase()
+      .replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
 
   function regionalPoiNameMatches(needle, item) {

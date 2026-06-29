@@ -13,10 +13,10 @@ import { MapPoint, StationViewModel } from "../types";
 import { BrandBadge } from "./BrandBadge";
 
 const maxStationMarkers = 240;
-const maxPriceMarkers = 24;
-const maxDotMarkers = 90;
-const markerGridSize = 108;
-const compactMarkerGridSize = 36;
+const maxPriceMarkers = 18;
+const maxDotMarkers = 56;
+const markerGridSize = 132;
+const compactMarkerGridSize = 48;
 const decorativeStationMarkerAccessibility = {
   accessibilityElementsHidden: true,
   importantForAccessibility: "no-hide-descendants" as const,
@@ -628,6 +628,7 @@ const styles = StyleSheet.create({
   },
   pinSelected: {
     borderColor: colors.black,
+    boxShadow: "0 0 0 4px rgba(255, 106, 61, 0.35)",
   },
   pinPrice: {
     backgroundColor: colors.greenDark,

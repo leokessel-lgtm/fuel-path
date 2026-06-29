@@ -32,10 +32,17 @@ export function locationEvidence(point: MapPoint): LocationEvidence {
         level: "exact",
       };
     }
+    if (point.refineRequired || point.matchType === "building_refine") {
+      return {
+        detail: "Matched a building. Choose the exact unit before routing.",
+        label: "Building - confirm unit",
+        level: "unconfirmed",
+      };
+    }
     return {
-      detail: "Matched an indexed address candidate.",
-      label: "Address match",
-      level: "exact",
+      detail: "Near match from the address index. Confirm this is the right address.",
+      label: "Near address match",
+      level: "area",
     };
   }
 

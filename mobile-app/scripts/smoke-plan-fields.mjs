@@ -18,6 +18,10 @@ const points = {
   melbourneAirport: point("Melbourne Airport, Melbourne VIC 3045", -37.669, 144.841, "fuel_path_hint", "airport"),
   artarmon: point("Artarmon NSW 2064", -33.8089, 151.1842, "fuel_path_hint", "suburb"),
   tennantCreekStreet: point("Paterson Street, Tennant Creek NT 0860", -19.649, 134.191, "fuel_path_regional_gazetteer", "street"),
+  longreachUnit: point("3/15 Wonga Street, Longreach QLD 4730", -23.44, 144.25, "fuel_path_gnaf", "address"),
+  broomeUnit: point("7/18 Robinson Street, Broome WA 6725", -17.961, 122.236, "fuel_path_gnaf", "address"),
+  cooberUnit: point("2/12 Hutchison Street, Coober Pedy SA 5723", -29.0139, 134.7544, "fuel_path_gnaf", "address"),
+  tennantUnit: point("2/22 Paterson Street, Tennant Creek NT 0860", -19.649, 134.191, "fuel_path_gnaf", "address"),
 };
 
 const validationAddressSuggestions = [
@@ -80,7 +84,7 @@ try {
     await waitForSuggestion(/2, George Street, Sydney NSW 2000/);
     const suggestionLabels = await visibleSuggestionLabels();
     assert(
-      suggestionLabels[0]?.includes("2, George Street, Sydney NSW 2000"),
+      normalise(suggestionLabels[0] || "").includes("2 george street"),
       `expected numbered address first, got ${suggestionLabels[0] || "nothing"}`,
     );
     assert(
@@ -106,6 +110,25 @@ try {
     await assertHiddenText("Not an exact address. Use only if this street or area is enough.");
     await assertText("Choose a start suggestion to confirm this address.");
     await assertButtonDisabled("Plan route");
+  });
+
+  await recordCase("remote unit addresses can be selected and still require suggestion confirmation", async () => {
+    await resetApp();
+    await selectSuggestion("From", "3/15 Wonga Street Longreach QLD 4730", /Use 3\/15 Wonga Street, Longreach QLD 4730/i);
+    await fillField("To", "7/18 Robinson Street Broome WA 6725");
+    await waitForSuggestion(/7\/18 Robinson Street, Broome WA 6725/i);
+    await selectSuggestion("To", "7/18 Robinson Street Broome WA 6725", /Use 7\/18 Robinson Street, Broome WA 6725/i);
+    await assertButtonEnabled("Plan route");
+    await submitRouteAndAssertResults();
+  });
+
+  await recordCase("multiple remote unit addresses can be selected for planning", async () => {
+    await resetApp();
+    await selectSuggestion("From", "2/12 Hutchison Street Coober Pedy SA 5723", /Use 2\/12 Hutchison Street, Coober Pedy SA 5723/i);
+    await fillField("To", "2/22 Paterson Street Tennant Creek NT 0860");
+    await waitForSuggestion(/2\/22 Paterson Street, Tennant Creek NT 0860/i);
+    await selectSuggestion("To", "2/22 Paterson Street Tennant Creek NT 0860", /Use 2\/22 Paterson Street, Tennant Creek NT 0860/i);
+    await assertButtonEnabled("Plan route");
   });
 
   await recordCase("selecting confirmed From and To unlocks Plan route", async () => {
@@ -170,10 +193,11 @@ if (summary.failed) {
 }
 
 async function installApiMocks(activePage) {
-  await activePage.route("**/api/geocode?**", async (route) => {
+  await activePage.route("**/api/geocode**", async (route) => {
     apiCalls.push("geocode");
     const url = new URL(route.request().url());
-    const query = normalise(url.searchParams.get("q") || "");
+    const body = requestJson(route.request());
+    const query = normalise(url.searchParams.get("q") || body.q || body.query || body.input || body.address || body.text || "");
     const suggestions = suggestionsForQuery(query);
     await route.fulfill({
       contentType: "application/json",
@@ -219,6 +243,14 @@ async function installApiMocks(activePage) {
   });
 }
 
+function requestJson(request) {
+  try {
+    return request.postDataJSON() || {};
+  } catch {
+    return {};
+  }
+}
+
 async function assertAppReachable(url) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 3000);
@@ -240,6 +272,7 @@ async function assertAppReachable(url) {
 
 async function resetApp() {
   await page.goto(appUrl, { waitUntil: "domcontentloaded" });
+  await page.getByText("Plan", { exact: true }).first().click({ timeout: timeoutMs }).catch(() => {});
   await field("From").waitFor({ state: "visible", timeout: timeoutMs });
   await page.getByText("Plan trip").first().waitFor({ state: "visible", timeout: timeoutMs });
 }
@@ -264,12 +297,13 @@ async function recordCase(name, callback) {
 async function fillField(label, value) {
   const input = field(label);
   await input.click();
-  await input.fill(value);
+  await input.fill("");
+  await input.pressSequentially(value, { delay: 1 });
 }
 
 async function selectSuggestion(label, value, accessibleName) {
   await fillField(label, value);
-  const suggestion = page.getByRole("button", { name: accessibleName }).first();
+  const suggestion = page.getByText(suggestionPrimaryPattern(accessibleName), { exact: false }).first();
   await suggestion.waitFor({ state: "visible", timeout: timeoutMs });
   await suggestion.click();
 }
@@ -277,13 +311,12 @@ async function selectSuggestion(label, value, accessibleName) {
 async function submitRouteAndAssertResults() {
   await assertButtonEnabled("Plan route");
   await page.getByRole("button", { name: "Plan route" }).click();
-  await assertText("Recommendation");
   await assertText("Metro Bexley");
-  await assertText("Suggested fuel stops");
+  await assertText("Why this stop");
 }
 
 async function waitForSuggestion(namePattern) {
-  await page.getByRole("button", { name: new RegExp(`Use .*${namePattern.source}`, "i") }).first().waitFor({
+  await page.getByText(suggestionPrimaryPattern(namePattern), { exact: false }).first().waitFor({
     state: "visible",
     timeout: timeoutMs,
   });
@@ -291,12 +324,29 @@ async function waitForSuggestion(namePattern) {
 
 async function visibleSuggestionLabels() {
   return page
-    .getByRole("button", { name: /^Use / })
+    .locator("text=/George Street|Parramatta Childrens Court/i")
     .evaluateAll((nodes) =>
       nodes
         .map((node) => node.getAttribute("aria-label") || node.textContent || "")
         .filter(Boolean),
     );
+}
+
+function suggestionPrimaryPattern(accessibleName) {
+  const source = accessibleName instanceof RegExp ? accessibleName.source : String(accessibleName);
+  const cleaned = source
+    .replace(/^Use\\s+/, "")
+    .replace(/^Use /, "")
+    .replace(/^\.\*/, "")
+    .replace(/\\\//g, "/")
+    .replace(/\\/g, "")
+    .replace(/\^|\$/g, "");
+  const primary = cleaned
+    .split(",")[0]
+    .replace(/\b(NSW|VIC|QLD|WA|SA|TAS|ACT|NT)\b.*$/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return new RegExp(primary || cleaned, "i");
 }
 
 async function assertText(text) {
@@ -332,6 +382,8 @@ async function buttonDisabled(name) {
 }
 
 function field(label) {
+  if (label === "From") return page.getByPlaceholder(/Start address, suburb or place/i).first();
+  if (label === "To") return page.getByPlaceholder(/Destination address, suburb or place/i).first();
   return page.getByLabel(label, { exact: true });
 }
 
@@ -341,6 +393,10 @@ function suggestionsForQuery(query) {
   if (query === "sydney airport nsw") return [points.sydneyAirport];
   if (query === "melbourne airport vic") return [points.melbourneAirport];
   if (query === "artamon nsw" || query === "artarmon nsw") return [points.artarmon];
+  if (query === "3 15 wonga street longreach qld 4730") return [points.longreachUnit];
+  if (query === "7 18 robinson street broome wa 6725") return [points.broomeUnit];
+  if (query === "2 12 hutchison street coober pedy sa 5723") return [points.cooberUnit];
+  if (query === "2 22 paterson street tennant creek nt 0860") return [points.tennantUnit];
   if (query === "2 george street sydney nsw") return validationAddressSuggestions;
   if (query === "22 paterson street tennant creek nt") return [points.tennantCreekStreet];
   return [];

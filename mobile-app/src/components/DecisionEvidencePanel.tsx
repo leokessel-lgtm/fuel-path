@@ -55,24 +55,21 @@ export function cheapestTradeOffExplanation(candidates: StationViewModel[]) {
 }
 
 export function DecisionEvidencePanel({
-  alternatives,
   candidate,
   capability,
-  cheapestExplanation,
   decisionSummary,
 }: {
-  alternatives: DecisionAlternative[];
   candidate: StationViewModel;
   capability?: string;
-  cheapestExplanation: string;
   decisionSummary?: RouteDecisionSummary;
 }) {
   const economics = decisionSummary?.economics;
-  const saving = Number(economics?.netSavingAfterDetourFuel ?? candidate.netSaving ?? 0);
+  const routeComparisonCpl = Number(economics?.comparisonCpl);
+  const savingCpl = Number.isFinite(routeComparisonCpl) && routeComparisonCpl > 0
+    ? Math.max(0, routeComparisonCpl - Number(candidate.adjustedCpl || 0))
+    : Math.max(0, Number(candidate.pumpCpl || 0) - Number(candidate.adjustedCpl || 0));
   const detour = Number(economics?.detourMinutes ?? candidate.detourMinutes ?? 0);
-  const detourFuel = Number(economics?.detourFuelLitres ?? candidate.detourFuelLitres ?? 0);
   const capabilityLabel = capability ? capabilityLabelFor(capability) : "Live data";
-  const trustLine = stationTimestampLine(candidate.station);
 
   return (
     <View style={styles.evidencePanel}>
@@ -90,42 +87,16 @@ export function DecisionEvidencePanel({
       <View style={styles.evidenceGrid}>
         <EvidenceMetric label="Pump" value={`${candidate.pumpCpl.toFixed(1)} c/L`} />
         <EvidenceMetric label="Your price" value={`${candidate.adjustedCpl.toFixed(1)} c/L`} />
-        <EvidenceMetric label="Saving" value={formatMoney(saving)} />
+        <EvidenceMetric label="Best price by" value={`${savingCpl.toFixed(1)} c/L`} />
         <EvidenceMetric label="Detour" value={`${detour.toFixed(1)} min`} />
-        <EvidenceMetric label="Fuel used" value={`${detourFuel.toFixed(1)} L`} />
       </View>
-      <Text numberOfLines={2} style={styles.evidenceTrustLine}>
-        {trustLine}
+      <Text numberOfLines={2} style={styles.savingSourceLine}>
+        {Number.isFinite(routeComparisonCpl) && routeComparisonCpl > 0
+          ? `Compared with the next-best route option at ${routeComparisonCpl.toFixed(1)} c/L. Your price includes eligible discounts.`
+          : candidate.discountCpl
+            ? `Your price includes ${candidate.discountLabel}. Pump price is ${candidate.pumpCpl.toFixed(1)} c/L.`
+            : "Your price is the current pump price."}
       </Text>
-      {cheapestExplanation ? (
-        <Text numberOfLines={3} style={styles.cheapestExplanation}>
-          {cheapestExplanation}
-        </Text>
-      ) : null}
-      {alternatives.length ? (
-        <View style={styles.tradeOffPanel}>
-          <Text style={styles.tradeOffTitle}>Decision trade-offs</Text>
-          <View style={styles.tradeOffGrid}>
-            {alternatives.map((item) => (
-              <View
-                key={item.label}
-                style={[
-                  styles.tradeOffItem,
-                  item.stationCode === candidate.station.stationCode && styles.tradeOffItemSelected,
-                ]}
-              >
-                <Text style={styles.tradeOffLabel}>{item.label}</Text>
-                <Text numberOfLines={1} style={styles.tradeOffStation}>
-                  {item.stationName}
-                </Text>
-                <Text numberOfLines={1} style={styles.tradeOffNote}>
-                  {item.note}
-                </Text>
-              </View>
-            ))}
-          </View>
-        </View>
-      ) : null}
     </View>
   );
 }
@@ -180,7 +151,7 @@ function safestCandidate(candidates: StationViewModel[]) {
 }
 
 function routeValueSummary(candidate: StationViewModel) {
-  return `${formatMoney(Number(candidate.netSaving || 0))} after ${Number(candidate.detourMinutes || 0).toFixed(1)} min`;
+  return `${candidate.adjustedCpl.toFixed(1)} c/L, ${Number(candidate.detourMinutes || 0).toFixed(1)} min detour`;
 }
 
 function safetySummary(candidate: StationViewModel) {
@@ -252,7 +223,7 @@ const styles = StyleSheet.create({
     borderColor: colors.line,
     borderRadius: radii.sm,
     borderWidth: 1,
-    flexBasis: "18%",
+    flexBasis: "23%",
     flexGrow: 1,
     justifyContent: "center",
     minHeight: 48,
@@ -272,64 +243,10 @@ const styles = StyleSheet.create({
     marginTop: 2,
     textAlign: "center",
   },
-  evidenceTrustLine: {
-    color: colors.muted,
+  savingSourceLine: {
+    color: colors.greenDark,
     fontSize: 10,
-    fontWeight: "400",
-    lineHeight: 14,
-  },
-  cheapestExplanation: {
-    color: colors.ink,
-    fontSize: typeScale.caption,
-    fontWeight: "400",
-    lineHeight: 18,
-  },
-  tradeOffPanel: {
-    borderTopColor: colors.line,
-    borderTopWidth: 1,
-    gap: spacing.xs,
-    paddingTop: spacing.sm,
-  },
-  tradeOffTitle: {
-    color: colors.ink,
-    fontSize: typeScale.caption,
-    fontWeight: "600",
-  },
-  tradeOffGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing.xs,
-  },
-  tradeOffItem: {
-    backgroundColor: colors.white,
-    borderColor: colors.line,
-    borderRadius: radii.sm,
-    borderWidth: 1,
-    flexBasis: "48%",
-    flexGrow: 1,
-    minHeight: 62,
-    padding: spacing.xs,
-  },
-  tradeOffItemSelected: {
-    backgroundColor: colors.greenSoft,
-    borderColor: colors.green,
-  },
-  tradeOffLabel: {
-    color: colors.muted,
-    fontSize: 9,
     fontWeight: "700",
-    textTransform: "uppercase",
-  },
-  tradeOffStation: {
-    color: colors.ink,
-    fontSize: typeScale.caption,
-    fontWeight: "600",
-    marginTop: 2,
-  },
-  tradeOffNote: {
-    color: colors.muted,
-    fontSize: 10,
-    fontWeight: "400",
-    marginTop: 2,
+    lineHeight: 14,
   },
 });

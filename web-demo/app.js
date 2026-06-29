@@ -1115,10 +1115,11 @@ async function resolveRouteLocation(kind) {
   if (place && place.inputValue === text && Number.isFinite(place.lat) && Number.isFinite(place.lon)) {
     return place;
   }
-  const params = new URLSearchParams({ q: addressQuery(text) });
-  const response = await fetch(`${API_GEOCODE_URL}?${params.toString()}`, {
-    headers: { Accept: "application/json" },
+  const response = await fetch(API_GEOCODE_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
     cache: "no-store",
+    body: JSON.stringify({ q: addressQuery(text) }),
   });
   const payload = await response.json();
   if (!response.ok) {
@@ -2483,10 +2484,11 @@ function lookupAddress(kind) {
 async function fetchAddressSuggestions(kind, rawQuery) {
   const query = rawQuery.trim();
   try {
-    const params = new URLSearchParams({ q: addressQuery(query), limit: "5" });
-    const response = await fetch(`${API_GEOCODE_URL}?${params.toString()}`, {
-      headers: { Accept: "application/json" },
+    const response = await fetch(API_GEOCODE_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
       cache: "no-store",
+      body: JSON.stringify({ q: addressQuery(query), limit: 5 }),
     });
     const payload = await response.json();
     if (!response.ok) {

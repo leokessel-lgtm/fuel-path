@@ -18,6 +18,7 @@ test("provider terms readiness blocks public launch when configured terms are mi
         cwd: ROOT,
         env: {
           ...process.env,
+          VIC_SERVO_SAVER_API_KEY: "",
           NSW_FUEL_API_KEY: "test-nsw-key",
           NSW_FUEL_API_SECRET: "test-nsw-secret",
           QLD_FUEL_API_TOKEN: "test-qld-token",
@@ -61,6 +62,7 @@ test("provider terms readiness blocks public launch when flags are set without e
         cwd: ROOT,
         env: {
           ...process.env,
+          VIC_SERVO_SAVER_API_KEY: "",
           NSW_FUEL_API_KEY: "test-nsw-key",
           NSW_FUEL_API_SECRET: "test-nsw-secret",
           QLD_FUEL_API_TOKEN: "test-qld-token",
@@ -82,6 +84,31 @@ test("provider terms readiness blocks public launch when flags are set without e
       assert.equal(payload.blockers.includes("tas_terms_evidence_missing"), true);
       assert.equal(payload.evidence.provided, false);
       assert.deepEqual(payload.termsBlocked, []);
+      return true;
+    },
+  );
+});
+
+test("provider terms readiness blocks VIC public claims when Servo Saver evidence is missing", async () => {
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      ["scripts/check-provider-terms-readiness.mjs", "--production", "--enforce-public-launch"],
+      {
+        cwd: ROOT,
+        env: {
+          ...process.env,
+          VIC_SERVO_SAVER_API_KEY: "test-vic-key",
+        },
+        timeout: 10_000,
+      },
+    ),
+    (error) => {
+      const payload = JSON.parse(error.stdout);
+      assert.equal(payload.status, "blocked");
+      assert.equal(payload.publicLivePriceClaimsAllowed, false);
+      assert.equal(payload.blockers.includes("vic_terms_evidence_missing"), true);
+      assert.equal(payload.evidenceBlocked.some((entry) => entry.region === "VIC"), true);
       return true;
     },
   );
@@ -129,6 +156,7 @@ test("provider terms readiness rejects vague evidence fields even when booleans 
         cwd: ROOT,
         env: {
           ...process.env,
+          VIC_SERVO_SAVER_API_KEY: "",
           NSW_FUEL_API_KEY: "test-nsw-key",
           NSW_FUEL_API_SECRET: "test-nsw-secret",
           QLD_FUEL_API_TOKEN: "test-qld-token",
@@ -177,6 +205,7 @@ test("provider terms readiness rejects generic attribution wording", async () =>
         cwd: ROOT,
         env: {
           ...process.env,
+          VIC_SERVO_SAVER_API_KEY: "",
           NSW_FUEL_API_KEY: "test-nsw-key",
           NSW_FUEL_API_SECRET: "test-nsw-secret",
           QLD_FUEL_API_TOKEN: "test-qld-token",
@@ -221,6 +250,7 @@ test("provider terms readiness rejects future terms acceptance dates", async () 
         cwd: ROOT,
         env: {
           ...process.env,
+          VIC_SERVO_SAVER_API_KEY: "",
           NSW_FUEL_API_KEY: "test-nsw-key",
           NSW_FUEL_API_SECRET: "test-nsw-secret",
           QLD_FUEL_API_TOKEN: "test-qld-token",
@@ -269,6 +299,7 @@ test("provider terms readiness rejects vague evidence references", async () => {
         cwd: ROOT,
         env: {
           ...process.env,
+          VIC_SERVO_SAVER_API_KEY: "",
           NSW_FUEL_API_KEY: "test-nsw-key",
           NSW_FUEL_API_SECRET: "test-nsw-secret",
           QLD_FUEL_API_TOKEN: "test-qld-token",
@@ -319,6 +350,7 @@ test("provider terms readiness rejects evidence references dated before terms ac
         cwd: ROOT,
         env: {
           ...process.env,
+          VIC_SERVO_SAVER_API_KEY: "",
           NSW_FUEL_API_KEY: "test-nsw-key",
           NSW_FUEL_API_SECRET: "test-nsw-secret",
           QLD_FUEL_API_TOKEN: "test-qld-token",
@@ -363,6 +395,7 @@ test("provider terms readiness rejects future-dated evidence references", async 
         cwd: ROOT,
         env: {
           ...process.env,
+          VIC_SERVO_SAVER_API_KEY: "",
           NSW_FUEL_API_KEY: "test-nsw-key",
           NSW_FUEL_API_SECRET: "test-nsw-secret",
           QLD_FUEL_API_TOKEN: "test-qld-token",
@@ -414,6 +447,7 @@ test("provider terms readiness rejects evidence references from the wrong provid
         cwd: ROOT,
         env: {
           ...process.env,
+          VIC_SERVO_SAVER_API_KEY: "",
           NSW_FUEL_API_KEY: "test-nsw-key",
           NSW_FUEL_API_SECRET: "test-nsw-secret",
           QLD_FUEL_API_TOKEN: "test-qld-token",
@@ -471,6 +505,7 @@ test("provider terms readiness rejects state-only provider evidence references",
         cwd: ROOT,
         env: {
           ...process.env,
+          VIC_SERVO_SAVER_API_KEY: "",
           NSW_FUEL_API_KEY: "test-nsw-key",
           NSW_FUEL_API_SECRET: "test-nsw-secret",
           QLD_FUEL_API_TOKEN: "test-qld-token",
@@ -523,6 +558,7 @@ test("provider terms readiness rejects stale evidence references", async () => {
         cwd: ROOT,
         env: {
           ...process.env,
+          VIC_SERVO_SAVER_API_KEY: "",
           NSW_FUEL_API_KEY: "test-nsw-key",
           NSW_FUEL_API_SECRET: "test-nsw-secret",
           QLD_FUEL_API_TOKEN: "test-qld-token",
@@ -570,6 +606,7 @@ test("provider terms readiness caps excessive evidence freshness windows", async
         cwd: ROOT,
         env: {
           ...process.env,
+          VIC_SERVO_SAVER_API_KEY: "",
           NSW_FUEL_API_KEY: "test-nsw-key",
           NSW_FUEL_API_SECRET: "test-nsw-secret",
           QLD_FUEL_API_TOKEN: "test-qld-token",
@@ -613,6 +650,7 @@ test("provider terms readiness rejects evidence references without source files"
         cwd: ROOT,
         env: {
           ...process.env,
+          VIC_SERVO_SAVER_API_KEY: "",
           NSW_FUEL_API_KEY: "test-nsw-key",
           NSW_FUEL_API_SECRET: "test-nsw-secret",
           QLD_FUEL_API_TOKEN: "test-qld-token",
@@ -669,6 +707,7 @@ test("provider terms readiness rejects source files that leak provider secrets",
         cwd: ROOT,
         env: {
           ...process.env,
+          VIC_SERVO_SAVER_API_KEY: "",
           NSW_FUEL_API_KEY: "test-nsw-key",
           NSW_FUEL_API_SECRET: "test-nsw-secret",
           QLD_FUEL_API_TOKEN: "test-qld-token",
@@ -690,6 +729,65 @@ test("provider terms readiness rejects source files that leak provider secrets",
   );
 });
 
+test("provider terms readiness rejects VIC evidence source files that leak Servo Saver credentials", async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-provider-terms-vic-secret-"));
+  const sourcePath = path.join(tmp, "evidence", "vic-terms-source.md");
+  fs.mkdirSync(path.dirname(sourcePath), { recursive: true });
+  fs.writeFileSync(
+    sourcePath,
+    [
+      "Service Victoria Servo Saver terms source for service-victoria-servo-saver-api-approval-email-2026-06-25.",
+      "Terms accepted at 2026-06-25.",
+      "Attribution wording: Service Victoria Servo Saver source and required disclaimer wording approved for display.",
+      "x-consumer-id: do-not-store-provider-credential",
+    ].join("\n"),
+  );
+
+  const evidence = providerTermsEvidence({
+    VIC: {
+      servoSaverApiAccessApproved: true,
+      servoSaverTermsAccepted: true,
+      cachingDurationConfirmed: true,
+      cachingDurationMinutes: 5,
+      attributionDisclaimerReady: true,
+      attributionDisclaimerWording: "Service Victoria Servo Saver source and required disclaimer wording approved for display.",
+      commercialConsumerAppUseConfirmed: true,
+      termsAcceptedAt: "2026-06-25",
+      evidenceReference: "service-victoria-servo-saver-api-approval-email-2026-06-25",
+      evidenceSource: "evidence/vic-terms-source.md",
+    },
+  });
+  const evidencePath = path.join(tmp, "provider-terms-evidence.json");
+  fs.writeFileSync(evidencePath, `${JSON.stringify(evidence, null, 2)}\n`);
+
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "scripts/check-provider-terms-readiness.mjs",
+        "--production",
+        "--enforce-public-launch",
+        "--evidence-json",
+        evidencePath,
+      ],
+      {
+        cwd: ROOT,
+        env: {
+          ...process.env,
+          VIC_SERVO_SAVER_API_KEY: "test-vic-key",
+        },
+        timeout: 10_000,
+      },
+    ),
+    (error) => {
+      const payload = JSON.parse(error.stdout);
+      assert.equal(payload.status, "blocked");
+      assert.equal(payload.blockers.includes("vic_terms_evidence_missing"), true);
+      return true;
+    },
+  );
+});
+
 test("provider terms readiness passes when configured provider terms have evidence", async () => {
   const evidencePath = writeEvidenceFile();
   const { stdout } = await execFileAsync(
@@ -705,6 +803,7 @@ test("provider terms readiness passes when configured provider terms have eviden
       cwd: ROOT,
       env: {
         ...process.env,
+          VIC_SERVO_SAVER_API_KEY: "",
         NSW_FUEL_API_KEY: "test-nsw-key",
         NSW_FUEL_API_SECRET: "test-nsw-secret",
         QLD_FUEL_API_TOKEN: "test-qld-token",
@@ -723,6 +822,46 @@ test("provider terms readiness passes when configured provider terms have eviden
   assert.deepEqual(payload.evidenceBlocked, []);
   assert.equal(payload.evidence.provided, true);
   assert.deepEqual(payload.confirmationChecklist, []);
+});
+
+test("provider terms readiness passes VIC when Servo Saver evidence is present", async () => {
+  const evidencePath = writeEvidenceFile({
+    VIC: {
+      servoSaverApiAccessApproved: true,
+      servoSaverTermsAccepted: true,
+      cachingDurationConfirmed: true,
+      cachingDurationMinutes: 5,
+      attributionDisclaimerReady: true,
+      attributionDisclaimerWording: "Service Victoria Servo Saver source and required disclaimer wording approved for display.",
+      commercialConsumerAppUseConfirmed: true,
+      termsAcceptedAt: "2026-06-25",
+      evidenceReference: "service-victoria-servo-saver-api-approval-email-2026-06-25",
+    },
+  });
+
+  const { stdout } = await execFileAsync(
+    process.execPath,
+    [
+      "scripts/check-provider-terms-readiness.mjs",
+      "--production",
+      "--enforce-public-launch",
+      "--evidence-json",
+      evidencePath,
+    ],
+    {
+      cwd: ROOT,
+      env: {
+        ...process.env,
+        VIC_SERVO_SAVER_API_KEY: "test-vic-key",
+      },
+      timeout: 10_000,
+    },
+  );
+  const payload = JSON.parse(stdout);
+  assert.equal(payload.status, "ready");
+  assert.equal(payload.publicLivePriceClaimsAllowed, true);
+  assert.deepEqual(payload.evidenceBlocked, []);
+  assert.equal(payload.publicLiveRegions.includes("VIC"), true);
 });
 
 function writeEvidenceFile(overrides = {}) {
@@ -755,6 +894,7 @@ function writeProviderEvidenceSources(tmp, evidence, overrides) {
 
 function providerFamilyText(region) {
   if (region === "QLD") return "Queensland Fuel Prices";
+  if (region === "VIC") return "Service Victoria Servo Saver";
   return "FuelCheck API.NSW";
 }
 

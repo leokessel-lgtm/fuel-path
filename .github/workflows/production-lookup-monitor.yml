@@ -5,6 +5,10 @@ on:
     - cron: "*/30 * * * *"
   workflow_dispatch:
 
+concurrency:
+  group: production-lookup-monitor
+  cancel-in-progress: false
+
 jobs:
   monitor:
     name: Check production lookup readiness
@@ -26,3 +30,14 @@ jobs:
 
       - name: Run production lookup monitor
         run: npm run check:production-lookup-monitor -- --api-base https://fuel-path.vercel.app
+
+      - name: Upload monitor evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-lookup-monitor
+          path: |
+            tmp/production-lookup-monitor-*.json
+            tmp/geocode-focused-regression-*.json
+          if-no-files-found: warn
+          retention-days: 30

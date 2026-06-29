@@ -240,3 +240,48 @@ Recommended chaos cases:
 - One state provider down while another works.
 - Provider returns stale but usable price data.
 
+
+## Provider integration chaos stress results
+
+Command:
+
+```bash
+npm run test:provider-chaos
+```
+
+Script:
+
+- `scripts/provider-integration-chaos-stress.mjs`
+
+Result: pass.
+
+Evidence:
+
+- JSON: `tmp/provider-integration-chaos-stress-2026-06-29T10-14-57-328Z.json`
+- Report: `tmp/provider-integration-chaos-stress-2026-06-29T10-14-57-328Z.md`
+
+Coverage:
+
+- Production `/api/status` lookup readiness.
+- Invalid station coordinates return clean client errors without stack leakage.
+- NT fuel coverage gap returns explicit unsupported-region context, not a provider crash.
+- Production sample fallback is disabled or explicit, with no accidental demo-price leakage.
+- EV provider list exposes expected provider candidates.
+- Unsupported commercial EV provider, PlugShare, returns pending-commercial-access context and no live availability claim.
+- Invalid EV provider returns clean client error.
+- Open Charge Map missing-key/live contract stays explicit and avoids live bay availability claims.
+- Empty geocode query returns clean not-found error.
+- G-NAF exact-address geocode still resolves as `fuel_path_gnaf` / `exact_address`.
+- Missing route destination returns clean client error.
+- Route score with impossible brand filter returns zero recommendations without crashing and preserves brand-filter context.
+- API Ninjas EV malformed payload normalisation drops invalid rows, keeps valid connectors, and does not invent unknown power.
+- Open Charge Map malformed payload normalisation drops invalid rows, keeps valid power/connector data, and avoids live availability overclaim.
+- Simulated API Ninjas timeout throws a provider timeout error through the adapter layer.
+
+Brutal read:
+
+- Provider degradation contracts held in this run.
+- The suite now covers both live-safe production behaviour and local injected EV adapter chaos.
+- This still does not fully simulate every state fuel provider returning malformed payloads. NSW/WA/VIC/SA/TAS provider-specific malformed payload tests should be the next depth upgrade if provider chaos becomes a release blocker.
+- NT remains a deliberate coverage-gap problem, not an integration crash.
+- Open Charge Map remains not configured in production, so EV live data currently depends on the configured production EV provider path rather than OCM.

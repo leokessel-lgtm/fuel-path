@@ -564,3 +564,36 @@ Run window: 2026-06-29 12:10-13:08 AEST.
 - The strongest remaining product limitation is not route/scoring stability. It is data coverage and quality: NT live fuel remains unavailable, Tennant Creek is a combined fuel/EV coverage gap, and API Ninjas EV metadata is often thin with missing power values.
 - The EV provider trial script is not useful from this terminal without local `OPENWEB_NINJA_API_KEY` or `API_NINJAS_API_KEY`; production EV results do work through deployed server configuration, but local provider-trial evidence remains skipped.
 - Browser stress is now strong for controlled UI states and route journeys, but not yet a substitute for physical-device native map smoke.
+
+## Limitations follow-up: EV cascade and rural/remote coverage
+
+Run window: 2026-06-29 17:57-18:11 AEST.
+
+### Changes made
+
+- Nearby EV app calls no longer hard-pin `api_ninjas`; the backend can now use its configured default provider and zero-result cascade.
+- EV provider fallback now tries configured OpenWeb Ninja when the primary provider returns zero chargers, before Open Charge Map.
+- EV charger sorting now tolerates missing `distanceKm` instead of producing unstable ordering.
+- EV provider trial smoke can run in `--proxy` mode against the deployed `/api/ev-chargers` endpoint, so local terminal secrets are not required for coverage evidence.
+- Rural/remote combined smoke now performs and reports an expanded 100 km search before declaring a true coverage gap.
+
+### Evidence
+
+| Gate | Evidence | Result |
+|---|---|---:|
+| EV provider proxy comparison | `node scripts/validate-ev-provider-trial-smoke.mjs --proxy --provider=openweb_ninja,open_charge_map,api_ninjas --limit=5` | OpenWeb Ninja 5/5 NT, API Ninjas 3/5 NT, OCM 0/5 NT |
+| Rural/remote combined nearby smoke | `tmp/combined-nearby-rural-remote-smoke-2026-06-29T18-04-17-232Z.json` | 12/12 pass, 0 coverage gaps |
+| Tennant Creek default EV cascade probe | `/api/ev-chargers` with no provider override | provider `api_ninjas+openweb_ninja`, 2 chargers |
+| EV provider unit tests | `node --test tests/api/ev-chargers.test.js` | 12/12 pass |
+| Mobile app typecheck | `cd mobile-app && npm run typecheck` | pass |
+| Production smoke matrix | `tmp/production-smoke-matrix-stress-2026-06-29T18-09-46-483Z.json` | 9/9 pass |
+| Frontend failure-state UX | `tmp/frontend-failure-state-stress-2026-06-29T18-10-58-983Z.json` | 7/7 pass |
+| Provider integration chaos | `tmp/provider-integration-chaos-stress-2026-06-29T18-05-11-381Z.json` | 15/15 pass |
+| Claim-safety audit | `tmp/claim-safety-audit-stress-2026-06-29T18-05-11-264Z.json` | 20/20 pass |
+
+### Brutal read
+
+- The Tennant Creek combined coverage gap is addressed for EV: production default search now falls through to OpenWeb Ninja and returns two charger candidates.
+- NT live fuel pricing is still not addressed. The app remains honest about this: NT fuel returns the national-provider-matrix warning until a live NT fuel source is approved.
+- EV metadata is materially better in fallback cases like Mount Isa, Coober Pedy and Tennant Creek because OpenWeb rows include power values, but API Ninjas-only locations still often have thin power metadata.
+- OpenWeb Ninja is slower than API Ninjas in the proxy comparison, so the fallback should remain zero-result recovery rather than first-choice everywhere unless we later optimise or pay for a better provider.

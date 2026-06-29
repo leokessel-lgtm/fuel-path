@@ -119,9 +119,9 @@ test("EV provider policy falls back to configured Open Charge Map before not-con
   });
 });
 
-test("EV fallback providers avoid slow OpenWeb unless explicitly configured", () => {
+test("EV fallback providers include OpenWeb for zero-result recovery unless explicitly configured", () => {
   withEnv({ FUEL_PATH_EV_CASCADE_PROVIDERS: "" }, () => {
-    assert.deepEqual(fallbackEvProviders("api_ninjas"), ["open_charge_map"]);
+    assert.deepEqual(fallbackEvProviders("api_ninjas"), ["openweb_ninja", "open_charge_map"]);
   });
   withEnv({ FUEL_PATH_EV_CASCADE_PROVIDERS: "openweb_ninja,open_charge_map" }, () => {
     assert.deepEqual(fallbackEvProviders("api_ninjas"), ["openweb_ninja", "open_charge_map"]);

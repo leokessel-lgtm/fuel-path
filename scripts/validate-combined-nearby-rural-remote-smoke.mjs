@@ -6,6 +6,8 @@ const API_BASE = (process.env.FUEL_PATH_API_BASE || "https://fuel-path.vercel.ap
 const fuel = process.env.FUEL_PATH_SMOKE_FUEL || "U91";
 const radiusKm = Number(process.env.FUEL_PATH_SMOKE_RADIUS_KM || 35);
 const limit = Number(process.env.FUEL_PATH_SMOKE_LIMIT || 20);
+const expandedRadiusKm = Number(process.env.FUEL_PATH_SMOKE_EXPANDED_RADIUS_KM || 100);
+const expandedLimit = Number(process.env.FUEL_PATH_SMOKE_EXPANDED_LIMIT || 40);
 const runId = new Date().toISOString().replace(/[:.]/g, "-");
 const outputDir = path.resolve("tmp");
 
@@ -30,9 +32,25 @@ for (const item of cases) {
     fetchStations(item),
     fetchChargers(item),
   ]);
-  const combinedCount = stations.returned + chargers.returned;
+  let expanded = null;
+  let combinedCount = stations.returned + chargers.returned;
+  if (combinedCount === 0 && expandedRadiusKm > radiusKm) {
+    const [expandedStations, expandedChargers] = await Promise.all([
+      fetchStations(item, { radiusKm: expandedRadiusKm, limit: expandedLimit }),
+      fetchChargers(item, { radiusKm: expandedRadiusKm, limit: expandedLimit }),
+    ]);
+    expanded = {
+      radiusKm: expandedRadiusKm,
+      stations: expandedStations.returned,
+      chargers: expandedChargers.returned,
+      combinedCount: expandedStations.returned + expandedChargers.returned,
+      stationWarning: expandedStations.warning,
+      chargerWarning: expandedChargers.warning,
+    };
+    combinedCount = expanded.combinedCount > 0 ? expanded.combinedCount : combinedCount;
+  }
   const chargerMetadata = chargerMetadataSummary(chargers.items);
-  const status = combinedStatus(stations, chargers, combinedCount);
+  const status = combinedStatus(stations, chargers, stations.returned + chargers.returned, expanded);
   results.push({
     id: item.id,
     label: item.label,
@@ -53,6 +71,7 @@ for (const item of cases) {
       metadataQuality: chargerMetadata.quality,
     },
     combinedCount,
+    expandedSearch: expanded,
     topUsefulnessPreview: usefulnessPreview(stations.items, chargers.items),
   });
 }
@@ -70,9 +89,10 @@ if (summary.failed > 0) {
   throw new Error(`${summary.failed}/${summary.cases} rural/remote combined nearby cases failed`);
 }
 
-function combinedStatus(stations, chargers, combinedCount) {
+function combinedStatus(stations, chargers, combinedCount, expanded) {
   if (stations.status !== 200 || chargers.status !== 200) return "fail";
   if (combinedCount > 0) return "pass";
+  if (expanded?.combinedCount > 0) return "expanded_pass";
   return "coverage_gap";
 }
 
@@ -80,15 +100,17 @@ function c(id, label, lat, lon, category) {
   return { id, label, lat, lon, category };
 }
 
-async function fetchStations(item) {
+async function fetchStations(item, options = {}) {
+  const requestedRadiusKm = options.radiusKm || radiusKm;
+  const requestedLimit = options.limit || limit;
   const params = new URLSearchParams({
     source: "live",
     fuel,
     lat: String(item.lat),
     lon: String(item.lon),
     label: item.label,
-    radiusKm: String(radiusKm),
-    limit: String(limit),
+    radiusKm: String(requestedRadiusKm),
+    limit: String(requestedLimit),
   });
   const response = await fetch(`${API_BASE}/api/stations?${params}`, { headers: { Accept: "application/json" } });
   const body = await safeJson(response);
@@ -100,14 +122,15 @@ async function fetchStations(item) {
   };
 }
 
-async function fetchChargers(item) {
+async function fetchChargers(item, options = {}) {
+  const requestedRadiusKm = options.radiusKm || radiusKm;
+  const requestedLimit = options.limit || limit;
   const params = new URLSearchParams({
-    provider: "api_ninjas",
     lat: String(item.lat),
     lon: String(item.lon),
     label: item.label,
-    radiusKm: String(radiusKm),
-    limit: String(limit),
+    radiusKm: String(requestedRadiusKm),
+    limit: String(requestedLimit),
   });
   const response = await fetch(`${API_BASE}/api/ev-chargers?${params}`, { headers: { Accept: "application/json" } });
   const body = await safeJson(response);
@@ -162,11 +185,13 @@ function usefulnessPreview(stations, chargers) {
 function summarise(rows) {
   const failedRows = rows.filter((row) => row.status === "fail");
   const coverageGapRows = rows.filter((row) => row.status === "coverage_gap");
+  const expandedRows = rows.filter((row) => row.status === "expanded_pass");
   const chargerLocations = rows.filter((row) => row.chargers.returned > 0);
   const poorMetadata = rows.filter((row) => row.chargers.returned > 0 && row.chargers.metadataQuality === "poor");
   return {
     cases: rows.length,
     passed: rows.filter((row) => row.status === "pass").length,
+    expandedPasses: expandedRows.length,
     failed: failedRows.length,
     coverageGaps: coverageGapRows.length,
     chargerLocations: chargerLocations.length,
@@ -176,6 +201,7 @@ function summarise(rows) {
     chargerResultTotal: rows.reduce((total, row) => total + row.chargers.returned, 0),
     failures: failedRows.map((row) => row.id),
     coverageGapLocations: coverageGapRows.map((row) => row.id),
+    expandedPassLocations: expandedRows.map((row) => row.id),
   };
 }
 
@@ -189,6 +215,7 @@ Run: ${payload.runId}
 
 - Cases: ${summary.cases}
 - Passed with fuel or charger results: ${summary.passed}
+- Recovered by expanded ${expandedRadiusKm} km search: ${summary.expandedPasses}
 - Coverage gaps with no fuel or charger results: ${summary.coverageGaps}
 - Failed HTTP or malformed provider responses: ${summary.failed}
 - Charger locations: ${summary.chargerLocations}
@@ -200,6 +227,10 @@ Run: ${payload.runId}
 ## Coverage gaps
 
 ${results.filter((row) => row.status === "coverage_gap").map((row) => `- ${row.id}: ${row.label}; fuel warning="${row.stations.warning || "none"}"; charger warning="${row.chargers.warning || "none"}"`).join("\n") || "- None"}
+
+## Expanded-search recoveries
+
+${results.filter((row) => row.status === "expanded_pass").map((row) => `- ${row.id}: ${row.label}; expanded ${row.expandedSearch.radiusKm} km found ${row.expandedSearch.stations} fuel stations and ${row.expandedSearch.chargers} chargers`).join("\n") || "- None"}
 
 ## Failures
 

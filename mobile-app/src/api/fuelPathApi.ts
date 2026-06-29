@@ -166,7 +166,7 @@ export async function getNearbyEvChargers({
   connectors = [],
   powerMode = "",
   minPowerKw = 0,
-  provider = "api_ninjas",
+  provider = "",
 }: {
   centre: MapPoint;
   radiusKm?: number;
@@ -174,11 +174,11 @@ export async function getNearbyEvChargers({
   connectors?: string[];
   powerMode?: EvPowerMode;
   minPowerKw?: number;
-  provider?: "open_charge_map" | "openweb_ninja" | "api_ninjas" | "plugshare" | "here" | "mapbox" | "tomtom" | "network_partner";
+  provider?: "" | "open_charge_map" | "openweb_ninja" | "api_ninjas" | "plugshare" | "here" | "mapbox" | "tomtom" | "network_partner";
 }) {
   return fetchJson<EvChargerResponse>(
     `/api/ev-chargers?${query({
-      provider,
+      provider: provider || undefined,
       lat: centre.lat,
       lon: centre.lon,
       label: centre.label,

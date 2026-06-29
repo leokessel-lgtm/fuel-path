@@ -38,7 +38,7 @@ function evChargingStatus() {
     configured,
     capability: configured ? "prototype_live_capable" : "prototype_not_configured",
     defaultProvider: provider,
-    providerSelection: "api_ninjas_if_configured_else_openweb_ninja_if_configured_else_open_charge_map_if_configured_else_api_ninjas_not_configured",
+    providerSelection: "api_ninjas_if_configured_else_openweb_ninja_if_configured_else_open_charge_map_if_configured_else_api_ninjas_not_configured; zero-result fallback tries configured OpenWeb Ninja then Open Charge Map unless overridden",
     apiNinjasConfigured,
     openWebNinjaConfigured,
     openChargeMapConfigured,
@@ -67,7 +67,7 @@ function fallbackEvProviders(provider) {
     .map(normaliseEvProvider)
     .filter((item) => item !== "list");
   if (configured.length) return configured.filter((item) => item !== provider);
-  return ["api_ninjas", "open_charge_map"].filter((item) => item !== provider);
+  return ["api_ninjas", "openweb_ninja", "open_charge_map"].filter((item) => item !== provider);
 }
 
 module.exports = {

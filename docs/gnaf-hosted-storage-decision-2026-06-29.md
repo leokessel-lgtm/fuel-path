@@ -15,6 +15,26 @@ Approve this sequence:
 
 Do not migrate to Supabase or Vercel storage for this step.
 
+## 2026-06-29 update
+
+The NSW state-shard load was attempted and failed because the current Neon project size limit is 512 MB.
+
+Evidence:
+
+- Result file: `docs/gnaf-hosted-nsw-shard-load-result-2026-06-29.md`
+- Rows loaded before failure: `1,655,000`
+- Expected NSW rows: `5,206,855`
+- Failure: `could not extend file because project size limit (512 MB) has been exceeded`
+
+Updated decision:
+
+- Current Neon target is not sufficient for the NSW shard.
+- Full national hosted load remains blocked.
+- Hosted 900-case national benchmark remains blocked.
+- Public exact-address claims remain blocked.
+- Next storage decision must approve a larger Neon tier or a replacement architecture before another hosted write attempt.
+- The failed partial shard load was rolled back to the indexed 80,000-row preview posture.
+
 ## Current evidence
 
 Source: `tmp/gnaf-hosted-load-plan-2026-06-29T00-19-56-270Z.json`
@@ -99,6 +119,8 @@ Weak points:
 - The plan does not yet prove p90/p95 query latency under realistic autocomplete traffic.
 - Full national load could create a slow, expensive database that still does not feel Google-grade to users.
 - Supabase looks cheaper on disk, but that comparison is incomplete unless compute, downtime, migration, indexes, pooling and rollback are included.
+- Actual NSW shard loading failed at the current 512 MB project limit before reaching even half the state shard.
+- Rollback was successful, but still too manual and should be scripted before retrying hosted writes.
 
 Required iteration before full load:
 

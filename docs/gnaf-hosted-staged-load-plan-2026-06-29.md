@@ -117,6 +117,32 @@ npm run plan:gnaf-hosted-load
 ## Current blockers
 
 - Full national hosted storage cost is not approved.
-- State-shard benchmark is not yet run.
+- NSW state-shard load failed on the current hosted Neon target after 1,655,000 rows because the project size limit is 512 MB.
+- State-shard benchmark is not yet run because the shard load did not complete.
 - Automated rollback is not yet implemented.
 - Hosted 900-case national benchmark is not yet held.
+
+## 2026-06-29 NSW shard attempt
+
+The NSW shard load was attempted with the approved staged command and failed before completion.
+
+Evidence:
+
+- Result file: `docs/gnaf-hosted-nsw-shard-load-result-2026-06-29.md`
+- Progress file: `tmp/gnaf-raw-postgres-load-2026-06-29T02-52-32-960Z-NSW-shard.json`
+- Rows loaded before failure: `1,655,000`
+- Error: `could not extend file because project size limit (512 MB) has been exceeded`
+
+Rollback:
+
+- Restored preview-sized hosted dataset with `80,000` rows.
+- Recreated expected hosted search indexes.
+- Hosted readiness remains blocked only by row count after rollback.
+- The first rollback attempt without explicit `--states` stuck on the `OT` source bucket, so future rollback/load commands should pass explicit supported states.
+
+Decision:
+
+- Do not retry the shard load on the current storage tier.
+- Do not run national load.
+- Do not run hosted 900-case benchmark.
+- Fix storage tier or architecture first.

@@ -145,4 +145,6 @@ Decision:
 - Do not retry the shard load on the current storage tier.
 - Do not run national load.
 - Do not run hosted 900-case benchmark.
-- Fix storage tier or architecture first.
+- Do not immediately upgrade storage just to repeat the raw-table load.
+- Trial the compact serving index first: `docs/gnaf-compact-serving-index-plan-2026-06-29.md`.
+- Fix storage tier or architecture only after compact NSW storage evidence is held.

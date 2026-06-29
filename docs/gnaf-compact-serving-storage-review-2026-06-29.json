@@ -1,0 +1,30 @@
+{
+  "status": "compact_state_shard_trial_approved",
+  "decision": "compact_serving_index_nsw_trial_approved",
+  "date": "2026-06-29",
+  "target": "neon",
+  "sourceDocument": "docs/gnaf-compact-serving-index-plan-2026-06-29.md",
+  "priorEvidence": {
+    "rawStateShardAttempt": "docs/gnaf-hosted-nsw-shard-load-result-2026-06-29.md",
+    "rawRowsLoadedBeforeFailure": 1655000,
+    "rawFailure": "could not extend file because project size limit (512 MB) has been exceeded",
+    "currentPreviewRows": 80000
+  },
+  "decisionScope": {
+    "compactPreviewLoadApproved": true,
+    "compactStateShardLoadApproved": true,
+    "compactNationalLoadApproved": false,
+    "runtimeSwitchApproved": false,
+    "paidStorageUpgradeApproved": false,
+    "publicExactAddressClaimsApproved": false
+  },
+  "requiredBeforeCompactNationalLoad": [
+    "compact_nsw_shard_load_completes",
+    "compact_indexes_created",
+    "compact_storage_per_row_measured",
+    "compact_query_benchmark_passes",
+    "national_storage_projection_accepted",
+    "rollback_path_scripted",
+    "runtime_switch_reviewed"
+  ]
+}

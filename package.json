@@ -45,7 +45,8 @@
     "review:gnaf-hosted-storage": "node scripts/review-gnaf-hosted-storage.mjs",
     "plan:gnaf-hosted-load": "node scripts/plan-gnaf-hosted-load.mjs",
     "load:gnaf-raw-postgres": "node scripts/load-gnaf-raw-postgres.mjs",
-    "start:gnaf-api": "node scripts/oracle/gnaf-api-server.mjs"
+    "start:gnaf-api": "node scripts/oracle/gnaf-api-server.mjs",
+    "load:gnaf-compact-postgres": "node scripts/load-gnaf-compact-postgres.mjs"
   },
   "engines": {
     "node": "22.x"

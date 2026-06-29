@@ -34,6 +34,7 @@ Updated decision:
 - Public exact-address claims remain blocked.
 - Next storage decision must approve a larger Neon tier or a replacement architecture before another hosted write attempt.
 - The failed partial shard load was rolled back to the indexed 80,000-row preview posture.
+- Recommended next step is not an immediate paid upgrade. Build and trial the compact serving index documented in `docs/gnaf-compact-serving-index-plan-2026-06-29.md`.
 
 ## Current evidence
 
@@ -121,6 +122,7 @@ Weak points:
 - Supabase looks cheaper on disk, but that comparison is incomplete unless compute, downtime, migration, indexes, pooling and rollback are included.
 - Actual NSW shard loading failed at the current 512 MB project limit before reaching even half the state shard.
 - Rollback was successful, but still too manual and should be scripted before retrying hosted writes.
+- A compact serving table may still fail once indexed, so the compact NSW trial is evidence gathering, not an approval to ship public exact-address claims.
 
 Required iteration before full load:
 

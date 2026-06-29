@@ -1,5 +1,5 @@
 {
-  "status": "compact_state_shard_trial_approved",
+  "status": "compact_state_shard_failed_project_size_limit",
   "decision": "compact_serving_index_nsw_trial_approved",
   "date": "2026-06-29",
   "target": "neon",
@@ -12,7 +12,7 @@
   },
   "decisionScope": {
     "compactPreviewLoadApproved": true,
-    "compactStateShardLoadApproved": true,
+    "compactStateShardLoadApproved": false,
     "compactNationalLoadApproved": false,
     "runtimeSwitchApproved": false,
     "paidStorageUpgradeApproved": false,
@@ -26,5 +26,20 @@
     "national_storage_projection_accepted",
     "rollback_path_scripted",
     "runtime_switch_reviewed"
-  ]
+  ],
+  "compactStateShardAttempt": {
+    "state": "NSW",
+    "runId": "compact-NSW-shard-2026-06-29",
+    "status": "failed",
+    "rowsLoadedBeforeFailure": 1588000,
+    "expectedRows": 5206855,
+    "failure": "could not extend file because project size limit (512 MB) has been exceeded",
+    "progressFile": "tmp/gnaf-compact-serving-load-NSW-shard-2026-06-29.json",
+    "resultFile": "docs/gnaf-compact-serving-nsw-shard-result-2026-06-29.md"
+  },
+  "cleanup": {
+    "status": "completed",
+    "runId": "compact-reset-empty-2026-06-29",
+    "progressFile": "tmp/gnaf-compact-serving-reset-empty-2026-06-29.json"
+  }
 }

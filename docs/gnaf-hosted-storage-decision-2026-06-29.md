@@ -35,6 +35,7 @@ Updated decision:
 - Next storage decision must approve a larger Neon tier or a replacement architecture before another hosted write attempt.
 - The failed partial shard load was rolled back to the indexed 80,000-row preview posture.
 - Recommended next step is not an immediate paid upgrade. Build and trial the compact serving index documented in `docs/gnaf-compact-serving-index-plan-2026-06-29.md`.
+- Compact serving-index NSW trial also failed on the current Neon project limit after `1,588,000` rows. Current target should not be retried for hosted G-NAF without a storage tier or architecture change.
 
 ## Current evidence
 
@@ -123,6 +124,7 @@ Weak points:
 - Actual NSW shard loading failed at the current 512 MB project limit before reaching even half the state shard.
 - Rollback was successful, but still too manual and should be scripted before retrying hosted writes.
 - A compact serving table may still fail once indexed, so the compact NSW trial is evidence gathering, not an approval to ship public exact-address claims.
+- The compact trial failed before index creation, so the current storage limit is conclusively too small for this approach.
 
 Required iteration before full load:
 

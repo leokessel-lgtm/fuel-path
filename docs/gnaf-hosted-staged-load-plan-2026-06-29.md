@@ -148,3 +148,9 @@ Decision:
 - Do not immediately upgrade storage just to repeat the raw-table load.
 - Trial the compact serving index first: `docs/gnaf-compact-serving-index-plan-2026-06-29.md`.
 - Fix storage tier or architecture only after compact NSW storage evidence is held.
+
+Compact result:
+
+- Compact NSW also failed on the current Neon project after `1,588,000` rows.
+- Result file: `docs/gnaf-compact-serving-nsw-shard-result-2026-06-29.md`
+- The next action is storage architecture selection, not another load retry on the current target.

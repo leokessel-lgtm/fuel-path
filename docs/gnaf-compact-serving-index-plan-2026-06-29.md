@@ -8,6 +8,24 @@ Build and trial a compact hosted G-NAF serving index before approving any paid n
 
 The raw hosted NSW shard failed at `1,655,000` rows because the current Neon project size limit is `512 MB`. That proves the current raw-table approach is not viable on the current target.
 
+## 2026-06-29 compact NSW result
+
+The compact NSW trial also failed on the current Neon project size limit.
+
+Evidence:
+
+- Result file: `docs/gnaf-compact-serving-nsw-shard-result-2026-06-29.md`
+- Progress file: `tmp/gnaf-compact-serving-load-NSW-shard-2026-06-29.json`
+- Rows loaded before failure: `1,588,000`
+- Error: `could not extend file because project size limit (512 MB) has been exceeded`
+
+Decision update:
+
+- Do not retry compact NSW on the current Neon project.
+- Do not run compact national load.
+- Do not switch runtime to the compact table.
+- Pick a storage architecture or paid tier before the next hosted G-NAF write.
+
 ## Recommendation
 
 Use a separate compact serving table first:

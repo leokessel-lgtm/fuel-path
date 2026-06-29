@@ -285,3 +285,247 @@ Brutal read:
 - This still does not fully simulate every state fuel provider returning malformed payloads. NSW/WA/VIC/SA/TAS provider-specific malformed payload tests should be the next depth upgrade if provider chaos becomes a release blocker.
 - NT remains a deliberate coverage-gap problem, not an integration crash.
 - Open Charge Map remains not configured in production, so EV live data currently depends on the configured production EV provider path rather than OCM.
+
+## State fuel provider malformed-payload chaos stress results
+
+Command:
+
+```bash
+npm run test:state-fuel-chaos
+```
+
+Script:
+
+- `scripts/state-fuel-provider-chaos-stress.mjs`
+
+Final result: pass.
+
+Evidence:
+
+- JSON: `tmp/state-fuel-provider-chaos-stress-2026-06-29T11-04-15-119Z.json`
+- Report: `tmp/state-fuel-provider-chaos-stress-2026-06-29T11-04-15-119Z.md`
+
+Coverage:
+
+- NSW FuelCheck malformed station and price rows.
+- TAS FuelCheck state filtering, station-code prefixing and malformed rows.
+- WA FuelWatch RSS malformed XML items, zero coordinates and tomorrow prices.
+- VIC Servo Saver reference merging, fuel-type aliases, unavailable prices and unusable rows.
+- QLD FPP Direct missing site rows, zero coordinates, unavailable prices and unknown fuel IDs.
+- SA FPP Direct missing site rows, zero coordinates, unavailable prices and unknown fuel IDs.
+- Cross-provider invariant: no returned station may have zero/zero coordinates, no prices, or non-finite price values.
+
+Initial findings and iterations:
+
+- First run failed on VIC because the fixture did not match the normaliser's actual fuel-type contract closely enough.
+- After tightening the VIC fixture, the suite exposed a real aliasing issue: `Premium Diesel` normalised to `PREMIUM DIESEL` instead of `PDL`.
+- NSW/TAS normalisation was hardened before the run so malformed price-only and `0,0` rows cannot appear as valid map stations.
+- VIC fuel aliases now map `Premium Diesel` to `PDL`.
+
+Brutal read:
+
+- This materially improves backend resilience for live state provider data.
+- The test is still contract-synthetic, not a replay of captured raw provider payloads. It covers known malformed-payload families, but not every possible future schema drift.
+- WA, VIC, QLD and SA already had strong coordinate guards; NSW/TAS were the weaker edge and are now aligned with the rest of the provider layer.
+- The next weakness is user-facing failure behaviour when these providers are unavailable, slow or empty, which belongs in the frontend failure-state UX stress pass.
+
+## Frontend failure-state UX stress results
+
+Command:
+
+```bash
+npm run test:frontend-failure-states
+```
+
+Script:
+
+- `scripts/frontend-failure-state-stress.mjs`
+
+Final result: pass.
+
+Evidence:
+
+- JSON: `tmp/frontend-failure-state-stress-2026-06-29T11-14-41-081Z.json`
+- Report: `tmp/frontend-failure-state-stress-2026-06-29T11-14-41-081Z.md`
+- Screenshots: `tmp/frontend-failure-state-stress-2026-06-29T11-14-41-081Z-screenshots/`
+
+Coverage:
+
+- Nearby fuel empty unsupported-region response.
+- Nearby fuel provider error response.
+- EV empty directory result.
+- EV provider error in expanded charger list.
+- Plan geocode provider failure.
+- Plan route provider failure.
+- Plan score empty eligible-station result.
+- Cross-scenario guard for raw stack traces, TypeErrors, source-file leakage and misleading EV availability claims.
+
+Initial findings and iterations:
+
+- First run failed 5 of 7 scenarios.
+- Two failures were harness false positives caused by expected browser 503 console noise, while the app rendered useful copy.
+- Three Plan failures were harness navigation problems because the bottom tab is not exposed as a standard role button in this web build.
+- After fixing tab navigation, one Plan geocode scenario still failed because the test used an exact-address-looking query and the app correctly blocked planning until the user confirmed a suggestion.
+- The final scenario now uses place/suburb-style input to exercise the geocode outage path directly.
+
+Brutal read:
+
+- The app now has automated protection against catastrophic blank/error states for the main failure families.
+- The copy is serviceable but not beautiful. It prevents confusion, but some outage messages are still generic rather than highly contextual.
+- The script checks rendered text and raw-error leakage, not detailed visual quality.
+- This pass increases confidence that provider and route failures do not strand users, but it does not prove every real provider outage will have perfect wording.
+
+## Route recommendation adversarial stress results
+
+Command:
+
+```bash
+npm run test:route-adversarial
+```
+
+Script:
+
+- `scripts/route-recommendation-adversarial-stress.mjs`
+
+Final result: pass.
+
+Evidence:
+
+- JSON: `tmp/route-recommendation-adversarial-stress-2026-06-29T11-20-33-953Z.json`
+- Report: `tmp/route-recommendation-adversarial-stress-2026-06-29T11-20-33-953Z.md`
+
+Coverage:
+
+- Cheaper open viable station wins.
+- Closed cheapest station loses and is absent when closed stations are excluded.
+- Cheapest station outside smart detour threshold loses.
+- Equal adjusted price favours shorter detour.
+- Stale non-official price does not down-rank a cheaper viable station.
+- Membership-only station is excluded by default.
+- Invalid price and invalid coordinates are dropped.
+- Zero c/L best-price lead receives neutral `Best route price` labelling rather than a savings-detour label.
+
+Initial findings and iterations:
+
+- First run failed the closed-cheapest case because the harness expected a closed station to remain present but rejected.
+- The scorer actually excludes closed stations entirely when `includeClosed=false`, which matches the product rule.
+- The assertion was corrected to require absence from candidates rather than rejected presence.
+
+Brutal read:
+
+- The focused recommendation rules held under adversarial fixtures.
+- This is stronger than broad route-pair stress because it targets the exact ways the recommendation could feel wrong or misleading.
+- The test does not prove real-world station freshness or opening-hours data is correct. It proves the scorer obeys the intended decision hierarchy when those fields are present.
+- The backend decision summary can still internally call a zero-best-price route a saving via dollar economics, but the Plan UI rule is to override that with `Best route price`; this remains an important claim-safety audit item.
+
+## Map density and performance stress results
+
+Command:
+
+```bash
+FUEL_PATH_DENSITY_URL=http://localhost:8099 npm run test:map-density
+```
+
+Script:
+
+- `scripts/map-density-performance-stress.mjs`
+
+Final result: pass against local patched web app.
+
+Evidence:
+
+- JSON: `tmp/map-density-performance-stress-2026-06-29T11-28-20-823Z.json`
+- Report: `tmp/map-density-performance-stress-2026-06-29T11-28-20-823Z.md`
+- Screenshots: `tmp/map-density-performance-stress-2026-06-29T11-28-20-823Z-screenshots/`
+
+Additional validation:
+
+```bash
+cd mobile-app && npm run typecheck
+```
+
+Result: pass.
+
+Coverage:
+
+- 2 mobile viewports: `430x900` and `390x780`.
+- Dense fuel response with 820 mocked stations.
+- Dense EV response with 360 mocked chargers.
+- Marker cap enforcement for direct fuel price markers, clusters and EV markers.
+- Leaflet zoom controls remain present.
+- Bottom controls remain measurable and visible.
+- Map drag after dense fuel rendering still leaves visible markers/clusters.
+- EV density state does not show `? kw` and does not claim `available now`.
+
+Initial findings and iterations:
+
+- First production-targeted density run failed EV density because production still contains stale EV sheet copy: `Full list` and `Browse view. Full list for more.`
+- The EV sheet was aligned with the newer Nearby fuel behaviour by removing the stale EV list-toggle copy and old browse helper line.
+- The density test was rerun against a local patched web server because production does not yet include the local change.
+- The local patched run passed 4/4 density cases.
+- A local rerun of the older `test:map-interactions` gate failed because the local dev app did not receive live station data and the error sheet covered the zoom controls. That gate remains useful against production/live data or a future mocked-data variant, but it was not the acceptance gate for this local density patch.
+
+Brutal read:
+
+- Fuel density is in good shape: direct marker rendering stayed bounded and clustered under large metro-like loads.
+- EV marker rendering is bounded at the current `maxStationMarkers` cap, but 240 EV markers is still visually noisy. It passes performance, not taste.
+- EV UI consistency improved by removing stale `Full list` / browse-helper copy.
+- The app still needs a mocked version of the broad map-interaction gate so local UI changes can be validated without relying on production provider availability.
+
+## Claim-safety audit stress results
+
+Command:
+
+```bash
+npm run test:claim-safety
+```
+
+Script:
+
+- `scripts/claim-safety-audit-stress.mjs`
+
+Final result: pass.
+
+Evidence:
+
+- JSON: `tmp/claim-safety-audit-stress-2026-06-29T11-42-13-367Z.json`
+- Report: `tmp/claim-safety-audit-stress-2026-06-29T11-42-13-367Z.md`
+
+Additional validation:
+
+```bash
+cd mobile-app && npm run typecheck
+```
+
+Result: pass.
+
+Coverage:
+
+- Plan UI does not mention `Suggested fuel stops`.
+- Plan UI does not mention `Decision trade-offs`.
+- Plan UI does not show `Fuel used`.
+- Plan route notice does not mention `standard fill estimate`.
+- Plan UI does not use `Route saving` as the displayed label.
+- Plan UI does not show guaranteed total dollar saving copy.
+- Plan recommendation uses `Best price by`.
+- `Why this stop` uses `Best price by` and compares against the next-best route option.
+- Selected Plan station detail hides the generic station-row `your adjusted price` line.
+- EV UI does not show stale `Full list` helper copy.
+- EV UI does not show `available now` claims.
+- EV UI does not show unknown power as `? kw`.
+- EV provider wording keeps `live bay status unknown` / no-live-availability-claim language.
+- Logic document records next-best viable comparison, no total-dollar saving claims, and stale-price non-penalty.
+
+Initial findings and iterations:
+
+- First audit failed because stale Plan strings still existed: hidden `Suggested fuel stops`, `Fuel used` / route-saving language in unused evidence helpers, and dollar-saving recommendation reasons.
+- Removed stale exported helper functions from `DecisionEvidencePanel` because they were unreferenced and carried retired claim wording.
+- Changed Plan station-detail accessibility wording from `Show suggested fuel stops` to `Show route options`.
+- Removed dollar-saving recommendation reasons from `PlanScreen.utils` and replaced them with route-price / detour-safe language.
+- Updated `docs/route-recommendation-logic-rules.md` wording examples to use `Best price by` and next-best route option language.
+
+Brutal read:
+
+- The highest-risk visible claim surfaces now have a repeatable static audit.
+- This does not replace rendered smoke testing after deployment; it prevents risky copy from being reintroduced into the source files.
+- Backend route scoring still carries internal dollar economics for ranking. That is acceptable only while the UI and public copy avoid presenting it as a guaranteed user saving.

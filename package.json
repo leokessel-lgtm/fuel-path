@@ -50,7 +50,12 @@
     "test:geocode-focused-regression": "node scripts/geocode-focused-regression.mjs",
     "check:production-lookup-monitor": "node scripts/check-production-lookup-monitor.mjs",
     "test:map-interactions": "node scripts/map-interaction-stress.mjs",
-    "test:provider-chaos": "node scripts/provider-integration-chaos-stress.mjs"
+    "test:provider-chaos": "node scripts/provider-integration-chaos-stress.mjs",
+    "test:state-fuel-chaos": "node scripts/state-fuel-provider-chaos-stress.mjs",
+    "test:frontend-failure-states": "node scripts/frontend-failure-state-stress.mjs",
+    "test:route-adversarial": "node scripts/route-recommendation-adversarial-stress.mjs",
+    "test:map-density": "node scripts/map-density-performance-stress.mjs",
+    "test:claim-safety": "node scripts/claim-safety-audit-stress.mjs"
   },
   "engines": {
     "node": "22.x"

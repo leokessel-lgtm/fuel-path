@@ -252,14 +252,6 @@ export function EvChargerPanel({
       </View>
       <View style={styles.evPanelTitleRow}>
         <Text style={styles.evPanelTitle}>{loading ? "Finding chargers..." : `${chargers.length} chargers nearby`}</Text>
-        <Pressable
-          accessibilityLabel={sheetExpanded ? "Show charger map" : "Show charger list"}
-          accessibilityRole="button"
-          onPress={() => requestSnap(isFull ? "browse" : "full")}
-          style={styles.evListToggle}
-        >
-          <Text style={styles.evListToggleText}>{sheetExpanded ? "Map" : "Full list"}</Text>
-        </Pressable>
       </View>
       {isFull && error ? <Text style={styles.evPanelNotice}>{error}</Text> : null}
       {!isPeek && controls ? <View style={styles.controlDeck}>{controls}</View> : null}
@@ -277,9 +269,6 @@ export function EvChargerPanel({
       ) : null}
       {!loading && !error && selectedCharger && !isFull ? (
         <>
-          {!isPeek ? (
-            <Text numberOfLines={1} style={styles.evPeekHint}>Browse view. Full list for more.</Text>
-          ) : null}
           <EvChargerRow
             charger={selectedCharger}
             selected

@@ -89,9 +89,9 @@ export function vehicleRouteCapacityNotice(preferences: AppPreferences, routeDis
   if (!routeDistanceKm || preferences.vehicleEnergyType === "electric") return "";
   const routeKm = Math.round(routeDistanceKm);
   if (preferences.vehicleEnergyType === "hybrid") {
-    return `Route is about ${routeKm} km. Fuel scoring uses smart detour rules; EV charger stops are not scored yet.`;
+    return `Route is about ${routeKm} km. Fuel stop suggestions use smart detour rules; EV charger stops are not scored yet.`;
   }
-  return `Route is about ${routeKm} km. Fuel scoring uses smart detour rules and a standard fill estimate.`;
+  return `Route is about ${routeKm} km.`;
 }
 
 export function uniqueStations(stations: StationViewModel[]) {
@@ -124,7 +124,7 @@ export function routeRecommendationCopy(
   }
   return {
     title: "Small savings detour",
-    reason: `Probably not worth it: saves ${formatMoney(saving)} after ${Number(best.detourMinutes || 0).toFixed(1)} min.`,
+    reason: `Probably not worth it for this ${Number(best.detourMinutes || 0).toFixed(1)} min detour.`,
   };
 }
 
@@ -151,13 +151,9 @@ function routeValueReason(best: StationViewModel) {
   const saving = Number(best.netSaving || 0);
   const detourMinutes = Number(best.detourMinutes || 0);
   if (detourMinutes > 0.05) {
-    return `Suggested detour adds ${detourMinutes.toFixed(1)} min and saves about ${formatMoney(saving)}.`;
+    return `Suggested detour adds ${detourMinutes.toFixed(1)} min for a better route price.`;
   }
-  return `Suggested stop is on the route and saves about ${formatMoney(saving)}.`;
-}
-function formatMoney(value: number) {
-  const sign = value < 0 ? "-" : "";
-  return `${sign}$${Math.abs(value).toFixed(2)}`;
+  return "Suggested stop is on the route with the best route price found.";
 }
 
 function savingsDetourLabel(saving: number) {

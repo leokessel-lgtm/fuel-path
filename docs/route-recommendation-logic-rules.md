@@ -317,9 +317,9 @@ api/route.js
 Allowed:
 
 ```text
-Route saving 20.0 c/L
-Compared with 176.9 c/L across route options. Your price includes eligible discounts.
-Suggested stop adds a 0.1 min detour for a 20.0 c/L better route price.
+Best price by 20.0 c/L
+Compared with the next-best route option at 176.9 c/L. Your price includes eligible discounts.
+Suggested stop adds a 0.1 min detour and is best by 20.0 c/L.
 ```
 
 Not allowed:

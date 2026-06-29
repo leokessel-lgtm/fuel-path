@@ -1,58 +1,7 @@
 import { StyleSheet, Text, View } from "react-native";
 
-import { stationTimestampLine } from "../utils/decisionEvidence";
 import { colors, radii, spacing, surfaces, typeScale } from "../theme";
 import { RouteDecisionSummary, StationViewModel } from "../types";
-
-export type DecisionAlternative = {
-  label: string;
-  note: string;
-  stationCode: string;
-  stationName: string;
-  selected?: boolean;
-};
-
-export function routeDecisionAlternatives(
-  candidates: StationViewModel[],
-  summary?: RouteDecisionSummary,
-): DecisionAlternative[] {
-  if (summary?.alternatives?.length) {
-    return summary.alternatives.map((item) => ({
-      label: decisionAlternativeLabel(item.kind, item.label),
-      note: item.note,
-      selected: item.selected,
-      stationCode: item.stationCode,
-      stationName: item.stationName,
-    }));
-  }
-  if (!candidates.length) return [];
-  const bestValue = candidates[0];
-  const cheapest = minBy(candidates, (item) => item.adjustedCpl);
-  const closest = minBy(candidates, (item) => Number(item.detourMinutes ?? item.distanceKm ?? 0));
-  const safest = safestCandidate(candidates);
-
-  return [
-    decisionAlternative("Best value", bestValue, routeValueSummary(bestValue)),
-    decisionAlternative("Cheapest", cheapest, `${cheapest.adjustedCpl.toFixed(1)} c/L after wallet`),
-    decisionAlternative("Closest", closest, `${Number(closest.detourMinutes || 0).toFixed(1)} min detour`),
-    decisionAlternative("Safest", safest, safetySummary(safest)),
-  ];
-}
-
-export function cheapestTradeOffExplanation(candidates: StationViewModel[]) {
-  if (!candidates.length) return "";
-  const best = candidates[0];
-  const cheapest = minBy(candidates, (item) => item.adjustedCpl);
-  const cheapestDetour = Number(cheapest.detourMinutes || 0);
-  const cheapestSaving = Number(cheapest.netSaving || 0);
-  const cheapestFuel = Number(cheapest.detourFuelLitres || 0);
-
-  if (cheapest.station.stationCode === best.station.stationCode) {
-    return "Cheapest also wins because the route saving stays ahead after detour time and fuel used.";
-  }
-
-  return `${cheapest.station.name} is cheapest at ${cheapest.adjustedCpl.toFixed(1)} c/L, but nets ${formatMoney(cheapestSaving)} after ${cheapestDetour.toFixed(1)} min and ${cheapestFuel.toFixed(1)} L detour fuel.`;
-}
 
 export function DecisionEvidencePanel({
   candidate,
@@ -110,64 +59,6 @@ function EvidenceMetric({ label, value }: { label: string; value: string }) {
       </Text>
     </View>
   );
-}
-
-function decisionAlternative(
-  label: string,
-  candidate: StationViewModel,
-  note: string,
-): DecisionAlternative {
-  return {
-    label,
-    note,
-    stationCode: candidate.station.stationCode,
-    stationName: candidate.station.name,
-  };
-}
-
-function decisionAlternativeLabel(
-  kind: RouteDecisionSummary["alternatives"][number]["kind"],
-  fallback: string,
-) {
-  if (kind === "best_value") return "Best value";
-  if (kind === "cheapest") return "Cheapest";
-  if (kind === "closest") return "Closest";
-  if (kind === "safest") return "Safest";
-  return fallback;
-}
-
-function safestCandidate(candidates: StationViewModel[]) {
-  const safe = candidates.filter((item) => {
-    const warnings = (item.warnings || []).join(" ").toLowerCase();
-    return (
-      item.reachable !== false &&
-      item.station.openNow !== false &&
-      !/range|closed|unavailable|out of fuel|stale|fallback/i.test(warnings)
-    );
-  });
-  return minBy(safe.length ? safe : candidates, (item) =>
-    Number(item.detourMinutes ?? item.distanceKm ?? 0) + (item.station.openNow === false ? 1000 : 0),
-  );
-}
-
-function routeValueSummary(candidate: StationViewModel) {
-  return `${candidate.adjustedCpl.toFixed(1)} c/L, ${Number(candidate.detourMinutes || 0).toFixed(1)} min detour`;
-}
-
-function safetySummary(candidate: StationViewModel) {
-  if (candidate.reachable === false) return "Range risk";
-  if (candidate.station.openNow === false) return "Closed";
-  if ((candidate.warnings || []).length) return "Check warning";
-  return "No range/open warning";
-}
-
-function minBy<T>(items: T[], score: (item: T) => number): T {
-  return items.reduce((best, item) => (score(item) < score(best) ? item : best), items[0]);
-}
-
-function formatMoney(value: number) {
-  const sign = value < 0 ? "-" : "";
-  return `${sign}$${Math.abs(value).toFixed(2)}`;
 }
 
 function capabilityLabelFor(capability: string) {

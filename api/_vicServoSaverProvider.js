@@ -20,6 +20,7 @@ const FUEL_TYPE_ALIASES = {
   DSL: "DL",
   PDSL: "PDL",
   DIESEL: "DL",
+  "PREMIUM DIESEL": "PDL",
   PETROL: "U91",
   "UNLEADED 91": "U91",
   "UNLEADED PETROL": "U91",

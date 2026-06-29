@@ -75,7 +75,7 @@ export function PlanRouteSheet({
   const routeSheetRestoreLabel = stationPanelOpen
     ? "Show station detail"
     : routeEndpointsPresent
-      ? "Show suggested fuel stops"
+      ? "Show route panel"
       : "Show route panel";
   const routeSheetRestoreText = stationPanelOpen ? "Detail" : routeEndpointsPresent ? "Stops" : "Panel";
 
@@ -174,7 +174,7 @@ function StationDetailPanel({
       <View style={styles.sheetHeaderRow}>
         <View />
         <Pressable
-          accessibilityLabel="Show suggested fuel stops"
+          accessibilityLabel="Show route options"
           accessibilityRole="button"
           onPress={onShowStops}
           style={styles.textButton}
@@ -243,7 +243,7 @@ function RouteResultsPanel({
   routeNotice,
   selectedCode,
   showStopsList = true,
-  stopsTitle = "Suggested fuel stops",
+  stopsTitle = "Route options",
   statusCapability,
 }: {
   best?: StationViewModel;

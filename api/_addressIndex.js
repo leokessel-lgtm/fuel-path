@@ -46,10 +46,7 @@ async function searchAddressIndex(query, limit = 5, options = {}) {
   const searchContext = normaliseSearchContext(options.searchContext);
 
   if (configuredApiUrl()) {
-    const apiResults = mergeAddressSuggestions(
-      await Promise.all(needles.map((item) => searchApiIndex(item.rawQuery, item.needle, limit))),
-      limit,
-    );
+    const apiResults = await searchApiNeedles(apiAddressSearchNeedles(rawQuery, needles), limit, rawQuery);
     if (apiResults.length) return apiResults;
   }
 
@@ -117,6 +114,40 @@ function searchSqliteNeedles(needles, limit, searchContext, rawNeedle = "") {
     if (shouldStopSqliteNeedleSearch(merged, item.needle, limit, item.rawNeedle || rawNeedle || primaryRawNeedle)) return merged;
   }
   return collapseAmbiguousUnitHouseResults(mergeAddressSuggestions(groups, limit), primaryNeedle, primaryRawNeedle);
+}
+
+async function searchApiNeedles(needles, limit, rawNeedle = "") {
+  const groups = [];
+  for (const item of needles) {
+    const rows = await searchApiIndex(item.rawQuery, item.needle, limit);
+    groups.push(rows);
+    const merged = mergeAddressSuggestions(groups, limit);
+    if (rows.length) return merged;
+    if (shouldStopApiNeedleSearch(merged, item.needle, limit, item.rawNeedle || rawNeedle)) return merged;
+  }
+  return mergeAddressSuggestions(groups, limit);
+}
+
+function apiAddressSearchNeedles(rawQuery, needles) {
+  const rawNeedle = normaliseAddressText(rawQuery);
+  if (!rawNeedle) return needles;
+  const seen = new Set();
+  return [
+    { needle: rawNeedle, rawQuery: String(rawQuery || ""), rawNeedle: String(rawQuery || "") },
+    ...needles,
+  ].filter((item) => {
+    if (!item?.needle || item.needle.length < 4 || seen.has(item.needle)) return false;
+    seen.add(item.needle);
+    return true;
+  });
+}
+
+function shouldStopApiNeedleSearch(results, needle, limit, rawNeedle = null) {
+  const top = results[0];
+  if (!top) return false;
+  if (queryHasUnitBuildingIntent(needle, rawNeedle) && top.matchType !== "exact_address") return false;
+  if (top.matchType === "exact_address" && !top.refineRequired) return true;
+  return results.length >= limit && top.matchType === "address_prefix";
 }
 
 function collapseAmbiguousUnitHouseResults(suggestions, primaryNeedle, rawNeedle = null) {

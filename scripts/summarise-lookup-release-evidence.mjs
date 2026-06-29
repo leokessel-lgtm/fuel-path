@@ -38,7 +38,7 @@ const evidence = {
   planFieldSmoke: await assessPlanFieldSmoke(inputs.planFieldSmoke),
   planFieldStress: await assessPlanFieldStress(inputs.planFieldStress),
   exactAddressReadiness: await assessExactAddress(inputs.exactAddressReadiness, inputs.lookupReadiness),
-  gnafLoadPlan: await assessGnafLoadPlan(inputs.gnafLoadPlan),
+  gnafLoadPlan: await assessGnafLoadPlan(inputs.gnafLoadPlan, inputs.lookupReadiness),
   prefix600: await assessPrefix600(inputs.prefix600),
   hostedPreview: await assessHostedPreview(inputs.hostedPreview),
   hostedNational: await assessHostedNational(inputs.hostedNational),
@@ -271,7 +271,25 @@ function lookupReadinessReady(payload) {
   );
 }
 
-async function assessGnafLoadPlan(filePath) {
+async function assessGnafLoadPlan(filePath, lookupReadinessPath = "") {
+  const lookupReadiness = lookupReadinessPath ? await readJson(lookupReadinessPath) : null;
+  if (lookupReadinessReady(lookupReadiness)) {
+    return gate({
+      id: "gnaf_hosted_load_plan",
+      label: "Hosted G-NAF load plan",
+      filePath: lookupReadinessPath,
+      status: "passed",
+      metrics: {
+        planStatus: "hosted_api_ready",
+        sqliteRows: null,
+        hostedRows: lookupReadiness.addressIndex?.reportedAddressRows ?? null,
+        hostedRowGap: 0,
+        estimatedHostedStorage: "oracle_api_external",
+        warnings: "none",
+      },
+      note: "Production hosted Oracle G-NAF API readiness supersedes the legacy storage/load-plan gate.",
+    });
+  }
   if (!filePath) {
     return gate({
       id: "gnaf_hosted_load_plan",

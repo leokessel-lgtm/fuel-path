@@ -890,7 +890,9 @@ function createGeocoder({ fetchJson, loadStationData }) {
     );
     let providerSuggestions = [];
     let providerWarning = "";
-    const strongLocalFallback = requiresExactAddress ? false : hasStrongLocalSuggestion(localSuggestions);
+    const strongLocalFallback = requiresExactAddress
+      ? false
+      : hasStrongLocalSuggestion(localSuggestions) || hasStrongRegionalPoiSuggestion(query, localSuggestions);
     const hasExactAddress = hasExactAddressSuggestion(requiresExactAddress ? strictAddressSuggestions : addressSuggestions);
     if (!hasExactAddress && !strongLocalFallback && !shouldSuppressExternalGeocode(query, localSuggestions)) {
       try {
@@ -1060,7 +1062,7 @@ function createGeocoder({ fetchJson, loadStationData }) {
     if (tokens.length < 3) return false;
     if (!/\d/.test(needle)) return false;
     if (/\bunit\b/.test(needle)) return true;
-    return /(?:\bstreet\b|\bst\b|\broad\b|\brd\b|\bavenue\b|\bave\b|\bdrive\b|\bdr\b|\bparade\b|\bpde\b|\bplace\b|\bpl\b|\blane\b|\bln\b|\bway\b|\bcres\b|\bcrescent\b|\bcourt\b|\bct\b|\bhighway\b|\bhwy\b)/i.test(needle);
+    return /(?:\bstreet\b|\bst\b|\broad\b|\brd\b|\bavenue\b|\bave\b|\bdrive\b|\bdr\b|\bparade\b|\bpde\b|\bplace\b|\bpl\b|\blane\b|\bln\b|\bway\b|\bcres\b|\bcrescent\b|\bcourt\b|\bct\b|\bhighway\b|\bhwy\b|\bboulevard\b|\bbvd\b|\bblvd\b|\bterrace\b|\btce\b|\bclose\b|\bcircuit\b|\bcct\b|\besplanade\b|\besp\b|\bsquare\b|\bsq\b|\bparkway\b|\bpkwy\b|\bpwy\b)/i.test(needle);
   }
 
   function normaliseAddressNeedleForUnitAlias(value) {
@@ -1158,7 +1160,7 @@ function createGeocoder({ fetchJson, loadStationData }) {
     if (!text) return false;
     if (hasSensitiveAddressContext(query) || isPostalAddressQuery(query)) return false;
     const hasHouseNumber = /\b\d+[a-z]?(?:-\d+[a-z]?)?\b/.test(text);
-    const hasStreetToken = /\b(?:street|st|road|rd|avenue|ave|drive|dr|pde|parade|place|pl|lane|ln|court|ct|cres|crescent|way)\b/.test(text);
+    const hasStreetToken = /\b(?:street|st|road|rd|avenue|ave|drive|dr|pde|parade|place|pl|lane|ln|court|ct|cres|crescent|way|boulevard|bvd|blvd|terrace|tce|close|circuit|cct|highway|hwy|esplanade|esp|square|sq|parkway|pkwy|pwy)\b/.test(text);
     const hasLocalityContext = Boolean(detectQueryLocality(query));
     const hasExplicitAddressContext = queryHasPostcode(query) || hasExplicitUppercaseStateCode(query);
     const unitIntentQuery = /(^|\s)\d+[a-z]?\s*\/\s*\d+[a-z]?\b/i.test(String(query || ""));
@@ -1548,6 +1550,14 @@ function createGeocoder({ fetchJson, loadStationData }) {
     if (item?.provider !== "fuel_path_regional_gazetteer" || item?.type !== "regional_poi") return false;
     const primaryName = normaliseSearchText(String(item?.label || "").split(",")[0] || "");
     return primaryName.length >= 5 && needle.includes(primaryName);
+  }
+
+  function hasStrongRegionalPoiSuggestion(query, suggestions) {
+    const needle = normaliseSearchText(query);
+    return suggestions.some((item) => {
+      if (item?.provider !== "fuel_path_regional_gazetteer" || item?.type !== "regional_poi") return false;
+      return regionalPoiNameMatches(needle, item);
+    });
   }
 
   function hasPlaceIntent(needle) {

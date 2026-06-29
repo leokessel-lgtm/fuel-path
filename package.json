@@ -46,7 +46,9 @@
     "plan:gnaf-hosted-load": "node scripts/plan-gnaf-hosted-load.mjs",
     "load:gnaf-raw-postgres": "node scripts/load-gnaf-raw-postgres.mjs",
     "start:gnaf-api": "node scripts/oracle/gnaf-api-server.mjs",
-    "load:gnaf-compact-postgres": "node scripts/load-gnaf-compact-postgres.mjs"
+    "load:gnaf-compact-postgres": "node scripts/load-gnaf-compact-postgres.mjs",
+    "test:geocode-focused-regression": "node scripts/geocode-focused-regression.mjs",
+    "check:production-lookup-monitor": "node scripts/check-production-lookup-monitor.mjs"
   },
   "engines": {
     "node": "22.x"

@@ -34,6 +34,11 @@ type RouteResponse = {
   points: MapPoint[];
 };
 
+type PlanRouteResponse = {
+  route: RouteResponse;
+  score: ScoreResponse;
+};
+
 export type FuelProviderStatus = {
   selection: string;
   capabilityLabels: RegionCapabilityStatus[];
@@ -422,6 +427,44 @@ export async function scoreRoute({
       economy: 8.2,
       reserveKm: 35,
       corridorKm: 2.5,
+      eligibleDiscounts,
+      brandFilter: policyBrands.length > 0,
+      brands: policyBrands,
+      includeMemberPrices: false,
+      includeClosed: false,
+    }),
+  });
+}
+
+export async function planFuelRoute({
+  approvedPolicyBrands = [],
+  eligibleDiscounts,
+  from,
+  fuel,
+  to,
+}: {
+  approvedPolicyBrands?: string[];
+  eligibleDiscounts: string[];
+  from: MapPoint;
+  fuel: FuelCode;
+  to: MapPoint;
+}) {
+  const policyBrands = approvedPolicyBrands.map((brand) => brand.trim()).filter(Boolean);
+  return fetchJson<PlanRouteResponse>("/api/score", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      source: "live",
+      from,
+      to,
+      fuel,
+      tankPercent: 45,
+      economy: 8.2,
+      reserveKm: 35,
+      corridorKm: 2.5,
+      detourSpeedKmh: 80,
       eligibleDiscounts,
       brandFilter: policyBrands.length > 0,
       brands: policyBrands,

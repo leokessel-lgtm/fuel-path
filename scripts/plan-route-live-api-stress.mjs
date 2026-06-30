@@ -4,6 +4,7 @@ import path from "node:path";
 const appUrl = (process.env.FUEL_PATH_PLAN_LIVE_STRESS_URL || "https://fuel-path.vercel.app").replace(/\/$/, "");
 const pairCount = Number(process.env.FUEL_PATH_PLAN_LIVE_STRESS_PAIRS || 12);
 const fuel = String(process.env.FUEL_PATH_PLAN_LIVE_STRESS_FUEL || "PDL").toUpperCase();
+const useCombinedPlanRoute = process.env.FUEL_PATH_PLAN_LIVE_STRESS_LEGACY !== "1";
 const runId = new Date().toISOString().replace(/[:.]/g, "-");
 const outputDir = path.resolve("tmp");
 
@@ -45,6 +46,7 @@ for (const [index, pair] of pairs.entries()) {
 }
 
 const failed = results.filter((item) => item.status === "failed");
+const passed = results.filter((item) => item.status === "passed");
 const summary = {
   runId,
   appUrl,
@@ -55,6 +57,11 @@ const summary = {
   warnings: results.reduce((sum, item) => sum + item.warnings.length, 0),
   recommendations: results.filter((item) => item.recommendation).length,
   noRecommendation: results.filter((item) => !item.recommendation).length,
+  timingsMs: {
+    route: timingSummary(passed.map((item) => item.timingsMs?.route)),
+    score: timingSummary(passed.map((item) => item.timingsMs?.score)),
+    total: timingSummary(passed.map((item) => item.timingsMs?.total)),
+  },
   stateCoverage: countBy(results.flatMap((item) => [item.from.state, item.to.state])),
   typeCoverage: countBy(results.flatMap((item) => [item.from.type, item.to.type])),
 };
@@ -68,8 +75,12 @@ console.log(JSON.stringify({ ...summary, jsonPath, reportPath }, null, 2));
 if (failed.length) throw new Error(`${failed.length}/${results.length} live API route cases failed`);
 
 async function runCase(pair, index) {
-  const route = await fetchRoute(pair);
-  const score = await postScore(route);
+  const totalStarted = Date.now();
+  const routeStarted = Date.now();
+  const { route, score, routeMs, scoreMs } = useCombinedPlanRoute
+    ? await postPlanRoute(pair, routeStarted)
+    : await legacyPlanRoute(pair, routeStarted);
+  const totalMs = Date.now() - totalStarted;
   const warnings = [];
   const failures = [];
   const best = score.recommendations?.[0];
@@ -92,6 +103,11 @@ async function runCase(pair, index) {
     to: pair.to,
     status: failures.length ? "failed" : "passed",
     routeKm: route.distanceKm,
+    timingsMs: {
+      route: routeMs,
+      score: scoreMs,
+      total: totalMs,
+    },
     provider: score.context?.provider,
     source: score.context?.source,
     capability: score.context?.capability,
@@ -120,6 +136,40 @@ async function fetchRoute(pair) {
   const response = await fetch(`${appUrl}/api/route?${params}`, { signal: AbortSignal.timeout(15000) });
   if (!response.ok) throw new Error(`/api/route HTTP ${response.status}`);
   return response.json();
+}
+
+async function legacyPlanRoute(pair, routeStarted) {
+  const route = await fetchRoute(pair);
+  const routeMs = Date.now() - routeStarted;
+  const scoreStarted = Date.now();
+  const score = await postScore(route);
+  const scoreMs = Date.now() - scoreStarted;
+  return { route, score, routeMs, scoreMs };
+}
+
+async function postPlanRoute(pair, routeStarted) {
+  const response = await fetch(`${appUrl}/api/score`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      source: "live",
+      from: pair.from,
+      to: pair.to,
+      fuel,
+      eligibleDiscounts: ["fleet-card", "everyday-rewards"],
+      corridorKm: 2.5,
+      detourSpeedKmh: 80,
+    }),
+    signal: AbortSignal.timeout(25000),
+  });
+  if (!response.ok) throw new Error(`/api/score combined HTTP ${response.status}`);
+  const payload = await response.json();
+  return {
+    route: payload.route,
+    score: payload.score,
+    routeMs: Date.now() - routeStarted,
+    scoreMs: 0,
+  };
 }
 
 async function postScore(route) {
@@ -153,6 +203,24 @@ function buildRoutePairs(items, count) {
 
 function ep(id, label, lat, lon, state, type) { return { id, label, lat, lon, state, type }; }
 function countBy(values) { return values.reduce((counts, value) => { counts[value] = (counts[value] || 0) + 1; return counts; }, {}); }
+function timingSummary(values) {
+  const ordered = values.map(Number).filter(Number.isFinite).sort((left, right) => left - right);
+  return {
+    count: ordered.length,
+    p50: percentile(ordered, 50),
+    p90: percentile(ordered, 90),
+    p95: percentile(ordered, 95),
+    max: ordered.length ? ordered[ordered.length - 1] : null,
+  };
+}
+function percentile(ordered, p) {
+  if (!ordered.length) return null;
+  const index = Math.ceil((p / 100) * ordered.length) - 1;
+  return ordered[Math.max(0, Math.min(ordered.length - 1, index))];
+}
 function renderReport(summary, results) {
-  return `# Plan route live API stress\n\nRun: ${summary.runId}\n\n## Summary\n\n- Route pairs: ${summary.pairCount}\n- Passed: ${summary.passed}\n- Failed: ${summary.failed}\n- Warnings: ${summary.warnings}\n- Recommendations returned: ${summary.recommendations}\n- No recommendation: ${summary.noRecommendation}\n\n## Failures\n\n${results.filter((item) => item.failures.length).map((item) => `- ${item.id}: ${item.failures.join("; ")}`).join("\n") || "- None"}\n\n## Warnings\n\n${results.filter((item) => item.warnings.length).map((item) => `- ${item.id}: ${item.warnings.join("; ")}`).join("\n") || "- None"}\n`;
+  return `# Plan route live API stress\n\nRun: ${summary.runId}\n\n## Summary\n\n- Mode: ${useCombinedPlanRoute ? "combined /api/plan-route" : "legacy /api/route plus /api/score"}\n- Route pairs: ${summary.pairCount}\n- Passed: ${summary.passed}\n- Failed: ${summary.failed}\n- Warnings: ${summary.warnings}\n- Recommendations returned: ${summary.recommendations}\n- No recommendation: ${summary.noRecommendation}\n\n## Latency\n\n| Segment | p50 | p90 | p95 | max |\n| --- | ---: | ---: | ---: | ---: |\n| Route or combined route | ${formatMs(summary.timingsMs.route.p50)} | ${formatMs(summary.timingsMs.route.p90)} | ${formatMs(summary.timingsMs.route.p95)} | ${formatMs(summary.timingsMs.route.max)} |\n| Legacy score only | ${formatMs(summary.timingsMs.score.p50)} | ${formatMs(summary.timingsMs.score.p90)} | ${formatMs(summary.timingsMs.score.p95)} | ${formatMs(summary.timingsMs.score.max)} |\n| Total | ${formatMs(summary.timingsMs.total.p50)} | ${formatMs(summary.timingsMs.total.p90)} | ${formatMs(summary.timingsMs.total.p95)} | ${formatMs(summary.timingsMs.total.max)} |\n\n## Per-case timings\n\n${results.map((item) => `- ${item.id}: total ${formatMs(item.timingsMs?.total)}, route/combined ${formatMs(item.timingsMs?.route)}, legacy score ${formatMs(item.timingsMs?.score)}`).join("\n")}\n\n## Failures\n\n${results.filter((item) => item.failures.length).map((item) => `- ${item.id}: ${item.failures.join("; ")}`).join("\n") || "- None"}\n\n## Warnings\n\n${results.filter((item) => item.warnings.length).map((item) => `- ${item.id}: ${item.warnings.join("; ")}`).join("\n") || "- None"}\n`;
+}
+function formatMs(value) {
+  return Number.isFinite(Number(value)) ? `${Math.round(Number(value))} ms` : "-";
 }

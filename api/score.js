@@ -1,5 +1,7 @@
 const {
   boolParam,
+  buildRoute,
+  liveProviderKeysForArea,
   loadStationData,
   methodAllowed,
   numberParam,
@@ -17,11 +19,16 @@ module.exports = async function handler(req, res) {
     const body = req.method === "POST" ? req.body || {} : {};
     const query = req.query || {};
     const source = req.method === "POST" ? body.source || "auto" : stringParam(query.source, "auto");
-    const route = req.method === "POST" ? routeFromPayload(body.route || {}) : routeFromPayloadFromQuery(query);
     const fuel = String(req.method === "POST" ? body.fuel || "U91" : stringParam(query.fuel, "U91")).toUpperCase();
-    const data = await loadStationData({
+    const forceRefresh = req.method === "POST" ? Boolean(body.forceRefresh) : boolParam(query.forceRefresh);
+    const combinedPlanRoute = req.method === "POST" && body.from && body.to && !body.route;
+    const routePlan = combinedPlanRoute
+      ? await buildRouteAndPreloadStations({ body, source, forceRefresh, fuel })
+      : { route: req.method === "POST" ? routeFromPayload(body.route || {}) : routeFromPayloadFromQuery(query), data: null, builtRoute: null };
+    const route = routePlan.route;
+    const data = routePlan.data || await loadStationData({
       requestedSource: source,
-      forceRefresh: req.method === "POST" ? Boolean(body.forceRefresh) : boolParam(query.forceRefresh),
+      forceRefresh,
       points: route.points || [],
       fuels: [fuel],
     });
@@ -58,7 +65,7 @@ module.exports = async function handler(req, res) {
     const recommendations = scored.candidates.slice(0, 20);
     const excludedCodes = new Set(recommendations.map((candidate) => String(candidate.station.stationCode)));
 
-    sendJson(res, 200, {
+    const payload = {
       context: {
         ...scored.context,
         source: data.source,
@@ -93,7 +100,8 @@ module.exports = async function handler(req, res) {
         includeMemberPrices,
         includeClosed,
       }),
-    });
+    };
+    sendJson(res, 200, combinedPlanRoute ? { route: routePlan.builtRoute, score: payload } : payload);
   } catch (error) {
     sendJson(res, 400, {
       error: error instanceof Error ? error.message : "Could not score route",
@@ -132,4 +140,67 @@ function providerStatuses(providerHealth = {}) {
       },
     ]),
   );
+}
+
+async function buildRouteAndPreloadStations({ body, source, forceRefresh, fuel }) {
+  const from = pointFromBody(body.from, "from");
+  const to = pointFromBody(body.to, "to");
+  const endpointPoints = [from, to];
+  const endpointProviderKeys = liveProviderKeysForArea(endpointPoints, 0).join("|");
+  const stationDataPromise = loadStationData({
+    requestedSource: source,
+    forceRefresh,
+    points: endpointPoints,
+    fuels: [fuel],
+  }).then(
+    (data) => ({ data, error: null }),
+    (error) => ({ data: null, error }),
+  );
+  const builtRoute = await buildRoute({ from, to });
+  const routeProviderKeys = liveProviderKeysForArea(builtRoute.points || endpointPoints, 0).join("|");
+  const preloadResult = endpointProviderKeys === routeProviderKeys ? await stationDataPromise : null;
+  if (preloadResult?.error) throw preloadResult.error;
+  const data = preloadResult?.data || await loadStationData({
+    requestedSource: source,
+    forceRefresh,
+    points: builtRoute.points || endpointPoints,
+    fuels: [fuel],
+  });
+  return {
+    builtRoute: {
+      ...builtRoute,
+      points: builtRoute.points || [],
+    },
+    data,
+    route: routeFromPayload({
+      id: "native-route",
+      name: "Native planned route",
+      provider: builtRoute.provider,
+      defaultCorridorKm: Number(body.corridorKm || 2.5),
+      defaultDetourSpeedKmh: Number(body.detourSpeedKmh || 80),
+      points: compactPoints(builtRoute.points || []),
+    }),
+  };
+}
+
+function pointFromBody(point, fallbackLabel) {
+  return {
+    lat: Number(point?.lat),
+    lon: Number(point?.lon),
+    label: String(point?.label || fallbackLabel),
+  };
+}
+
+function compactPoints(points, maxPoints = 180) {
+  if (points.length <= maxPoints) return points;
+  const compacted = [];
+  let previousIndex = -1;
+  for (let index = 0; index < maxPoints; index += 1) {
+    const sourceIndex = Math.round((index / (maxPoints - 1)) * (points.length - 1));
+    if (sourceIndex !== previousIndex) {
+      compacted.push(points[sourceIndex]);
+      previousIndex = sourceIndex;
+    }
+  }
+  return compacted;
 }

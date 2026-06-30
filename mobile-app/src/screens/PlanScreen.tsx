@@ -6,7 +6,7 @@ import {
   View,
 } from "react-native";
 
-import { geocodeAddress, getRoute, getRouteEvFallbackChargers, scoreRoute } from "../api/fuelPathApi";
+import { geocodeAddress, getRoute, getRouteEvFallbackChargers, planFuelRoute } from "../api/fuelPathApi";
 import { PlanRouteEditorCard } from "../components/PlanRouteEditorCard";
 import { PlanRouteSheet } from "../components/PlanRouteSheet";
 import { QuickPlace } from "../components/QuickPlaceShortcuts";
@@ -181,8 +181,8 @@ export function PlanScreen({
           near: resolvedFromPoint,
           nearRadiusKm: 80,
         }));
-      const route = await getRoute(resolvedFromPoint, resolvedToPoint);
       if (preferences.vehicleEnergyType === "electric") {
+        const route = await getRoute(resolvedFromPoint, resolvedToPoint);
         let fallbackChargers: EvCharger[] = [];
         let fallbackError = "";
         setEvFallback((current) => ({ ...current, loading: true, error: "" }));
@@ -222,11 +222,12 @@ export function PlanScreen({
         resetAddressSessionToken("to");
         return;
       }
-      const score = await scoreRoute({
+      const planned = await planFuelRoute({
         approvedPolicyBrands,
         fuel: preferences.fuel,
         eligibleDiscounts: eligiblePreferenceDiscounts,
-        route,
+        from: resolvedFromPoint,
+        to: resolvedToPoint,
       });
       if (
         requestId !== routeRequestIdRef.current ||
@@ -238,10 +239,10 @@ export function PlanScreen({
       setToPoint(resolvedToPoint);
       setFrom(displayLocationLabel(resolvedFromPoint, fromLabel));
       setTo(displayLocationLabel(resolvedToPoint, toLabel));
-      setRouteData({ endpoints: { from: resolvedFromPoint, to: resolvedToPoint }, points: route.points, distanceKm: route.distanceKm });
+      setRouteData({ endpoints: { from: resolvedFromPoint, to: resolvedToPoint }, points: planned.route.points, distanceKm: planned.route.distanceKm });
       setEvFallback(emptyEvFallback);
-      setResult(score);
-      setSelectedCode(score.recommendations[0]?.station.stationCode);
+      setResult(planned.score);
+      setSelectedCode(planned.score.recommendations[0]?.station.stationCode);
       onAddRecentLocation?.(resolvedFromPoint);
       onAddRecentLocation?.(resolvedToPoint);
       setStationPanelOpen(false);

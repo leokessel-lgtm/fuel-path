@@ -326,38 +326,65 @@ async function loadLiveStationsForArea({ forceRefresh = false, points = [], radi
   let cacheHit = true;
   let maxCacheAgeSeconds = 0;
   let degraded = false;
-  for (const provider of providers) {
-    try {
-      let live;
-      if (provider === "qld") {
-        if (productionRuntime() && !hasQldUsageTermsConfirmed()) {
-          throw new Error("QLD Fuel Prices public usage, caching and attribution terms are not confirmed.");
+
+  const providerResults = await Promise.all(
+    providers.map(async (provider) => {
+      try {
+        let live;
+        let loadedProvider = "";
+        if (provider === "qld") {
+          if (productionRuntime() && !hasQldUsageTermsConfirmed()) {
+            throw new Error("QLD Fuel Prices public usage, caching and attribution terms are not confirmed.");
+          }
+          live = await loadLiveQldStations({ forceRefresh });
+          loadedProvider = "api_qld";
+        } else if (provider === "wa") {
+          live = await loadLiveWaStations({ forceRefresh, points, radiusKm, fuels });
+          loadedProvider = "api_wa";
+        } else if (provider === "vic") {
+          live = await loadLiveVicStations({ forceRefresh });
+          loadedProvider = "api_vic";
+        } else if (provider === "sa") {
+          live = await loadLiveSaStations({ forceRefresh });
+          loadedProvider = "api_sa";
+        } else if (provider === "nsw") {
+          if (productionRuntime() && !hasNswActUsageTermsConfirmed()) {
+            throw new Error("FuelCheck NSW/ACT public usage, caching and attribution terms are not confirmed.");
+          }
+          live = await loadLiveStations({ forceRefresh });
+          loadedProvider = "api_nsw";
+        } else if (provider === "tas") {
+          if (productionRuntime() && !hasTasUsageTermsConfirmed()) {
+            throw new Error("TAS FuelCheck public usage, caching and attribution terms are not confirmed.");
+          }
+          live = await loadLiveTasStations({ forceRefresh, points, radiusKm, fuels });
+          loadedProvider = "api_tas";
         }
-        live = await loadLiveQldStations({ forceRefresh });
-        loadedProviders.push("api_qld");
-      } else if (provider === "wa") {
-        live = await loadLiveWaStations({ forceRefresh, points, radiusKm, fuels });
-        loadedProviders.push("api_wa");
-      } else if (provider === "vic") {
-        live = await loadLiveVicStations({ forceRefresh });
-        loadedProviders.push("api_vic");
-      } else if (provider === "sa") {
-        live = await loadLiveSaStations({ forceRefresh });
-        loadedProviders.push("api_sa");
-      } else if (provider === "nsw") {
-        if (productionRuntime() && !hasNswActUsageTermsConfirmed()) {
-          throw new Error("FuelCheck NSW/ACT public usage, caching and attribution terms are not confirmed.");
-        }
-        live = await loadLiveStations({ forceRefresh });
-        loadedProviders.push("api_nsw");
-      } else if (provider === "tas") {
-        if (productionRuntime() && !hasTasUsageTermsConfirmed()) {
-          throw new Error("TAS FuelCheck public usage, caching and attribution terms are not confirmed.");
-        }
-        live = await loadLiveTasStations({ forceRefresh, points, radiusKm, fuels });
-        loadedProviders.push("api_tas");
+        return { provider, loadedProvider, live, error: "" };
+      } catch (error) {
+        return { provider, loadedProvider: "", live: null, error: error instanceof Error ? error.message : String(error) };
       }
+    }),
+  );
+
+  for (const result of providerResults) {
+    const { provider, loadedProvider, live, error } = result;
+    if (error) {
+      errors.push(`${provider}: ${error}`);
+      providerHealthMap[provider] = {
+        status: "unavailable",
+        cacheMode: "none",
+        cacheAgeSeconds: null,
+        lastError: error,
+        warning: "",
+      };
+      cacheHit = false;
+      degraded = true;
+      continue;
+    }
+    try {
       if (!live) continue;
+      if (loadedProvider) loadedProviders.push(loadedProvider);
       stations.push(...live.stations);
       Object.assign(providerHealthMap, live.providerHealth || {});
       if (live.warning) warnings.push(live.warning);

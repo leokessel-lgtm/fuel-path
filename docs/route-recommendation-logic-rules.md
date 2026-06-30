@@ -311,6 +311,7 @@ npm run test:plan-route-browser-clicks
 npm run test:plan-route-browser-clicks:full
 npm run test:plan-route-visual-snapshots
 npm run test:plan-route-live-api
+npm run check:plan-route-latency-budget
 ```
 
 The browser click stress should remain capable of proving that the recommended station plus three alternate map stations can be selected and render the compact station-detail sheet correctly.
@@ -353,6 +354,8 @@ api/score.js
 Plan route scoring may need live fuel data from more than one provider region. Independent regional provider loads should run in parallel and then be aggregated in stable provider order. This keeps multi-state route latency bounded by the slowest required provider rather than the sum of every required provider. Do not change ranking, rejection, source attribution or warning semantics just to optimise latency.
 
 Fuel Plan routes should use the combined `/api/score` mode from the app by sending `from` and `to` points instead of a pre-built `route`. This returns both route geometry and route scoring in one response, and it may preload endpoint fuel providers while route geometry is being built. The old `/api/route` then `/api/score` sequence should be kept only for legacy/testing paths or non-fuel route flows such as EV fallback.
+
+Production monitoring runs a 12-case Plan route latency budget against live `/api/score` route mode. Current guardrails are total p90 <= 5500 ms, p95 <= 8000 ms, max <= 12000 ms, and at least 10 recommendations returned. This is a regression guard for speed and obvious route coverage loss, not proof that every route ranking is optimal.
 
 ## Wording rules
 

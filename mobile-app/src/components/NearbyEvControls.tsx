@@ -252,16 +252,8 @@ export function EvChargerPanel({
       </View>
       <View style={styles.evPanelTitleRow}>
         <Text style={styles.evPanelTitle}>{loading ? "Finding chargers..." : `${chargers.length} chargers nearby`}</Text>
-        <Pressable
-          accessibilityLabel={sheetExpanded ? "Show charger map" : "Show charger list"}
-          accessibilityRole="button"
-          onPress={() => requestSnap(isFull ? "browse" : "full")}
-          style={styles.evListToggle}
-        >
-          <Text style={styles.evListToggleText}>{sheetExpanded ? "Map" : "Full list"}</Text>
-        </Pressable>
       </View>
-      {isFull && error ? <Text style={styles.evPanelNotice}>{error}</Text> : null}
+      {!isPeek && error ? <Text style={styles.evPanelNotice}>{error}</Text> : null}
       {!isPeek && controls ? <View style={styles.controlDeck}>{controls}</View> : null}
       {isFull ? (
         <EvSheetFilters
@@ -277,9 +269,6 @@ export function EvChargerPanel({
       ) : null}
       {!loading && !error && selectedCharger && !isFull ? (
         <>
-          {!isPeek ? (
-            <Text numberOfLines={1} style={styles.evPeekHint}>Browse view. Full list for more.</Text>
-          ) : null}
           <EvChargerRow
             charger={selectedCharger}
             selected
@@ -503,11 +492,16 @@ export function EvChargerRow({
           <Text style={styles.evNavigateButtonIcon}>↗</Text>
         </Pressable>
         <View style={styles.evDistanceBadge}>
-          <Text style={styles.evDistanceBadgeText}>{charger.distanceKm.toFixed(1)} km</Text>
+          <Text style={styles.evDistanceBadgeText}>{formatEvDistance(charger.distanceKm)}</Text>
         </View>
       </View>
     </Pressable>
   );
+}
+
+function formatEvDistance(distanceKm: number | undefined, suffix = "") {
+  if (!Number.isFinite(distanceKm)) return suffix ? "distance unknown" : "Distance unknown";
+  return `${Number(distanceKm).toFixed(1)} km${suffix ? ` ${suffix}` : ""}`;
 }
 
 function chargerConnectorSummary(charger: EvCharger) {
@@ -522,7 +516,7 @@ function chargerConnectorSummary(charger: EvCharger) {
 function evWhyLine(charger: EvCharger) {
   const connector = charger.connectors[0] || charger.connections[0]?.connectorLabel || "Connector unknown";
   const speed = charger.maxPowerKw ? `${Math.round(charger.maxPowerKw)} kW` : powerBandLabel(charger.powerBand);
-  return `${connector}, ${speed}, ${charger.distanceKm.toFixed(1)} km away`;
+  return [connector, speed, formatEvDistance(charger.distanceKm, "away")].filter(Boolean).join(", ");
 }
 
 function powerBandLabel(powerBand: EvCharger["powerBand"]) {
@@ -552,7 +546,7 @@ function chargerRowAccessibilityLabel(charger: EvCharger) {
     charger.address || charger.operator,
     chargerConnectorSummary(charger),
     power,
-    `${charger.distanceKm.toFixed(1)} kilometres away`,
+    formatEvDistance(charger.distanceKm, "away"),
     "Directory data",
     charger.availabilityLabel,
   ].filter(Boolean).join(". ");

@@ -793,7 +793,6 @@ test("regional POI names outrank their town fallback in benchmark-style queries"
       ["Smithton District Hospital TAS", "Smithton District Hospital"],
       ["Newcastle Airport Williamtown NSW", "Newcastle Airport Williamtown"],
       ["Sunshine Coast University Hospital QLD", "Sunshine Coast University Hospital"],
-      ["Mandurah Forum WA", "Mandurah Forum"],
       ["Alice Springs Airport NT", "Alice Springs Airport"],
     ];
 
@@ -894,12 +893,189 @@ test("hosted G-NAF address suggestions do not outrank exact regional POI names",
         assert.equal(result.suggestions[0].provider, "fuel_path_regional_gazetteer", query);
         assert.equal(result.suggestions[0].type, "regional_poi", query);
         assert.notEqual(result.suggestions[0].providerId, "wrong-address", query);
+      }
+
+      mockFetch.restore();
+    },
+  );
+});
+
+test("transit station POI intent is not swallowed by hosted G-NAF address suggestions", async () => {
+  await withGeocodeEnv(
+    {
+      FUEL_PATH_GEOCODE_PROVIDER: "nominatim",
+      FUEL_PATH_GNAF_API_URL: "https://gnaf.example.test",
+      FUEL_PATH_GNAF_API_TOKEN: "test-token",
+    },
+    async () => {
+      const mockFetch = installFetchMock((input) => {
+        const url = String(input);
+        if (url.startsWith("https://gnaf.example.test/")) {
+          const query = new URL(url).searchParams.get("q") || "";
+          const addressLabel = query.includes("Rockdale")
+            ? "13 Station Street, Rockdale NSW 2216"
+            : query.includes("Wolli")
+              ? "4 Magdalene Terrace, Wolli Creek NSW 2205"
+              : query.includes("Central")
+                ? "302 Pitt Street, Sydney NSW 2000"
+                : "90 Station Street, Arncliffe NSW 2205";
+          return jsonResponse({
+            suggestions: [
+              {
+                id: `hosted-address-${query}`,
+                label: addressLabel,
+                lat: -33.936,
+                lon: 151.147,
+                state: "NSW",
+                postcode: "2205",
+                matchType: "exact_address",
+                score: 980,
+              },
+            ],
+          });
+        }
+        return jsonResponse({ error: { message: "Too many requests" } }, 429);
+      });
+
+      const cases = [
+        ["Arncliffe station", "Arncliffe Station, Arncliffe NSW 2205"],
+        ["Rockdale Station", "Rockdale Station, Rockdale NSW 2216"],
+        ["Wolli Creek Station", "Wolli Creek Station, Wolli Creek NSW 2205"],
+        ["Central Station Sydney", "Central Station, Haymarket NSW 2000"],
+        ["St James Station NSW", "St James Station, Sydney NSW 2000"],
+        ["St James Station, NSW", "St James Station, Sydney NSW 2000"],
+      ];
+
+      for (const [query, expectedTop] of cases) {
+        const result = await geocode({
+          query,
+          limit: 5,
+          sessionToken: `hosted-gnaf-transit-poi-${query}`,
+        });
+
+        assert.equal(result.suggestions[0].label, expectedTop, query);
+        assert.equal(result.suggestions[0].provider, "fuel_path_hint", query);
+        assert.equal(result.suggestions[0].type, "station", query);
         assert.ok(
-          result.suggestions.some((item) => item.providerId === "wrong-address"),
-          "keeps hosted address suggestions available without ranking them above the intended POI",
+          result.suggestions.every((item) => !(item.provider === "fuel_path_gnaf" && item.type === "address")),
+          "station intent should not show address rows as primary POI suggestions",
         );
       }
 
+      mockFetch.restore();
+    },
+  );
+});
+
+test("transit station wording does not block exact Station Street addresses", async () => {
+  await withGeocodeEnv(
+    {
+      FUEL_PATH_GEOCODE_PROVIDER: "nominatim",
+      FUEL_PATH_GNAF_API_URL: "https://gnaf.example.test",
+      FUEL_PATH_GNAF_API_TOKEN: "test-token",
+    },
+    async () => {
+      const mockFetch = installFetchMock((input) => {
+        const url = String(input);
+        if (url.startsWith("https://gnaf.example.test/")) {
+          return jsonResponse({
+            suggestions: [
+              {
+                id: "station-street-address",
+                label: "90 Station Street, Arncliffe NSW 2205",
+                lat: -33.936,
+                lon: 151.147,
+                state: "NSW",
+                postcode: "2205",
+                matchType: "exact_address",
+                score: 990,
+              },
+            ],
+          });
+        }
+        return jsonResponse({ error: { message: "Too many requests" } }, 429);
+      });
+
+      const result = await geocode({
+        query: "90 Station Street Arncliffe NSW 2205",
+        limit: 5,
+        sessionToken: "hosted-gnaf-station-street-address",
+      });
+
+      assert.equal(result.suggestions[0].label, "90 Station Street, Arncliffe NSW 2205");
+      assert.equal(result.suggestions[0].provider, "fuel_path_gnaf");
+      assert.equal(result.suggestions[0].type, "address");
+
+      mockFetch.restore();
+    },
+  );
+});
+
+test("curated metro POI hints outrank duplicate regional or town fallbacks", async () => {
+  await withGeocodeEnv({ FUEL_PATH_GEOCODE_PROVIDER: "nominatim" }, async () => {
+    const mockFetch = installFetchMock(() =>
+      jsonResponse({ error: { message: "Too many requests" } }, 429),
+    );
+
+    const cases = [
+      ["Old Parliament House near Parkes", "Old Parliament House, Parkes ACT 2600"],
+      ["Majura Park near Canberra Airport", "Majura Park, Canberra Airport ACT 2609"],
+      ["Fremantle Prison Australia", "Fremantle Prison, Fremantle WA 6160"],
+      ["Mandurah Forum WA", "Mandurah Forum, Mandurah WA 6210"],
+      ["Westfield Belconnen", "Westfield Belconnen, Belconnen ACT 2617"],
+      ["Domestic Airport railway station NSW", "Domestic Airport Station, Mascot NSW 2020"],
+      ["Wolli Creek Station Australia", "Wolli Creek Station, Wolli Creek NSW 2205"],
+      ["Scarborough Beach", "Scarborough Beach, Scarborough WA 6019"],
+    ];
+
+    for (const [query, expectedTop] of cases) {
+      const result = await geocode({
+        query,
+        limit: 5,
+        sessionToken: `curated-metro-poi-${query}`,
+      });
+
+      assert.equal(result.suggestions[0].label, expectedTop, query);
+      assert.equal(result.suggestions[0].provider, "fuel_path_hint", query);
+    }
+
+    assert.equal(mockFetch.calls.length, 0);
+    mockFetch.restore();
+  });
+});
+
+test("hosted G-NAF is skipped for non-address POI intent with strong local hints", async () => {
+  await withGeocodeEnv(
+    {
+      FUEL_PATH_GEOCODE_PROVIDER: "nominatim",
+      FUEL_PATH_GNAF_API_URL: "https://gnaf.example.test",
+      FUEL_PATH_GNAF_API_TOKEN: "test-token",
+    },
+    async () => {
+      const mockFetch = installFetchMock(() =>
+        jsonResponse({ error: { message: "Hosted address lookup should not be called for local POI intent" } }, 500),
+      );
+
+      const cases = [
+        ["Wolli Creek Station Australia", "Wolli Creek Station, Wolli Creek NSW 2205"],
+        ["Scarborough Beach", "Scarborough Beach, Scarborough WA 6019"],
+        ["Westfield Belconnen", "Westfield Belconnen, Belconnen ACT 2617"],
+        ["Makers Workshop Burnie", "Makers Workshop Burnie", "fuel_path_regional_gazetteer"],
+        ["Australian National University near Acton", "Australian National University, Acton ACT 2601"],
+      ];
+
+      for (const [query, expectedTop, expectedProvider = "fuel_path_hint"] of cases) {
+        const result = await geocode({
+          query,
+          limit: 5,
+          sessionToken: `hosted-skip-poi-${query}`,
+        });
+
+        assert.equal(result.suggestions[0].label, expectedTop, query);
+        assert.equal(result.suggestions[0].provider, expectedProvider, query);
+      }
+
+      assert.equal(mockFetch.calls.length, 0);
       mockFetch.restore();
     },
   );

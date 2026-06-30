@@ -24,6 +24,7 @@ function usefulBadge(point: MapPoint) {
   if (point.sourceLabel === "Exact address") return "Exact address";
   if (point.sourceLabel === "Street/road") return "Street";
   if (point.sourceLabel === "Suburb/area") return "Suburb";
+  if (point.sourceLabel === "Transit stop") return "Transit stop";
   if (point.sourceLabel === "Place/landmark") return "Place";
   if (point.sourceLabel === "Fuel station") return "Fuel station";
   return "";

@@ -22,7 +22,7 @@ const { loadEvChargers: loadApiNinjasEvChargers } = createApiNinjasAdapter();
 const { loadEvChargers: loadOpenWebNinjaEvChargers } = createOpenWebNinjaAdapter();
 const { scoreEvRouteFallback } = createEvRouteFallbackScorer({
   buildRoute,
-  loadEvChargers: loadApiNinjasEvChargers,
+  loadEvChargers: (request) => loadDefaultProviderCascade(defaultEvProvider(), request),
 });
 
 module.exports = async function handler(req, res) {

@@ -127,7 +127,7 @@ function chargerPreferenceScore(
   charger: EvCharger,
   chargingPreference: AppPreferences["evChargingPreference"],
 ) {
-  const distanceScore = charger.distanceKm;
+  const distanceScore = Number.isFinite(charger.distanceKm) ? charger.distanceKm : 999;
   const powerPenalty = charger.powerBand === "ultra_fast"
     ? -2.6
     : charger.powerBand === "dc_fast"

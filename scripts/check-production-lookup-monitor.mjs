@@ -9,11 +9,13 @@ const API_BASE = args.apiBase || process.env.FUEL_PATH_API_BASE || "https://fuel
 const RUN_ID = args.runId || process.env.FUEL_PATH_LOOKUP_MONITOR_RUN_ID || new Date().toISOString().replace(/[:.]/g, "-");
 const OUT_DIR = args.outDir || process.env.FUEL_PATH_LOOKUP_MONITOR_OUT_DIR || "tmp";
 const CHECK_FOCUSED = args.skipFocused ? false : true;
+const GNAF_API_ATTEMPTS = Number(args.gnafApiAttempts || process.env.FUEL_PATH_LOOKUP_MONITOR_GNAF_ATTEMPTS || 3);
+const GNAF_API_RETRY_BASE_MS = Number(args.gnafRetryBaseMs || process.env.FUEL_PATH_LOOKUP_MONITOR_GNAF_RETRY_BASE_MS || 1500);
 
 const checks = [];
 const status = await checkStatus();
 checks.push(status);
-if (status.details?.gnafApiUrl) checks.push(await checkGnafApi(status.details.gnafApiUrl));
+if (status.details?.gnafApiUrl) checks.push(await checkGnafApiWithRetries(status.details.gnafApiUrl));
 if (CHECK_FOCUSED) checks.push(await checkFocusedRegression());
 
 const failures = checks.filter((check) => !check.ok);
@@ -84,6 +86,43 @@ async function checkGnafApi(rawUrl) {
   }
 }
 
+async function checkGnafApiWithRetries(rawUrl) {
+  const attempts = [];
+  const maxAttempts = Math.max(1, GNAF_API_ATTEMPTS);
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const result = await checkGnafApi(rawUrl);
+    attempts.push({
+      attempt,
+      ok: result.ok,
+      status: result.status ?? null,
+      details: result.details || null,
+      error: result.error || "",
+    });
+    if (result.ok) {
+      return {
+        ...result,
+        details: {
+          ...(result.details || {}),
+          attempts,
+          unstable: attempt > 1,
+        },
+      };
+    }
+    if (attempt < maxAttempts) await sleep(GNAF_API_RETRY_BASE_MS * attempt);
+  }
+  const last = attempts.at(-1) || {};
+  return {
+    id: "oracle_gnaf_api_health_and_auth",
+    ok: false,
+    error: last.error || "Oracle G-NAF API health/auth probe failed after retries",
+    details: {
+      attempts,
+      unstable: true,
+      finalDetails: last.details || null,
+    },
+  };
+}
+
 async function checkFocusedRegression() {
   try {
     const { spawn } = await import("node:child_process");
@@ -111,6 +150,10 @@ function safeLastJson(value) {
     try { return JSON.parse(lines[index]); } catch {}
   }
   return String(value || "").trim();
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function parseArgs(values) {

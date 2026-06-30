@@ -249,9 +249,6 @@ export function NearbyStationSheet({
           {topControls && !isPeek ? <View style={styles.topControls}>{topControls}</View> : null}
           {selected && !sheetExpanded ? (
             <>
-              {!isPeek ? (
-                <Text numberOfLines={1} style={styles.peekHint}>Browse view. Full list for more.</Text>
-              ) : null}
               <SelectedStationCard
                 onNavigate={() => onNavigateToStation(selected)}
                 selected={selected}
@@ -445,6 +442,8 @@ const styles = StyleSheet.create({
   grabberTouch: {
     alignItems: "center",
     flex: 1,
+    justifyContent: "center",
+    minHeight: 44,
     paddingVertical: spacing.xs,
   },
   mapButton: {
@@ -498,6 +497,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.panelStrong,
     borderRadius: radii.pill,
     flex: 1,
+    justifyContent: "center",
+    minHeight: 44,
     paddingVertical: spacing.sm,
   },
   sortButtonSelected: {

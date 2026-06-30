@@ -1,6 +1,23 @@
 #!/usr/bin/env node
 
 const PROVIDERS = {
+  open_charge_map: {
+    label: "Open Charge Map",
+    env: "OPEN_CHARGE_MAP_API_KEY",
+    header: "X-API-Key",
+    url: "https://api.openchargemap.io/v3/poi",
+    buildUrl: (location) => {
+      const url = new URL("https://api.openchargemap.io/v3/poi");
+      url.searchParams.set("latitude", String(location.lat));
+      url.searchParams.set("longitude", String(location.lon));
+      url.searchParams.set("distance", String(Math.min(location.radiusKm || 25, 100)));
+      url.searchParams.set("distanceunit", "KM");
+      url.searchParams.set("maxresults", "40");
+      return url;
+    },
+    countRows: (payload) => Array.isArray(payload) ? payload.length : 0,
+    firstRow: (payload) => Array.isArray(payload) ? payload[0] : undefined,
+  },
   openweb_ninja: {
     label: "OpenWeb Ninja",
     env: "OPENWEB_NINJA_API_KEY",
@@ -46,6 +63,8 @@ const providerArg = process.argv.find((item) => item.startsWith("--provider="))?
 const providers = providerArg === "all" ? Object.keys(PROVIDERS) : providerArg.split(",").map((item) => item.trim()).filter(Boolean);
 const limitArg = Number(process.argv.find((item) => item.startsWith("--limit="))?.split("=")[1] || LOCATIONS.length);
 const locations = LOCATIONS.slice(0, Math.max(1, Math.min(LOCATIONS.length, limitArg)));
+const proxyBase = (process.env.FUEL_PATH_API_BASE || "https://fuel-path.vercel.app").replace(/\/$/, "");
+const proxyMode = process.argv.includes("--proxy") || process.env.FUEL_PATH_EV_PROVIDER_PROXY_SMOKE === "1";
 
 let failures = 0;
 
@@ -58,33 +77,28 @@ for (const providerId of providers) {
   }
 
   const key = process.env[provider.env];
-  if (!key) {
-    console.log(`SKIP ${provider.label}: ${provider.env} is not set`);
+  if (!key && !proxyMode) {
+    console.log(`SKIP ${provider.label}: ${provider.env} is not set. Re-run with --proxy to validate through ${proxyBase}/api/ev-chargers using deployed server credentials.`);
     continue;
   }
 
-  console.log(`\n${provider.label} smoke (${locations.length} locations)`);
+  console.log(`\n${provider.label} ${proxyMode && !key ? "proxy " : ""}smoke (${locations.length} locations)`);
   const results = [];
   for (const location of locations) {
     const started = Date.now();
-    const url = provider.buildUrl(location);
+    const url = key ? provider.buildUrl(location) : proxyUrl(providerId, location);
     let status = 0;
     let rowCount = 0;
     let sampleFields = [];
     let error = "";
     try {
-      const response = await fetch(url, {
-        headers: {
-          Accept: "application/json",
-          [provider.header]: key,
-        },
-      });
+      const response = await fetch(url, { headers: key ? { Accept: "application/json", [provider.header]: key } : { Accept: "application/json" } });
       status = response.status;
       const text = await response.text();
       const payload = text ? JSON.parse(text) : {};
       if (!response.ok) throw new Error(payload?.message || payload?.error || response.statusText);
-      rowCount = provider.countRows(payload);
-      sampleFields = Object.keys(provider.firstRow(payload) || {}).slice(0, 12);
+      rowCount = key ? provider.countRows(payload) : Array.isArray(payload?.chargers) ? payload.chargers.length : 0;
+      sampleFields = Object.keys((key ? provider.firstRow(payload) : payload?.chargers?.[0]) || {}).slice(0, 12);
     } catch (caught) {
       error = caught instanceof Error ? caught.message : String(caught);
       failures += 1;
@@ -117,4 +131,15 @@ if (failures) {
 
 function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function proxyUrl(providerId, location) {
+  const url = new URL(`${proxyBase}/api/ev-chargers`);
+  url.searchParams.set("provider", providerId);
+  url.searchParams.set("lat", String(location.lat));
+  url.searchParams.set("lon", String(location.lon));
+  url.searchParams.set("label", location.label);
+  url.searchParams.set("radiusKm", String(location.radiusKm || 25));
+  url.searchParams.set("limit", "40");
+  return url;
 }

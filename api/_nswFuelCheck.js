@@ -325,8 +325,9 @@ function normaliseFuelCheckPayload(payload, { source, stationCodePrefix, stateFi
     station.phone = station.phone || stationPhone(row);
     const fuelCode = String(row.fueltype || row.fuelType || row.FuelCode || "").toUpperCase();
     const price = row.price ?? row.Price ?? row.fuelprice;
-    if (fuelCode && price !== undefined && price !== null) {
-      station.prices[fuelCode] = Number(price);
+    const priceValue = Number(price);
+    if (fuelCode && Number.isFinite(priceValue)) {
+      station.prices[fuelCode] = priceValue;
     }
     const updatedAt = normaliseFuelCheckTimestamp(row.lastupdated || row.lastUpdated || row.LastUpdated);
     if (updatedAt && (!station.updatedAt || updatedAt > String(station.updatedAt))) {
@@ -335,7 +336,13 @@ function normaliseFuelCheckPayload(payload, { source, stationCodePrefix, stateFi
     stations.set(stationCode, station);
   }
 
-  return [...stations.values()].filter((station) => Number.isFinite(station.lat) && Number.isFinite(station.lon));
+  return [...stations.values()].filter(
+    (station) =>
+      Object.keys(station.prices || {}).length &&
+      Number.isFinite(station.lat) &&
+      Number.isFinite(station.lon) &&
+      (station.lat || station.lon),
+  );
 }
 
 function tasNearbyRequests({ points = [], radiusKm = 0, fuels = [] } = {}) {

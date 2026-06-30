@@ -166,7 +166,7 @@ export async function getNearbyEvChargers({
   connectors = [],
   powerMode = "",
   minPowerKw = 0,
-  provider = "api_ninjas",
+  provider = "",
 }: {
   centre: MapPoint;
   radiusKm?: number;
@@ -174,11 +174,11 @@ export async function getNearbyEvChargers({
   connectors?: string[];
   powerMode?: EvPowerMode;
   minPowerKw?: number;
-  provider?: "open_charge_map" | "openweb_ninja" | "api_ninjas" | "plugshare" | "here" | "mapbox" | "tomtom" | "network_partner";
+  provider?: "" | "open_charge_map" | "openweb_ninja" | "api_ninjas" | "plugshare" | "here" | "mapbox" | "tomtom" | "network_partner";
 }) {
   return fetchJson<EvChargerResponse>(
     `/api/ev-chargers?${query({
-      provider,
+      provider: provider || undefined,
       lat: centre.lat,
       lon: centre.lon,
       label: centre.label,
@@ -343,8 +343,9 @@ function lookupSourceLabel(provider?: string, matchType?: string, lookupStatus?:
     return "Near address match";
   }
   if (provider === "fuel_path_hint" || provider === "fuel_path_regional_gazetteer") {
+    if (["station", "ferry_wharf"].includes(String(type || ""))) return "Transit stop";
+    if (["poi", "regional_poi", "airport", "venue", "university", "hospital", "beach"].includes(String(type || ""))) return "Place/landmark";
     if (type === "street" || addressLike) return "Street/road";
-    if (["poi", "regional_poi", "airport"].includes(String(type || ""))) return "Place/landmark";
     return "Suburb/area";
   }
   if (provider === "fuel_path") return "Fuel station";
@@ -359,6 +360,7 @@ function lookupSourceLabel(provider?: string, matchType?: string, lookupStatus?:
 function addressLikeQuery(value: string) {
   const text = value.trim();
   if (text.length < 8) return false;
+  if (!/^(?:unit|apt|apartment|flat|suite|townhouse)?\s*\d/i.test(text) && /\bstation\b/i.test(text)) return false;
   const hasStreetType = /\b(street|st|road|rd|avenue|ave|drive|dr|highway|hwy|terrace|tce|circuit|cct|way|lane|ln|place|pl|court|ct|crescent|cres|boulevard|bvd|blvd|parade|pde|parkway|pkwy|pwy|esplanade|esp|square|sq)\b/i.test(text);
   const hasLeadingAddressToken = /^(?:unit|apt|apartment|flat|suite|townhouse)?\s*\d+[a-z]?(?:\/\d+[a-z]?)?\s+[a-z]/i.test(text);
   return hasStreetType || hasLeadingAddressToken;

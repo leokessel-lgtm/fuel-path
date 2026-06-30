@@ -581,7 +581,7 @@ export function PlanScreen({
           selectedCode={selectedCode}
           showStopsList={false}
           stationPanelOpen={stationPanelOpen}
-          stopsTitle="Suggested fuel stops"
+          stopsTitle="Route options"
           statusCapability={result?.context.capability}
         />
       ) : null}

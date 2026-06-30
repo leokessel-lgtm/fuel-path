@@ -239,7 +239,7 @@ test("exact G-NAF address skips Google even when paid fallback is enabled", asyn
       const mockFetch = installGoogleMockFetch();
 
       const payload = await geocode({
-        query: "87a corea street",
+        query: "87a corea street sylvania nsw 2224",
         limit: 2,
         sessionToken: "session-gnaf-first",
       });

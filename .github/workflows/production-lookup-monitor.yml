@@ -1,6 +1,9 @@
 name: Production lookup monitor
 
 on:
+  pull_request:
+    branches:
+      - main
   schedule:
     - cron: "*/30 * * * *"
   workflow_dispatch:
@@ -28,4 +31,5 @@ jobs:
         run: npm run test:poi-autocomplete-budget
 
       - name: Run production lookup monitor
+        if: github.event_name != 'pull_request'
         run: npm run check:production-lookup-monitor -- --api-base https://fuel-path.vercel.app

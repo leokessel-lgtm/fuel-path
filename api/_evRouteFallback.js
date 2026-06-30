@@ -82,10 +82,9 @@ function scoreRouteFallbackChargers({ chargers = [], limit = 3, routePoints = []
 
 async function refineFallbackDetours({ buildRoute, chargers = [], routePoints = [] }) {
   if (typeof buildRoute !== "function") return chargers;
-  const refined = [];
-  for (const charger of chargers) {
-    refined.push(await refineFallbackDetour({ buildRoute, charger, routePoints }));
-  }
+  const refined = await Promise.all(
+    chargers.map((charger) => refineFallbackDetour({ buildRoute, charger, routePoints })),
+  );
   return refined.sort((left, right) => chargerRank(left) - chargerRank(right));
 }
 

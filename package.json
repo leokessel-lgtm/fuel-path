@@ -48,6 +48,7 @@
     "start:gnaf-api": "node scripts/oracle/gnaf-api-server.mjs",
     "load:gnaf-compact-postgres": "node scripts/load-gnaf-compact-postgres.mjs",
     "test:geocode-focused-regression": "node scripts/geocode-focused-regression.mjs",
+    "test:poi-autocomplete-budget": "node scripts/check-poi-autocomplete-budget.mjs",
     "check:production-lookup-monitor": "node scripts/check-production-lookup-monitor.mjs",
     "test:map-interactions": "node scripts/map-interaction-stress.mjs",
     "test:provider-chaos": "node scripts/provider-integration-chaos-stress.mjs",

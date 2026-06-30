@@ -1,6 +1,6 @@
 # Route recommendation logic rules
 
-Last updated: 2026-06-28
+Last updated: 2026-06-30
 
 This document records the current Fuel Path route recommendation rules across backend scoring, frontend display and product wording. It is the working source of truth for the Plan route recommendation card.
 
@@ -231,6 +231,37 @@ estimated route value after detour fuel
 Do not add stale-price penalty to ranking.
 
 Do not add hidden fuel tank or fuel-level reachability assumptions for fuel vehicles.
+
+## EV route fallback rules
+
+EV route fallback is prototype route-corridor charger discovery, not live availability guidance.
+
+Primary API files:
+
+```text
+api/ev-chargers.js
+api/_evRouteFallback.js
+```
+
+Rules:
+
+- Use the same configured EV provider cascade as Nearby EV search.
+- Do not hard-wire EV route fallback to a single trial provider.
+- Preserve connector filters supplied by the user or vehicle profile.
+- Rank fallback chargers by route-corridor proximity, then refine detour with the route engine where available.
+- Refine candidate detours in parallel so one slow route-engine call does not serially delay every EV fallback result.
+- Do not claim live bay availability unless the provider supplies real-time status.
+- Keep provenance clear that EV route fallback uses directory data.
+
+Current provider cascade behaviour:
+
+```text
+default provider, then configured fallback providers until at least one provider returns chargers
+```
+
+Reason:
+
+Remote and regional EV coverage differs materially by provider. Route fallback should not fail a viable corridor only because the first cheap provider has thin coverage.
 
 ## Frontend files
 

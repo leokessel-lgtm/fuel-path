@@ -442,6 +442,8 @@ const styles = StyleSheet.create({
   grabberTouch: {
     alignItems: "center",
     flex: 1,
+    justifyContent: "center",
+    minHeight: 44,
     paddingVertical: spacing.xs,
   },
   mapButton: {
@@ -495,6 +497,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.panelStrong,
     borderRadius: radii.pill,
     flex: 1,
+    justifyContent: "center",
+    minHeight: 44,
     paddingVertical: spacing.sm,
   },
   sortButtonSelected: {

@@ -302,8 +302,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: spacing.sm,
     maxWidth: 188,
+    minHeight: 44,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
+    paddingVertical: 5,
   },
   vehiclePillPressed: {
     backgroundColor: colors.greenSoft,

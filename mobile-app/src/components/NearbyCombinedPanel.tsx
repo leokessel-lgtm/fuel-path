@@ -370,6 +370,8 @@ const styles = StyleSheet.create({
   grabberTouch: {
     alignItems: "center",
     flex: 1,
+    justifyContent: "center",
+    minHeight: 44,
     paddingVertical: spacing.xs,
   },
   grabber: {

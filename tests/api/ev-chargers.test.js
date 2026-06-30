@@ -234,6 +234,70 @@ test("EV route fallback scorer returns cautious prototype metadata", async () =>
   assert.equal(result.chargers[0].routeDetourDistanceKm, 4.8);
 });
 
+test("EV route fallback POST uses provider cascade after API Ninjas returns no chargers", async () => {
+  const handlerPath = require.resolve("../../api/ev-chargers");
+  delete require.cache[handlerPath];
+  const previousEnv = {
+    API_NINJAS_API_KEY: process.env.API_NINJAS_API_KEY,
+    OPENWEB_NINJA_API_KEY: process.env.OPENWEB_NINJA_API_KEY,
+    API_NINJAS_EV_CHARGER_API_BASE_URL: process.env.API_NINJAS_EV_CHARGER_API_BASE_URL,
+    OPENWEB_NINJA_EV_CHARGE_API_BASE_URL: process.env.OPENWEB_NINJA_EV_CHARGE_API_BASE_URL,
+    FUEL_PATH_EV_DEFAULT_PROVIDER: process.env.FUEL_PATH_EV_DEFAULT_PROVIDER,
+    FUEL_PATH_EV_CASCADE_PROVIDERS: process.env.FUEL_PATH_EV_CASCADE_PROVIDERS,
+  };
+  const previousFetch = global.fetch;
+  process.env.API_NINJAS_API_KEY = "api-ninjas-test";
+  process.env.OPENWEB_NINJA_API_KEY = "openweb-test";
+  process.env.API_NINJAS_EV_CHARGER_API_BASE_URL = "https://api-ninjas.test/evcharger";
+  process.env.OPENWEB_NINJA_EV_CHARGE_API_BASE_URL = "https://openweb.test/ev-charge-finder/search-by-location";
+  process.env.FUEL_PATH_EV_DEFAULT_PROVIDER = "api_ninjas";
+  process.env.FUEL_PATH_EV_CASCADE_PROVIDERS = "openweb_ninja";
+  const calls = [];
+  global.fetch = async (url) => {
+    calls.push(String(url));
+    if (String(url).startsWith("https://api-ninjas.test/")) {
+      return jsonResponse([]);
+    }
+    if (String(url).startsWith("https://openweb.test/")) {
+      return jsonResponse(openWebNinjaPayload());
+    }
+    throw new Error(`Unexpected fetch ${url}`);
+  };
+
+  try {
+    const handler = require("../../api/ev-chargers");
+    const payload = await invokeHandler(handler, {
+      method: "POST",
+      body: {
+        mode: "route_fallback",
+        connectors: ["CCS2"],
+        radiusKm: 35,
+        limit: 3,
+        route: {
+          points: [
+            { lat: -20.7364, lon: 116.8463, label: "Karratha" },
+            { lat: -21.9303, lon: 114.1240, label: "Exmouth" },
+          ],
+        },
+      },
+    });
+
+    assert.equal(payload.statusCode, 200);
+    assert.equal(payload.body.context.fallbackMode, "sampled_route_corridor");
+    assert.equal(payload.body.chargers.length > 0, true);
+    assert.equal(payload.body.chargers[0].source, "openweb_ninja");
+    assert.equal(calls.some((url) => url.startsWith("https://api-ninjas.test/")), true);
+    assert.equal(calls.some((url) => url.startsWith("https://openweb.test/")), true);
+  } finally {
+    global.fetch = previousFetch;
+    delete require.cache[handlerPath];
+    for (const [key, value] of Object.entries(previousEnv)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
+});
+
 function openChargeMapPayload() {
   return [
     {
@@ -428,4 +492,39 @@ function withEnv(values, callback) {
       else process.env[key] = previous[key];
     }
   }
+}
+
+function jsonResponse(payload) {
+  return {
+    ok: true,
+    status: 200,
+    headers: {
+      get: () => "application/json",
+    },
+    json: async () => payload,
+    text: async () => JSON.stringify(payload),
+  };
+}
+
+function invokeHandler(handler, req) {
+  return new Promise((resolve) => {
+    const response = {
+      statusCode: 200,
+      headers: {},
+      status(code) {
+        this.statusCode = code;
+        return this;
+      },
+      setHeader(name, value) {
+        this.headers[name] = value;
+      },
+      json(body) {
+        resolve({ statusCode: this.statusCode, headers: this.headers, body });
+      },
+      end(body) {
+        resolve({ statusCode: this.statusCode, headers: this.headers, body });
+      },
+    };
+    handler({ query: {}, ...req }, response);
+  });
 }

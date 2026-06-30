@@ -341,7 +341,7 @@ const checks = [
       planScreen.includes("onShowStops") &&
       planRouteSheet.includes('accessibilityLabel="Show more map"') &&
       planRouteSheet.includes("const routeSheetRestoreLabel = stationPanelOpen") &&
-      planRouteSheet.includes("Show suggested fuel stops") &&
+      planRouteSheet.includes("Show route options") &&
       planRouteSheet.includes("Show route panel"),
   },
   {

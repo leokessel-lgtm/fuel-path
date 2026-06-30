@@ -491,6 +491,7 @@ function createGeocoder({ fetchJson, loadStationData }) {
 
   function detectQueryLocality(query) {
     const text = String(query || "").trim().replace(/\s+/g, " ");
+    if (!/^(?:unit|apt|apartment|flat|suite|townhouse)?\s*\d/i.test(text) && /\bstation\b/i.test(text)) return "";
     const streetMatch = /\b(?:street|st|road|rd|avenue|ave|drive|dr|parade|pde|place|pl|terrace|highway|mall|court|close|vista|circuit|way|lane|ln)\b\s+(.+?)(?:\s+\b(NSW|ACT|QLD|WA|VIC|SA|TAS|NT)\b|\s*$)/i.exec(text);
     if (streetMatch?.[1]) {
       const locality = normaliseSearchText(streetMatch[1]);
@@ -502,6 +503,7 @@ function createGeocoder({ fetchJson, loadStationData }) {
 
   function looksLikeAddressStreetQuery(query) {
     const text = String(query || "").trim();
+    if (!/^(?:unit|apt|apartment|flat|suite|townhouse)?\s*\d/i.test(text) && /\bstation\b/i.test(text)) return false;
     return /^(?:unit|apt|apartment|flat|suite|townhouse)?\s*\d+[a-z]?(?:\/\d+[a-z]?)?\s+.+\b(?:street|st|road|rd|avenue|ave|drive|dr|parade|pde|place|pl|terrace|highway|mall|court|close|vista|circuit|way|lane|ln)\b/i.test(text);
   }
 
@@ -590,11 +592,13 @@ function createGeocoder({ fetchJson, loadStationData }) {
     return null;
   }
 
-  function hasStrongLocalSuggestion(suggestions) {
+  function hasStrongLocalSuggestion(query, suggestions) {
+    const needle = normaliseSearchText(query);
     return suggestions.some(
       (item) =>
         isStrongLocalHintSuggestion(item) ||
         isStrongRegionalSuggestion(item) ||
+        (item.provider === "fuel_path_hint" && isLocalPoiSuggestion(item) && localPoiNameBoost(needle, item)) ||
         (item.provider === "fuel_path_gnaf" &&
           item.type === "address" &&
           ["exact_address", "address_prefix"].includes(item.matchType)),
@@ -862,6 +866,42 @@ function createGeocoder({ fetchJson, loadStationData }) {
     }
     const addressLookupLimit = safeSearchContext ? Math.max(limit * 4, 20) : limit;
     const requiresExactAddress = requiresExactAddressLookup(query);
+    const hintSuggestions = localHintGeocode(query, limit);
+    const strongHintSuggestions = hintSuggestions.filter(isStrongLocalHintSuggestion);
+    const weakHintSuggestions = hintSuggestions.filter((item) => !isStrongLocalHintSuggestion(item));
+    const regionalSuggestions = regionalLocalGeocode(query, limit);
+    const fastLocalSuggestions = rankLocalSuggestions(
+      query,
+      [
+        ...strongHintSuggestions,
+        ...regionalSuggestions,
+        ...weakHintSuggestions,
+      ],
+      limit,
+      safeSearchContext,
+    );
+    if (shouldReturnFastLocalAutocomplete(query, fastLocalSuggestions, requiresExactAddress)) {
+      const lookupStatus = "ok";
+      const payload = {
+        provider: selectedProvider,
+        providerMode: selectedProvider === "nominatim" ? "validation" : "production_candidate",
+        recommendedProductionProvider: RECOMMENDED_GEOCODE_PROVIDER,
+        requestedProvider: provider || process.env.FUEL_PATH_GEOCODE_PROVIDER || "auto",
+        sessionToken,
+        query,
+        ...(safeSearchContext ? { searchContext: safeSearchContext } : {}),
+        location: fastLocalSuggestions[0] || null,
+        suggestions: fastLocalSuggestions,
+        lookupStatus,
+        cache: "miss",
+        cacheMode: geocodeCacheMode(lookupStatus),
+        providerHealth: geocodeProviderHealth(selectedProvider, lookupStatus, "", geocodeCacheMode(lookupStatus)),
+        degraded: false,
+        fastPath: "local_autocomplete",
+      };
+      writeGeocodeCache(cacheKey, payload, true);
+      return payload;
+    }
     const rawAddressSuggestions = shouldSkipAddressIndex(query, addressIndex)
       ? []
       : await searchAddressIndex(query, addressLookupLimit, { searchContext: safeSearchContext });
@@ -869,9 +909,6 @@ function createGeocoder({ fetchJson, loadStationData }) {
     const strictAddressSuggestions = requiresExactAddress
       ? filterExactAddressSuggestionsForExactQuery(query, addressSuggestions)
       : addressSuggestions;
-    const hintSuggestions = localHintGeocode(query, limit);
-    const strongHintSuggestions = hintSuggestions.filter(isStrongLocalHintSuggestion);
-    const weakHintSuggestions = hintSuggestions.filter((item) => !isStrongLocalHintSuggestion(item));
     const stationSuggestions =
       !stationGeocodeDisabled() && selectedProvider === "nominatim" && looksLikeStationQuery(query)
         ? await localStationGeocode(query, limit)
@@ -881,7 +918,7 @@ function createGeocoder({ fetchJson, loadStationData }) {
       [
         ...strictAddressSuggestions,
         ...strongHintSuggestions,
-        ...regionalLocalGeocode(query, limit),
+        ...regionalSuggestions,
         ...weakHintSuggestions,
         ...stationSuggestions,
       ],
@@ -892,7 +929,7 @@ function createGeocoder({ fetchJson, loadStationData }) {
     let providerWarning = "";
     const strongLocalFallback = requiresExactAddress
       ? false
-      : hasStrongLocalSuggestion(localSuggestions) || hasStrongRegionalPoiSuggestion(query, localSuggestions);
+      : hasStrongLocalSuggestion(query, localSuggestions) || hasStrongRegionalPoiSuggestion(query, localSuggestions);
     const hasExactAddress = hasExactAddressSuggestion(requiresExactAddress ? strictAddressSuggestions : addressSuggestions);
     if (!hasExactAddress && !strongLocalFallback && !shouldSuppressExternalGeocode(query, localSuggestions)) {
       try {
@@ -973,6 +1010,24 @@ function createGeocoder({ fetchJson, loadStationData }) {
 
   function geocodeCacheKey({ provider, query, limit, addressIndex, searchContext }) {
     return `${provider}:${limit}:${addressIndexSignature(addressIndex)}:${searchContextSignature(searchContext)}:${explicitStateCodeSignature(query)}:${normaliseSearchText(query)}`;
+  }
+
+  function shouldReturnFastLocalAutocomplete(query, suggestions, requiresExactAddress) {
+    if (!suggestions.length) return false;
+    if (requiresExactAddress && looksLikeAddressStreetQuery(query)) return false;
+    if (!hasStrongLocalSuggestion(query, suggestions) && !hasStrongRegionalPoiSuggestion(query, suggestions)) return false;
+    const top = suggestions[0];
+    if (top?.provider === "fuel_path_hint") {
+      return fastLocalAutocompleteTypes().has(String(top.type || ""));
+    }
+    if (top?.provider === "fuel_path_regional_gazetteer") {
+      return ["regional_poi", "regional_town"].includes(String(top.type || ""));
+    }
+    return false;
+  }
+
+  function fastLocalAutocompleteTypes() {
+    return new Set(["poi", "regional_poi", "airport", "venue", "university", "hospital", "beach", "station", "ferry_wharf", "park", "city", "suburb"]);
   }
 
   function addressIndexSignature(status) {
@@ -1085,6 +1140,7 @@ function createGeocoder({ fetchJson, loadStationData }) {
 
     if (isBroadLocalityOnlyQuery(query)) return false;
     if (hasPlaceIntent(needle)) {
+      if (!addressLikeQuery(query) && !isPlaceWordAddressSignal(query)) return false;
       if (addressLikeQuery(query)) {
         return addressLikeIntentMatch(query, item?.label);
       }
@@ -1128,14 +1184,15 @@ function createGeocoder({ fetchJson, loadStationData }) {
   }
 
   function shouldSkipAddressIndex(query, addressIndex) {
-    if (addressIndex?.apiConfigured) return false;
-    if (requiresExactAddressLookup(query)) return false;
     const queryStateCode = detectStateCode(query);
     const queryLocality = detectQueryLocality(query);
     const queryNeedle = normaliseSearchText(query);
     const hasUnitLikeSignal = /\b(?:unit|flat|apart|apartment|lot|level|lvl|shop|suite|townhouse|site|office|offc|building|base|duplex)\b/.test(queryNeedle);
     const placeIntentSignal = hasPlaceIntent(queryNeedle);
     const queryTokens = queryNeedle.split(" ").filter(Boolean);
+    if (placeIntentSignal && !addressLikeQuery(query) && !isPlaceWordAddressSignal(query) && !hasUnitLikeSignal) return true;
+    if (addressIndex?.apiConfigured) return false;
+    if (requiresExactAddressLookup(query)) return false;
     return (
       (hasSensitiveAddressContext(query) && !addressLikeQuery(query)) ||
       isPostalAddressQuery(query) ||
@@ -1419,6 +1476,18 @@ function createGeocoder({ fetchJson, loadStationData }) {
     if (item?.provider === "fuel_path_regional_gazetteer" && item?.type === "regional_town" && !hasPlaceIntent(needle)) {
       score -= 10;
     }
+    if (item?.provider === "fuel_path_regional_gazetteer" && item?.type === "regional_town" && hasPlaceIntent(needle) && !hasTownCentreIntent(needle)) {
+      score += 24;
+    }
+    const localPoiBoost = item?.provider === "fuel_path_hint" && isLocalPoiSuggestion(item) && hasPoiDisambiguator(query, needle)
+      ? localPoiNameBoost(needle, item)
+      : 0;
+    if (localPoiBoost) {
+      score -= localPoiBoost;
+    }
+    if (item?.provider === "fuel_path_hint" && isLocalPoiSuggestion(item) && localSuggestionPrimaryName(item) === needle) {
+      score -= 100;
+    }
     const regionalPoiNameMatch = regionalPoiNameMatches(needle, item);
     if (item?.provider === "fuel_path_regional_gazetteer" && item?.type === "regional_poi" && !hasPlaceIntent(needle) && !regionalPoiNameMatch) {
       score += 10;
@@ -1428,6 +1497,10 @@ function createGeocoder({ fetchJson, loadStationData }) {
     if (hasPlaceIntent(needle) && isBroadAreaSuggestion(item) && !placeIntentMatches(needle, item)) score += 10;
     score -= searchContextBoost(item, searchContext);
     return score;
+  }
+
+  function localSuggestionPrimaryName(item) {
+    return normaliseSearchText(String(item?.label || "").split(",")[0] || "");
   }
 
   function normaliseSearchContext(value = {}) {
@@ -1552,6 +1625,23 @@ function createGeocoder({ fetchJson, loadStationData }) {
     return primaryName.length >= 5 && needle.includes(primaryName);
   }
 
+  function isLocalPoiSuggestion(item) {
+    return item?.provider === "fuel_path_hint" &&
+      ["poi", "airport", "venue", "university", "hospital", "beach", "station", "ferry_wharf", "park"].includes(String(item?.type || ""));
+  }
+
+  function localPoiNameBoost(needle, item) {
+    if (!isLocalPoiSuggestion(item)) return false;
+    const primaryName = normaliseSearchText(String(item?.label || "").split(",")[0] || "");
+    const index = primaryName.length >= 5 ? needle.indexOf(primaryName) : -1;
+    if (index < 0) return 0;
+    return 92 + Math.min(40, primaryName.length) + Math.max(0, 30 - index);
+  }
+
+  function hasPoiDisambiguator(query, needle) {
+    return Boolean(detectStateCode(query)) || /\b(?:near|australia)\b/.test(needle);
+  }
+
   function hasStrongRegionalPoiSuggestion(query, suggestions) {
     const needle = normaliseSearchText(query);
     return suggestions.some((item) => {
@@ -1562,6 +1652,15 @@ function createGeocoder({ fetchJson, loadStationData }) {
 
   function hasPlaceIntent(needle) {
     return placeIntentTerms(needle).length > 0;
+  }
+
+  function hasTransitPlaceIntent(needle) {
+    const terms = placeIntentTerms(needle);
+    return terms.some((term) => ["station", "interchange", "wharf"].includes(term));
+  }
+
+  function hasTownCentreIntent(needle) {
+    return /\b(?:town|city|regional)\s+centre\b/.test(needle) || /\bcbd\b/.test(needle);
   }
 
   function placeIntentMatches(needle, item) {

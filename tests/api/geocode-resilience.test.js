@@ -962,6 +962,7 @@ test("transit station POI intent is not swallowed by hosted G-NAF address sugges
         );
       }
 
+      assert.equal(mockFetch.calls.length, 0, "known transit POIs should resolve before hosted G-NAF is called");
       mockFetch.restore();
     },
   );

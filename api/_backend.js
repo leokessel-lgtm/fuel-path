@@ -10,7 +10,7 @@ const {
   purgePredictionBacktests,
   setPredictionStorageForTests,
 } = require("./_predictionStorage");
-const { providerHealth } = require("./_providerRuntime");
+const { providerHealth, singleFlight } = require("./_providerRuntime");
 const {
   googleRoutesApiKey,
 } = require("./_providerCredentials");
@@ -330,37 +330,40 @@ async function loadLiveStationsForArea({ forceRefresh = false, points = [], radi
   const providerResults = await Promise.all(
     providers.map(async (provider) => {
       try {
-        let live;
-        let loadedProvider = "";
-        if (provider === "qld") {
-          if (productionRuntime() && !hasQldUsageTermsConfirmed()) {
-            throw new Error("QLD Fuel Prices public usage, caching and attribution terms are not confirmed.");
+        const result = await singleFlight(liveProviderFlightKey(provider, { forceRefresh, points, radiusKm, fuels }), async () => {
+          let live;
+          let loadedProvider = "";
+          if (provider === "qld") {
+            if (productionRuntime() && !hasQldUsageTermsConfirmed()) {
+              throw new Error("QLD Fuel Prices public usage, caching and attribution terms are not confirmed.");
+            }
+            live = await loadLiveQldStations({ forceRefresh });
+            loadedProvider = "api_qld";
+          } else if (provider === "wa") {
+            live = await loadLiveWaStations({ forceRefresh, points, radiusKm, fuels });
+            loadedProvider = "api_wa";
+          } else if (provider === "vic") {
+            live = await loadLiveVicStations({ forceRefresh });
+            loadedProvider = "api_vic";
+          } else if (provider === "sa") {
+            live = await loadLiveSaStations({ forceRefresh });
+            loadedProvider = "api_sa";
+          } else if (provider === "nsw") {
+            if (productionRuntime() && !hasNswActUsageTermsConfirmed()) {
+              throw new Error("FuelCheck NSW/ACT public usage, caching and attribution terms are not confirmed.");
+            }
+            live = await loadLiveStations({ forceRefresh });
+            loadedProvider = "api_nsw";
+          } else if (provider === "tas") {
+            if (productionRuntime() && !hasTasUsageTermsConfirmed()) {
+              throw new Error("TAS FuelCheck public usage, caching and attribution terms are not confirmed.");
+            }
+            live = await loadLiveTasStations({ forceRefresh, points, radiusKm, fuels });
+            loadedProvider = "api_tas";
           }
-          live = await loadLiveQldStations({ forceRefresh });
-          loadedProvider = "api_qld";
-        } else if (provider === "wa") {
-          live = await loadLiveWaStations({ forceRefresh, points, radiusKm, fuels });
-          loadedProvider = "api_wa";
-        } else if (provider === "vic") {
-          live = await loadLiveVicStations({ forceRefresh });
-          loadedProvider = "api_vic";
-        } else if (provider === "sa") {
-          live = await loadLiveSaStations({ forceRefresh });
-          loadedProvider = "api_sa";
-        } else if (provider === "nsw") {
-          if (productionRuntime() && !hasNswActUsageTermsConfirmed()) {
-            throw new Error("FuelCheck NSW/ACT public usage, caching and attribution terms are not confirmed.");
-          }
-          live = await loadLiveStations({ forceRefresh });
-          loadedProvider = "api_nsw";
-        } else if (provider === "tas") {
-          if (productionRuntime() && !hasTasUsageTermsConfirmed()) {
-            throw new Error("TAS FuelCheck public usage, caching and attribution terms are not confirmed.");
-          }
-          live = await loadLiveTasStations({ forceRefresh, points, radiusKm, fuels });
-          loadedProvider = "api_tas";
-        }
-        return { provider, loadedProvider, live, error: "" };
+          return { loadedProvider, live };
+        });
+        return { provider, loadedProvider: result.loadedProvider, live: result.live, error: "" };
       } catch (error) {
         return { provider, loadedProvider: "", live: null, error: error instanceof Error ? error.message : String(error) };
       }
@@ -425,6 +428,14 @@ async function loadLiveStationsForArea({ forceRefresh = false, points = [], radi
     providerHealth: providerHealthMap,
     warning: [...warnings, ...(errors.length ? [`Some live fuel providers unavailable: ${errors.join("; ")}`] : [])].join(" "),
   };
+}
+
+function liveProviderFlightKey(provider, { forceRefresh = false, points = [], radiusKm = 0, fuels = [] } = {}) {
+  const pointKey = (points || [])
+    .map((point) => `${Number(point.lat || 0).toFixed(2)},${Number(point.lon || 0).toFixed(2)}`)
+    .join("|");
+  const fuelKey = (fuels || []).map(String).sort().join(",");
+  return ["live-provider", provider, forceRefresh ? "refresh" : "cached", Math.round(Number(radiusKm || 0)), fuelKey, pointKey].join(":");
 }
 
 async function loadStationData({ requestedSource = "auto", forceRefresh = false, points = [], radiusKm = 0, fuels = [] } = {}) {

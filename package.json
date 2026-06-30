@@ -19,6 +19,7 @@
     "test:plan-route-live-api": "node scripts/plan-route-live-api-stress.mjs",
     "check:plan-route-latency-budget": "FUEL_PATH_PLAN_LIVE_STRESS_PAIRS=12 FUEL_PATH_PLAN_LIVE_MAX_TOTAL_P90_MS=5500 FUEL_PATH_PLAN_LIVE_MAX_TOTAL_P95_MS=8000 FUEL_PATH_PLAN_LIVE_MAX_TOTAL_MAX_MS=12000 FUEL_PATH_PLAN_LIVE_MIN_RECOMMENDATIONS=10 node scripts/plan-route-live-api-stress.mjs",
     "test:plan-route-live-api:full": "FUEL_PATH_PLAN_LIVE_STRESS_PAIRS=300 node scripts/plan-route-live-api-stress.mjs",
+    "test:poi-route-journeys": "node scripts/poi-route-journey-stress.mjs",
     "test:geocode-prefix-600:local": "node scripts/geocode-600-prefix-benchmark.mjs",
     "test:geocode-hosted-preview": "node scripts/geocode-hosted-preview-smoke.mjs",
     "test:geocode-hosted-national": "node scripts/geocode-hosted-national-benchmark.mjs",

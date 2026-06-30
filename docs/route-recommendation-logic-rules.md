@@ -357,6 +357,21 @@ Fuel Plan routes should use the combined `/api/score` mode from the app by sendi
 
 Production monitoring runs a 12-case Plan route latency budget against live `/api/score` route mode. Current guardrails are total p90 <= 5500 ms, p95 <= 8000 ms, max <= 12000 ms, and at least 10 recommendations returned. This is a regression guard for speed and obvious route coverage loss, not proof that every route ranking is optimal.
 
+Broad POI-to-POI Plan journey stress uses the app's current route shape: geocode each selected endpoint, then call combined `/api/score` with `from` and `to`. Legacy `/api/route` plus `/api/score` mode is retained only behind an explicit stress-script flag. Live provider loads for Plan scoring share in-flight provider requests where possible, so concurrent route scoring does not stampede the same state fuel provider.
+
+Current production evidence after provider single-flight and local POI geocode fast-path hardening:
+
+- 12-case live Plan route latency budget: 12/12 passed, p90 2,835 ms, p95 4,411 ms, max 4,411 ms.
+- 200-case live POI-to-POI Plan journey stress: 200/200 passed, p90 2,468 ms, p95 3,405 ms, max 5,742 ms.
+- POI journey failures: 0 geocode, 0 route, 0 score.
+
+Evidence files:
+
+```text
+tmp/plan-route-live-api-stress-2026-06-30T11-48-47-637Z.md
+tmp/poi-route-journey-stress-2026-06-30T11-48-48-041Z.md
+```
+
 ## Wording rules
 
 Allowed:

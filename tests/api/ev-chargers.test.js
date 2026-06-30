@@ -298,6 +298,119 @@ test("EV route fallback POST uses provider cascade after API Ninjas returns no c
   }
 });
 
+test("EV default provider cascade enriches thin API Ninjas charger metadata when OpenWeb is configured", async () => {
+  const handlerPath = require.resolve("../../api/ev-chargers");
+  delete require.cache[handlerPath];
+  const previousEnv = {
+    API_NINJAS_API_KEY: process.env.API_NINJAS_API_KEY,
+    OPENWEB_NINJA_API_KEY: process.env.OPENWEB_NINJA_API_KEY,
+    API_NINJAS_EV_CHARGER_API_BASE_URL: process.env.API_NINJAS_EV_CHARGER_API_BASE_URL,
+    OPENWEB_NINJA_EV_CHARGE_API_BASE_URL: process.env.OPENWEB_NINJA_EV_CHARGE_API_BASE_URL,
+    FUEL_PATH_EV_DEFAULT_PROVIDER: process.env.FUEL_PATH_EV_DEFAULT_PROVIDER,
+    FUEL_PATH_EV_CASCADE_PROVIDERS: process.env.FUEL_PATH_EV_CASCADE_PROVIDERS,
+  };
+  const previousFetch = global.fetch;
+  process.env.API_NINJAS_API_KEY = "api-ninjas-test";
+  process.env.OPENWEB_NINJA_API_KEY = "openweb-test";
+  process.env.API_NINJAS_EV_CHARGER_API_BASE_URL = "https://api-ninjas.test/evcharger";
+  process.env.OPENWEB_NINJA_EV_CHARGE_API_BASE_URL = "https://openweb.test/ev-charge-finder/search-by-location";
+  process.env.FUEL_PATH_EV_DEFAULT_PROVIDER = "api_ninjas";
+  process.env.FUEL_PATH_EV_CASCADE_PROVIDERS = "openweb_ninja";
+  const calls = [];
+  global.fetch = async (url) => {
+    calls.push(String(url));
+    if (String(url).startsWith("https://api-ninjas.test/")) return jsonResponse(apiNinjasThinKarrathaPayload());
+    if (String(url).startsWith("https://openweb.test/")) return jsonResponse(openWebNinjaPayload());
+    throw new Error(`Unexpected fetch ${url}`);
+  };
+
+  try {
+    const handler = require("../../api/ev-chargers");
+    const payload = await invokeHandler(handler, {
+      method: "GET",
+      query: {
+        lat: "-20.7364",
+        lon: "116.8463",
+        label: "Karratha WA",
+        radiusKm: "20",
+        limit: "8",
+      },
+    });
+
+    assert.equal(payload.statusCode, 200);
+    assert.equal(payload.body.context.provider, "api_ninjas+openweb_ninja");
+    assert.equal(payload.body.chargers.some((charger) => charger.source === "api_ninjas"), true);
+    assert.equal(payload.body.chargers.some((charger) => charger.source === "openweb_ninja" && charger.maxPowerKw === 50), true);
+    assert.equal(calls.some((url) => url.startsWith("https://api-ninjas.test/")), true);
+    assert.equal(calls.some((url) => url.startsWith("https://openweb.test/")), true);
+  } finally {
+    global.fetch = previousFetch;
+    delete require.cache[handlerPath];
+    for (const [key, value] of Object.entries(previousEnv)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
+});
+
+test("EV default provider cascade keeps usable rows healthy when optional enrichment is rate limited", async () => {
+  const handlerPath = require.resolve("../../api/ev-chargers");
+  delete require.cache[handlerPath];
+  const previousEnv = {
+    API_NINJAS_API_KEY: process.env.API_NINJAS_API_KEY,
+    OPENWEB_NINJA_API_KEY: process.env.OPENWEB_NINJA_API_KEY,
+    API_NINJAS_EV_CHARGER_API_BASE_URL: process.env.API_NINJAS_EV_CHARGER_API_BASE_URL,
+    OPENWEB_NINJA_EV_CHARGE_API_BASE_URL: process.env.OPENWEB_NINJA_EV_CHARGE_API_BASE_URL,
+    FUEL_PATH_EV_DEFAULT_PROVIDER: process.env.FUEL_PATH_EV_DEFAULT_PROVIDER,
+    FUEL_PATH_EV_CASCADE_PROVIDERS: process.env.FUEL_PATH_EV_CASCADE_PROVIDERS,
+  };
+  const previousFetch = global.fetch;
+  process.env.API_NINJAS_API_KEY = "api-ninjas-test";
+  process.env.OPENWEB_NINJA_API_KEY = "openweb-test";
+  process.env.API_NINJAS_EV_CHARGER_API_BASE_URL = "https://api-ninjas.test/evcharger";
+  process.env.OPENWEB_NINJA_EV_CHARGE_API_BASE_URL = "https://openweb.test/ev-charge-finder/search-by-location";
+  process.env.FUEL_PATH_EV_DEFAULT_PROVIDER = "api_ninjas";
+  process.env.FUEL_PATH_EV_CASCADE_PROVIDERS = "openweb_ninja";
+  const calls = [];
+  global.fetch = async (url) => {
+    calls.push(String(url));
+    if (String(url).startsWith("https://api-ninjas.test/")) return jsonResponse(apiNinjasThinKarrathaPayload());
+    if (String(url).startsWith("https://openweb.test/")) {
+      return jsonResponse({ error: { message: "Rate limit exceeded" } }, 429);
+    }
+    throw new Error(`Unexpected fetch ${url}`);
+  };
+
+  try {
+    const handler = require("../../api/ev-chargers");
+    const payload = await invokeHandler(handler, {
+      method: "GET",
+      query: {
+        lat: "-20.7364",
+        lon: "116.8463",
+        label: "Karratha WA",
+        radiusKm: "20",
+        limit: "8",
+      },
+    });
+
+    assert.equal(payload.statusCode, 200);
+    assert.equal(payload.body.context.provider, "api_ninjas+openweb_ninja");
+    assert.equal(payload.body.context.degraded, false);
+    assert.match(payload.body.context.warning, /Optional openweb_ninja enrichment unavailable/);
+    assert.equal(payload.body.chargers.some((charger) => charger.source === "api_ninjas"), true);
+    assert.equal(calls.some((url) => url.startsWith("https://api-ninjas.test/")), true);
+    assert.equal(calls.some((url) => url.startsWith("https://openweb.test/")), true);
+  } finally {
+    global.fetch = previousFetch;
+    delete require.cache[handlerPath];
+    for (const [key, value] of Object.entries(previousEnv)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
+});
+
 function openChargeMapPayload() {
   return [
     {
@@ -426,6 +539,29 @@ function apiNinjasMixedPayload() {
   ];
 }
 
+function apiNinjasThinKarrathaPayload() {
+  return [
+    {
+      is_active: true,
+      name: "Karratha Shopping Centre AC",
+      address: "Welcome Road",
+      city: "Karratha",
+      region: "WA",
+      country: "AU",
+      latitude: -20.7362,
+      longitude: 116.8461,
+      connections: [
+        {
+          type_name: "Type 2 (Socket Only)",
+          type_official: "IEC 62196-2 Type 2",
+          level: 2,
+          num_connectors: 2,
+        },
+      ],
+    },
+  ];
+}
+
 function openWebNinjaPayload() {
   return {
     data: [
@@ -494,10 +630,10 @@ function withEnv(values, callback) {
   }
 }
 
-function jsonResponse(payload) {
+function jsonResponse(payload, status = 200) {
   return {
-    ok: true,
-    status: 200,
+    ok: status >= 200 && status < 300,
+    status,
     headers: {
       get: () => "application/json",
     },

@@ -292,7 +292,7 @@ async function defaultFetchJson(url, { headers = {}, timeoutMs = 12000 } = {}) {
       throw new Error(`Provider returned non-JSON response: ${text.slice(0, 120)}`);
     }
     if (!response.ok) {
-      throw new Error(`Provider returned ${response.status}: ${payload?.message || payload?.error || response.statusText}`);
+      throw new Error(`Provider returned ${response.status}: ${providerErrorMessage(payload, response.statusText)}`);
     }
     return payload;
   } catch (error) {
@@ -301,6 +301,15 @@ async function defaultFetchJson(url, { headers = {}, timeoutMs = 12000 } = {}) {
   } finally {
     clearTimeout(timeout);
   }
+}
+
+function providerErrorMessage(payload, fallback = "Unknown error") {
+  const raw = payload?.message || payload?.error || payload?.detail || fallback;
+  if (typeof raw === "string") return raw;
+  if (raw && typeof raw === "object") {
+    return raw.message || raw.detail || raw.code || JSON.stringify(raw).slice(0, 160);
+  }
+  return String(raw || fallback);
 }
 
 function cacheSeconds() {

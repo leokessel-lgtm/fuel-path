@@ -114,7 +114,7 @@ async function loadDefaultProviderCascade(provider, request) {
     try {
       const result = await loadSingleProvider(candidate, request);
       results.push(result);
-      if (result.chargers?.length) break;
+      if (result.chargers?.length && !evResultNeedsEnrichment(result, request)) break;
     } catch (error) {
       results.push(providerErrorResult({ error, provider: candidate, request }));
     }
@@ -169,7 +169,10 @@ function mergeProviderResults(results, request) {
   }
   chargers.sort((left, right) => Number(left.distanceKm || 0) - Number(right.distanceKm || 0));
   const providers = results.map((result) => result.context?.provider).filter(Boolean);
-  const warnings = results.map((result) => result.context?.warning).filter(Boolean);
+  const warnings = results.map((result) => cascadeWarning(result, chargers.length > 0)).filter(Boolean);
+  const degraded = chargers.length
+    ? results.some((result) => result.context?.degraded && result.context?.cacheMode !== "provider_error")
+    : results.some((result) => result.context?.degraded);
   return {
     context: {
       provider: providers.join("+"),
@@ -188,7 +191,7 @@ function mergeProviderResults(results, request) {
       cacheHit: results.every((result) => result.context?.cacheHit),
       cacheAgeSeconds: Math.max(...results.map((result) => Number(result.context?.cacheAgeSeconds || 0))),
       cacheMode: "cascade",
-      degraded: results.some((result) => result.context?.degraded),
+      degraded,
       provenance: {
         source: providers.join("+"),
         label: `Charger data from ${providers.join(" and ")}`,
@@ -199,6 +202,26 @@ function mergeProviderResults(results, request) {
     },
     chargers,
   };
+}
+
+function cascadeWarning(result, hasUsableRows) {
+  const warning = result?.context?.warning;
+  if (!warning) return "";
+  if (hasUsableRows && result?.context?.cacheMode === "provider_error") {
+    return `Optional ${result.context.provider} enrichment unavailable.`;
+  }
+  return warning;
+}
+
+function evResultNeedsEnrichment(result, request) {
+  const chargers = result?.chargers || [];
+  if (!chargers.length) return false;
+  if (request.minPowerKw || request.powerMode) return true;
+  const withPower = chargers.filter((charger) => Number.isFinite(Number(charger.maxPowerKw)) && Number(charger.maxPowerKw) > 0).length;
+  const withOperator = chargers.filter((charger) => charger.operator && charger.operator !== "Unknown operator").length;
+  const powerCoverage = withPower / chargers.length;
+  const operatorCoverage = withOperator / chargers.length;
+  return powerCoverage < 0.5 || operatorCoverage < 0.5;
 }
 
 function boundedNumberParam(value, name, fallback, { min, max, clampMax = true }) {

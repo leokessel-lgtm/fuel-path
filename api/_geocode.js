@@ -849,22 +849,19 @@ function createGeocoder({ fetchJson, loadStationData }) {
 
   async function geocode({ query, limit, sessionToken, provider, searchContext }) {
     const selectedProvider = selectGeocodeProvider(provider || process.env.FUEL_PATH_GEOCODE_PROVIDER || "auto");
-    const addressIndex = addressIndexStatus();
     const safeSearchContext = normaliseSearchContext(searchContext);
-    const cacheKey = geocodeCacheKey({ provider: selectedProvider, query, limit, addressIndex, searchContext: safeSearchContext });
-    const cached = readGeocodeCache(cacheKey);
-    if (cached) {
-      const cachedCacheMode = cached.lookupStatus === "ok" ? "fresh" : geocodeCacheMode(cached.lookupStatus);
+    const fastLocalCacheKey = geocodeCacheKey({ provider: selectedProvider, query, limit, addressIndex: null, searchContext: safeSearchContext });
+    const cachedFastLocal = readGeocodeCache(fastLocalCacheKey);
+    if (cachedFastLocal?.fastPath === "local_autocomplete") {
       return {
-        ...cached,
+        ...cachedFastLocal,
         cache: "hit",
-        cacheMode: cachedCacheMode,
-        providerHealth: geocodeProviderHealth(cached.provider, cached.lookupStatus, cached.warning, cachedCacheMode),
-        degraded: cached.lookupStatus !== "ok",
+        cacheMode: "fresh",
+        providerHealth: geocodeProviderHealth(cachedFastLocal.provider, cachedFastLocal.lookupStatus, cachedFastLocal.warning, "fresh"),
+        degraded: cachedFastLocal.lookupStatus !== "ok",
         sessionToken,
       };
     }
-    const addressLookupLimit = safeSearchContext ? Math.max(limit * 4, 20) : limit;
     const requiresExactAddress = requiresExactAddressLookup(query);
     const hintSuggestions = localHintGeocode(query, limit);
     const strongHintSuggestions = hintSuggestions.filter(isStrongLocalHintSuggestion);
@@ -899,9 +896,24 @@ function createGeocoder({ fetchJson, loadStationData }) {
         degraded: false,
         fastPath: "local_autocomplete",
       };
-      writeGeocodeCache(cacheKey, payload, true);
+      writeGeocodeCache(fastLocalCacheKey, payload, true);
       return payload;
     }
+    const addressIndex = addressIndexStatus();
+    const cacheKey = geocodeCacheKey({ provider: selectedProvider, query, limit, addressIndex, searchContext: safeSearchContext });
+    const cached = readGeocodeCache(cacheKey);
+    if (cached) {
+      const cachedCacheMode = cached.lookupStatus === "ok" ? "fresh" : geocodeCacheMode(cached.lookupStatus);
+      return {
+        ...cached,
+        cache: "hit",
+        cacheMode: cachedCacheMode,
+        providerHealth: geocodeProviderHealth(cached.provider, cached.lookupStatus, cached.warning, cachedCacheMode),
+        degraded: cached.lookupStatus !== "ok",
+        sessionToken,
+      };
+    }
+    const addressLookupLimit = safeSearchContext ? Math.max(limit * 4, 20) : limit;
     const rawAddressSuggestions = shouldSkipAddressIndex(query, addressIndex)
       ? []
       : await searchAddressIndex(query, addressLookupLimit, { searchContext: safeSearchContext });

@@ -18,6 +18,7 @@ This protects the user experience for searches like:
 
 - Exact numbered address and unit/building queries stay address-first.
 - Known local POI/station/gazetteer queries return immediately from local autocomplete data.
+- Strong local POI/station/gazetteer queries must be checked before address-index status is loaded.
 - Hosted G-NAF lookup must not run before a strong local POI/station suggestion.
 - External provider lookup must not run before a strong local POI/station suggestion.
 - Slow provider enrichment belongs after user selection or in downstream flows, not ahead of first suggestions.
@@ -66,6 +67,24 @@ Report:
 
 ```text
 tmp/poi-500-http-stress-2026-06-30T01-46-05-461Z.md
+```
+
+After the local fast path was moved ahead of address-index status loading, the live production POI-to-POI Plan journey stress returned:
+
+- 200/200 journey cases passed.
+- 0 geocode failures.
+- 0 route failures.
+- 0 score failures.
+- 200/200 recommendations returned.
+- total journey p50 1,363 ms.
+- total journey p90 2,468 ms.
+- total journey p95 3,405 ms.
+- max 5,742 ms.
+
+Report:
+
+```text
+tmp/poi-route-journey-stress-2026-06-30T11-48-48-041Z.md
 ```
 
 ## Change checklist

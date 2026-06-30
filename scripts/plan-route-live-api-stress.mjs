@@ -5,6 +5,10 @@ const appUrl = (process.env.FUEL_PATH_PLAN_LIVE_STRESS_URL || "https://fuel-path
 const pairCount = Number(process.env.FUEL_PATH_PLAN_LIVE_STRESS_PAIRS || 12);
 const fuel = String(process.env.FUEL_PATH_PLAN_LIVE_STRESS_FUEL || "PDL").toUpperCase();
 const useCombinedPlanRoute = process.env.FUEL_PATH_PLAN_LIVE_STRESS_LEGACY !== "1";
+const maxTotalP90Ms = optionalNumber(process.env.FUEL_PATH_PLAN_LIVE_MAX_TOTAL_P90_MS);
+const maxTotalP95Ms = optionalNumber(process.env.FUEL_PATH_PLAN_LIVE_MAX_TOTAL_P95_MS);
+const maxTotalMaxMs = optionalNumber(process.env.FUEL_PATH_PLAN_LIVE_MAX_TOTAL_MAX_MS);
+const minRecommendations = optionalNumber(process.env.FUEL_PATH_PLAN_LIVE_MIN_RECOMMENDATIONS);
 const runId = new Date().toISOString().replace(/[:.]/g, "-");
 const outputDir = path.resolve("tmp");
 
@@ -65,14 +69,16 @@ const summary = {
   stateCoverage: countBy(results.flatMap((item) => [item.from.state, item.to.state])),
   typeCoverage: countBy(results.flatMap((item) => [item.from.type, item.to.type])),
 };
+const budgetFailures = budgetFailureMessages(summary);
 
 fs.mkdirSync(outputDir, { recursive: true });
 const jsonPath = path.join(outputDir, `plan-route-live-api-stress-${runId}.json`);
 const reportPath = path.join(outputDir, `plan-route-live-api-stress-${runId}.md`);
-fs.writeFileSync(jsonPath, `${JSON.stringify({ summary, results }, null, 2)}\n`);
+fs.writeFileSync(jsonPath, `${JSON.stringify({ summary: { ...summary, budgetFailures }, results }, null, 2)}\n`);
 fs.writeFileSync(reportPath, renderReport(summary, results));
-console.log(JSON.stringify({ ...summary, jsonPath, reportPath }, null, 2));
+console.log(JSON.stringify({ ...summary, budgetFailures, jsonPath, reportPath }, null, 2));
 if (failed.length) throw new Error(`${failed.length}/${results.length} live API route cases failed`);
+if (budgetFailures.length) throw new Error(`Plan route latency budget failed: ${budgetFailures.join("; ")}`);
 
 async function runCase(pair, index) {
   const totalStarted = Date.now();
@@ -218,8 +224,30 @@ function percentile(ordered, p) {
   const index = Math.ceil((p / 100) * ordered.length) - 1;
   return ordered[Math.max(0, Math.min(ordered.length - 1, index))];
 }
+function budgetFailureMessages(summary) {
+  const failures = [];
+  const total = summary.timingsMs.total;
+  if (Number.isFinite(maxTotalP90Ms) && Number(total.p90) > maxTotalP90Ms) {
+    failures.push(`total p90 ${total.p90}ms above ${maxTotalP90Ms}ms`);
+  }
+  if (Number.isFinite(maxTotalP95Ms) && Number(total.p95) > maxTotalP95Ms) {
+    failures.push(`total p95 ${total.p95}ms above ${maxTotalP95Ms}ms`);
+  }
+  if (Number.isFinite(maxTotalMaxMs) && Number(total.max) > maxTotalMaxMs) {
+    failures.push(`total max ${total.max}ms above ${maxTotalMaxMs}ms`);
+  }
+  if (Number.isFinite(minRecommendations) && Number(summary.recommendations) < minRecommendations) {
+    failures.push(`recommendations ${summary.recommendations} below ${minRecommendations}`);
+  }
+  return failures;
+}
+function optionalNumber(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
 function renderReport(summary, results) {
-  return `# Plan route live API stress\n\nRun: ${summary.runId}\n\n## Summary\n\n- Mode: ${useCombinedPlanRoute ? "combined /api/plan-route" : "legacy /api/route plus /api/score"}\n- Route pairs: ${summary.pairCount}\n- Passed: ${summary.passed}\n- Failed: ${summary.failed}\n- Warnings: ${summary.warnings}\n- Recommendations returned: ${summary.recommendations}\n- No recommendation: ${summary.noRecommendation}\n\n## Latency\n\n| Segment | p50 | p90 | p95 | max |\n| --- | ---: | ---: | ---: | ---: |\n| Route or combined route | ${formatMs(summary.timingsMs.route.p50)} | ${formatMs(summary.timingsMs.route.p90)} | ${formatMs(summary.timingsMs.route.p95)} | ${formatMs(summary.timingsMs.route.max)} |\n| Legacy score only | ${formatMs(summary.timingsMs.score.p50)} | ${formatMs(summary.timingsMs.score.p90)} | ${formatMs(summary.timingsMs.score.p95)} | ${formatMs(summary.timingsMs.score.max)} |\n| Total | ${formatMs(summary.timingsMs.total.p50)} | ${formatMs(summary.timingsMs.total.p90)} | ${formatMs(summary.timingsMs.total.p95)} | ${formatMs(summary.timingsMs.total.max)} |\n\n## Per-case timings\n\n${results.map((item) => `- ${item.id}: total ${formatMs(item.timingsMs?.total)}, route/combined ${formatMs(item.timingsMs?.route)}, legacy score ${formatMs(item.timingsMs?.score)}`).join("\n")}\n\n## Failures\n\n${results.filter((item) => item.failures.length).map((item) => `- ${item.id}: ${item.failures.join("; ")}`).join("\n") || "- None"}\n\n## Warnings\n\n${results.filter((item) => item.warnings.length).map((item) => `- ${item.id}: ${item.warnings.join("; ")}`).join("\n") || "- None"}\n`;
+  const budgetFailures = budgetFailureMessages(summary);
+  return `# Plan route live API stress\n\nRun: ${summary.runId}\n\n## Summary\n\n- Mode: ${useCombinedPlanRoute ? "combined /api/score" : "legacy /api/route plus /api/score"}\n- Route pairs: ${summary.pairCount}\n- Passed: ${summary.passed}\n- Failed: ${summary.failed}\n- Warnings: ${summary.warnings}\n- Recommendations returned: ${summary.recommendations}\n- No recommendation: ${summary.noRecommendation}\n- Budget failures: ${budgetFailures.length ? budgetFailures.join("; ") : "None"}\n\n## Latency\n\n| Segment | p50 | p90 | p95 | max |\n| --- | ---: | ---: | ---: | ---: |\n| Route or combined route | ${formatMs(summary.timingsMs.route.p50)} | ${formatMs(summary.timingsMs.route.p90)} | ${formatMs(summary.timingsMs.route.p95)} | ${formatMs(summary.timingsMs.route.max)} |\n| Legacy score only | ${formatMs(summary.timingsMs.score.p50)} | ${formatMs(summary.timingsMs.score.p90)} | ${formatMs(summary.timingsMs.score.p95)} | ${formatMs(summary.timingsMs.score.max)} |\n| Total | ${formatMs(summary.timingsMs.total.p50)} | ${formatMs(summary.timingsMs.total.p90)} | ${formatMs(summary.timingsMs.total.p95)} | ${formatMs(summary.timingsMs.total.max)} |\n\n## Per-case timings\n\n${results.map((item) => `- ${item.id}: total ${formatMs(item.timingsMs?.total)}, route/combined ${formatMs(item.timingsMs?.route)}, legacy score ${formatMs(item.timingsMs?.score)}`).join("\n")}\n\n## Failures\n\n${results.filter((item) => item.failures.length).map((item) => `- ${item.id}: ${item.failures.join("; ")}`).join("\n") || "- None"}\n\n## Warnings\n\n${results.filter((item) => item.warnings.length).map((item) => `- ${item.id}: ${item.warnings.join("; ")}`).join("\n") || "- None"}\n`;
 }
 function formatMs(value) {
   return Number.isFinite(Number(value)) ? `${Math.round(Number(value))} ms` : "-";

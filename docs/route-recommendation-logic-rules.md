@@ -343,6 +343,17 @@ Route endpoint:
 api/route.js
 ```
 
+Fuel provider orchestration:
+
+```text
+api/_backend.js
+api/score.js
+```
+
+Plan route scoring may need live fuel data from more than one provider region. Independent regional provider loads should run in parallel and then be aggregated in stable provider order. This keeps multi-state route latency bounded by the slowest required provider rather than the sum of every required provider. Do not change ranking, rejection, source attribution or warning semantics just to optimise latency.
+
+Fuel Plan routes should use the combined `/api/score` mode from the app by sending `from` and `to` points instead of a pre-built `route`. This returns both route geometry and route scoring in one response, and it may preload endpoint fuel providers while route geometry is being built. The old `/api/route` then `/api/score` sequence should be kept only for legacy/testing paths or non-fuel route flows such as EV fallback.
+
 ## Wording rules
 
 Allowed:

@@ -41,7 +41,7 @@ const defaultNearbyRadiusKm = 16;
 const minMapSearchRadiusKm = 16;
 const emptyMapRetryRadiusKm = 32;
 const maxMapSearchRadiusKm = 90;
-const nearbyCameraInsets = { top: 170, right: 18, bottom: 330, left: 18 };
+const nearbyCameraInsets = { top: 240, right: 18, bottom: 330, left: 18 };
 
 type MapSearchArea = {
   centre: MapPoint;

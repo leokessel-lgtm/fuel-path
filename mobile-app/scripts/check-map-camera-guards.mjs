@@ -81,6 +81,10 @@ const checks = [
     ok: nearbyScreen.includes("onMapSearchAreaChange={handleMapSearchAreaChange}"),
   },
   {
+    label: "nearby map keeps cluster pills clear of top controls",
+    ok: nearbyScreen.includes("const nearbyCameraInsets = { top: 240, right: 18, bottom: 330, left: 18 };"),
+  },
+  {
     label: "nearby screen keeps current location as a separate map pin",
     ok:
       nearbyScreen.includes("const [currentLocation, setCurrentLocation] = useState<MapPoint>();") &&

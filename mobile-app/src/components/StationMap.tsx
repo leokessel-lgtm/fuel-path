@@ -15,12 +15,6 @@ type CameraInsets = {
   left?: number;
 };
 
-type ClusterSelection = {
-  count: number;
-  minPrice?: number;
-  stationCodes: string[];
-};
-
 export function StationMap({
   centre,
   chargers = [],
@@ -29,7 +23,6 @@ export function StationMap({
   selectedStationCode,
   onSelect,
   onSelectCharger,
-  onSelectCluster: _onSelectCluster,
   onViewportStationsChange,
   onMapSearchAreaChange: _onMapSearchAreaChange,
   cameraFocusKey: _cameraFocusKey,
@@ -46,7 +39,6 @@ export function StationMap({
   selectedStationCode?: string;
   onSelect: (stationCode: string) => void;
   onSelectCharger?: (chargerId: string) => void;
-  onSelectCluster?: (cluster: ClusterSelection) => void;
   onViewportStationsChange?: (stationCodes: string[]) => void;
   onMapSearchAreaChange?: (area: { centre: MapPoint; radiusKm: number }) => void;
   cameraFocusKey?: string;

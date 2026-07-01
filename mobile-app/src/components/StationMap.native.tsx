@@ -44,17 +44,11 @@ type ClusterMarker = {
   lon: number;
 };
 
-type ClusterSelection = {
-  count: number;
-  stationCodes: string[];
-};
-
 export function StationMap({
   centre,
   stations,
   selectedStationCode,
   onSelect,
-  onSelectCluster,
   onViewportStationsChange,
   onMapSearchAreaChange,
   cameraFocusKey,
@@ -68,7 +62,6 @@ export function StationMap({
   stations: StationViewModel[];
   selectedStationCode?: string;
   onSelect: (stationCode: string) => void;
-  onSelectCluster?: (cluster: ClusterSelection) => void;
   onViewportStationsChange?: (stationCodes: string[]) => void;
   onMapSearchAreaChange?: (area: { centre: MapPoint; radiusKm: number }) => void;
   cameraFocusKey?: string;
@@ -224,10 +217,6 @@ export function StationMap({
   };
 
   const handleClusterPress = (cluster: ClusterMarker) => {
-    onSelectCluster?.({
-      count: cluster.count,
-      stationCodes: cluster.items.map((item) => item.station.stationCode),
-    });
     runProgrammaticMapMove(programmaticMoveRef, () => {
       mapRef.current?.fitToCoordinates(
         cluster.items.map((item) => ({

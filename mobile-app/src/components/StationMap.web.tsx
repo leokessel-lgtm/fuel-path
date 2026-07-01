@@ -22,12 +22,6 @@ type ClusterMarker = {
   minPrice: number;
 };
 
-type ClusterSelection = {
-  count: number;
-  minPrice?: number;
-  stationCodes: string[];
-};
-
 type CameraInsets = {
   top?: number;
   right?: number;
@@ -43,7 +37,6 @@ export function StationMap({
   selectedStationCode,
   onSelect,
   onSelectCharger,
-  onSelectCluster,
   onViewportStationsChange,
   onMapSearchAreaChange,
   cameraFocusKey,
@@ -60,7 +53,6 @@ export function StationMap({
   selectedStationCode?: string;
   onSelect: (stationCode: string) => void;
   onSelectCharger?: (chargerId: string) => void;
-  onSelectCluster?: (cluster: ClusterSelection) => void;
   onViewportStationsChange?: (stationCodes: string[]) => void;
   onMapSearchAreaChange?: (area: { centre: MapPoint; radiusKm: number }) => void;
   cameraFocusKey?: string;
@@ -225,11 +217,6 @@ export function StationMap({
         zIndexOffset: 680,
       });
       marker.on("click", () => {
-        onSelectCluster?.({
-          count: cluster.count,
-          minPrice: cluster.minPrice,
-          stationCodes: cluster.items.map((item) => item.station.stationCode),
-        });
         runProgrammaticMapMove(programmaticMoveRef, map, () => {
           map.fitBounds(
             L.latLngBounds(cluster.items.map((item) => [item.station.lat, item.station.lon] as [number, number])),
@@ -408,7 +395,6 @@ export function StationMap({
     selectedStationCode,
     stations,
     onSelectCharger,
-    onSelectCluster,
     userLocation,
     mapRenderVersion,
   ]);

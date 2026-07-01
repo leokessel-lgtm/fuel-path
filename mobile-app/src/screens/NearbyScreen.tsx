@@ -6,13 +6,11 @@ import {
 
 import { geocodeAddress } from "../api/fuelPathApi";
 import { NearbyLocationSearch } from "../components/NearbyLocationSearch";
-import { NearbyClusterContextCard } from "../components/NearbyClusterContextCard";
 import { NearbyCombinedPanel } from "../components/NearbyCombinedPanel";
 import { NearbyFuelPanel } from "../components/NearbyFuelPanel";
 import { NearbySortMode } from "../components/NearbyStationSheet";
 import { StationMap } from "../components/StationMap";
 import { useNearbyLocationSearch } from "../hooks/useNearbyLocationSearch";
-import { useNearbyClusterSelection, SelectedCluster } from "../hooks/useNearbyClusterSelection";
 import { useNearbyResults } from "../hooks/useNearbyResults";
 import { getCurrentMapPoint, getGrantedCurrentMapPoint } from "../services/currentLocation";
 import { spacing } from "../theme";
@@ -72,7 +70,6 @@ export function NearbyScreen({
   const [evConnectors, setEvConnectors] = useState<EvConnector[]>(preferences.evConnectors || []);
   const [evPowerMode, setEvPowerMode] = useState<EvPowerMode>("");
   const [energySelectorOpen, setEnergySelectorOpen] = useState(false);
-  const { clearSelectedCluster, selectedCluster, selectCluster } = useNearbyClusterSelection();
   const sheetExpanded = sheetSnap === "full";
   const setSheetExpanded = (expanded: boolean) => {
     setSheetSnap(expanded ? "full" : "browse");
@@ -145,7 +142,6 @@ export function NearbyScreen({
       resetAddressSessionToken();
       setSheetSnap("browse");
       setSortMode(undefined);
-      clearSelectedCluster();
     } catch (err) {
       setLocationError(err instanceof Error ? err.message : "Could not find that location");
     } finally {
@@ -167,7 +163,6 @@ export function NearbyScreen({
       resetAddressSessionToken();
       setSheetSnap("browse");
       setSortMode(undefined);
-      clearSelectedCluster();
     } catch (err) {
       setLocationError(err instanceof Error ? err.message : "Current location is not available.");
     } finally {
@@ -199,7 +194,6 @@ export function NearbyScreen({
     );
     setLocationQuery("");
     clearLocationSearch();
-    clearSelectedCluster();
   }, []);
 
   const selectRecentLocation = (location: MapPoint) => {
@@ -210,7 +204,6 @@ export function NearbyScreen({
     clearLocationSearch();
     setSheetSnap("browse");
     setSortMode(undefined);
-    clearSelectedCluster();
   };
 
   const selectLocationSuggestion = (location: MapPoint) => {
@@ -228,21 +221,15 @@ export function NearbyScreen({
     resetAddressSessionToken();
     setSheetSnap("browse");
     setSortMode(undefined);
-    clearSelectedCluster();
   };
 
   const visibleStationSet = useMemo(() => new Set(visibleStationCodes), [visibleStationCodes]);
 
   const listSourceStations = useMemo(() => {
-    if (selectedCluster?.stationCodes.length) {
-      const clusterStationCodes = new Set(selectedCluster.stationCodes);
-      const clusterStations = stations.filter((item) => clusterStationCodes.has(item.station.stationCode));
-      if (clusterStations.length) return clusterStations;
-    }
     if (!sortMode || sortMode === "distance" || visibleStationSet.size === 0) return stations;
     const visible = stations.filter((item) => visibleStationSet.has(item.station.stationCode));
     return visible.length ? visible : stations;
-  }, [selectedCluster, sortMode, stations, visibleStationSet]);
+  }, [sortMode, stations, visibleStationSet]);
 
   const sortedStations = useMemo(
     () => (sortMode ? sortStations(listSourceStations, sortMode) : listSourceStations),
@@ -262,36 +249,24 @@ export function NearbyScreen({
     setSelectedCode(stationCode);
     setSortMode(undefined);
     setSelectionDismissed(false);
-    clearSelectedCluster();
     setSheetSnap("peek");
   }, []);
 
   const handleMapChargerSelect = useCallback((chargerId: string) => {
     setSelectedCode(chargerId);
     setSelectionDismissed(false);
-    clearSelectedCluster();
     setSheetSnap("peek");
   }, []);
 
   const handleListStationSelect = useCallback((stationCode: string) => {
     setSelectedCode(stationCode);
     setSelectionDismissed(false);
-    clearSelectedCluster();
   }, []);
 
   const handleCloseSelectedStation = useCallback(() => {
     setSelectedCode(undefined);
     setSelectionDismissed(true);
-    clearSelectedCluster();
   }, []);
-
-  const handleMapClusterSelect = (cluster: SelectedCluster) => {
-    setSelectedCode(undefined);
-    setSelectionDismissed(false);
-    selectCluster(cluster);
-    setSortMode(undefined);
-    setSheetSnap("full");
-  };
 
   const handleNavigateToStation = useCallback(async (item: StationViewModel) => {
     const { station } = item;
@@ -329,7 +304,6 @@ export function NearbyScreen({
           selectedStationCode={selectedCode}
           onSelect={handleMapStationSelect}
           onSelectCharger={handleMapChargerSelect}
-          onSelectCluster={handleMapClusterSelect}
           onViewportStationsChange={handleViewportStationsChange}
           onMapSearchAreaChange={handleMapSearchAreaChange}
           cameraFocusKey={`nearby-${cameraFocusVersion}`}
@@ -337,7 +311,6 @@ export function NearbyScreen({
           userLocation={currentLocation}
           cameraInsets={nearbyCameraInsets}
         />
-        {selectedCluster ? <NearbyClusterContextCard cluster={selectedCluster} /> : null}
       </View>
 
       <View style={styles.topControls}>

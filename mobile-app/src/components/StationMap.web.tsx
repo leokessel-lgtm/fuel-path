@@ -222,7 +222,7 @@ export function StationMap({
         alt: "",
         keyboard: false,
         riseOnHover: true,
-        zIndexOffset: 100,
+        zIndexOffset: 680,
       });
       marker.on("click", () => {
         onSelectCluster?.({

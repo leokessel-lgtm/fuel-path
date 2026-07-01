@@ -336,7 +336,7 @@ export function StationMap({
             key={`cluster-${cluster.lat.toFixed(5)}-${cluster.lon.toFixed(5)}-${cluster.count}`}
             onPress={() => handleClusterPress(cluster)}
             tracksViewChanges={false}
-            zIndex={220}
+            zIndex={680}
           >
             <View style={styles.clusterPin}>
               <Text style={styles.clusterCount}>{cluster.count}</Text>

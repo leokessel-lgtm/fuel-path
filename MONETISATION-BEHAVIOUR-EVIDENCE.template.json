@@ -1,0 +1,47 @@
+{
+  "notes": [
+    "Copy this template to MONETISATION-BEHAVIOUR-EVIDENCE-YYYY-MM-DD.json after real validation sessions or beta behaviour collection.",
+    "Do not include exact Home or Work addresses, raw route coordinates, station addresses, push tokens, device identifiers, registration numbers, provider credentials or direct contact details.",
+    "Public comments, positive feedback and concept interest do not count as behaviour."
+  ],
+  "reviewedAt": "",
+  "reviewer": "",
+  "collectionMode": "manual_validation_notes",
+  "events": [
+    {
+      "eventId": "E1",
+      "sessionId": "",
+      "eventName": "route_plan_completed",
+      "segment": "",
+      "regionSet": [],
+      "fuel": "",
+      "resultStatus": "",
+      "topRecommendationSourceType": "",
+      "bestPriceByCplBand": "",
+      "detourMinutesBand": "",
+      "routeDistanceKmBand": "",
+      "rejectionReason": "",
+      "alertUseCase": "",
+      "evidenceFile": ""
+    }
+  ],
+  "summary": {
+    "realParticipants": 0,
+    "routePlansCompleted": 0,
+    "repeatRoutePlanners": 0,
+    "savedCommutesCreated": 0,
+    "routeAlertOptIns": 0,
+    "navigationOpened": 0,
+    "recommendationRejected": 0,
+    "commuterOrHighFrequencyUsers": 0,
+    "commuterOrHighFrequencySavedRouteDemand": 0,
+    "smallOperatorPilotOrWtpFollowUps": 0,
+    "privacyObjectionsUnresolved": 0
+  },
+  "decision": {
+    "consumerMonetisationReady": false,
+    "fleetLitePilotReady": false,
+    "mainBlocker": "",
+    "nextAction": ""
+  }
+}

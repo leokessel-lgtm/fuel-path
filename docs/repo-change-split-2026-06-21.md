@@ -57,7 +57,7 @@ Reason:
 - restore visible web-demo station logos
 - document the current local branch, latest app shell URL and web-demo validation URL separately
 - record the refreshed Android physical-device evidence
-- keep beta readiness blocked on provider terms, iOS validation, privacy/store evidence and support readiness
+- keep beta readiness blocked on provider terms, fresh Android installed-build/physical-performance evidence, privacy/store evidence and support readiness while treating source-level iOS simulator validation separately from signed iOS push/store evidence
 - ignore local/generated artefact noise such as `var/`
 
 Verification:

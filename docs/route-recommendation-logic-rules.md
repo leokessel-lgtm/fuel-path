@@ -44,6 +44,9 @@ The Plan result should show:
 - `Best price by`
 - `Detour`
 - one comparison sentence
+- a light follow-up prompt after the recommendation evidence:
+  - `Save this commute` when the route is not saved
+  - `Watch this route` only after the route is saved
 
 The Plan result should not show:
 
@@ -56,6 +59,8 @@ The Plan result should not show:
 - stale-price penalty explanations
 - tank size
 - user-configurable decision rules
+- route alert prompts before the route is saved
+- route tracking or beta-behaviour claims as part of the recommendation evidence
 
 Plan recommendation and station-detail sheets should size to their content. Do not use fixed tall sheet heights that leave empty white space below the evidence or detail content.
 

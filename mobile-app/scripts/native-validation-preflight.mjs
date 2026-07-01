@@ -29,6 +29,11 @@ check("iOS bundle identifier configured", appJson.ios?.bundleIdentifier === "com
   detail: appJson.ios?.bundleIdentifier || "missing",
 });
 
+check("iOS launch target is iPhone-only until tablet UX is optimised", appJson.ios?.supportsTablet === false, {
+  fail: true,
+  detail: "Set ios.supportsTablet to false unless a dedicated tablet UX pass has been validated.",
+});
+
 check("Android package configured", appJson.android?.package === "com.fuelpath.app", {
   fail: true,
   detail: appJson.android?.package || "missing",

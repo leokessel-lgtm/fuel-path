@@ -181,7 +181,7 @@ function parseIosRuntimes(output) {
   return output
     .split("\n")
     .map((line) => line.trim())
-    .filter((line) => /^iOS \d+/.test(line) && /\(available\)/i.test(line));
+    .filter((line) => /^iOS \d+/.test(line) && !/\bunavailable\b/i.test(line));
 }
 
 function buildNextCommands(android, ios) {

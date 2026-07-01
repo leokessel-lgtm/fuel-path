@@ -182,13 +182,11 @@ async function installPlanMocks(page) {
     const location = isSydney ? { label: "Sydney NSW", lat: -33.8688, lon: 151.2093, state: "NSW", provider: "smoke_mock" } : { label: "Melbourne VIC", lat: -37.8136, lon: 144.9631, state: "VIC", provider: "smoke_mock" };
     await route.fulfill(jsonResponse({ provider: "smoke_mock", lookupStatus: "ok", location, suggestions: [location] }));
   });
-  await page.route("**/api/route?**", async (route) => route.fulfill(jsonResponse({
-    provider: "smoke_mock",
-    distanceKm: 859,
-    durationMin: 540,
-    points: [{ lat: -33.8688, lon: 151.2093, label: "Sydney NSW" }, { lat: -35.2809, lon: 149.13, label: "Canberra ACT" }, { lat: -37.8136, lon: 144.9631, label: "Melbourne VIC" }],
+  await page.route("**/api/route?**", async (route) => route.fulfill(jsonResponse(routePayload())));
+  await page.route("**/api/score", async (route) => route.fulfill(jsonResponse({
+    route: routePayload(),
+    score: scorePayload(),
   })));
-  await page.route("**/api/score", async (route) => route.fulfill(jsonResponse(scorePayload())));
 }
 
 async function chooseFuelMode(page, label) {
@@ -283,6 +281,19 @@ function scorePayload() {
     },
     recommendations: stations,
     contextStations: [],
+  };
+}
+
+function routePayload() {
+  return {
+    provider: "smoke_mock",
+    distanceKm: 859,
+    durationMin: 540,
+    points: [
+      { lat: -33.8688, lon: 151.2093, label: "Sydney NSW" },
+      { lat: -35.2809, lon: 149.13, label: "Canberra ACT" },
+      { lat: -37.8136, lon: 144.9631, label: "Melbourne VIC" },
+    ],
   };
 }
 

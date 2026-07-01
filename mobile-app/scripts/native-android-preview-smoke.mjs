@@ -20,6 +20,7 @@ const reportJson = join(outputRoot, `android-preview-smoke-${timestamp}.json`);
 const reportMd = join(outputRoot, `android-preview-smoke-${timestamp}.md`);
 const screenshots = [];
 const marks = [];
+const uiDumpWarnings = [];
 let emulatorProcess;
 let selectedDeviceSerial = requestedDeviceSerial;
 
@@ -93,6 +94,7 @@ try {
     mapWarningLines,
     mapTileSummary,
     mapTileSummaries,
+    uiDumpWarnings,
     attentionItems,
   };
   writeReport(result);
@@ -125,6 +127,7 @@ async function ensureAndroidBooted() {
       "swiftshader_indirect",
       "-no-boot-anim",
     ], { stdio: "ignore" });
+    emulatorProcess.unref();
   }
 
   const startedAt = Date.now();
@@ -190,15 +193,26 @@ async function launchPreviewApp() {
   adbCommand(["shell", "am", "force-stop", packageName]);
   adbCommand(["shell", "am", "start", "-n", activityName]);
   const startedAt = Date.now();
+  let lastDump = "";
   while (Date.now() - startedAt < 45_000) {
-    const dump = readUiDump();
+    let dump = "";
+    try {
+      dump = readUiDump();
+      lastDump = dump;
+    } catch (error) {
+      uiDumpWarnings.push(`Launch UI dump warning: ${error.message}`);
+      if (isFuelPathForeground()) {
+        marks.push({ name: "preview_app_launched_foreground_fallback", ms: Date.now() - startedAt });
+        return;
+      }
+    }
     if (/Fuel Path|Plan trip|Nearby|Account/i.test(dump) && dump.includes(`package="${packageName}"`)) {
       marks.push({ name: "preview_app_launched", ms: Date.now() - startedAt });
       return;
     }
     await wait(1_500);
   }
-  throw new Error(`Fuel Path preview APK did not become visible. Last UI dump:\n${readUiDump().slice(0, 2_000)}`);
+  throw new Error(`Fuel Path preview APK did not become visible. Last UI dump:\n${lastDump.slice(0, 2_000)}`);
 }
 
 async function tap(x, y, label) {
@@ -230,8 +244,15 @@ async function performMeasuredFramePass() {
 }
 
 async function capture(name) {
-  const dump = readUiDump();
-  if (!dump.includes(`package="${packageName}"`)) {
+  let foreground = false;
+  try {
+    const dump = readUiDump();
+    foreground = dump.includes(`package="${packageName}"`);
+  } catch (error) {
+    uiDumpWarnings.push(`Capture ${name} UI dump warning: ${error.message}`);
+    foreground = isFuelPathForeground();
+  }
+  if (!foreground) {
     throw new Error(`Could not capture ${name}: Fuel Path is not foreground.`);
   }
   const path = join(outputRoot, `android-preview-smoke-${timestamp}-${name}.png`);
@@ -247,14 +268,40 @@ async function capture(name) {
 }
 
 function readUiDump() {
-  adbSpawnSync(["shell", "uiautomator", "dump", "/sdcard/fuel-path-preview-window.xml"], {
+  const dumpResult = adbSpawnSync(["shell", "uiautomator", "dump", "/sdcard/fuel-path-preview-window.xml"], {
     encoding: "utf8",
     maxBuffer: 1024 * 1024,
+    timeout: 10_000,
   });
-  return adbSpawnSync(["exec-out", "cat", "/sdcard/fuel-path-preview-window.xml"], {
+  if (dumpResult.error) {
+    throw new Error(`Android UI dump timed out or failed: ${dumpResult.error.message}`);
+  }
+  if (dumpResult.status !== 0) {
+    throw new Error(`Android UI dump failed: ${dumpResult.stderr || dumpResult.stdout || "unknown error"}`);
+  }
+  const readResult = adbSpawnSync(["exec-out", "cat", "/sdcard/fuel-path-preview-window.xml"], {
     encoding: "utf8",
     maxBuffer: 2 * 1024 * 1024,
-  }).stdout || "";
+    timeout: 5_000,
+  });
+  if (readResult.error) {
+    throw new Error(`Android UI dump read timed out or failed: ${readResult.error.message}`);
+  }
+  if (readResult.status !== 0) {
+    throw new Error(`Android UI dump read failed: ${readResult.stderr || readResult.stdout || "unknown error"}`);
+  }
+  return readResult.stdout || "";
+}
+
+function isFuelPathForeground() {
+  const result = adbSpawnSync(["shell", "dumpsys", "window"], {
+    encoding: "utf8",
+    maxBuffer: 1024 * 1024,
+    timeout: 5_000,
+  });
+  if (result.error || result.status !== 0) return false;
+  return result.stdout.includes(`${packageName}/${packageName}.MainActivity`)
+    || result.stdout.includes(`${packageName}/.MainActivity`);
 }
 
 function readApkCertificate() {
@@ -297,6 +344,9 @@ function packageVersion(name) {
 
 function buildAttentionItems(frameSummary, mapWarningLines, mapTileSummaries) {
   const attentionItems = [];
+  if (uiDumpWarnings.length) {
+    attentionItems.push(`Android UI hierarchy dump was unreliable ${uiDumpWarnings.length} time(s); screenshot capture used foreground fallback where possible.`);
+  }
   if (mapWarningLines.length) {
     attentionItems.push("Google Maps or Google Play services credential warnings were captured; confirm the Android Maps key restriction, API enablement and emulator Google Play services state.");
   }
@@ -379,6 +429,10 @@ function writeReport(result) {
     "## Attention Items",
     "",
     ...(result.attentionItems.length ? result.attentionItems.map((item) => `- ${item}`) : ["- None"]),
+    "",
+    "## UI Dump Warnings",
+    "",
+    ...(result.uiDumpWarnings.length ? result.uiDumpWarnings.map((item) => `- ${item}`) : ["- None"]),
     "",
     "## Map Warning Lines",
     "",

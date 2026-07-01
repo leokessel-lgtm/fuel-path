@@ -192,7 +192,13 @@ async function installMocks(activePage) {
   });
   await activePage.route("**/api/score", async (route) => {
     apiCalls.push("score");
-    await route.fulfill({ contentType: "application/json", body: JSON.stringify(currentScore) });
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        route: routePayload(currentPair),
+        score: currentScore,
+      }),
+    });
   });
 }
 

@@ -10,12 +10,8 @@ const LEAFLET_CSS_ID = "fuel-path-leaflet-css";
 const LEAFLET_CUSTOM_CSS_ID = "fuel-path-leaflet-custom-css";
 const maxStationMarkers = 240;
 const maxPriceMarkers = 14;
-const maxExtraPriceMarkers = 18;
-const maxClusterMarkers = 24;
 const markerGridSize = 132;
-const minClusterStationCount = 3;
 const mixedEnergyMaxPriceMarkers = 8;
-const mixedEnergyMaxExtraPriceMarkers = 12;
 const mixedEnergyMarkerGridSize = 190;
 
 type ClusterMarker = {
@@ -348,7 +344,7 @@ export function StationMap({
         .filter((item) => bounds.contains([item.station.lat, item.station.lon]))
         .map((item) => item.station.stationCode);
       onViewportStationsChange(visibleCodes);
-      if (!routeEndpoints && userMovedMapRef.current && !programmaticMoveRef.current) {
+      if (!routeEndpoints && !programmaticMoveRef.current) {
         const nextCentre = map.getCenter();
         const radiusKm = radiusKmForBounds(map.getBounds(), nextCentre);
         const centreKey = `${nextCentre.lat.toFixed(4)}:${nextCentre.lng.toFixed(
@@ -512,10 +508,10 @@ function visibleMarkerGroups(
   const clusterGroups = new Map<string, StationViewModel[]>();
   const priceMarkers: StationViewModel[] = [];
   const priceLimit = hasEvMarkers ? mixedEnergyMaxPriceMarkers : maxPriceMarkers;
-  const extraPriceLimit = hasEvMarkers ? mixedEnergyMaxExtraPriceMarkers : maxExtraPriceMarkers;
   const gridSize = hasEvMarkers ? mixedEnergyMarkerGridSize : markerGridSize;
+  const visibleStations = stations.filter((item) => bounds.contains([item.station.lat, item.station.lon]));
 
-  const ranked = [...stations].sort((left, right) => {
+  const ranked = [...visibleStations].sort((left, right) => {
     const leftProtected = protectedCodes.has(left.station.stationCode) ? 0 : 1;
     const rightProtected = protectedCodes.has(right.station.stationCode) ? 0 : 1;
     return (
@@ -542,19 +538,9 @@ function visibleMarkerGroups(
     clusterGroups.set(cell, grouped);
   }
 
-  const overflowGroups = Array.from(clusterGroups.values());
-  const extraPriceMarkers = overflowGroups
-    .filter((items) => items.length < minClusterStationCount)
-    .flat()
-    .sort((left, right) => markerPriorityScore(left) - markerPriorityScore(right))
-    .slice(0, Math.max(0, extraPriceLimit - priceMarkers.length));
-  priceMarkers.push(...extraPriceMarkers);
-
-  const clusterMarkers = overflowGroups
-    .filter((items) => items.length >= minClusterStationCount)
+  const clusterMarkers = Array.from(clusterGroups.values())
     .map(clusterMarkerForItems)
     .sort((left, right) => right.count - left.count || left.minPrice - right.minPrice)
-    .slice(0, maxClusterMarkers);
 
   return { priceMarkers, clusterMarkers };
 }

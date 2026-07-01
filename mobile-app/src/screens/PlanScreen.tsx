@@ -50,6 +50,8 @@ type PlanScreenProps = {
   onRemoveRecentLocation?: (point: MapPoint) => void;
   onSaveNamedPlace?: (kind: "home" | "work", point: MapPoint) => void;
   onSaveCommute: (commute: Pick<SavedCommute, "from" | "fuel" | "name" | "to">) => void;
+  onToggleCommuteAlert?: (commuteId: string) => void;
+  alertSyncingCommuteId?: string | null;
   recentLocations?: MapPoint[];
   savedCommutes: SavedCommute[];
 };
@@ -81,6 +83,8 @@ export function PlanScreen({
   onFuelChange,
   onRemoveRecentLocation,
   onSaveCommute,
+  onToggleCommuteAlert,
+  alertSyncingCommuteId = null,
   savedCommutes,
 }: PlanScreenProps) {
   const [from, setFrom] = useState("");
@@ -448,11 +452,15 @@ export function PlanScreen({
     ? `Policy mode active: ${preferences.approvedPolicyBrands.join(", ")} only.`
     : "";
   const currentRouteEndpoints = routeData.endpoints;
-  const currentRouteSaved = Boolean(
-    currentRouteEndpoints &&
-      savedCommutes.some((commute) =>
+  const currentSavedCommute = currentRouteEndpoints
+    ? savedCommutes.find((commute) =>
         sameSavedCommuteRoute(commute, currentRouteEndpoints, preferences.fuel),
-      ),
+      )
+    : undefined;
+  const currentRouteSaved = Boolean(currentSavedCommute);
+  const currentRouteWatched = Boolean(currentSavedCommute?.alertEnabled);
+  const currentRouteWatchDisabled = Boolean(
+    currentSavedCommute && alertSyncingCommuteId === currentSavedCommute.id,
   );
   const routeCameraInsets = resolveRouteCameraInsets({
     routeControlsCollapsed,
@@ -571,6 +579,11 @@ export function PlanScreen({
           onSaveCommute={handleSaveCurrentCommute}
           onSelectStation={handleStationSelect}
           onShowStops={() => setStationPanelOpen(false)}
+          onWatchRoute={
+            currentSavedCommute && onToggleCommuteAlert
+              ? () => onToggleCommuteAlert(currentSavedCommute.id)
+              : undefined
+          }
           policyActive={preferences.fuelPolicyEnabled}
           policyNotice={policyNotice}
           recommendationCopy={recommendationCopy}
@@ -584,6 +597,8 @@ export function PlanScreen({
           stationPanelOpen={stationPanelOpen}
           stopsTitle="Route options"
           statusCapability={result?.context.capability}
+          watchRouteDisabled={currentRouteWatchDisabled}
+          watchRouteEnabled={currentRouteWatched}
         />
       ) : null}
     </View>

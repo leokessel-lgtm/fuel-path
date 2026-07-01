@@ -65,7 +65,7 @@ Android physical-device validation is current for the local parity APK:
 - Device: Pixel 9 Pro `49231FDAP0017N`
 - Result: Plan, Nearby and Nearby-after-pan map screenshots non-blank, no Maps warning lines, 186 frames, 1 janky frame, p95 8 ms and p99 11 ms
 
-Beta readiness remains blocked on provider terms, iOS validation, privacy/store evidence and support readiness.
+Beta readiness now remains blocked on provider terms evidence, fresh Android installed-build/physical-performance evidence for the current build, privacy/store evidence and support readiness. Source-level iOS simulator validation is captured, but signed iOS preview/development and push-token validation remain future store-readiness work.
 
 ## Tree Simplification
 

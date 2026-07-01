@@ -1,6 +1,6 @@
 # Fuel Path Project Goals And Roadmap
 
-Last updated: 21 June 2026, Australia/Sydney
+Last updated: 1 July 2026, Australia/Sydney
 
 ## Main Project Goals
 
@@ -12,12 +12,12 @@ Fuel Path should stay focused on four differentiators.
 
 Before Fuel Path can be treated as safe enough for real-user beta testing, address the current readiness blockers:
 
-- provider usage, caching and attribution terms for NSW/ACT, QLD and TAS
-- iOS native validation
+- provider usage, caching and attribution evidence for NSW/ACT, QLD, VIC and TAS
+- fresh Android physical-device evidence for the current localParity build
 - privacy/store evidence, including contact method, listing links, store privacy/data-safety review references and provider limitation disclosure
 - support readiness, including a concrete support process reference
 
-Android physical-device render and performance validation is now captured for the current preview APK on Pixel 9 Pro `49231FDAP0017N`; keep it current for later builds, but it is no longer the active beta blocker.
+iOS source-level simulator validation is captured for Plan, Nearby and Account. Treat it as source-level simulator evidence only; signed iOS preview/development evidence is still required before notification, push-token or store-readiness claims. Android now needs a fresh physical-device pass for the current localParity APK.
 
 Keep `npm run check:beta-readiness -- --api-base https://fuel-path.vercel.app --allow-blocked` as the summary gate until these are cleared.
 
@@ -31,12 +31,13 @@ The latest Gold Mining scorecard keeps the product focused on the highest-scorin
 
 **Do next:**
 
-- Confirm provider usage, caching and attribution terms for NSW/ACT, QLD and TAS.
-- Capture iOS simulator or physical-device validation covering Plan, Nearby and Account.
+- Confirm provider usage, caching and attribution evidence for NSW/ACT, QLD, VIC and TAS.
+- Rerun Android physical performance smoke with the current localParity APK.
 - Fill privacy contact, store listing links, Apple privacy review, Google Data Safety review, provider limitation disclosure and support-process evidence.
-- Keep Android performance evidence current for each preview APK and add a lower-end Android pass before broad public performance claims.
+- Keep iOS simulator evidence current, then add signed iOS preview/development evidence before push or store claims.
+- Add a lower-end Android pass before broad public performance claims.
 
-**Why:** Real-user testing is not credible while the app is blocked on terms, iOS, store/privacy and support evidence.
+**Why:** Real-user testing is not credible while the app is blocked on provider evidence, fresh Android native evidence, store/privacy and support evidence.
 
 ### Phase 2: Core Route Decision Validation
 
@@ -163,9 +164,9 @@ The app should represent all Australian states and territories as first-class re
 | ACT | Covered through API.NSW FuelCheck feed | Keep visible as ACT capability, confirm permitted usage terms |
 | QLD | Live provider adapter validated | Confirm licence/usage constraints before public/commercial launch |
 | WA | Live FuelWatch statewide v2 implemented | Monitor request budget, regional smoke coverage and tomorrow-price UX |
-| VIC | Access confirmed; schema/terms pending | Implement adapter after approved schema, licence, caching and attribution terms are captured |
+| VIC | Live Servo Saver adapter implemented and configured | Keep terms/attribution evidence current and pass the provider evidence gate before public claims |
 | SA | Live provider adapter validated | Configure production token server-side before live SA prices appear |
-| TAS | API.NSW Fuel API v2 path confirmed | Validate v2 payloads with approved credentials, then implement adapter |
+| TAS | API.NSW Fuel API v2 adapter implemented for internal validation | Confirm API.NSW/FuelCheck TAS public usage, caching and attribution terms before production claims |
 | NT | Pending access path | Confirm MyFuel NT API/data access and usage terms before implementation |
 
 Capability labels in the app and backend should be:

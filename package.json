@@ -38,6 +38,7 @@
     "check:database-platform": "node scripts/check-database-platform-review.mjs",
     "check:secret-hygiene": "node scripts/check-secret-hygiene.mjs",
     "check:validation-results": "node scripts/check-validation-results.mjs",
+    "check:monetisation-behaviour": "node scripts/check-monetisation-behaviour-evidence.mjs",
     "publish:lookup-readiness-evidence": "node scripts/publish-lookup-readiness-evidence.mjs",
     "summarise:lookup-release-evidence": "node scripts/summarise-lookup-release-evidence.mjs",
     "plan:lookup-deploy": "node scripts/plan-lookup-deployment-stages.mjs",

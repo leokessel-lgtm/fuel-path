@@ -1,5 +1,6 @@
 import { ScrollView, StyleSheet } from "react-native";
 
+import { BetaPrivacyCard } from "../components/BetaPrivacyCard";
 import { DiscountWalletCard } from "../components/DiscountWalletCard";
 import { PolicyModeCard } from "../components/PolicyModeCard";
 import { SavedPlacesCard } from "../components/SavedPlacesCard";
@@ -40,6 +41,8 @@ export function AccountScreen({
         onVehicleProfileChange={onVehicleProfileChange}
         onVehicleEnergyTypeChange={onVehicleEnergyTypeChange}
       />
+
+      <BetaPrivacyCard />
 
       <SavedPlacesCard
         homeLocation={preferences.homeLocation}

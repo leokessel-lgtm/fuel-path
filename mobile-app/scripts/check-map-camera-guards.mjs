@@ -30,6 +30,7 @@ const planScreenUtils = read("src/screens/PlanScreen.utils.ts");
 const accountScreen = read("src/screens/AccountScreen.tsx");
 const stationRow = read("src/components/StationRow.tsx");
 const brandBadge = read("src/components/BrandBadge.tsx");
+const betaPrivacyCard = read("src/components/BetaPrivacyCard.tsx");
 const discountPrograms = read("src/data/discountPrograms.ts");
 const fuelPathApi = read("src/api/fuelPathApi.ts");
 const types = read("src/types.ts");
@@ -60,8 +61,8 @@ const checks = [
     ok: webMap.includes('map.once("zoomend", finishProgrammaticMove);'),
   },
   {
-    label: "web map-area search ignores programmatic movement",
-    ok: webMap.includes("userMovedMapRef.current && !programmaticMoveRef.current"),
+    label: "web map-area search reports visible area outside programmatic movement",
+    ok: webMap.includes("if (!routeEndpoints && !programmaticMoveRef.current)"),
   },
   {
     label: "web explicit camera changes reset reported map-area centre",
@@ -103,14 +104,17 @@ const checks = [
       !webMap.includes("title: accessibilityLabel"),
   },
   {
-    label: "web station markers stay price-first and density limited",
+    label: "web station markers keep price caps but represent viewport overflow as clusters",
     ok:
       webMap.includes("const maxPriceMarkers = 14;") &&
-      webMap.includes("const maxExtraPriceMarkers = 18;") &&
       webMap.includes("const markerGridSize = 132;") &&
-      webMap.includes("const minClusterStationCount = 3;") &&
       webMap.includes("fuel-path-marker-cluster") &&
       webMap.includes("lowest ${cluster.minPrice.toFixed(1)} c/L") &&
+      webMap.includes("const visibleStations = stations.filter((item) => bounds.contains([item.station.lat, item.station.lon]));") &&
+      webMap.includes("Array.from(clusterGroups.values())") &&
+      !webMap.includes(".filter((items) => items.length >= minClusterStationCount)") &&
+      !webMap.includes(".slice(0, maxClusterMarkers)") &&
+      webMap.includes("if (!routeEndpoints && !programmaticMoveRef.current)") &&
       webMap.includes('<span class="fuel-path-marker-price">') &&
       webMap.includes('<span class="fuel-path-marker-brand">') &&
       webMap.includes(".fuel-path-marker::after") &&
@@ -146,7 +150,6 @@ const checks = [
       !webMap.includes('`${item.station.name} - ${item.adjustedCpl.toFixed(1)} c/L`') &&
       webMap.includes("nearestStationsForCamera(stations, centre, 12)") &&
       webMap.includes("showCentreMarker ? 15 : 14") &&
-      webMap.includes(".filter((items) => items.length >= minClusterStationCount)") &&
       webMap.includes("transform: translateY(-4px);") &&
       !webMap.includes("transform: scale(1.12)") &&
       !webMap.includes(".fuel-path-marker-cluster::after"),
@@ -183,10 +186,26 @@ const checks = [
       !stationRow.includes("Possible lower price, not guaranteed"),
   },
   {
-    label: "native station markers stay price-first and density limited",
+    label: "native station markers keep price caps but represent viewport overflow",
     ok:
-      nativeMap.includes("const maxPriceMarkers = 18;") &&
-      nativeMap.includes("const markerGridSize = 132;") &&
+      nativeMap.includes("const defaultMarkerDensity = {") &&
+      nativeMap.includes("maxPriceMarkers: 8,") &&
+      nativeMap.includes("maxDotMarkers: 18,") &&
+      nativeMap.includes("markerGridSize: 240,") &&
+      nativeMap.includes("compactMarkerGridSize: 128,") &&
+      nativeMap.includes("const compactMarkerDensity = {") &&
+      nativeMap.includes("maxPriceMarkers: 3,") &&
+      nativeMap.includes("maxDotMarkers: 8,") &&
+      nativeMap.includes("markerGridSize: 390,") &&
+      nativeMap.includes("compactMarkerGridSize: 230,") &&
+      nativeMap.includes("function nativeMarkerDensity(width: number)") &&
+      nativeMap.includes("return width <= 430 ? compactMarkerDensity : defaultMarkerDensity;") &&
+      nativeMap.includes("type ClusterMarker = {") &&
+      nativeMap.includes("clusterGroups") &&
+      nativeMap.includes("stationInRegion(item, region)") &&
+      nativeMap.includes("clusterMarkerForItems") &&
+      nativeMap.includes("styles.clusterPin") &&
+      nativeMap.includes("styles.clusterCount") &&
       nativeMap.includes("styles.pinBrand") &&
       nativeMap.includes("styles.pinPointer") &&
       nativeMap.includes("borderTopColor: colors.white") &&
@@ -196,7 +215,7 @@ const checks = [
       nativeMap.includes("height: 46") &&
       nativeMap.includes("minHeight: 24") &&
       nativeMap.includes("<BrandBadge station={item.station} size={22} />") &&
-      nativeMap.includes("const routeStationCameraPoints = stations.slice(0, maxPriceMarkers).map") &&
+      nativeMap.includes("const routeStationCameraPoints = stations.slice(0, markerDensity.maxPriceMarkers).map") &&
       nativeMap.includes("return [...visibleRoutePoints, ...routeStationCameraPoints]") &&
       brandBadge.includes('resizeMode="contain"') &&
       !nativeMap.includes("scale: 1.05") &&
@@ -225,6 +244,17 @@ const checks = [
       appShell.includes("styles.tabIconShell") &&
       appShell.includes("styles.nearbyPin") &&
       !appShell.includes("styles.tabHint"),
+  },
+  {
+    label: "app shell caps fixed chrome text scaling for accessibility",
+    ok:
+      appShell.includes("const chromeTextScale = 1.2;") &&
+      appShell.includes("<Text maxFontSizeMultiplier={chromeTextScale} numberOfLines={1} style={styles.brand}>Fuel Path</Text>") &&
+      appShell.includes("<Text maxFontSizeMultiplier={chromeTextScale} numberOfLines={1} style={styles.subhead}>Live fuel decisions</Text>") &&
+      appShell.includes("<Text maxFontSizeMultiplier={chromeTextScale} style={styles.vehicleIconText}>{vehicleInitials}</Text>") &&
+      appShell.includes("<Text maxFontSizeMultiplier={chromeTextScale} numberOfLines={1} style={styles.vehiclePrimary}>") &&
+      appShell.includes("<Text maxFontSizeMultiplier={chromeTextScale} numberOfLines={1} style={styles.vehicleSecondary}>") &&
+      appShell.includes("<Text maxFontSizeMultiplier={chromeTextScale} numberOfLines={1} style={[styles.tabLabel, selected && styles.tabLabelSelected]}>{tab.label}</Text>"),
   },
   {
     label: "typography keeps normal text lighter than standout text",
@@ -470,6 +500,41 @@ const checks = [
       !appShell.includes("onUpdateCommuteAlertRule") &&
       decisionEvidence.includes("smart detour rules") &&
       decisionEvidence.includes("one alert per run"),
+  },
+  {
+    label: "plan recommendation follow-up keeps save before watch",
+    ok:
+      planRouteSheet.includes("Save this commute") &&
+      planRouteSheet.includes("Watch this route") &&
+      planRouteSheet.includes("Watching this route") &&
+      planRouteSheet.includes("currentRouteSaved") &&
+      planRouteSheet.includes("watchRouteEnabled") &&
+      planScreen.includes("currentSavedCommute") &&
+      planScreen.includes("onToggleCommuteAlert(currentSavedCommute.id)") &&
+      appShell.includes("onToggleCommuteAlert={toggleCommuteAlert}"),
+  },
+  {
+    label: "account beta evidence copy excludes sensitive route data",
+    ok:
+      accountScreen.includes("BetaPrivacyCard") &&
+      betaPrivacyCard.includes("Behaviour, not tracking") &&
+      betaPrivacyCard.includes("repeat route plans") &&
+      betaPrivacyCard.includes("saved commutes") &&
+      betaPrivacyCard.includes("route watches") &&
+      betaPrivacyCard.includes("navigation opens") &&
+      betaPrivacyCard.includes("exact Home or Work addresses") &&
+      betaPrivacyCard.includes("route geometry") &&
+      betaPrivacyCard.includes("push tokens"),
+  },
+  {
+    label: "EV fallback confidence chips avoid live availability claims",
+    ok:
+      planRouteSheet.includes("Directory data") &&
+      planRouteSheet.includes("No live bays") &&
+      planRouteSheet.includes("Confirm tariff, access and live bay status in the network app.") &&
+      !planRouteSheet.includes("Live chargers available now") &&
+      !planRouteSheet.includes("Best charging stop for your route") &&
+      !planRouteSheet.includes("Guaranteed available charger"),
   },
   {
     label: "local route data retention caps match privacy policy",

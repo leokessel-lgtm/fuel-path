@@ -25,6 +25,7 @@ export function PlanRouteSheet({
   onSaveCommute,
   onSelectStation,
   onShowStops,
+  onWatchRoute,
   onRestore,
   policyActive,
   policyNotice,
@@ -39,6 +40,8 @@ export function PlanRouteSheet({
   stationPanelOpen,
   stopsTitle,
   statusCapability,
+  watchRouteDisabled,
+  watchRouteEnabled,
 }: {
   best?: StationViewModel;
   candidates: StationViewModel[];
@@ -56,6 +59,7 @@ export function PlanRouteSheet({
   onSaveCommute: () => void;
   onSelectStation: (stationCode: string) => void;
   onShowStops: () => void;
+  onWatchRoute?: () => void;
   policyActive: boolean;
   policyNotice: string;
   recommendationCopy: { title: string; reason: string } | null;
@@ -69,6 +73,8 @@ export function PlanRouteSheet({
   stationPanelOpen: boolean;
   stopsTitle?: string;
   statusCapability?: string;
+  watchRouteDisabled?: boolean;
+  watchRouteEnabled?: boolean;
 }) {
   const bestTomorrow = best ? tomorrowPriceView(best) : null;
   const selectedTomorrow = selected ? tomorrowPriceView(selected) : null;
@@ -150,6 +156,9 @@ export function PlanRouteSheet({
               showStopsList={showStopsList}
               stopsTitle={stopsTitle}
               statusCapability={statusCapability}
+              onWatchRoute={onWatchRoute}
+              watchRouteDisabled={watchRouteDisabled}
+              watchRouteEnabled={watchRouteEnabled}
             />
           )}
         </>
@@ -236,6 +245,7 @@ function RouteResultsPanel({
   loadingLabel,
   onSaveCommute,
   onSelectStation,
+  onWatchRoute,
   policyActive,
   policyNotice,
   recommendationCopy,
@@ -245,6 +255,8 @@ function RouteResultsPanel({
   showStopsList = true,
   stopsTitle = "Route options",
   statusCapability,
+  watchRouteDisabled = false,
+  watchRouteEnabled = false,
 }: {
   best?: StationViewModel;
   bestTomorrow: ReturnType<typeof tomorrowPriceView>;
@@ -260,6 +272,7 @@ function RouteResultsPanel({
   loadingLabel?: string;
   onSaveCommute: () => void;
   onSelectStation: (stationCode: string) => void;
+  onWatchRoute?: () => void;
   policyActive: boolean;
   policyNotice: string;
   recommendationCopy: { title: string; reason: string } | null;
@@ -269,6 +282,8 @@ function RouteResultsPanel({
   showStopsList?: boolean;
   stopsTitle?: string;
   statusCapability?: string;
+  watchRouteDisabled?: boolean;
+  watchRouteEnabled?: boolean;
 }) {
   const recommendationSavingCpl = best ? routeSavingCpl(best, decisionSummary) : 0;
   const recommendationDetour =
@@ -357,6 +372,14 @@ function RouteResultsPanel({
             capability={statusCapability}
             decisionSummary={decisionSummary}
           />
+          <RouteFollowUpPrompt
+            currentRouteSaved={currentRouteSaved}
+            onSaveCommute={onSaveCommute}
+            onWatchRoute={onWatchRoute}
+            routeEndpointsPresent={routeEndpointsPresent}
+            watchRouteDisabled={watchRouteDisabled}
+            watchRouteEnabled={watchRouteEnabled}
+          />
         </>
       ) : null}
       {!loading && !error && routeEndpointsPresent && !best ? (
@@ -429,6 +452,69 @@ function RouteResultsPanel({
   );
 }
 
+function RouteFollowUpPrompt({
+  currentRouteSaved,
+  onSaveCommute,
+  onWatchRoute,
+  routeEndpointsPresent,
+  watchRouteDisabled,
+  watchRouteEnabled,
+}: {
+  currentRouteSaved: boolean;
+  onSaveCommute: () => void;
+  onWatchRoute?: () => void;
+  routeEndpointsPresent: boolean;
+  watchRouteDisabled: boolean;
+  watchRouteEnabled: boolean;
+}) {
+  if (!routeEndpointsPresent) return null;
+  if (!currentRouteSaved) {
+    return (
+      <View style={styles.followUpCard}>
+        <View style={styles.followUpCopy}>
+          <Text style={styles.followUpTitle}>Save this commute</Text>
+          <Text style={styles.followUpText}>Keep this route ready for repeat checks.</Text>
+        </View>
+        <Pressable
+          accessibilityLabel="Save this commute"
+          accessibilityRole="button"
+          onPress={onSaveCommute}
+          style={styles.followUpButton}
+        >
+          <Text style={styles.followUpButtonText}>Save</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.followUpCard}>
+      <View style={styles.followUpCopy}>
+        <Text style={styles.followUpTitle}>{watchRouteEnabled ? "Watching this route" : "Watch this route"}</Text>
+        <Text style={styles.followUpText}>
+          {watchRouteEnabled
+            ? "Fuel Path will check this saved route under your alert rules."
+            : "Get a route check when the saving is worth attention."}
+        </Text>
+      </View>
+      <Pressable
+        accessibilityLabel={watchRouteEnabled ? "Route already being watched" : "Watch this route"}
+        accessibilityRole="button"
+        accessibilityState={{ disabled: watchRouteDisabled || watchRouteEnabled }}
+        disabled={watchRouteDisabled || watchRouteEnabled || !onWatchRoute}
+        onPress={onWatchRoute}
+        style={[
+          styles.followUpButton,
+          watchRouteEnabled && styles.followUpButtonDone,
+          (watchRouteDisabled || watchRouteEnabled || !onWatchRoute) && styles.followUpButtonDisabled,
+        ]}
+      >
+        <Text style={styles.followUpButtonText}>{watchRouteEnabled ? "Watching" : watchRouteDisabled ? "Saving" : "Watch"}</Text>
+      </Pressable>
+    </View>
+  );
+}
+
 function priceSavingCpl(item: StationViewModel) {
   return Math.max(0, Number(item.pumpCpl || 0) - Number(item.adjustedCpl || 0));
 }
@@ -485,7 +571,10 @@ function EvFallbackPanel({
     <View style={styles.fallbackPanel}>
       <View style={styles.sheetHeaderRow}>
         <Text style={styles.fallbackTitle}>Charging fallback</Text>
-        <Text style={styles.fallbackBadge}>Directory data</Text>
+        <View style={styles.fallbackBadgeRow}>
+          <Text style={styles.fallbackBadge}>Directory data</Text>
+          <Text style={styles.fallbackCautionBadge}>No live bays</Text>
+        </View>
       </View>
       <Text style={styles.fallbackMeta}>
         Compatible chargers near sampled route points. Detour time is route-estimated where available, otherwise a rough straight-line fallback. Confirm tariff, access and live bay status in the network app.
@@ -702,6 +791,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: 2,
   },
+  fallbackBadgeRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: spacing.xs,
+  },
+  fallbackCautionBadge: {
+    backgroundColor: colors.amberSoft,
+    borderRadius: radii.pill,
+    color: colors.amber,
+    fontSize: 10,
+    fontWeight: "800",
+    overflow: "hidden",
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+  },
   fallbackRow: {
     alignItems: "center",
     backgroundColor: colors.white,
@@ -892,6 +996,52 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     marginTop: 2,
     maxWidth: 96,
+  },
+  followUpCard: {
+    alignItems: "center",
+    backgroundColor: colors.panel,
+    borderColor: colors.line,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: spacing.sm,
+    justifyContent: "space-between",
+    padding: spacing.sm,
+  },
+  followUpCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  followUpTitle: {
+    color: colors.ink,
+    fontSize: typeScale.caption,
+    fontWeight: "800",
+  },
+  followUpText: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: "500",
+    lineHeight: 15,
+    marginTop: 2,
+  },
+  followUpButton: {
+    backgroundColor: colors.black,
+    borderRadius: radii.pill,
+    minWidth: 76,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  followUpButtonDone: {
+    backgroundColor: colors.greenDark,
+  },
+  followUpButtonDisabled: {
+    opacity: 0.72,
+  },
+  followUpButtonText: {
+    color: colors.white,
+    fontSize: typeScale.caption,
+    fontWeight: "800",
+    textAlign: "center",
   },
   tomorrowPriceDown: {
     color: colors.greenDark,

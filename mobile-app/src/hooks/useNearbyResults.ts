@@ -150,9 +150,9 @@ function chargerPreferenceScore(
 
 function stationLimitForRadius(radiusKm: number) {
   if (radiusKm >= 60) return 420;
-  if (radiusKm >= 35) return 320;
-  if (radiusKm >= 20) return 240;
-  return 160;
+  if (radiusKm >= 35) return 360;
+  if (radiusKm >= 15) return 320;
+  return 200;
 }
 
 function stationContextNotice(context: {

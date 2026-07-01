@@ -8,7 +8,7 @@ import { EvCharger, MapPoint, StationViewModel } from "../types";
 
 const LEAFLET_CSS_ID = "fuel-path-leaflet-css";
 const LEAFLET_CUSTOM_CSS_ID = "fuel-path-leaflet-custom-css";
-const maxStationMarkers = 240;
+const maxStationMarkers = 420;
 const maxPriceMarkers = 14;
 const markerGridSize = 132;
 const mixedEnergyMaxPriceMarkers = 8;

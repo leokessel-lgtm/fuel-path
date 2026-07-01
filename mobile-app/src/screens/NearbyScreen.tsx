@@ -37,8 +37,8 @@ const defaultNearbyCentre: MapPoint = {
   lon: 115.861309,
   label: "Perth CBD WA 6000",
 };
-const defaultNearbyRadiusKm = 8;
-const minMapSearchRadiusKm = 10;
+const defaultNearbyRadiusKm = 16;
+const minMapSearchRadiusKm = 16;
 const emptyMapRetryRadiusKm = 32;
 const maxMapSearchRadiusKm = 90;
 const nearbyCameraInsets = { top: 170, right: 18, bottom: 330, left: 18 };

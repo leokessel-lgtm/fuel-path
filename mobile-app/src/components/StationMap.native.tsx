@@ -12,7 +12,7 @@ import { colors, mapSkin, radii, shadow, spacing } from "../theme";
 import { MapPoint, StationViewModel } from "../types";
 import { BrandBadge } from "./BrandBadge";
 
-const maxStationMarkers = 240;
+const maxStationMarkers = 420;
 const defaultMarkerDensity = {
   maxPriceMarkers: 8,
   maxDotMarkers: 18,

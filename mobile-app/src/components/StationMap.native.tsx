@@ -39,8 +39,14 @@ type CameraInsets = {
 
 type ClusterMarker = {
   count: number;
+  items: StationViewModel[];
   lat: number;
   lon: number;
+};
+
+type ClusterSelection = {
+  count: number;
+  stationCodes: string[];
 };
 
 export function StationMap({
@@ -48,6 +54,7 @@ export function StationMap({
   stations,
   selectedStationCode,
   onSelect,
+  onSelectCluster,
   onViewportStationsChange,
   onMapSearchAreaChange,
   cameraFocusKey,
@@ -61,6 +68,7 @@ export function StationMap({
   stations: StationViewModel[];
   selectedStationCode?: string;
   onSelect: (stationCode: string) => void;
+  onSelectCluster?: (cluster: ClusterSelection) => void;
   onViewportStationsChange?: (stationCodes: string[]) => void;
   onMapSearchAreaChange?: (area: { centre: MapPoint; radiusKm: number }) => void;
   cameraFocusKey?: string;
@@ -215,6 +223,25 @@ export function StationMap({
     onSelect(stationCode);
   };
 
+  const handleClusterPress = (cluster: ClusterMarker) => {
+    onSelectCluster?.({
+      count: cluster.count,
+      stationCodes: cluster.items.map((item) => item.station.stationCode),
+    });
+    runProgrammaticMapMove(programmaticMoveRef, () => {
+      mapRef.current?.fitToCoordinates(
+        cluster.items.map((item) => ({
+          latitude: item.station.lat,
+          longitude: item.station.lon,
+        })),
+        {
+          animated: true,
+          edgePadding: activeInsets,
+        },
+      );
+    });
+  };
+
   return (
     <View style={styles.map}>
       <MapView
@@ -307,6 +334,7 @@ export function StationMap({
             {...decorativeStationMarkerAccessibility}
             coordinate={{ latitude: cluster.lat, longitude: cluster.lon }}
             key={`cluster-${cluster.lat.toFixed(5)}-${cluster.lon.toFixed(5)}-${cluster.count}`}
+            onPress={() => handleClusterPress(cluster)}
             tracksViewChanges={false}
             zIndex={220}
           >
@@ -441,7 +469,18 @@ function visibleMarkerGroups(
     clusterGroups.set(compactCell, grouped);
   }
 
-  const clusterMarkers = Array.from(clusterGroups.values())
+  const singletonMarkers: StationViewModel[] = [];
+  const clusterItems: StationViewModel[][] = [];
+  for (const items of clusterGroups.values()) {
+    if (items.length === 1) {
+      singletonMarkers.push(items[0]);
+    } else {
+      clusterItems.push(items);
+    }
+  }
+  priceMarkers.push(...singletonMarkers);
+
+  const clusterMarkers = clusterItems
     .map(clusterMarkerForItems)
     .sort((left, right) => right.count - left.count);
 
@@ -472,6 +511,7 @@ function clusterMarkerForItems(items: StationViewModel[]): ClusterMarker {
   );
   return {
     count: totals.count,
+    items,
     lat: totals.lat / totals.count,
     lon: totals.lon / totals.count,
   };

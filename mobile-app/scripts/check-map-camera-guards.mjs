@@ -19,10 +19,12 @@ const planRouteEditorCard = read("src/components/PlanRouteEditorCard.tsx");
 const policyModeCard = read("src/components/PolicyModeCard.tsx");
 const nearbyLocationSearch = read("src/components/NearbyLocationSearch.tsx");
 const nearbyStationSheet = read("src/components/NearbyStationSheet.tsx");
+const nearbyClusterContextCard = read("src/components/NearbyClusterContextCard.tsx");
 const savedPlaceEditor = read("src/components/SavedPlaceEditor.tsx");
 const savedRouteAlertsCard = read("src/components/SavedRouteAlertsCard.tsx");
 const weeklyReportCard = read("src/components/WeeklyReportCard.tsx");
 const routeAddressSuggestionHook = read("src/hooks/useRouteAddressSuggestions.ts");
+const nearbyClusterSelectionHook = read("src/hooks/useNearbyClusterSelection.ts");
 const theme = read("src/theme.ts");
 const nearbyScreen = read("src/screens/NearbyScreen.tsx");
 const planScreen = read("src/screens/PlanScreen.tsx");
@@ -110,8 +112,13 @@ const checks = [
       webMap.includes("const markerGridSize = 132;") &&
       webMap.includes("fuel-path-marker-cluster") &&
       webMap.includes("lowest ${cluster.minPrice.toFixed(1)} c/L") &&
+      webMap.includes("onSelectCluster?.({") &&
+      webMap.includes("stationCodes: cluster.items.map((item) => item.station.stationCode)") &&
+      webMap.includes("map.fitBounds(") &&
+      webMap.includes("if (items.length === 1)") &&
+      webMap.includes("priceMarkers.push(...singletonMarkers)") &&
       webMap.includes("const visibleStations = stations.filter((item) => bounds.contains([item.station.lat, item.station.lon]));") &&
-      webMap.includes("Array.from(clusterGroups.values())") &&
+      webMap.includes("for (const items of clusterGroups.values())") &&
       !webMap.includes(".filter((items) => items.length >= minClusterStationCount)") &&
       !webMap.includes(".slice(0, maxClusterMarkers)") &&
       webMap.includes("if (!routeEndpoints && userMovedMapRef.current && !programmaticMoveRef.current)") &&
@@ -201,6 +208,11 @@ const checks = [
       nativeMap.includes("function nativeMarkerDensity(width: number)") &&
       nativeMap.includes("return width <= 430 ? compactMarkerDensity : defaultMarkerDensity;") &&
       nativeMap.includes("type ClusterMarker = {") &&
+      nativeMap.includes("items: StationViewModel[];") &&
+      nativeMap.includes("onSelectCluster?.({") &&
+      nativeMap.includes("fitToCoordinates(") &&
+      nativeMap.includes("if (items.length === 1)") &&
+      nativeMap.includes("priceMarkers.push(...singletonMarkers)") &&
       nativeMap.includes("clusterGroups") &&
       nativeMap.includes("stationInRegion(item, region)") &&
       nativeMap.includes("clusterMarkerForItems") &&
@@ -226,6 +238,17 @@ const checks = [
       nativeMap.indexOf("<Text style={[styles.pinPrice") <
         nativeMap.indexOf("<View style={styles.pinBrand}>") &&
       nativeMap.includes("pinPointerSelected"),
+  },
+  {
+    label: "nearby selected cluster opens scoped station context",
+    ok:
+      nearbyClusterSelectionHook.includes("export type SelectedCluster = {") &&
+      nearbyClusterSelectionHook.includes("stationCodes: string[];") &&
+      nearbyScreen.includes("useNearbyClusterSelection()") &&
+      nearbyScreen.includes("onSelectCluster={handleMapClusterSelect}") &&
+      nearbyScreen.includes("clusterStations.length") &&
+      nearbyClusterContextCard.includes("stations in this area") &&
+      nearbyClusterContextCard.includes("Showing this group in the list"),
   },
   {
     label: "app shell uses the Fuel Path logo lockup",

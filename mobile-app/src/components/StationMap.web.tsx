@@ -16,9 +16,16 @@ const mixedEnergyMarkerGridSize = 190;
 
 type ClusterMarker = {
   count: number;
+  items: StationViewModel[];
   lat: number;
   lon: number;
   minPrice: number;
+};
+
+type ClusterSelection = {
+  count: number;
+  minPrice?: number;
+  stationCodes: string[];
 };
 
 type CameraInsets = {
@@ -36,6 +43,7 @@ export function StationMap({
   selectedStationCode,
   onSelect,
   onSelectCharger,
+  onSelectCluster,
   onViewportStationsChange,
   onMapSearchAreaChange,
   cameraFocusKey,
@@ -52,6 +60,7 @@ export function StationMap({
   selectedStationCode?: string;
   onSelect: (stationCode: string) => void;
   onSelectCharger?: (chargerId: string) => void;
+  onSelectCluster?: (cluster: ClusterSelection) => void;
   onViewportStationsChange?: (stationCodes: string[]) => void;
   onMapSearchAreaChange?: (area: { centre: MapPoint; radiusKm: number }) => void;
   cameraFocusKey?: string;
@@ -71,6 +80,7 @@ export function StationMap({
   const programmaticMoveRef = useRef(false);
   const userMovedMapRef = useRef(false);
   const [mapReady, setMapReady] = useState(false);
+  const [mapRenderVersion, setMapRenderVersion] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -215,10 +225,21 @@ export function StationMap({
         zIndexOffset: 100,
       });
       marker.on("click", () => {
+        onSelectCluster?.({
+          count: cluster.count,
+          minPrice: cluster.minPrice,
+          stationCodes: cluster.items.map((item) => item.station.stationCode),
+        });
         runProgrammaticMapMove(programmaticMoveRef, map, () => {
-          map.flyTo([cluster.lat, cluster.lon], Math.min(map.getZoom() + 2, 17), {
-            animate: true,
-          });
+          map.fitBounds(
+            L.latLngBounds(cluster.items.map((item) => [item.station.lat, item.station.lon] as [number, number])),
+            {
+              ...leafletPadding(activeInsets),
+              animate: true,
+              maxZoom: 17,
+            },
+          );
+          map.once("moveend", () => setMapRenderVersion((current) => current + 1));
         });
       });
       marker.bindTooltip(
@@ -387,7 +408,9 @@ export function StationMap({
     selectedStationCode,
     stations,
     onSelectCharger,
+    onSelectCluster,
     userLocation,
+    mapRenderVersion,
   ]);
 
   return (
@@ -538,7 +561,18 @@ function visibleMarkerGroups(
     clusterGroups.set(cell, grouped);
   }
 
-  const clusterMarkers = Array.from(clusterGroups.values())
+  const singletonMarkers: StationViewModel[] = [];
+  const clusterItems: StationViewModel[][] = [];
+  for (const items of clusterGroups.values()) {
+    if (items.length === 1) {
+      singletonMarkers.push(items[0]);
+    } else {
+      clusterItems.push(items);
+    }
+  }
+  priceMarkers.push(...singletonMarkers);
+
+  const clusterMarkers = clusterItems
     .map(clusterMarkerForItems)
     .sort((left, right) => right.count - left.count || left.minPrice - right.minPrice)
 
@@ -557,6 +591,7 @@ function clusterMarkerForItems(items: StationViewModel[]): ClusterMarker {
   );
   return {
     count: totals.count,
+    items,
     lat: totals.lat / totals.count,
     lon: totals.lon / totals.count,
     minPrice: totals.minPrice,

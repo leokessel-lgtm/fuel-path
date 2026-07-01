@@ -115,6 +115,7 @@ const checks = [
       webMap.includes("fuel-path-marker-cluster") &&
       webMap.includes("lowest ${cluster.minPrice.toFixed(1)} c/L") &&
       webMap.includes("map.fitBounds(") &&
+      webMap.includes("clusterFitsInteractiveMapArea(map, cluster, activeInsets)") &&
       webMap.includes("if (items.length === 1)") &&
       webMap.includes("priceMarkers.push(...singletonMarkers)") &&
       webMap.includes("const visibleStations = stations.filter((item) => bounds.contains([item.station.lat, item.station.lon]));") &&
@@ -215,6 +216,7 @@ const checks = [
       nativeMap.includes("clusterGroups") &&
       nativeMap.includes("stationInRegion(item, region)") &&
       nativeMap.includes("clusterMarkerForItems") &&
+      nativeMap.includes("clusterFitsInteractiveRegion(cluster, currentRegion, activeInsets)") &&
       nativeMap.includes("styles.clusterPin") &&
       nativeMap.includes("styles.clusterCount") &&
       nativeMap.includes("styles.pinBrand") &&

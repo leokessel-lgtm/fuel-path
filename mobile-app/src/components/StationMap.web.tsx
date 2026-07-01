@@ -203,7 +203,9 @@ export function StationMap({
       chargers.length > 0,
     );
 
-    markerGroups.clusterMarkers.forEach((cluster) => {
+    markerGroups.clusterMarkers
+      .filter((cluster) => clusterFitsInteractiveMapArea(map, cluster, activeInsets))
+      .forEach((cluster) => {
       const marker = L.marker([cluster.lat, cluster.lon], {
         icon: L.divIcon({
           className: "",
@@ -234,7 +236,7 @@ export function StationMap({
         { direction: "top", offset: [0, -22] },
       );
       markerLayer.addLayer(marker);
-    });
+      });
 
     markerGroups.priceMarkers.forEach((item) => {
       const selected = item.station.stationCode === selectedStationCode;
@@ -492,6 +494,23 @@ function clusterMarkerHtml(cluster: ClusterMarker) {
       <span class="fuel-path-marker-cluster-low">${cluster.minPrice.toFixed(1)}</span>
     </div>
   `;
+}
+
+function clusterFitsInteractiveMapArea(
+  map: Leaflet.Map,
+  cluster: ClusterMarker,
+  insets: Required<CameraInsets>,
+) {
+  const point = map.latLngToContainerPoint([cluster.lat, cluster.lon]);
+  const size = map.getSize();
+  const horizontalPadding = 58;
+  const verticalPadding = 24;
+  return (
+    point.x >= Math.max(insets.left, horizontalPadding) &&
+    point.x <= size.x - Math.max(insets.right, horizontalPadding) &&
+    point.y >= insets.top + verticalPadding &&
+    point.y <= size.y - insets.bottom - verticalPadding
+  );
 }
 
 function evChargerMarkerHtml(charger: EvCharger, selected: boolean) {

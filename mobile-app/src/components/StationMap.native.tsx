@@ -318,7 +318,9 @@ export function StationMap({
           </Marker>
         ))}
 
-        {markerGroups.clusterMarkers.map((cluster) => (
+        {markerGroups.clusterMarkers
+          .filter((cluster) => clusterFitsInteractiveRegion(cluster, currentRegion, activeInsets))
+          .map((cluster) => (
           <Marker
             {...decorativeStationMarkerAccessibility}
             coordinate={{ latitude: cluster.lat, longitude: cluster.lon }}
@@ -504,6 +506,26 @@ function clusterMarkerForItems(items: StationViewModel[]): ClusterMarker {
     lat: totals.lat / totals.count,
     lon: totals.lon / totals.count,
   };
+}
+
+function clusterFitsInteractiveRegion(
+  cluster: ClusterMarker,
+  region: Region,
+  insets: Required<CameraInsets>,
+) {
+  const safeLatDelta = Math.max(region.latitudeDelta, 0.005);
+  const safeLonDelta = Math.max(region.longitudeDelta, 0.005);
+  const yRatio = 1 - (cluster.lat - (region.latitude - safeLatDelta / 2)) / safeLatDelta;
+  const xRatio = (cluster.lon - (region.longitude - safeLonDelta / 2)) / safeLonDelta;
+  const topRatio = Math.min(0.46, Math.max(0.08, insets.top / 900));
+  const bottomRatio = Math.min(0.48, Math.max(0.12, insets.bottom / 900));
+  const sideRatio = 0.12;
+  return (
+    xRatio >= sideRatio &&
+    xRatio <= 1 - sideRatio &&
+    yRatio >= topRatio &&
+    yRatio <= 1 - bottomRatio
+  );
 }
 
 function nativeMarkerDensity(width: number) {

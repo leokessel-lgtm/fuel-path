@@ -61,8 +61,8 @@ const checks = [
     ok: webMap.includes('map.once("zoomend", finishProgrammaticMove);'),
   },
   {
-    label: "web map-area search reports visible area outside programmatic movement",
-    ok: webMap.includes("if (!routeEndpoints && !programmaticMoveRef.current)"),
+    label: "web map-area search requires user movement and ignores programmatic movement",
+    ok: webMap.includes("userMovedMapRef.current && !programmaticMoveRef.current"),
   },
   {
     label: "web explicit camera changes reset reported map-area centre",
@@ -114,7 +114,7 @@ const checks = [
       webMap.includes("Array.from(clusterGroups.values())") &&
       !webMap.includes(".filter((items) => items.length >= minClusterStationCount)") &&
       !webMap.includes(".slice(0, maxClusterMarkers)") &&
-      webMap.includes("if (!routeEndpoints && !programmaticMoveRef.current)") &&
+      webMap.includes("if (!routeEndpoints && userMovedMapRef.current && !programmaticMoveRef.current)") &&
       webMap.includes('<span class="fuel-path-marker-price">') &&
       webMap.includes('<span class="fuel-path-marker-brand">') &&
       webMap.includes(".fuel-path-marker::after") &&

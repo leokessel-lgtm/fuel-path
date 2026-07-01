@@ -344,7 +344,7 @@ export function StationMap({
         .filter((item) => bounds.contains([item.station.lat, item.station.lon]))
         .map((item) => item.station.stationCode);
       onViewportStationsChange(visibleCodes);
-      if (!routeEndpoints && !programmaticMoveRef.current) {
+      if (!routeEndpoints && userMovedMapRef.current && !programmaticMoveRef.current) {
         const nextCentre = map.getCenter();
         const radiusKm = radiusKmForBounds(map.getBounds(), nextCentre);
         const centreKey = `${nextCentre.lat.toFixed(4)}:${nextCentre.lng.toFixed(

@@ -173,13 +173,7 @@ export function StationMap({
             ...routeStationCameraPoints,
           ]
       : [
-          ...(showCentreMarker
-            ? nearbyCameraPointsForCentre(centre, nearbyInitialMarkerRadiusKm)
-            : [
-                [centre.lat, centre.lon] as [number, number],
-                ...stations.slice(0, maxStationMarkers).map((item) => [item.station.lat, item.station.lon] as [number, number]),
-                ...cameraChargers.map((charger) => [charger.lat, charger.lon] as [number, number]),
-              ]),
+          ...nearbyCameraPointsForCentre(centre, nearbyInitialMarkerRadiusKm),
         ];
     const cameraContextKey = routeEndpoints
       ? [
@@ -353,7 +347,7 @@ export function StationMap({
     if (fitKey !== lastFitKeyRef.current && (!userMovedMapRef.current || cameraContextChanged)) {
       runProgrammaticMapMove(programmaticMoveRef, map, () => {
         map.invalidateSize();
-        if (!routeEndpoints && showCentreMarker) {
+        if (!routeEndpoints) {
           map.setView([centre.lat, centre.lon], nearbyInitialCameraZoom, { animate: true });
           return;
         }

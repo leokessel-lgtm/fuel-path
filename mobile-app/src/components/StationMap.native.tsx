@@ -105,15 +105,7 @@ export function StationMap({
       if (visibleRoutePoints.length >= 2) return [...visibleRoutePoints, ...routeStationCameraPoints];
       return [routeEndpoints.from, routeEndpoints.to, ...routeStationCameraPoints];
     }
-    if (showCentreMarker) return nearbyCameraPointsForCentre(centre, nearbyInitialMarkerRadiusKm);
-    return [
-      centre,
-      ...stations.slice(0, maxStationMarkers).map((item) => ({
-        lat: item.station.lat,
-        lon: item.station.lon,
-        label: item.station.name,
-      })),
-    ];
+    return nearbyCameraPointsForCentre(centre, nearbyInitialMarkerRadiusKm);
   }, [centre, markerDensity.maxPriceMarkers, routeEndpoints, showCentreMarker, stations, visibleRoutePoints]);
   const initialRegion = useMemo(() => regionForPoint(centre), [centre]);
   const markerGroups = useMemo(
@@ -148,7 +140,7 @@ export function StationMap({
     }
 
     runProgrammaticMapMove(programmaticMoveRef, () => {
-      if (!routeEndpoints && showCentreMarker) {
+      if (!routeEndpoints) {
         mapRef.current?.animateToRegion(regionForPoint(centre, nearbyInitialRegionDelta), 260);
         return;
       }

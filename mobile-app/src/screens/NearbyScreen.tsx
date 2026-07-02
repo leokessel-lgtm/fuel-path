@@ -170,11 +170,11 @@ export function NearbyScreen({
     }
   };
 
-  const handleViewportStationsChange = (stationCodes: string[]) => {
+  const handleViewportStationsChange = useCallback((stationCodes: string[]) => {
     setVisibleStationCodes((current) =>
       sameStationCodes(current, stationCodes) ? current : stationCodes,
     );
-  };
+  }, []);
 
   const handleMapSearchAreaChange = useCallback((area: MapSearchArea) => {
     const nextRadiusKm = Math.max(

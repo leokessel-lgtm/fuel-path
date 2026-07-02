@@ -72,6 +72,7 @@ export function StationMap({
   const lastReportedUserCentreKeyRef = useRef("");
   const programmaticMoveRef = useRef(false);
   const userMovedMapRef = useRef(false);
+  const zoomingRef = useRef(false);
   const [mapReady, setMapReady] = useState(false);
   const [mapRenderVersion, setMapRenderVersion] = useState(0);
 
@@ -86,9 +87,16 @@ export function StationMap({
 
       const map = L.map(mapElementRef.current, {
         attributionControl: true,
-        markerZoomAnimation: false,
-        zoomAnimation: false,
+        fadeAnimation: true,
+        markerZoomAnimation: true,
+        preferCanvas: true,
+        wheelDebounceTime: 36,
+        wheelPxPerZoomLevel: 88,
+        zoomAnimation: true,
+        zoomAnimationThreshold: 4,
         zoomControl: false,
+        zoomDelta: 0.5,
+        zoomSnap: 0.5,
       }).setView([centre.lat, centre.lon], 13);
 
       L.control.zoom({ position: "bottomright" }).addTo(map);
@@ -100,6 +108,13 @@ export function StationMap({
         if (!programmaticMoveRef.current) {
           userMovedMapRef.current = true;
         }
+      });
+      map.on("zoomstart", () => {
+        zoomingRef.current = true;
+      });
+      map.on("zoomend", () => {
+        zoomingRef.current = false;
+        setMapRenderVersion((current) => current + 1);
       });
 
       mapRef.current = map;
@@ -120,6 +135,7 @@ export function StationMap({
       lastReportedUserCentreKeyRef.current = "";
       programmaticMoveRef.current = false;
       userMovedMapRef.current = false;
+      zoomingRef.current = false;
     };
   }, []);
 
@@ -128,6 +144,7 @@ export function StationMap({
     const map = mapRef.current;
     const markerLayer = markerLayerRef.current;
     if (!mapReady || !L || !map || !markerLayer) return;
+    if (zoomingRef.current) return;
 
     markerLayer.clearLayers();
 

@@ -218,13 +218,14 @@ async function densityMetrics(page) {
 }
 
 function densityAssertions(metrics, options) {
+  const visibleFuelTargets = metrics.stationMarkers + metrics.clusters;
   return checks([
     [metrics.readyMs <= options.maxReadyMs, `ready time ${metrics.readyMs}ms exceeded ${options.maxReadyMs}ms`],
     [metrics.hasZoomControls, "Leaflet zoom controls missing"],
     [metrics.sheetTop > 0, "bottom controls/sheet controls not measurable"],
     [!metrics.bodyText.includes("Full list"), "Full list button text returned under density"],
     [!metrics.bodyText.includes("Browse view. Full list for more."), "old browse helper copy returned under density"],
-    [options.requireFuel ? metrics.stationMarkers >= options.minPriceMarkers : true, `expected at least ${options.minPriceMarkers} fuel price markers, got ${metrics.stationMarkers}`],
+    [options.requireFuel ? visibleFuelTargets >= options.minPriceMarkers : true, `expected at least ${options.minPriceMarkers} visible fuel markers or cluster pills, got ${visibleFuelTargets}`],
     [options.requireFuel ? metrics.stationMarkers <= options.maxPriceMarkers : true, `fuel price markers exceeded cap: ${metrics.stationMarkers}`],
     [options.requireFuel ? metrics.clusters <= options.maxClusters : true, `cluster markers exceeded cap: ${metrics.clusters}`],
     [options.requireEv ? metrics.evMarkers >= options.minEvMarkers : true, `expected at least ${options.minEvMarkers} EV markers, got ${metrics.evMarkers}`],

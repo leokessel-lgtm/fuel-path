@@ -1,5 +1,6 @@
 import { ScrollView, StyleSheet } from "react-native";
 
+import { AccountIntroCard } from "../components/AccountIntroCard";
 import { BetaPrivacyCard } from "../components/BetaPrivacyCard";
 import { DiscountWalletCard } from "../components/DiscountWalletCard";
 import { PolicyModeCard } from "../components/PolicyModeCard";
@@ -31,8 +32,11 @@ export function AccountScreen({
   onToggleFuelPolicy,
   onTogglePolicyBrand,
 }: AccountScreenProps) {
+  const firstRun = !preferences.vehicleName && !preferences.vehicleRego && !preferences.homeLocation && !preferences.workLocation && !savedCommutes.length;
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+      <AccountIntroCard firstRun={firstRun} />
+
       <VehicleFuelCard
         preferences={preferences}
         onFuelChange={onFuelChange}

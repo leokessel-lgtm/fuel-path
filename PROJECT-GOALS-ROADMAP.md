@@ -25,6 +25,13 @@ Keep `npm run check:beta-readiness -- --api-base https://fuel-path.vercel.app --
 
 The latest Gold Mining scorecard keeps the product focused on the highest-scoring ideas: net-savings route ranking, trust/freshness, the core drive decision, saved-route alerts and discount-aware real price. Treat these as validation phases, not proof that the market is already won.
 
+## Backlog Additions From QA Review - 2 July 2026
+
+- Make membership and discount eligibility explicit before recommending a stop.
+- Win on "best on my route with my real price", not generic map parity.
+- Be broader, cleaner, discount-aware and cross-jurisdictional.
+- Keep historical and cycle intelligence as a future wedge only after back-testing.
+
 ### Phase 1: Beta Evidence And Safe Test Gate
 
 **Priority:** P0 now.

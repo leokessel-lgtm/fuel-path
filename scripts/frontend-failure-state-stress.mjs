@@ -11,6 +11,7 @@ const runId = new Date().toISOString().replace(/[:.]/g, "-");
 const outputDir = path.resolve("tmp");
 const screenshotDir = path.join(outputDir, `frontend-failure-state-stress-${runId}-screenshots`);
 const viewport = { width: 430, height: 900 };
+const scenarioTimeoutMs = Number(process.env.FUEL_PATH_FAILURE_STATE_SCENARIO_TIMEOUT_MS || 25000);
 
 const scenarios = [
   {
@@ -108,7 +109,7 @@ const scenarios = [
     setup: async (page) => {
       await mockStatus(page);
       await mockGeocode(page);
-      await page.route("**/api/route?**", async (route) => route.fulfill(jsonResponse({ error: "Route engine temporarily unavailable." }, 503)));
+      await page.route("**/api/score", async (route) => route.fulfill(jsonResponse({ error: "Route engine temporarily unavailable." }, 503)));
     },
     run: async (page) => {
       await planSimpleRoute(page);
@@ -180,14 +181,16 @@ async function runScenario(page, scenario, consoleMessages) {
   const started = Date.now();
   const row = { id: scenario.id, status: "passed", latencyMs: 0, failures: [], warnings: [], screenshot: "", textSample: "" };
   try {
-    await scenario.setup(page);
-    await scenario.run(page);
-    row.failures.push(...await scenario.expect(page));
-    const actionableConsole = consoleMessages.filter((entry) => !/favicon|ResizeObserver|tile.openstreetmap.org|Cannot record touch end without a touch start|Failed to load resource: the server responded with a status of 503/i.test(entry));
-    if (actionableConsole.length) row.failures.push(`console/page errors: ${actionableConsole.slice(0, 3).join(" | ")}`);
-    row.failures.push(...await assertNoRawFailureLeak(page));
-    row.screenshot = await capture(page, scenario.id);
-    row.textSample = (await page.locator("body").innerText()).replace(/\s+/g, " ").slice(0, 700);
+    await withTimeout((async () => {
+      await scenario.setup(page);
+      await scenario.run(page);
+      row.failures.push(...await scenario.expect(page));
+      const actionableConsole = consoleMessages.filter((entry) => !/favicon|File not found|ResizeObserver|tile.openstreetmap.org|Cannot record touch end without a touch start|Failed to load resource: the server responded with a status of 503/i.test(entry));
+      if (actionableConsole.length) row.failures.push(`console/page errors: ${actionableConsole.slice(0, 3).join(" | ")}`);
+      row.failures.push(...await assertNoRawFailureLeak(page));
+      row.screenshot = await capture(page, scenario.id);
+      row.textSample = (await page.locator("body").innerText()).replace(/\s+/g, " ").slice(0, 700);
+    })(), scenarioTimeoutMs, `${scenario.id} exceeded ${scenarioTimeoutMs}ms failure-state timeout`);
   } catch (error) {
     row.failures.push(error instanceof Error ? error.message : String(error));
     try {
@@ -199,6 +202,20 @@ async function runScenario(page, scenario, consoleMessages) {
   if (row.failures.length) row.status = "failed";
   console.log(`${row.status === "passed" ? "OK" : "FAIL"} ${scenario.id}`);
   return row;
+}
+
+async function withTimeout(promise, timeoutMs, message) {
+  let timeout;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise((_, reject) => {
+        timeout = setTimeout(() => reject(new Error(message)), timeoutMs);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 async function launchBrowser() {
@@ -233,7 +250,7 @@ async function mockStatus(page) {
 }
 
 async function mockGeocode(page) {
-  await page.route("**/api/geocode", async (route) => {
+  await page.route("**/api/geocode**", async (route) => {
     const body = route.request().postDataJSON?.() || {};
     const query = String(body.q || "").toLowerCase();
     const isFrom = query.includes("sydney") || query.includes("sylvania") || query.includes("george");

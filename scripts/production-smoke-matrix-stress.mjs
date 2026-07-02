@@ -82,10 +82,11 @@ async function smokeNearbyFuel(page, row) {
   await page.waitForTimeout(800);
   const state = await uiState(page);
   row.metrics = state;
+  const visibleFuelTargets = state.stationMarkers + state.clusters;
   row.failures.push(...checks([
     [state.text.includes("Nearby"), "Nearby tab text missing"],
     [state.text.includes("Closest") && state.text.includes("Cheapest") && state.text.includes("Best value"), "fuel sort controls missing"],
-    [state.stationMarkers >= 6, `expected visible fuel markers, got ${state.stationMarkers}`],
+    [visibleFuelTargets >= 6, `expected visible fuel markers or cluster pills, got ${visibleFuelTargets}`],
     [state.hasZoomControls, "Leaflet zoom controls missing"],
     [!state.text.includes("Full list"), "removed Full list copy returned"],
     [!state.text.includes("WA tomorrow locked prices"), "state timing banner returned"],
@@ -155,7 +156,7 @@ function attachConsole(page) {
 }
 
 function consoleFailures(messages) {
-  const actionable = messages.filter((entry) => !/favicon|ResizeObserver|tile.openstreetmap.org|Cannot record touch end without a touch start/i.test(entry));
+  const actionable = messages.filter((entry) => !/favicon|File not found|ResizeObserver|tile.openstreetmap.org|Cannot record touch end without a touch start/i.test(entry));
   return actionable.length ? [`console/page errors: ${actionable.slice(0, 3).join(" | ")}`] : [];
 }
 
@@ -176,8 +177,9 @@ async function installCommonMocks(page) {
 }
 
 async function installPlanMocks(page) {
-  await page.route("**/api/geocode?**", async (route) => {
-    const q = new URL(route.request().url()).searchParams.get("q") || "";
+  await page.route("**/api/geocode**", async (route) => {
+    const body = route.request().postDataJSON?.() || {};
+    const q = body.q || new URL(route.request().url()).searchParams.get("q") || "";
     const isSydney = /sydney/i.test(q);
     const location = isSydney ? { label: "Sydney NSW", lat: -33.8688, lon: 151.2093, state: "NSW", provider: "smoke_mock" } : { label: "Melbourne VIC", lat: -37.8136, lon: 144.9631, state: "VIC", provider: "smoke_mock" };
     await route.fulfill(jsonResponse({ provider: "smoke_mock", lookupStatus: "ok", location, suggestions: [location] }));

@@ -157,22 +157,46 @@ function stationLimitForRadius(radiusKm: number) {
 
 function stationContextNotice(context: {
   warning?: string;
+  cacheAgeSeconds?: number;
+  cacheMode?: string;
   capability?: string;
+  degraded?: boolean;
   regionCapabilities?: Array<{ region: string; capability: string; blocker?: string }>;
 }) {
-  if (context.warning) return context.warning;
+  const notices = [];
+  if (context.warning) notices.push(context.warning);
+  if (context.degraded || context.cacheMode === "stale") {
+    const age = Number(context.cacheAgeSeconds || 0);
+    const ageText = age > 0 ? ` Cached ${formatCacheAge(age)} ago.` : "";
+    notices.push(`Price feed is degraded or stale.${ageText} Confirm before choosing a stop.`);
+  }
   const limited = context.regionCapabilities?.find((item) =>
     ["limited", "pending_access", "fallback", "unsupported"].includes(item.capability),
   );
-  if (!limited) return "";
+  if (!limited) return uniqueNotices(notices).join(" ");
   if (limited.capability === "pending_access") {
-    return `${limited.region} live prices are not enabled yet. ${limited.blocker || ""}`.trim();
+    notices.push(`${limited.region} live prices are not enabled yet. ${limited.blocker || ""}`.trim());
+    return uniqueNotices(notices).join(" ");
   }
   if (limited.capability === "limited") {
-    return `${limited.region} live coverage is limited. Confirm freshness before driving.`;
+    notices.push(`${limited.region} live coverage is limited. Confirm freshness before driving.`);
+    return uniqueNotices(notices).join(" ");
   }
   if (limited.capability === "fallback") {
-    return `Using fallback data for ${limited.region}. Do not treat it as a live price recommendation.`;
+    notices.push(`Using fallback data for ${limited.region}. Do not treat it as a live price recommendation.`);
+    return uniqueNotices(notices).join(" ");
   }
-  return "No live fuel provider covers this area yet.";
+  notices.push("No live fuel provider covers this area yet.");
+  return uniqueNotices(notices).join(" ");
+}
+
+function formatCacheAge(seconds: number) {
+  if (seconds < 90) return `${Math.round(seconds)} seconds`;
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 90) return `${minutes} minutes`;
+  return `${Math.round(minutes / 60)} hours`;
+}
+
+function uniqueNotices(notices: string[]) {
+  return Array.from(new Set(notices.map((notice) => notice.trim()).filter(Boolean)));
 }

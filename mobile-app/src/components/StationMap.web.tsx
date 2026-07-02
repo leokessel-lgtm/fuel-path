@@ -10,6 +10,7 @@ const LEAFLET_CSS_ID = "fuel-path-leaflet-css";
 const LEAFLET_CUSTOM_CSS_ID = "fuel-path-leaflet-custom-css";
 const maxStationMarkers = 420;
 const maxPriceMarkers = 14;
+const maxEvMarkers = 96;
 const markerGridSize = 132;
 const mixedEnergyMaxPriceMarkers = 8;
 const mixedEnergyMarkerGridSize = 190;
@@ -85,6 +86,8 @@ export function StationMap({
 
       const map = L.map(mapElementRef.current, {
         attributionControl: true,
+        markerZoomAnimation: false,
+        zoomAnimation: false,
         zoomControl: false,
       }).setView([centre.lat, centre.lon], 13);
 
@@ -196,12 +199,17 @@ export function StationMap({
       addUserLocationMarker(L, markerLayer, userLocation);
     }
 
-    const markerGroups = visibleMarkerGroups(
-      stations.slice(0, maxStationMarkers),
-      map.getBounds(),
-      selectedStationCode,
-      chargers.length > 0,
-    );
+    const markerGroups = routeEndpoints
+      ? {
+          priceMarkers: stations.slice(0, maxPriceMarkers),
+          clusterMarkers: [],
+        }
+      : visibleMarkerGroups(
+          stations.slice(0, maxStationMarkers),
+          map.getBounds(),
+          selectedStationCode,
+          chargers.length > 0,
+        );
 
     markerGroups.clusterMarkers
       .filter((cluster) => clusterFitsInteractiveMapArea(map, cluster, activeInsets))
@@ -278,7 +286,7 @@ export function StationMap({
       fitPoints.push([item.station.lat, item.station.lon]);
     });
 
-    chargers.slice(0, maxStationMarkers).forEach((charger) => {
+    chargers.slice(0, maxEvMarkers).forEach((charger) => {
       const selected = charger.id === selectedChargerId;
       const marker = L.marker([charger.lat, charger.lon], {
         icon: L.divIcon({

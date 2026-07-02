@@ -267,12 +267,26 @@ export function PlanScreen({
       setRouteControlsCollapsed(false);
       setStationPanelOpen(false);
       setRouteSheetMinimised(false);
-      setError(err instanceof Error ? err.message : "Could not plan route");
+      setError(routePlanningErrorMessage(err));
     } finally {
       if (requestId === routeRequestIdRef.current) {
         setLoading(false);
       }
     }
+  };
+
+  const routePlanningErrorMessage = (err: unknown) => {
+    const message = err instanceof Error ? err.message : String(err || "");
+    if (/route engine temporarily unavailable|provider failure|503/i.test(message)) {
+      return "Route engine temporarily unavailable. Try again shortly, or check Nearby fuel.";
+    }
+    if (/no eligible stations|no recommendations|empty results|no fuel stops/i.test(message)) {
+      return "No suitable fuel stop was found on this route. Try a different fuel, expand the route, or check Nearby fuel.";
+    }
+    if (/cannot read|undefined|null|points|typeerror|referenceerror/i.test(message)) {
+      return "Route planning needs attention. Try again, edit the route, or check Nearby fuel.";
+    }
+    return message || "Could not plan this route right now. Try again or edit the route.";
   };
 
   const markRouteEdited = () => {

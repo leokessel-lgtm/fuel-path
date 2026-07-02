@@ -255,6 +255,9 @@ export type NearbyResponse = {
     stationCount: number;
     returnedCount: number;
     generatedAt: string;
+    cacheAgeSeconds?: number;
+    cacheMode?: string;
+    degraded?: boolean;
     warning?: string;
   };
   stations: Station[];

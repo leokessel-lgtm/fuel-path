@@ -450,7 +450,7 @@ export async function planFuelRoute({
   to: MapPoint;
 }) {
   const policyBrands = approvedPolicyBrands.map((brand) => brand.trim()).filter(Boolean);
-  return fetchJson<PlanRouteResponse>("/api/score", {
+  const payload = await fetchJson<PlanRouteResponse | ScoreResponse>("/api/score", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -472,6 +472,23 @@ export async function planFuelRoute({
       includeClosed: false,
     }),
   });
+  return normalisePlanRouteResponse(payload, from, to);
+}
+
+function normalisePlanRouteResponse(payload: PlanRouteResponse | ScoreResponse, from: MapPoint, to: MapPoint): PlanRouteResponse {
+  const planned = payload as PlanRouteResponse;
+  if (planned.route?.points?.length && planned.score) return planned;
+
+  const score = payload as ScoreResponse;
+  return {
+    route: {
+      provider: "score_only",
+      distanceKm: score.context?.routeDistanceKm ?? 0,
+      durationMin: 0,
+      points: [from, to],
+    },
+    score,
+  };
 }
 
 function compactPoints(points: MapPoint[], maxPoints = 180) {

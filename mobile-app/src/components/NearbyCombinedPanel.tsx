@@ -141,6 +141,8 @@ export function NearbyCombinedPanel({
       </View>
 
       {error && isFull ? <Text style={styles.notice}>{error}</Text> : null}
+      {!error && stationNotice && !isPeek ? <Text style={styles.notice}>{stationNotice}</Text> : null}
+      {!error && evNotice && !isPeek ? <Text style={styles.notice}>{evNotice}</Text> : null}
 
       {!isPeek ? (
         <NearbyControlDeck

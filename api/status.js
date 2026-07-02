@@ -21,8 +21,19 @@ module.exports = async function handler(req, res) {
   if (!methodAllowed(req, res)) return;
   const providerCapabilities = fuelProviderCapabilityMatrix();
   const publicClaims = providerPublicClaimStatus(providerCapabilities);
+  const publicLaunchClaimsReviewed = process.env.FUEL_PATH_PUBLIC_LIVE_PRICE_CLAIMS_REVIEWED === "1";
+  const releasePublicClaims = publicClaims.publicLivePriceClaimsAllowed
+    ? publicLaunchClaimsReviewed
+      ? publicClaims
+      : {
+          ...publicClaims,
+          status: "blocked_until_release_evidence",
+          publicLivePriceClaimsAllowed: false,
+          blockers: Array.from(new Set([...publicClaims.blockers, "release_claims_evidence_not_reviewed"])),
+        }
+    : publicClaims;
   const publicBetaBlockers = [
-    ...(!publicClaims.publicLivePriceClaimsAllowed ? ["provider_terms_evidence"] : []),
+    ...(!releasePublicClaims.publicLivePriceClaimsAllowed ? ["provider_terms_evidence"] : []),
     "physical_device_validation",
     "ios_validation",
     "privacy_store_evidence",
@@ -35,7 +46,9 @@ module.exports = async function handler(req, res) {
     sourceScope: {
       defaultSourceMeaning: "coarse server diagnostic only; use fuelProviders.capabilities for region-level behaviour",
       regionalSelection: "region-aware",
-      publicLivePriceClaimsAllowed: Boolean(publicClaims.publicLivePriceClaimsAllowed),
+      publicLivePriceClaimsAllowed: Boolean(releasePublicClaims.publicLivePriceClaimsAllowed),
+      providerTermsGateAllowsClaims: Boolean(publicClaims.publicLivePriceClaimsAllowed),
+      releaseEvidenceGate: publicLaunchClaimsReviewed ? "reviewed" : "not_reviewed",
     },
     releaseReadiness: {
       publicBeta: {
@@ -54,7 +67,7 @@ module.exports = async function handler(req, res) {
       capabilityLabels: ["live", "limited", "pending_access", "fallback", "unsupported"],
       capabilitySummary: capabilitySummary(providerCapabilities),
       capabilities: providerCapabilities,
-      publicClaims,
+      publicClaims: releasePublicClaims,
     },
     cacheSeconds: cacheSeconds(),
     maps: {

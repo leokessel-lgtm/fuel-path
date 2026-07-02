@@ -276,12 +276,13 @@ test("status endpoint allows public live-price claims only when provider terms e
       const response = await callStatus();
       const claims = response.payload.fuelProviders.publicClaims;
 
-      assert.equal(claims.status, "ready");
-      assert.equal(claims.publicLivePriceClaimsAllowed, true);
-      assert.deepEqual(claims.blockers, []);
+      assert.equal(claims.status, "blocked_until_release_evidence");
+      assert.equal(claims.publicLivePriceClaimsAllowed, false);
+      assert.deepEqual(claims.blockers, ["release_claims_evidence_not_reviewed"]);
       assert.deepEqual(claims.evidenceRequired, []);
       assert.equal(claims.evidenceAttested, true);
-      assert.equal(response.payload.releaseReadiness.publicBeta.blockers.includes("provider_terms_evidence"), false);
+      assert.equal(response.payload.sourceScope.providerTermsGateAllowsClaims, true);
+      assert.equal(response.payload.releaseReadiness.publicBeta.blockers.includes("provider_terms_evidence"), true);
     },
   );
 });

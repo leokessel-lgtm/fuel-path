@@ -246,6 +246,12 @@ export function NearbyStationSheet({
 
       {!loading && !error ? (
         <>
+          {stationNotice && stations.length ? (
+            <View style={styles.noticeState}>
+              <Text style={styles.noticeTitle}>Check price freshness</Text>
+              <Text style={styles.muted}>{stationNotice}</Text>
+            </View>
+          ) : null}
           {topControls && !isPeek ? <View style={styles.topControls}>{topControls}</View> : null}
           {selected && !sheetExpanded ? (
             <>
@@ -524,9 +530,23 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
     padding: spacing.md,
   },
+  noticeState: {
+    backgroundColor: colors.amberSoft,
+    borderColor: "rgba(152, 99, 26, 0.26)",
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    gap: spacing.xs,
+    padding: spacing.md,
+  },
   emptyTitle: {
     color: colors.ink,
     fontWeight: "700",
+  },
+  noticeTitle: {
+    color: colors.amber,
+    fontSize: typeScale.caption,
+    fontWeight: "800",
+    textTransform: "uppercase",
   },
   muted: {
     color: colors.muted,

@@ -1444,7 +1444,13 @@ test("beta readiness passes custom store review freshness into store evidence ga
   assert.equal(payload.store.reviewMaxAgeDays, 0.5);
   assert.equal(payload.store.reviewEvidenceReady, true);
   assert.equal(payload.store.reviewFresh, false);
-  assert.deepEqual(payload.blockers, ["store_review_evidence_stale"]);
+  assert.deepEqual(payload.blockers, [
+    "apple_privacy_review_evidence_missing",
+    "google_data_safety_review_evidence_missing",
+    "provider_limitations_disclosure_evidence_missing",
+    "support_process_evidence_missing",
+    "store_review_evidence_stale",
+  ]);
 });
 
 test("beta readiness ignores excessive store review freshness windows", async () => {

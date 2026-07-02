@@ -135,10 +135,10 @@ export default function App() {
     };
   }, []);
 
-  const hasVehicle = Boolean(preferences.vehicleName.trim() || preferences.vehicleRego.trim());
-  const vehicleInitials = hasVehicle
+  const hasNamedVehicle = Boolean(preferences.vehicleName.trim() || preferences.vehicleRego.trim());
+  const vehicleInitials = hasNamedVehicle
     ? (preferences.vehicleRego || preferences.vehicleName).trim().slice(0, 2).toUpperCase()
-    : "+";
+    : vehicleEnergyLabel(preferences.vehicleEnergyType).slice(0, 2).toUpperCase();
   const vehicleDetail = preferences.vehicleName
     ? `${vehicleEnergyLabel(preferences.vehicleEnergyType)} | ${vehicleProfileShortLabel(preferences)}`
     : vehicleProfileShortLabel(preferences);
@@ -157,7 +157,7 @@ export default function App() {
             </View>
           </View>
           <Pressable
-            accessibilityLabel={hasVehicle ? "View vehicle profile" : "Add vehicle profile"}
+            accessibilityLabel={hasNamedVehicle ? "View vehicle profile" : "View fuel profile"}
             onPress={() => setActiveTab("account")}
             style={({ pressed }) => [styles.vehiclePill, pressed && styles.vehiclePillPressed]}
           >
@@ -166,10 +166,10 @@ export default function App() {
             </View>
             <View style={styles.vehicleTextGroup}>
               <Text maxFontSizeMultiplier={chromeTextScale} numberOfLines={1} style={styles.vehiclePrimary}>
-                {hasVehicle ? preferences.vehicleRego || preferences.vehicleName : "Add vehicle"}
+                {hasNamedVehicle ? preferences.vehicleRego || preferences.vehicleName : "Fuel profile"}
               </Text>
               <Text maxFontSizeMultiplier={chromeTextScale} numberOfLines={1} style={styles.vehicleSecondary}>
-                {hasVehicle ? vehicleDetail : "Set fuel"}
+                {vehicleDetail}
               </Text>
             </View>
           </Pressable>
@@ -278,7 +278,14 @@ const styles = StyleSheet.create({
   },
   appShell: {
     flex: 1,
+    alignSelf: "center",
     backgroundColor: colors.canvas,
+    borderColor: "rgba(20, 35, 29, 0.08)",
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    maxWidth: 1180,
+    overflow: "hidden",
+    width: "100%",
   },
   header: {
     alignItems: "center",

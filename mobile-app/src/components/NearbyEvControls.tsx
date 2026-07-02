@@ -251,9 +251,12 @@ export function EvChargerPanel({
         ) : null}
       </View>
       <View style={styles.evPanelTitleRow}>
-        <Text style={styles.evPanelTitle}>{loading ? "Finding chargers..." : `${chargers.length} chargers nearby`}</Text>
+        <Text style={styles.evPanelTitle}>{loading ? "Finding chargers..." : `${chargers.length} directory chargers`}</Text>
       </View>
       {!isPeek && error ? <Text style={styles.evPanelNotice}>{error}</Text> : null}
+      {!isPeek && !error && !loading && chargers.length ? (
+        <Text style={styles.evPanelNotice}>{conciseEvNotice(notice) || "Directory data only. Confirm access, tariff and live bay status in the charging network app."}</Text>
+      ) : null}
       {!isPeek && controls ? <View style={styles.controlDeck}>{controls}</View> : null}
       {isFull ? (
         <EvSheetFilters

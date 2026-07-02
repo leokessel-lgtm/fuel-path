@@ -117,8 +117,17 @@ export function StationMap({
   }, [centre, markerDensity.maxPriceMarkers, routeEndpoints, showCentreMarker, stations, visibleRoutePoints]);
   const initialRegion = useMemo(() => regionForPoint(centre), [centre]);
   const markerGroups = useMemo(
-    () => visibleMarkerGroups(stations.slice(0, maxStationMarkers), currentRegion, markerDensity, selectedStationCode),
-    [currentRegion, markerDensity, selectedStationCode, stations],
+    () => {
+      if (routeEndpoints) {
+        return {
+          priceMarkers: stations.slice(0, markerDensity.maxPriceMarkers),
+          dotMarkers: [],
+          clusterMarkers: [],
+        };
+      }
+      return visibleMarkerGroups(stations.slice(0, maxStationMarkers), currentRegion, markerDensity, selectedStationCode);
+    },
+    [currentRegion, markerDensity, routeEndpoints, selectedStationCode, stations],
   );
 
   useEffect(() => {

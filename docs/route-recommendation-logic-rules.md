@@ -1,6 +1,6 @@
 # Route recommendation logic rules
 
-Last updated: 2026-06-30
+Last updated: 2026-07-02
 
 This document records the current Fuel Path route recommendation rules across backend scoring, frontend display and product wording. It is the working source of truth for the Plan route recommendation card.
 
@@ -74,6 +74,8 @@ Selected station-detail sheets opened from the Plan route map should stay minima
 - keep price, station name, address, open status, data recency, confirmed discount, arrow CTA, distance and compact facts
 
 Plan route maps should keep the recommended station plus the next three route candidates as direct price markers where possible. Do not let marker clustering hide those first four route candidates, because they are the stations users compare immediately after a route recommendation.
+
+Plan route failure states should never show raw JavaScript errors, undefined route-shape errors or provider stack details. If scoring returns a valid score payload without a route shape, the frontend should preserve the route endpoints and show the score result or an empty recommendation state rather than crashing. If routing or scoring is unavailable, show a plain recovery message that points users back to retrying, editing the route or checking Nearby fuel.
 
 ## Frontend display rules
 

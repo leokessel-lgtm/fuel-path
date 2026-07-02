@@ -221,7 +221,7 @@ function densityAssertions(metrics, options) {
   const visibleFuelTargets = metrics.stationMarkers + metrics.clusters;
   return checks([
     [metrics.readyMs <= options.maxReadyMs, `ready time ${metrics.readyMs}ms exceeded ${options.maxReadyMs}ms`],
-    [metrics.hasZoomControls, "Leaflet zoom controls missing"],
+    [!metrics.hasZoomControls, "Leaflet zoom controls returned"],
     [metrics.sheetTop > 0, "bottom controls/sheet controls not measurable"],
     [!metrics.bodyText.includes("Full list"), "Full list button text returned under density"],
     [!metrics.bodyText.includes("Browse view. Full list for more."), "old browse helper copy returned under density"],

@@ -101,7 +101,6 @@ export function StationMap({
         zoomSnap: 0.5,
       }).setView([centre.lat, centre.lon], 13);
 
-      L.control.zoom({ position: "bottomright" }).addTo(map);
       L.tileLayer(mapSkin.baseTileUrl, {
         attribution: mapSkin.baseAttribution,
         maxZoom: 19,
@@ -849,15 +848,6 @@ function ensureLeafletStyles() {
       }
       .leaflet-control-attribution {
         font-size: 10px;
-      }
-      .leaflet-bottom.leaflet-right .leaflet-control-zoom {
-        margin-bottom: 132px;
-      }
-      .leaflet-touch .leaflet-bar a,
-      .leaflet-control-zoom a {
-        height: 44px;
-        line-height: 44px;
-        width: 44px;
       }
       .fuel-path-marker {
         align-items: center;

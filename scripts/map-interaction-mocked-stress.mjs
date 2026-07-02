@@ -48,14 +48,12 @@ async function runViewport(viewport) {
     row.metrics.default = await mapState(page);
     row.failures.push(...checks([
       [row.metrics.default.stationMarkers >= 8 || row.metrics.default.clusters >= 1, "fuel markers/clusters missing on default map"],
-      [row.metrics.default.hasZoomControls, "zoom controls missing on default map"],
+      [!row.metrics.default.hasZoomControls, "zoom controls returned on default map"],
       [row.metrics.default.sheetTop > viewport.height * 0.62, `collapsed Nearby controls too high: ${row.metrics.default.sheetTop}`],
       [!row.metrics.default.text.includes("Full list"), "Full list text returned in collapsed map"],
     ]));
     row.screenshots.push(await capture(page, `${viewport.id}-default`));
 
-    await clickZoom(page, "+");
-    await clickZoom(page, "−");
     await dragMap(page, viewport);
     row.metrics.afterDrag = await mapState(page);
     if (row.metrics.afterDrag.stationMarkers < 1 && row.metrics.afterDrag.clusters < 1) row.failures.push("drag left no visible fuel markers/clusters");
@@ -156,7 +154,6 @@ async function clickStation(page, code) {
   if (!box) throw new Error(`could not locate visible station ${code}`);
   await page.mouse.click(box.x, box.y);
 }
-async function clickZoom(page, label) { await page.locator(label === "+" ? ".leaflet-control-zoom-in" : ".leaflet-control-zoom-out").click({ timeout: 4000 }); await page.waitForTimeout(250); }
 async function dragMap(page, viewport) { await page.mouse.move(viewport.width / 2, viewport.height / 2); await page.mouse.down(); await page.mouse.move(viewport.width / 2 - 95, viewport.height / 2 + 65, { steps: 10 }); await page.mouse.up(); await page.waitForTimeout(800); }
 async function chooseFuelMode(page, label) { await page.getByRole("button", { name: "Choose fuel or EV charging", exact: true }).click({ timeout: 5000 }); await page.getByText(label, { exact: true }).click({ timeout: 5000 }); }
 async function clickBottomTab(page, label) { await page.getByText(label, { exact: true }).last().click({ timeout: 5000 }); await page.waitForTimeout(350); }

@@ -87,7 +87,7 @@ async function smokeNearbyFuel(page, row) {
     [state.text.includes("Nearby"), "Nearby tab text missing"],
     [state.text.includes("Closest") && state.text.includes("Cheapest") && state.text.includes("Best value"), "fuel sort controls missing"],
     [visibleFuelTargets >= 6, `expected visible fuel markers or cluster pills, got ${visibleFuelTargets}`],
-    [state.hasZoomControls, "Leaflet zoom controls missing"],
+    [!state.hasZoomControls, "Leaflet zoom controls returned"],
     [!state.text.includes("Full list"), "removed Full list copy returned"],
     [!state.text.includes("WA tomorrow locked prices"), "state timing banner returned"],
     [!state.text.includes("Suggested fuel stops"), "suggested fuel stops copy leaked into Nearby"],

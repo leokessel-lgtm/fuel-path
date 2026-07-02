@@ -25,6 +25,7 @@ const compactMarkerDensity = {
   markerGridSize: 390,
   compactMarkerGridSize: 230,
 };
+const nearbyInitialCameraStationCount = 6;
 const decorativeStationMarkerAccessibility = {
   accessibilityElementsHidden: true,
   importantForAccessibility: "no-hide-descendants" as const,
@@ -104,7 +105,7 @@ export function StationMap({
       return [routeEndpoints.from, routeEndpoints.to, ...routeStationCameraPoints];
     }
     const cameraStations = showCentreMarker
-      ? nearestStationsForCamera(stations, centre, 12)
+      ? nearestStationsForCamera(stations, centre, nearbyInitialCameraStationCount)
       : stations.slice(0, maxStationMarkers);
     return [
       centre,

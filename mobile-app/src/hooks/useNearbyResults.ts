@@ -164,8 +164,10 @@ function stationContextNotice(context: {
   regionCapabilities?: Array<{ region: string; capability: string; blocker?: string }>;
 }) {
   const notices = [];
-  if (context.warning) notices.push(context.warning);
-  if (context.degraded || context.cacheMode === "stale") {
+  if (context.warning && shouldShowProviderWarning(context.warning)) {
+    notices.push(context.warning);
+  }
+  if (shouldShowCacheNotice(context)) {
     const age = Number(context.cacheAgeSeconds || 0);
     const ageText = age > 0 ? ` Cached ${formatCacheAge(age)} ago.` : "";
     notices.push(`Price feed is degraded or stale.${ageText} Confirm before choosing a stop.`);
@@ -188,6 +190,17 @@ function stationContextNotice(context: {
   }
   notices.push("No live fuel provider covers this area yet.");
   return uniqueNotices(notices).join(" ");
+}
+
+function shouldShowProviderWarning(warning: string) {
+  return !/tomorrow locked prices are checked/i.test(warning);
+}
+
+function shouldShowCacheNotice(context: { cacheAgeSeconds?: number; cacheMode?: string; degraded?: boolean }) {
+  if (context.degraded) return true;
+  if (context.cacheMode !== "stale") return false;
+  const age = Number(context.cacheAgeSeconds || 0);
+  return Number.isFinite(age) && age >= 30 * 60;
 }
 
 function formatCacheAge(seconds: number) {

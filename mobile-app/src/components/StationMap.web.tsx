@@ -14,6 +14,7 @@ const maxEvMarkers = 96;
 const markerGridSize = 132;
 const mixedEnergyMaxPriceMarkers = 8;
 const mixedEnergyMarkerGridSize = 190;
+const nearbyInitialCameraStationCount = 6;
 
 type ClusterMarker = {
   count: number;
@@ -157,7 +158,7 @@ export function StationMap({
       .map((point) => [point.lat, point.lon] as [number, number]);
     const activeInsets = resolveCameraInsets(routeEndpoints ? "route" : "nearby", cameraInsets);
     const cameraStations = showCentreMarker
-      ? nearestStationsForCamera(stations, centre, 12)
+      ? nearestStationsForCamera(stations, centre, nearbyInitialCameraStationCount)
       : stations.slice(0, maxStationMarkers);
     const cameraChargers = chargers.slice(0, 16);
     const routeStationCameraPoints = routeEndpoints

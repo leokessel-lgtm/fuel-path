@@ -156,7 +156,8 @@ const checks = [
       webMap.includes("map.panInside([selectedCharger.lat, selectedCharger.lon]") &&
       webMap.includes("map.panInside([charger.lat, charger.lon]") &&
       !webMap.includes('`${item.station.name} - ${item.adjustedCpl.toFixed(1)} c/L`') &&
-      webMap.includes("nearestStationsForCamera(stations, centre, 12)") &&
+      webMap.includes("const nearbyInitialCameraStationCount = 6;") &&
+      webMap.includes("nearestStationsForCamera(stations, centre, nearbyInitialCameraStationCount)") &&
       webMap.includes("showCentreMarker ? 15 : 14") &&
       webMap.includes("transform: translateY(-4px);") &&
       !webMap.includes("transform: scale(1.12)") &&
@@ -235,7 +236,8 @@ const checks = [
       nativeMap.includes("backgroundColor: colors.greenDark") &&
       nativeMap.includes("pinSelected: {\n    borderColor: colors.black") &&
       nativeMap.includes("pinPriceSelected: {\n    backgroundColor: colors.black") &&
-      nativeMap.includes("nearestStationsForCamera(stations, centre, 12)") &&
+      nativeMap.includes("const nearbyInitialCameraStationCount = 6;") &&
+      nativeMap.includes("nearestStationsForCamera(stations, centre, nearbyInitialCameraStationCount)") &&
       nativeMap.indexOf("<Text style={[styles.pinPrice") <
         nativeMap.indexOf("<View style={styles.pinBrand}>") &&
       nativeMap.includes("pinPointerSelected"),

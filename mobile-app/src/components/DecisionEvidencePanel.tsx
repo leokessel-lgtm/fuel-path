@@ -41,9 +41,9 @@ export function DecisionEvidencePanel({
       </View>
       <Text numberOfLines={2} style={styles.savingSourceLine}>
         {Number.isFinite(routeComparisonCpl) && routeComparisonCpl > 0
-          ? `Compared with the next-best route option at ${routeComparisonCpl.toFixed(1)} c/L. Your price includes eligible discounts.`
+          ? `Compared with the next-best route option at ${routeComparisonCpl.toFixed(1)} c/L. Only selected eligible discounts are applied.`
           : candidate.discountCpl
-            ? `Your price includes ${candidate.discountLabel}. Pump price is ${candidate.pumpCpl.toFixed(1)} c/L.`
+            ? `Your price includes selected ${candidate.discountLabel}. Pump price is ${candidate.pumpCpl.toFixed(1)} c/L.`
             : "Your price is the current pump price."}
       </Text>
     </View>

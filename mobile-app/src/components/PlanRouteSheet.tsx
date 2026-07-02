@@ -22,6 +22,7 @@ export function PlanRouteSheet({
   loading,
   loadingLabel,
   onMinimise,
+  onNavigationOpened,
   onSaveCommute,
   onSelectStation,
   onShowStops,
@@ -55,6 +56,7 @@ export function PlanRouteSheet({
   loading: boolean;
   loadingLabel?: string;
   onMinimise: () => void;
+  onNavigationOpened?: (station: StationViewModel) => void;
   onRestore: () => void;
   onSaveCommute: () => void;
   onSelectStation: (stationCode: string) => void;
@@ -126,7 +128,10 @@ export function PlanRouteSheet({
           </View>
           {stationPanelOpen && selected ? (
             <StationDetailPanel
-              onNavigate={() => openDirections(selected.station.lat, selected.station.lon, selected.station.address || selected.station.name)}
+              onNavigate={() => {
+                onNavigationOpened?.(selected);
+                openDirections(selected.station.lat, selected.station.lon, selected.station.address || selected.station.name);
+              }}
               onShowStops={onShowStops}
               selected={selected}
               selectedTomorrow={selectedTomorrow}
@@ -146,6 +151,7 @@ export function PlanRouteSheet({
               loading={loading}
               loadingLabel={loadingLabel}
               onSaveCommute={onSaveCommute}
+              onNavigationOpened={onNavigationOpened}
               onSelectStation={onSelectStation}
               policyActive={policyActive}
               policyNotice={policyNotice}
@@ -244,6 +250,7 @@ function RouteResultsPanel({
   loading,
   loadingLabel,
   onSaveCommute,
+  onNavigationOpened,
   onSelectStation,
   onWatchRoute,
   policyActive,
@@ -271,6 +278,7 @@ function RouteResultsPanel({
   loading: boolean;
   loadingLabel?: string;
   onSaveCommute: () => void;
+  onNavigationOpened?: (station: StationViewModel) => void;
   onSelectStation: (stationCode: string) => void;
   onWatchRoute?: () => void;
   policyActive: boolean;
@@ -317,6 +325,7 @@ function RouteResultsPanel({
               <Text style={styles.noticeText}>{policyNotice}</Text>
             </View>
           ) : null}
+          <DiscountEligibilityCard best={best} policyActive={policyActive} />
           <Pressable
             accessibilityLabel={`Open ${best.station.name} recommendation detail`}
             accessibilityRole="button"
@@ -347,6 +356,7 @@ function RouteResultsPanel({
                 accessibilityRole="button"
                 onPress={(event) => {
                   event.stopPropagation();
+                  onNavigationOpened?.(best);
                   openDirections(best.station.lat, best.station.lon, best.station.address || best.station.name);
                 }}
                 style={styles.recommendationNavigateButton}
@@ -511,6 +521,44 @@ function RouteFollowUpPrompt({
       >
         <Text style={styles.followUpButtonText}>{watchRouteEnabled ? "Watching" : watchRouteDisabled ? "Saving" : "Watch"}</Text>
       </Pressable>
+    </View>
+  );
+}
+
+function DiscountEligibilityCard({
+  best,
+  policyActive,
+}: {
+  best: StationViewModel;
+  policyActive: boolean;
+}) {
+  const eligibilityLines = [];
+  if (best.discountCpl > 0 && best.discountLabel) {
+    eligibilityLines.push(`Selected discount applied: ${best.discountLabel}.`);
+  } else {
+    eligibilityLines.push("Pump price only. No selected discount is applied.");
+  }
+  if (best.station.membershipRequired) {
+    eligibilityLines.push("Membership or app access may be required at this stop.");
+  }
+  if (best.possibleLowerDisclosure || best.possibleLowerLabel || best.possibleLowerCpl) {
+    eligibilityLines.push(
+      best.possibleLowerDisclosure ||
+        `A lower ${best.possibleLowerLabel || "discount"} price may exist, but it is not applied unless selected and eligible.`,
+    );
+  }
+  if (policyActive) {
+    eligibilityLines.push("Policy mode is limiting recommendations to approved brands.");
+  }
+
+  return (
+    <View style={styles.eligibilityCard}>
+      <Text style={styles.eligibilityTitle}>Eligibility before you go</Text>
+      {eligibilityLines.map((line) => (
+        <Text key={line} style={styles.eligibilityLine}>
+          {line}
+        </Text>
+      ))}
     </View>
   );
 }
@@ -715,6 +763,26 @@ const styles = StyleSheet.create({
     color: colors.amber,
     fontSize: typeScale.caption,
     fontWeight: "500",
+  },
+  eligibilityCard: {
+    backgroundColor: colors.white,
+    borderColor: colors.line,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    gap: 3,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  eligibilityTitle: {
+    color: colors.ink,
+    fontSize: typeScale.caption,
+    fontWeight: "800",
+  },
+  eligibilityLine: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: "500",
+    lineHeight: 15,
   },
   recommendationCopy: {
     flex: 1,

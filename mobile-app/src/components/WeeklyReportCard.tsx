@@ -18,7 +18,7 @@ export function WeeklyReportCard({
       <Text style={styles.eyebrow}>Weekly report</Text>
       <Text style={styles.title}>Fleet-lite summary</Text>
       <Text style={styles.muted}>
-        A driver-facing view of watched routes and alert outcomes. No payroll, accounting or admin tools.
+        A driver-facing view of watched routes, selected discounts and alert outcomes. No payroll, accounting or admin tools.
       </Text>
       <View style={styles.weeklyReportGrid}>
         <WeeklyReportMetric label="Watched" value={`${weeklyReport.activeRouteCount}`} />

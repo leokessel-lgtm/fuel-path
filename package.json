@@ -62,7 +62,8 @@
     "test:map-density": "node scripts/map-density-performance-stress.mjs",
     "test:claim-safety": "node scripts/claim-safety-audit-stress.mjs",
     "test:production-smoke-matrix": "node scripts/production-smoke-matrix-stress.mjs",
-    "test:map-interactions:mocked": "node scripts/map-interaction-mocked-stress.mjs"
+    "test:map-interactions:mocked": "node scripts/map-interaction-mocked-stress.mjs",
+    "sample:fleet-lite-report": "node scripts/generate-fleet-lite-sample-report.mjs"
   },
   "engines": {
     "node": "22.x"

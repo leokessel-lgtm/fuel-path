@@ -20,6 +20,10 @@
       "bestPriceByCplBand": "",
       "detourMinutesBand": "",
       "routeDistanceKmBand": "",
+      "savingThresholdBand": "",
+      "detourThresholdBand": "",
+      "savedRouteCountBand": "",
+      "stationFreshnessBand": "",
       "rejectionReason": "",
       "alertUseCase": "",
       "evidenceFile": ""

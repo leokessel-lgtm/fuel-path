@@ -38,6 +38,7 @@ The Plan result should show:
 - savings-detour label
 - best-price-by comparison in c/L
 - navigate arrow
+- `Eligibility before you go`
 - `Why this stop`
 - `Pump`
 - `Your price`
@@ -62,6 +63,8 @@ The Plan result should not show:
 - route alert prompts before the route is saved
 - route tracking or beta-behaviour claims as part of the recommendation evidence
 
+Plan should make discount eligibility explicit before a driver acts on a recommendation. The eligibility card should state whether the displayed price is pump-only, a selected eligible discount, membership/app dependent, policy-limited, or lower-but-not-applied because the user has not selected/proven that discount.
+
 Plan recommendation and station-detail sheets should size to their content. Do not use fixed tall sheet heights that leave empty white space below the evidence or detail content.
 
 Navigation actions inside Plan recommendation and station-detail cards should use the same arrow treatment as station list rows. Do not add a second large `Navigate to this stop` button below a station card.
@@ -81,7 +84,7 @@ Plan route failure states should never show raw JavaScript errors, undefined rou
 
 ### Price
 
-`Price` is the recommended station price after eligible discounts.
+`Price` is the recommended station price after selected eligible discounts only.
 
 Example:
 
@@ -92,7 +95,7 @@ PDL
 
 ### Your price
 
-`Your price` is the recommended station price after eligible discounts.
+`Your price` is the recommended station price after selected eligible discounts only.
 
 Example:
 
@@ -137,8 +140,21 @@ BEST PRICE BY
 Helper copy:
 
 ```text
-Compared with the next-best route option at 160.9 c/L. Your price includes eligible discounts.
+Compared with the next-best route option at 160.9 c/L. Only selected eligible discounts are applied.
 ```
+
+### Eligibility before you go
+
+`Eligibility before you go` appears before the main recommendation card.
+
+Rules:
+
+- If a selected discount is applied, say `Selected discount applied`.
+- If no selected discount is applied, say `Pump price only`.
+- If the station may require app, membership or account access, say that clearly.
+- If a lower unselected discount may exist, disclose that it is not applied unless selected and eligible.
+- If policy mode is active, say recommendations are limited to approved brands.
+- Do not imply membership, fuel-card, voucher or loyalty eligibility unless it is selected and supported by the user's preferences.
 
 ### Detour
 

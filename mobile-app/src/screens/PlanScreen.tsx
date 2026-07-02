@@ -14,6 +14,12 @@ import { routeInputPrecisionHint } from "../components/RouteAddressSuggestions";
 import { StationMap } from "../components/StationMap";
 import { useRouteAddressSuggestions } from "../hooks/useRouteAddressSuggestions";
 import { getCurrentMapPoint } from "../services/currentLocation";
+import {
+  recordNavigationOpenedEvidence,
+  recordRouteAlertOptInEvidence,
+  recordRoutePlanCompletedEvidence,
+  recordSavedCommuteCreatedEvidence,
+} from "./PlanScreen.behaviour";
 import { colors, radii, shadow, spacing, surfaces, typeScale, typography } from "../theme";
 import {
   AppPreferences,
@@ -233,6 +239,7 @@ export function PlanScreen({
         from: resolvedFromPoint,
         to: resolvedToPoint,
       });
+      recordRoutePlanCompletedEvidence(planned, preferences);
       if (
         requestId !== routeRequestIdRef.current ||
         editVersionAtStart !== routeEditVersionRef.current
@@ -496,6 +503,35 @@ export function PlanScreen({
       name: commuteName(routeData.endpoints.from, routeData.endpoints.to),
       to: routeData.endpoints.to,
     });
+    recordSavedCommuteCreatedEvidence({
+      best,
+      decisionSummary: backendDecisionSummary,
+      distanceKm: routeData.distanceKm,
+      preferences,
+      result,
+      savedCommutes,
+    });
+  };
+
+  const handleWatchCurrentRoute = () => {
+    if (!currentSavedCommute || !onToggleCommuteAlert) return;
+    onToggleCommuteAlert(currentSavedCommute.id);
+    recordRouteAlertOptInEvidence({
+      distanceKm: routeData.distanceKm,
+      preferences,
+      result,
+      savedCommutes,
+    });
+  };
+
+  const handleNavigationOpened = (station: StationViewModel) => {
+    recordNavigationOpenedEvidence({
+      decisionSummary: backendDecisionSummary,
+      distanceKm: routeData.distanceKm,
+      preferences,
+      result,
+      station,
+    });
   };
 
   return (
@@ -591,11 +627,12 @@ export function PlanScreen({
           onMinimise={() => setRouteSheetMinimised(true)}
           onRestore={() => setRouteSheetMinimised(false)}
           onSaveCommute={handleSaveCurrentCommute}
+          onNavigationOpened={handleNavigationOpened}
           onSelectStation={handleStationSelect}
           onShowStops={() => setStationPanelOpen(false)}
           onWatchRoute={
             currentSavedCommute && onToggleCommuteAlert
-              ? () => onToggleCommuteAlert(currentSavedCommute.id)
+              ? handleWatchCurrentRoute
               : undefined
           }
           policyActive={preferences.fuelPolicyEnabled}

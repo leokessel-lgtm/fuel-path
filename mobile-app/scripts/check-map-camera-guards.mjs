@@ -156,9 +156,10 @@ const checks = [
       webMap.includes("map.panInside([selectedCharger.lat, selectedCharger.lon]") &&
       webMap.includes("map.panInside([charger.lat, charger.lon]") &&
       !webMap.includes('`${item.station.name} - ${item.adjustedCpl.toFixed(1)} c/L`') &&
-      webMap.includes("const nearbyInitialCameraRadiusKm = 4.2;") &&
-      webMap.includes("nearbyCameraPointsForCentre(centre, nearbyInitialCameraRadiusKm)") &&
-      webMap.includes("showCentreMarker ? 15 : 14") &&
+      webMap.includes("const nearbyInitialCameraZoom = 12.5;") &&
+      webMap.includes("const nearbyInitialMarkerRadiusKm = 4.2;") &&
+      webMap.includes("map.setView([centre.lat, centre.lon], nearbyInitialCameraZoom") &&
+      webMap.includes("nearbyCameraPointsForCentre(centre, nearbyInitialMarkerRadiusKm)") &&
       webMap.includes("transform: translateY(-4px);") &&
       !webMap.includes("transform: scale(1.12)") &&
       !webMap.includes(".fuel-path-marker-cluster::after"),
@@ -236,8 +237,10 @@ const checks = [
       nativeMap.includes("backgroundColor: colors.greenDark") &&
       nativeMap.includes("pinSelected: {\n    borderColor: colors.black") &&
       nativeMap.includes("pinPriceSelected: {\n    backgroundColor: colors.black") &&
-      nativeMap.includes("const nearbyInitialCameraRadiusKm = 4.2;") &&
-      nativeMap.includes("nearbyCameraPointsForCentre(centre, nearbyInitialCameraRadiusKm)") &&
+      nativeMap.includes("const nearbyInitialRegionDelta = 0.035;") &&
+      nativeMap.includes("const nearbyInitialMarkerRadiusKm = 4.2;") &&
+      nativeMap.includes("regionForPoint(centre, nearbyInitialRegionDelta)") &&
+      nativeMap.includes("nearbyCameraPointsForCentre(centre, nearbyInitialMarkerRadiusKm)") &&
       nativeMap.indexOf("<Text style={[styles.pinPrice") <
         nativeMap.indexOf("<View style={styles.pinBrand}>") &&
       nativeMap.includes("pinPointerSelected"),

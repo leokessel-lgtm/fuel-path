@@ -14,7 +14,8 @@ const maxEvMarkers = 96;
 const markerGridSize = 132;
 const mixedEnergyMaxPriceMarkers = 8;
 const mixedEnergyMarkerGridSize = 190;
-const nearbyInitialCameraRadiusKm = 4.2;
+const nearbyInitialCameraZoom = 12.5;
+const nearbyInitialMarkerRadiusKm = 4.2;
 
 type ClusterMarker = {
   count: number;
@@ -173,7 +174,7 @@ export function StationMap({
           ]
       : [
           ...(showCentreMarker
-            ? nearbyCameraPointsForCentre(centre, nearbyInitialCameraRadiusKm)
+            ? nearbyCameraPointsForCentre(centre, nearbyInitialMarkerRadiusKm)
             : [
                 [centre.lat, centre.lon] as [number, number],
                 ...stations.slice(0, maxStationMarkers).map((item) => [item.station.lat, item.station.lon] as [number, number]),
@@ -352,9 +353,13 @@ export function StationMap({
     if (fitKey !== lastFitKeyRef.current && (!userMovedMapRef.current || cameraContextChanged)) {
       runProgrammaticMapMove(programmaticMoveRef, map, () => {
         map.invalidateSize();
+        if (!routeEndpoints && showCentreMarker) {
+          map.setView([centre.lat, centre.lon], nearbyInitialCameraZoom, { animate: true });
+          return;
+        }
         map.fitBounds(L.latLngBounds(fitCameraPoints), {
           ...leafletPadding(activeInsets),
-          maxZoom: routeEndpoints ? 15 : showCentreMarker ? 15 : 14,
+          maxZoom: routeEndpoints ? 15 : 14,
         });
       });
       lastFitKeyRef.current = fitKey;

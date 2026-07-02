@@ -25,7 +25,8 @@ const compactMarkerDensity = {
   markerGridSize: 390,
   compactMarkerGridSize: 230,
 };
-const nearbyInitialCameraRadiusKm = 4.2;
+const nearbyInitialRegionDelta = 0.035;
+const nearbyInitialMarkerRadiusKm = 4.2;
 const decorativeStationMarkerAccessibility = {
   accessibilityElementsHidden: true,
   importantForAccessibility: "no-hide-descendants" as const,
@@ -104,7 +105,7 @@ export function StationMap({
       if (visibleRoutePoints.length >= 2) return [...visibleRoutePoints, ...routeStationCameraPoints];
       return [routeEndpoints.from, routeEndpoints.to, ...routeStationCameraPoints];
     }
-    if (showCentreMarker) return nearbyCameraPointsForCentre(centre, nearbyInitialCameraRadiusKm);
+    if (showCentreMarker) return nearbyCameraPointsForCentre(centre, nearbyInitialMarkerRadiusKm);
     return [
       centre,
       ...stations.slice(0, maxStationMarkers).map((item) => ({
@@ -147,6 +148,10 @@ export function StationMap({
     }
 
     runProgrammaticMapMove(programmaticMoveRef, () => {
+      if (!routeEndpoints && showCentreMarker) {
+        mapRef.current?.animateToRegion(regionForPoint(centre, nearbyInitialRegionDelta), 260);
+        return;
+      }
       if (cameraCoordinates.length === 1) {
         mapRef.current?.animateToRegion(regionForPoint(cameraCoordinates[0]), 260);
         return;
@@ -393,12 +398,12 @@ export function StationMap({
   );
 }
 
-function regionForPoint(point: MapPoint): Region {
+function regionForPoint(point: MapPoint, delta = 0.09): Region {
   return {
     latitude: point.lat,
     longitude: point.lon,
-    latitudeDelta: 0.09,
-    longitudeDelta: 0.09,
+    latitudeDelta: delta,
+    longitudeDelta: delta,
   };
 }
 

@@ -19,7 +19,7 @@ module.exports = async function handler(req, res) {
     };
     const fuel = stringParam(req.query.fuel, "U91").toUpperCase();
     const radiusKm = boundedNumberParam(req.query.radiusKm, "radiusKm", 8, { min: 0.5, max: 100 });
-    const limit = Math.round(boundedNumberParam(req.query.limit, "limit", 120, { min: 1, max: 120 }));
+    const limit = Math.round(boundedNumberParam(req.query.limit, "limit", 160, { min: 1, max: 420 }));
     const includeClosed = boolParam(req.query.includeClosed);
     const includeMemberPrices = boolParam(req.query.includeMemberPrices);
     const brandFilter = boolParam(req.query.brandFilter);

@@ -49,8 +49,8 @@ test("stations clamps very large safe radius and limit values", async () => {
 
   assert.equal(response.status, 200);
   assert.equal(response.payload.context.radiusKm, 100);
-  assert.ok(response.payload.context.returnedCount <= 120);
-  assert.ok(response.payload.stations.length <= 120);
+  assert.ok(response.payload.context.returnedCount <= 420);
+  assert.ok(response.payload.stations.length <= 420);
 });
 
 function callStations(query) {

@@ -112,6 +112,9 @@ export function StationMap({
       map.on("zoomstart", () => {
         zoomingRef.current = true;
       });
+      map.on("moveend", () => {
+        setMapRenderVersion((current) => current + 1);
+      });
       map.on("zoomend", () => {
         zoomingRef.current = false;
         setMapRenderVersion((current) => current + 1);
@@ -216,6 +219,12 @@ export function StationMap({
       addUserLocationMarker(L, markerLayer, userLocation);
     }
 
+    const currentMapBounds = map.getBounds();
+    const groupingBounds =
+      !routeEndpoints && !userMovedMapRef.current && cameraPoints.length >= 2
+        ? L.latLngBounds(cameraPoints).pad(0.12)
+        : currentMapBounds;
+    const groupingUsesCameraBounds = groupingBounds !== currentMapBounds;
     const markerGroups = routeEndpoints
       ? {
           priceMarkers: stations.slice(0, maxPriceMarkers),
@@ -223,13 +232,13 @@ export function StationMap({
         }
       : visibleMarkerGroups(
           stations.slice(0, maxStationMarkers),
-          map.getBounds(),
+          groupingBounds,
           selectedStationCode,
           chargers.length > 0,
         );
 
     markerGroups.clusterMarkers
-      .filter((cluster) => clusterFitsInteractiveMapArea(map, cluster, activeInsets))
+      .filter((cluster) => groupingUsesCameraBounds || clusterFitsInteractiveMapArea(map, cluster, activeInsets))
       .forEach((cluster) => {
       const marker = L.marker([cluster.lat, cluster.lon], {
         icon: L.divIcon({

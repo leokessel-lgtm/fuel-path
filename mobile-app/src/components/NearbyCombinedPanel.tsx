@@ -39,7 +39,6 @@ export function NearbyCombinedPanel({
   sheetSnap,
   sheetExpanded,
   sortedStations,
-  stationNotice,
 }: {
   chargers: EvCharger[];
   connectors: EvConnector[];
@@ -66,7 +65,6 @@ export function NearbyCombinedPanel({
   sheetSnap: NearbySheetSnap;
   sheetExpanded: boolean;
   sortedStations: StationViewModel[];
-  stationNotice: string;
 }) {
   const combinedRows = combinedNearbyRows(sortedStations, chargers, connectors, preferences.evChargingPreference);
   const selectedRows = combinedRows.filter((row) => row.id === selectedCode);
@@ -141,7 +139,6 @@ export function NearbyCombinedPanel({
       </View>
 
       {error && isFull ? <Text style={styles.notice}>{error}</Text> : null}
-      {!error && stationNotice && !isPeek ? <Text style={styles.notice}>{stationNotice}</Text> : null}
       {!error && evNotice && !isPeek ? <Text style={styles.notice}>{evNotice}</Text> : null}
 
       {!isPeek ? (

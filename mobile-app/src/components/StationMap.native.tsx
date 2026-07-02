@@ -25,7 +25,7 @@ const compactMarkerDensity = {
   markerGridSize: 390,
   compactMarkerGridSize: 230,
 };
-const nearbyInitialCameraStationCount = 6;
+const nearbyInitialCameraRadiusKm = 4.2;
 const decorativeStationMarkerAccessibility = {
   accessibilityElementsHidden: true,
   importantForAccessibility: "no-hide-descendants" as const,
@@ -104,12 +104,10 @@ export function StationMap({
       if (visibleRoutePoints.length >= 2) return [...visibleRoutePoints, ...routeStationCameraPoints];
       return [routeEndpoints.from, routeEndpoints.to, ...routeStationCameraPoints];
     }
-    const cameraStations = showCentreMarker
-      ? nearestStationsForCamera(stations, centre, nearbyInitialCameraStationCount)
-      : stations.slice(0, maxStationMarkers);
+    if (showCentreMarker) return nearbyCameraPointsForCentre(centre, nearbyInitialCameraRadiusKm);
     return [
       centre,
-      ...cameraStations.map((item) => ({
+      ...stations.slice(0, maxStationMarkers).map((item) => ({
         lat: item.station.lat,
         lon: item.station.lon,
         label: item.station.name,
@@ -569,6 +567,18 @@ function minBy<T>(items: T[], score: (item: T) => number) {
 
 function markerPriorityScore(item: StationViewModel) {
   return item.adjustedCpl + item.distanceKm * 0.85;
+}
+
+function nearbyCameraPointsForCentre(centre: MapPoint, radiusKm: number) {
+  const latDelta = radiusKm / 111;
+  const lonDelta = radiusKm / Math.max(35, 111 * Math.cos(toRad(centre.lat)));
+  return [
+    centre,
+    { lat: centre.lat + latDelta, lon: centre.lon, label: centre.label },
+    { lat: centre.lat - latDelta, lon: centre.lon, label: centre.label },
+    { lat: centre.lat, lon: centre.lon + lonDelta, label: centre.label },
+    { lat: centre.lat, lon: centre.lon - lonDelta, label: centre.label },
+  ];
 }
 
 function nearestStationsForCamera(

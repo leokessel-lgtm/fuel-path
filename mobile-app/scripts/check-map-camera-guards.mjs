@@ -156,8 +156,8 @@ const checks = [
       webMap.includes("map.panInside([selectedCharger.lat, selectedCharger.lon]") &&
       webMap.includes("map.panInside([charger.lat, charger.lon]") &&
       !webMap.includes('`${item.station.name} - ${item.adjustedCpl.toFixed(1)} c/L`') &&
-      webMap.includes("const nearbyInitialCameraStationCount = 6;") &&
-      webMap.includes("nearestStationsForCamera(stations, centre, nearbyInitialCameraStationCount)") &&
+      webMap.includes("const nearbyInitialCameraRadiusKm = 4.2;") &&
+      webMap.includes("nearbyCameraPointsForCentre(centre, nearbyInitialCameraRadiusKm)") &&
       webMap.includes("showCentreMarker ? 15 : 14") &&
       webMap.includes("transform: translateY(-4px);") &&
       !webMap.includes("transform: scale(1.12)") &&
@@ -236,8 +236,8 @@ const checks = [
       nativeMap.includes("backgroundColor: colors.greenDark") &&
       nativeMap.includes("pinSelected: {\n    borderColor: colors.black") &&
       nativeMap.includes("pinPriceSelected: {\n    backgroundColor: colors.black") &&
-      nativeMap.includes("const nearbyInitialCameraStationCount = 6;") &&
-      nativeMap.includes("nearestStationsForCamera(stations, centre, nearbyInitialCameraStationCount)") &&
+      nativeMap.includes("const nearbyInitialCameraRadiusKm = 4.2;") &&
+      nativeMap.includes("nearbyCameraPointsForCentre(centre, nearbyInitialCameraRadiusKm)") &&
       nativeMap.indexOf("<Text style={[styles.pinPrice") <
         nativeMap.indexOf("<View style={styles.pinBrand}>") &&
       nativeMap.includes("pinPointerSelected"),
@@ -298,7 +298,8 @@ const checks = [
     label: "nearby station sheet removes non-actionable notice cards",
     ok:
       nearbyScreen.includes("NearbyStationSheet") &&
-      !nearbyStationSheet.includes("sheetExpanded && stationNotice && stations.length") &&
+      !nearbyStationSheet.includes("Check price freshness") &&
+      !nearbyStationSheet.includes("stationNotice && stations.length") &&
       !nearbyStationSheet.includes("styles.noticeCard") &&
       !nearbyStationSheet.includes("noticeText"),
   },

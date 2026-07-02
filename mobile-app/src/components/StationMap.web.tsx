@@ -14,7 +14,7 @@ const maxEvMarkers = 96;
 const markerGridSize = 132;
 const mixedEnergyMaxPriceMarkers = 8;
 const mixedEnergyMarkerGridSize = 190;
-const nearbyInitialCameraStationCount = 6;
+const nearbyInitialCameraRadiusKm = 4.2;
 
 type ClusterMarker = {
   count: number;
@@ -157,9 +157,6 @@ export function StationMap({
       .filter((point) => Number.isFinite(point.lat) && Number.isFinite(point.lon))
       .map((point) => [point.lat, point.lon] as [number, number]);
     const activeInsets = resolveCameraInsets(routeEndpoints ? "route" : "nearby", cameraInsets);
-    const cameraStations = showCentreMarker
-      ? nearestStationsForCamera(stations, centre, nearbyInitialCameraStationCount)
-      : stations.slice(0, maxStationMarkers);
     const cameraChargers = chargers.slice(0, 16);
     const routeStationCameraPoints = routeEndpoints
       ? stations
@@ -175,9 +172,13 @@ export function StationMap({
             ...routeStationCameraPoints,
           ]
       : [
-          [centre.lat, centre.lon] as [number, number],
-          ...cameraStations.map((item) => [item.station.lat, item.station.lon] as [number, number]),
-          ...cameraChargers.map((charger) => [charger.lat, charger.lon] as [number, number]),
+          ...(showCentreMarker
+            ? nearbyCameraPointsForCentre(centre, nearbyInitialCameraRadiusKm)
+            : [
+                [centre.lat, centre.lon] as [number, number],
+                ...stations.slice(0, maxStationMarkers).map((item) => [item.station.lat, item.station.lon] as [number, number]),
+                ...cameraChargers.map((charger) => [charger.lat, charger.lon] as [number, number]),
+              ]),
         ];
     const cameraContextKey = routeEndpoints
       ? [
@@ -668,6 +669,18 @@ function minBy<T>(items: T[], score: (item: T) => number) {
 
 function markerPriorityScore(item: StationViewModel) {
   return item.adjustedCpl + item.distanceKm * 0.85;
+}
+
+function nearbyCameraPointsForCentre(centre: MapPoint, radiusKm: number) {
+  const latDelta = radiusKm / 111;
+  const lonDelta = radiusKm / Math.max(35, 111 * Math.cos(toRad(centre.lat)));
+  return [
+    [centre.lat, centre.lon] as [number, number],
+    [centre.lat + latDelta, centre.lon] as [number, number],
+    [centre.lat - latDelta, centre.lon] as [number, number],
+    [centre.lat, centre.lon + lonDelta] as [number, number],
+    [centre.lat, centre.lon - lonDelta] as [number, number],
+  ];
 }
 
 function nearestStationsForCamera(

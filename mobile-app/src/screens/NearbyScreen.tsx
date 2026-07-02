@@ -23,7 +23,6 @@ import {
 } from "../components/NearbyEvControls";
 import { sortStations } from "../utils/pricing";
 import {
-  combinedNearbyNotice,
   distanceKm,
   openDirections,
   preferredNearbyMode,
@@ -382,7 +381,6 @@ export function NearbyScreen({
           sheetSnap={sheetSnap}
           sheetExpanded={sheetExpanded}
           sortedStations={sortedStations}
-          stationNotice={combinedNearbyNotice(stationNotice, evNotice, chargers.length)}
         />
       ) : (
         <EvChargerPanel

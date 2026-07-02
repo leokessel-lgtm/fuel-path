@@ -246,12 +246,6 @@ export function NearbyStationSheet({
 
       {!loading && !error ? (
         <>
-          {stationNotice && stations.length ? (
-            <View style={styles.noticeState}>
-              <Text style={styles.noticeTitle}>Check price freshness</Text>
-              <Text style={styles.muted}>{stationNotice}</Text>
-            </View>
-          ) : null}
           {topControls && !isPeek ? <View style={styles.topControls}>{topControls}</View> : null}
           {selected && !sheetExpanded ? (
             <>

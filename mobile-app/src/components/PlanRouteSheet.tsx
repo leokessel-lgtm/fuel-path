@@ -925,14 +925,15 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: spacing.sm,
     justifyContent: "space-between",
+    minHeight: 32,
   },
   secondaryActionButton: {
     alignItems: "center",
     backgroundColor: colors.greenSoft,
     borderRadius: radii.pill,
-    minHeight: 40,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
+    justifyContent: "center",
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
   },
   secondaryActionButtonDisabled: {
     opacity: 0.7,

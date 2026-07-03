@@ -322,6 +322,18 @@ Toll preference may be passed to the route provider. Google toll estimates may b
 
 Historical/cycle intelligence remains measurement-gated. Back-test storage must be durable and meet sample-size, mean-absolute-error and direction-accuracy thresholds before limited cycle guidance can be considered. User-facing prediction copy remains disabled until those gates are met and reviewed.
 
+Prediction or cycle guidance must not be added to Nearby, Plan, alerts, saved routes or marketing copy unless the prediction readiness API reports:
+
+- `status: ready_for_limited_cycle_guidance`
+- `accuracyClaimsAllowed: true`
+- durable prediction back-test storage
+- completed sample size and direction sample size at or above the configured thresholds
+- mean absolute error at or below the configured threshold
+- directional accuracy at or above the configured threshold
+- clear blind spots covering uncovered regions/fuels, provider staleness/outages, station-level variance and WA tomorrow-price labelling
+
+Even when those gates pass, `userFacingPredictionEnabled` must remain `false` until a separate product review approves the exact copy and scope. Any user-facing prediction copy must show the measured sample size, directional accuracy, mean absolute error, model horizon, region/fuel scope and blind spots. WA tomorrow locked prices are official source data, not model prediction, and must be labelled separately.
+
 Personalised commute optimisation is local-behaviour gated. The app may classify readiness from aggregate behaviour such as repeated route plans, saved commutes, route alert opt-ins and navigation opens. It must not require exact saved addresses, route geometry, push tokens or provider secrets for that evidence.
 
 ## EV route fallback rules

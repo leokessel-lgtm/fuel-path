@@ -2,6 +2,10 @@ import { StyleSheet, Text, View } from "react-native";
 
 import { colors, radii, spacing, surfaces, typeScale } from "../theme";
 import { RouteDecisionSummary, StationViewModel } from "../types";
+import {
+  routeDetourEvidenceMetricLabel,
+  routeDetourMinutes,
+} from "../utils/routeEvidenceCopy";
 
 export function DecisionEvidencePanel({
   candidate,
@@ -17,7 +21,7 @@ export function DecisionEvidencePanel({
   const savingCpl = Number.isFinite(routeComparisonCpl) && routeComparisonCpl > 0
     ? Math.max(0, routeComparisonCpl - Number(candidate.adjustedCpl || 0))
     : Math.max(0, Number(candidate.pumpCpl || 0) - Number(candidate.adjustedCpl || 0));
-  const detour = Number(economics?.detourMinutes ?? candidate.detourMinutes ?? 0);
+  const detour = routeDetourMinutes(candidate, economics?.detourMinutes ?? 0);
   const capabilityLabel = capability ? capabilityLabelFor(capability) : "Live data";
 
   return (
@@ -37,7 +41,7 @@ export function DecisionEvidencePanel({
         <EvidenceMetric label="Pump" value={`${candidate.pumpCpl.toFixed(1)} c/L`} />
         <EvidenceMetric label="Your price" value={`${candidate.adjustedCpl.toFixed(1)} c/L`} />
         <EvidenceMetric label="Best price by" value={`${savingCpl.toFixed(1)} c/L`} />
-        <EvidenceMetric label="Detour" value={`${detour.toFixed(1)} min`} />
+        <EvidenceMetric label={routeDetourEvidenceMetricLabel(candidate)} value={`${detour.toFixed(1)} min`} />
       </View>
       <Text numberOfLines={2} style={styles.savingSourceLine}>
         {Number.isFinite(routeComparisonCpl) && routeComparisonCpl > 0

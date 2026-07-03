@@ -4,6 +4,12 @@ import { colors, radii, shadow, spacing, surfaces, typeScale, typography } from 
 import { EvCharger, ScoreResponse, StationViewModel } from "../types";
 import { stationTimestampLine } from "../utils/decisionEvidence";
 import { tomorrowPriceView } from "../utils/pricing";
+import {
+  routeDetourEvidenceLine,
+  routeDetourEvidenceMetricLabel,
+  routeDetourMinutes,
+  routeDetourNoticePhrase,
+} from "../utils/routeEvidenceCopy";
 import { BrandBadge } from "./BrandBadge";
 import { DecisionEvidencePanel } from "./DecisionEvidencePanel";
 import { StationRow } from "./StationRow";
@@ -212,8 +218,8 @@ function StationDetailPanel({
           <Text style={styles.factValue}>{priceSavingCpl(selected).toFixed(1)} c/L</Text>
         </View>
         <View style={styles.factPill}>
-          <Text style={styles.factLabel}>Detour</Text>
-          <Text style={styles.factValue}>{(selected.detourMinutes || 0).toFixed(1)} min</Text>
+          <Text style={styles.factLabel}>{routeDetourEvidenceMetricLabel(selected)}</Text>
+          <Text style={styles.factValue}>{routeDetourMinutes(selected).toFixed(1)} min</Text>
         </View>
         {selectedTomorrow ? (
           <View style={styles.factPill}>
@@ -294,10 +300,8 @@ function RouteResultsPanel({
   watchRouteEnabled?: boolean;
 }) {
   const recommendationSavingCpl = best ? routeSavingCpl(best, decisionSummary) : 0;
-  const recommendationDetour =
-    best?.detourMinutes || decisionSummary?.economics?.detourMinutes || 0;
   const recommendationFuel = best?.fuel || "fuel";
-  const routeOutcomeNotice = routeRecommendationNotice(routeNotice, recommendationSavingCpl, recommendationDetour);
+  const routeOutcomeNotice = routeRecommendationNotice(routeNotice, recommendationSavingCpl, best, decisionSummary?.economics?.detourMinutes);
 
   return (
     <>
@@ -348,6 +352,9 @@ function RouteResultsPanel({
               </Text>
               <Text numberOfLines={1} style={styles.compactSavingLine}>
                 Best price by {recommendationSavingCpl.toFixed(1)} c/L
+              </Text>
+              <Text numberOfLines={1} style={styles.compactDetourLine}>
+                {routeDetourEvidenceLine(best, decisionSummary?.economics?.detourMinutes)}
               </Text>
             </View>
             <View style={styles.recommendationRouteValue}>
@@ -584,17 +591,18 @@ function recommendationTitle(fallback: string | undefined, savingCpl: number) {
   return fallback || "Strong savings detour";
 }
 
-function routeRecommendationNotice(routeNotice: string, savingCpl: number, detourMinutes: number) {
+function routeRecommendationNotice(
+  routeNotice: string,
+  savingCpl: number,
+  candidate?: StationViewModel,
+  fallbackDetourMinutes = 0,
+) {
   const routeDistance = routeNotice.match(/^Route is about [^.]+\./)?.[0] || routeNotice;
   if (!Number.isFinite(savingCpl)) return routeDistance;
-  const detour = Number(detourMinutes || 0);
   const savingText = savingCpl > 0
     ? `and is best by ${savingCpl.toFixed(1)} c/L`
     : "and is the best route price found";
-  if (detour > 0.05) {
-    return `${routeDistance} Suggested stop adds a ${detour.toFixed(1)} min detour ${savingText}.`;
-  }
-  return `${routeDistance} Suggested stop is on the route ${savingText}.`;
+  return `${routeDistance} ${routeDetourNoticePhrase(candidate, fallbackDetourMinutes)} ${savingText}.`;
 }
 
 function EvFallbackPanel({
@@ -833,6 +841,12 @@ const styles = StyleSheet.create({
     fontSize: typeScale.caption,
     fontWeight: "700",
     marginTop: 2,
+  },
+  compactDetourLine: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: "700",
+    marginTop: 1,
   },
   emptyRouteState: {
     ...surfaces.softPanel,

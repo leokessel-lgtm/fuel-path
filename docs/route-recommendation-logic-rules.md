@@ -43,7 +43,8 @@ The Plan result should show:
 - `Pump`
 - `Your price`
 - `Best price by`
-- `Detour`
+- `Route-checked detour` only when the route engine checked the via-station route
+- `Estimated detour` when the stop uses smart-detour estimation or route-engine refinement is unavailable
 - one comparison sentence
 - a light follow-up prompt after the recommendation evidence:
   - `Save this commute` when the route is not saved
@@ -156,16 +157,34 @@ Rules:
 - If policy mode is active, say recommendations are limited to approved brands.
 - Do not imply membership, fuel-card, voucher or loyalty eligibility unless it is selected and supported by the user's preferences.
 
-### Detour
+### Detour evidence
 
-`Detour` is the estimated extra time required to take the suggested stop from the route.
+Plan must distinguish route-checked detours from estimated detours.
+
+`Route-checked detour` means the backend route engine compared:
+
+```text
+origin -> station -> destination
+minus
+origin -> destination
+```
+
+`Estimated detour` means the stop uses smart-detour estimation or route-engine refinement was unavailable, timed out or not requested.
 
 Example:
 
 ```text
-DETOUR
+ROUTE-CHECKED
 0.1 min
 ```
+
+Rules:
+
+- Show `Route-checked detour` only when the candidate has `actualDetour.source = route_engine_via_station`.
+- Show `Estimated detour` for all other fuel route candidates.
+- Do not expose approximate same-side-road, turn-friction, traffic-aware or toll-optimised claims in Plan recommendation copy.
+- Do not imply a stop is exact, traffic-aware or toll-cost optimised unless the provider supplied that signal and the scoring path used it.
+- It is acceptable to say `about 3.2 min`, because even route-engine detours are still provider estimates.
 
 ### Savings labels
 
@@ -283,6 +302,7 @@ Rules:
 - include route-position metadata for candidates, including near-origin, mid-route, near-destination and endpoint-adjacent/backtracking-risk hints
 - include approximate same-side-road and turn-friction metadata only as route-geometry hints, not as proven navigation truth
 - do not claim live traffic or toll-aware optimisation unless the route provider actually supplied that signal
+- user-facing Plan copy should show only `Route-checked` or `Estimated` detour evidence, not same-side-road, turn-friction, traffic or toll claims
 - keep approximate smart-detour scoring as the safe fallback when actual detour routing is unavailable
 - use dynamic corridor attempts: narrower for short urban routes and wider for long regional/remote routes
 

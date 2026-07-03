@@ -1,6 +1,6 @@
 # Route recommendation logic rules
 
-Last updated: 2026-07-02
+Last updated: 2026-07-03
 
 This document records the current Fuel Path route recommendation rules across backend scoring, frontend display and product wording. It is the working source of truth for the Plan route recommendation card.
 
@@ -254,6 +254,38 @@ estimated route value after detour fuel
 Do not add stale-price penalty to ranking.
 
 Do not add hidden fuel tank or fuel-level reachability assumptions for fuel vehicles.
+
+### Route and detour quality
+
+Route building currently uses the configured route provider for road-route geometry. Google Routes is preferred when configured; OSRM remains the validation fallback. Current production routing is traffic-unaware by default.
+
+Route responses should carry route quality metadata:
+
+- `high`: traffic-aware provider route
+- `medium`: provider road route without traffic
+- `low`: validation or fallback road route
+
+Fuel recommendations may optionally run feature-flagged actual detour routing for a small ranked candidate set. This mode compares:
+
+```text
+origin -> station -> destination
+minus
+origin -> destination
+```
+
+Rules:
+
+- keep actual detour routing off by default unless explicitly requested or feature-flagged
+- cap route-engine detour checks to a small top-candidate set
+- record actual detour source, provider, base distance/time and via-station distance/time
+- include route-position metadata for candidates, including near-origin, mid-route, near-destination and endpoint-adjacent/backtracking-risk hints
+- do not claim live traffic or toll-aware optimisation unless the route provider actually supplied that signal
+- keep approximate smart-detour scoring as the safe fallback when actual detour routing is unavailable
+- use dynamic corridor attempts: narrower for short urban routes and wider for long regional/remote routes
+
+Traffic-aware routing may be requested only through explicit request/provider configuration. If enabled, route quality should move to `high` only when the provider returns a traffic-aware route.
+
+Toll preference may be passed to the route provider. Google toll estimates may be captured in actual-detour metadata when supplied. Toll-cost ranking may only apply inside actual-detour mode, and only using provider-supplied toll deltas. Do not claim general toll-cost optimisation until toll charges are consistently available and included in ranking.
 
 ## EV route fallback rules
 

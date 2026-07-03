@@ -102,17 +102,30 @@ function bestDiscount(station, eligibleDiscounts) {
 }
 
 function adaptiveCorridorAttempts(routeDistanceKm, requestedCorridorKm) {
-  const attempts = [requestedCorridorKm];
-  if (routeDistanceKm >= 150) attempts.push(5, 8, 12, 20);
-  else if (routeDistanceKm >= 50) attempts.push(4, 6, 10);
-  else attempts.push(3.5, 5);
+  const profile = routeCorridorProfile(routeDistanceKm);
+  const attempts = [requestedCorridorKm, ...profile.attemptsKm];
   return [...new Set(attempts.map((value) => round(Math.max(requestedCorridorKm, value), 1)))];
+}
+
+function routeCorridorProfile(routeDistanceKm) {
+  const km = Number(routeDistanceKm || 0);
+  if (km <= 25) {
+    return { id: "urban_short", label: "Urban short route", attemptsKm: [2.5, 3.5, 5] };
+  }
+  if (km <= 80) {
+    return { id: "metro_regional", label: "Metro/regional route", attemptsKm: [3, 5, 8] };
+  }
+  if (km <= 180) {
+    return { id: "regional", label: "Regional route", attemptsKm: [4, 6, 10, 14] };
+  }
+  return { id: "long_regional_remote", label: "Long regional or remote route", attemptsKm: [5, 8, 12, 20] };
 }
 
 function scoreRoute({ source, route, stations, fuel, tankLitres, tankPercent, economy, reserveKm, corridorKm, eligibleDiscounts, includeMemberPrices, includeClosed, minSavingDollars, maxDetourMinutes }) {
   const decisionRule = normaliseDecisionRule({ minSavingDollars, maxDetourMinutes });
   const points = route.points || [];
   const routeKm = totalRouteKm(points);
+  const corridorProfile = routeCorridorProfile(routeKm);
   const attempts = adaptiveCorridorAttempts(routeKm, corridorKm || route.defaultCorridorKm || 2.5);
   let scored = null;
   for (const attempt of attempts) {
@@ -132,6 +145,8 @@ function scoreRoute({ source, route, stations, fuel, tankLitres, tankPercent, ec
       includeMemberPrices,
       includeClosed,
     });
+    scored.context.corridorProfile = corridorProfile;
+    scored.context.corridorAttemptsKm = attempts;
     if (scored.candidates.length || attempt === attempts[attempts.length - 1]) break;
   }
   return scored;
@@ -190,6 +205,11 @@ function scoreRouteForCorridor({ source, route, stations, fuel, tankLitres, tank
     const detourFuelLitres = (detourKm * economy) / 100;
     const detourCost = detourFuelLitres * (adjustedCpl / 100);
     const netSaving = fillLitres * ((baselineCpl - adjustedCpl) / 100) - detourCost;
+    const routePosition = candidateRoutePosition({
+      distanceAlongRouteKm: routeDistanceInfo.distanceAlongRouteKm,
+      distanceToRouteKm: routeDistanceInfo.distanceToRouteKm,
+      routeKm: totalRouteKm(points),
+    });
     const reachable = true;
     const [, freshWarning] = freshnessPenalty(station.updatedAt, now, station.source);
     const smartDetourLimitMinutes = smartDetourLimitMinutesForSaving(netSaving);
@@ -233,6 +253,7 @@ function scoreRouteForCorridor({ source, route, stations, fuel, tankLitres, tank
       distanceKm: round(routeDistanceInfo.distanceToRouteKm, 2),
       distanceToRouteKm: round(routeDistanceInfo.distanceToRouteKm, 2),
       distanceAlongRouteKm: round(routeDistanceInfo.distanceAlongRouteKm, 1),
+      routePosition,
     });
   }
 
@@ -266,6 +287,29 @@ function scoreRouteForCorridor({ source, route, stations, fuel, tankLitres, tank
         maxDetourMinutes,
       }),
     },
+  };
+}
+
+function candidateRoutePosition({ distanceAlongRouteKm, distanceToRouteKm, routeKm }) {
+  const along = Math.max(0, Number(distanceAlongRouteKm || 0));
+  const total = Math.max(0, Number(routeKm || 0));
+  const remainingKm = Math.max(0, total - along);
+  const progressRatio = total > 0 ? Math.max(0, Math.min(1, along / total)) : 0;
+  const endpointAdjacent = total > 0 && (along <= 1 || remainingKm <= 1) && Number(distanceToRouteKm || 0) > 0.5;
+  const segment =
+    progressRatio >= 0.9 ? "near_destination" :
+      progressRatio <= 0.1 ? "near_origin" :
+        "mid_route";
+  const backtrackingRisk =
+    endpointAdjacent && progressRatio >= 0.9 ? "destination_side_check" :
+      endpointAdjacent && progressRatio <= 0.1 ? "origin_side_check" :
+        "low";
+  return {
+    segment,
+    progressRatio: round(progressRatio, 3),
+    remainingRouteKm: round(remainingKm, 1),
+    endpointAdjacent,
+    backtrackingRisk,
   };
 }
 

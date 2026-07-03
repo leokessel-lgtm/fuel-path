@@ -24,37 +24,46 @@ function createRouting({ fetchJson, googleRoutesApiKey }) {
     };
   }
 
-  async function buildRoute({ from, to }) {
+  async function buildRoute({ from, to, tollPreference, trafficPreference } = {}) {
     const provider = activeRouteProvider();
-    return singleFlight(`route:${provider}:${routePointKey(from)}:${routePointKey(to)}`, () => buildRouteFresh({ from, to, provider }));
+    const normalisedTollPreference = normaliseTollPreference(tollPreference);
+    const normalisedTrafficPreference = normaliseTrafficPreference(trafficPreference);
+    return singleFlight(`route:${provider}:${normalisedTollPreference}:${normalisedTrafficPreference}:${routePointKey(from)}:${routePointKey(to)}`, () =>
+      buildRouteFresh({ from, to, provider, tollPreference: normalisedTollPreference, trafficPreference: normalisedTrafficPreference }),
+    );
   }
 
-  async function buildRouteFresh({ from, to, provider }) {
+  async function buildRouteFresh({ from, to, provider, tollPreference, trafficPreference }) {
     if (provider === "google") {
       try {
-        return await googleRoute(from, to);
+        return await googleRoute(from, to, { tollPreference, trafficPreference });
       } catch (error) {
         return await osrmRoute(from, to, {
           providerWarning: `Google Routes unavailable: ${error instanceof Error ? error.message : String(error)}`,
+          tollPreference,
+          trafficPreference,
         });
       }
     }
-    return osrmRoute(from, to);
+    return osrmRoute(from, to, { tollPreference, trafficPreference });
   }
 
-  async function googleRoute(from, to) {
+  async function googleRoute(from, to, { tollPreference = "no_preference", trafficPreference = "unaware" } = {}) {
+    const avoidTolls = tollPreference === "avoid";
+    const trafficAware = trafficPreference === "aware";
     const payload = await fetchJson("https://routes.googleapis.com/directions/v2:computeRoutes", {
       data: {
         origin: { location: { latLng: { latitude: from.lat, longitude: from.lon } } },
         destination: { location: { latLng: { latitude: to.lat, longitude: to.lon } } },
         travelMode: "DRIVE",
-        routingPreference: "TRAFFIC_UNAWARE",
+        routingPreference: trafficAware ? "TRAFFIC_AWARE" : "TRAFFIC_UNAWARE",
+        routeModifiers: avoidTolls ? { avoidTolls: true } : undefined,
         units: "METRIC",
         languageCode: "en-AU",
       },
       headers: {
         "X-Goog-Api-Key": googleRoutesApiKey(),
-        "X-Goog-FieldMask": "routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline",
+        "X-Goog-FieldMask": "routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline,routes.travelAdvisory.tollInfo",
       },
       timeoutMs: providerTimeoutMs("google_routes", 15000),
     });
@@ -68,6 +77,14 @@ function createRouting({ fetchJson, googleRoutesApiKey }) {
       distanceKm: round(Number(route.distanceMeters || 0) / 1000, 2),
       durationMin: round(parseDurationSeconds(route.duration) / 60, 1),
       points,
+      tollCostDollars: routeTollCostDollars(route),
+      tollInfo: route.travelAdvisory?.tollInfo || undefined,
+      routeQuality: routeQuality({
+        provider: "google_routes",
+        tollPreference,
+        tollAware: avoidTolls ? "avoid_tolls_requested" : "provider_default",
+        trafficAware,
+      }),
     };
   }
 
@@ -90,6 +107,12 @@ function createRouting({ fetchJson, googleRoutesApiKey }) {
       distanceKm: round(Number(route.distance || 0) / 1000, 2),
       durationMin: round(Number(route.duration || 0) / 60, 1),
       points,
+      routeQuality: routeQuality({
+        provider: "osrm",
+        tollPreference: extra.tollPreference,
+        tollAware: "not_supported",
+        trafficAware: false,
+      }),
       ...extra,
     };
   }
@@ -104,6 +127,40 @@ function routePointKey(point = {}) {
   const lat = Number(point.lat);
   const lon = Number(point.lon);
   return `${Number.isFinite(lat) ? lat.toFixed(5) : "x"},${Number.isFinite(lon) ? lon.toFixed(5) : "x"}`;
+}
+
+function normaliseTollPreference(value) {
+  const normalised = String(value || "no_preference").toLowerCase();
+  return ["avoid", "allow", "no_preference"].includes(normalised) ? normalised : "no_preference";
+}
+
+function normaliseTrafficPreference(value) {
+  const normalised = String(value || "unaware").toLowerCase();
+  return ["aware", "unaware"].includes(normalised) ? normalised : "unaware";
+}
+
+function routeQuality({ provider, tollAware, tollPreference, trafficAware }) {
+  const isGoogle = provider === "google_routes";
+  const isTrafficAware = Boolean(trafficAware);
+  let level = "low";
+  if (isGoogle && isTrafficAware) level = "high";
+  else if (isGoogle) level = "medium";
+  return {
+    level,
+    provider,
+    geometry: provider === "osrm" ? "road_route_validation" : "provider_road_route",
+    traffic: isTrafficAware ? "traffic_aware" : "traffic_unaware",
+    tolls: tollAware || "unknown",
+    tollPreference: normaliseTollPreference(tollPreference),
+  };
+}
+
+function routeTollCostDollars(route) {
+  const estimates = route?.travelAdvisory?.tollInfo?.estimatedPrice;
+  if (!Array.isArray(estimates)) return undefined;
+  const aud = estimates.find((item) => String(item?.currencyCode || "").toUpperCase() === "AUD") || estimates[0];
+  if (!aud) return undefined;
+  return round(Number(aud.units || 0) + Number(aud.nanos || 0) / 1000000000, 2);
 }
 
 function parseDurationSeconds(value) {
@@ -152,4 +209,7 @@ function round(value, decimals = 0) {
 
 module.exports = {
   createRouting,
+  normaliseTrafficPreference,
+  normaliseTollPreference,
+  routeQuality,
 };

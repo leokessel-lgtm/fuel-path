@@ -1,7 +1,7 @@
 {
   "private": true,
   "scripts": {
-    "test": "node --test --test-concurrency=1 tests/api/provider-routing.test.js tests/api/provider-terms-readiness.test.js tests/api/store-publishing-readiness.test.js tests/api/support-readiness.test.js tests/api/beta-readiness.test.js",
+    "test": "node --test --test-concurrency=1 tests/api/provider-routing.test.js tests/api/provider-terms-readiness.test.js tests/api/store-publishing-readiness.test.js tests/api/support-readiness.test.js tests/api/beta-readiness.test.js tests/api/route-quality-now.test.js",
     "validate:tas-v2": "node scripts/validate-api-nsw-v2-tas.mjs",
     "validate:vic-servo-saver": "node scripts/validate-vic-servo-saver-smoke.mjs",
     "validate:vic-servo-saver:matrix": "node scripts/validate-vic-servo-saver-smoke.mjs --matrix",

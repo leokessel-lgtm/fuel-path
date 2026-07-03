@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { colors, radii, shadow, spacing, surfaces, typeScale, typography } from "../theme";
@@ -8,7 +9,6 @@ import {
   routeDetourEvidenceLine,
   routeDetourEvidenceMetricLabel,
   routeDetourMinutes,
-  routeDetourNoticePhrase,
 } from "../utils/routeEvidenceCopy";
 import { BrandBadge } from "./BrandBadge";
 import { DecisionEvidencePanel } from "./DecisionEvidencePanel";
@@ -301,7 +301,8 @@ function RouteResultsPanel({
 }) {
   const recommendationSavingCpl = best ? routeSavingCpl(best, decisionSummary) : 0;
   const recommendationFuel = best?.fuel || "fuel";
-  const routeOutcomeNotice = routeRecommendationNotice(routeNotice, recommendationSavingCpl, best, decisionSummary?.economics?.detourMinutes);
+  const [evidenceExpanded, setEvidenceExpanded] = useState(false);
+  const eligibility = best ? discountEligibilitySummary(best, policyActive) : null;
 
   return (
     <>
@@ -319,17 +320,11 @@ function RouteResultsPanel({
       ) : null}
       {!loading && !error && best ? (
         <>
-          {routeNotice ? (
-            <View style={styles.noticeCard}>
-              <Text style={styles.noticeText}>{routeOutcomeNotice}</Text>
-            </View>
-          ) : null}
-          {policyNotice ? (
+          {policyNotice && evidenceExpanded ? (
             <View style={styles.noticeCard}>
               <Text style={styles.noticeText}>{policyNotice}</Text>
             </View>
           ) : null}
-          <DiscountEligibilityCard best={best} policyActive={policyActive} />
           <Pressable
             accessibilityLabel={`Open ${best.station.name} recommendation detail`}
             accessibilityRole="button"
@@ -356,6 +351,29 @@ function RouteResultsPanel({
               <Text numberOfLines={1} style={styles.compactDetourLine}>
                 {routeDetourEvidenceLine(best, decisionSummary?.economics?.detourMinutes)}
               </Text>
+              <View style={styles.compactChipRow}>
+                {eligibility?.chips.slice(0, 2).map((chip) => (
+                  <Text
+                    key={chip.label}
+                    numberOfLines={1}
+                    style={[
+                      styles.compactChip,
+                      chip.tone === "caution" ? styles.compactChipCaution : null,
+                    ]}
+                  >
+                    {chip.label}
+                  </Text>
+                ))}
+                <Text
+                  numberOfLines={1}
+                  style={[
+                    styles.compactChip,
+                    statusCapability && statusCapability !== "live" ? styles.compactChipCaution : null,
+                  ]}
+                >
+                  {statusCapability ? capabilityLabelForPlan(statusCapability) : "Live data"}
+                </Text>
+              </View>
             </View>
             <View style={styles.recommendationRouteValue}>
               <Pressable
@@ -384,19 +402,48 @@ function RouteResultsPanel({
               ) : null}
             </View>
           </Pressable>
-          <DecisionEvidencePanel
-            candidate={best}
-            capability={statusCapability}
-            decisionSummary={decisionSummary}
-          />
-          <RouteFollowUpPrompt
-            currentRouteSaved={currentRouteSaved}
-            onSaveCommute={onSaveCommute}
-            onWatchRoute={onWatchRoute}
-            routeEndpointsPresent={routeEndpointsPresent}
-            watchRouteDisabled={watchRouteDisabled}
-            watchRouteEnabled={watchRouteEnabled}
-          />
+          <View style={styles.compactActionRow}>
+            <Pressable
+              accessibilityLabel={evidenceExpanded ? "Hide route evidence" : "Show route evidence"}
+              accessibilityRole="button"
+              onPress={() => setEvidenceExpanded((value) => !value)}
+              style={styles.secondaryActionButton}
+            >
+              <Text style={styles.secondaryActionText}>{evidenceExpanded ? "Less" : "Why?"}</Text>
+            </Pressable>
+            {routeEndpointsPresent ? (
+              <Pressable
+                accessibilityLabel={currentRouteSaved ? "Route already saved" : "Save route"}
+                accessibilityRole="button"
+                disabled={currentRouteSaved}
+                onPress={onSaveCommute}
+                style={[
+                  styles.secondaryActionButton,
+                  currentRouteSaved && styles.secondaryActionButtonDisabled,
+                ]}
+              >
+                <Text style={styles.secondaryActionText}>{currentRouteSaved ? "Saved" : "Save route"}</Text>
+              </Pressable>
+            ) : null}
+          </View>
+          {evidenceExpanded ? (
+            <>
+              <DiscountEligibilityCard summary={eligibility} />
+              <DecisionEvidencePanel
+                candidate={best}
+                capability={statusCapability}
+                decisionSummary={decisionSummary}
+              />
+              <RouteFollowUpPrompt
+                currentRouteSaved={currentRouteSaved}
+                onSaveCommute={onSaveCommute}
+                onWatchRoute={onWatchRoute}
+                routeEndpointsPresent={routeEndpointsPresent}
+                watchRouteDisabled={watchRouteDisabled}
+                watchRouteEnabled={watchRouteEnabled}
+              />
+            </>
+          ) : null}
         </>
       ) : null}
       {!loading && !error && routeEndpointsPresent && !best ? (
@@ -426,7 +473,7 @@ function RouteResultsPanel({
         </View>
       ) : null}
 
-      {showStopsList ? (
+      {showStopsList && (!best || evidenceExpanded) ? (
         <>
           <View style={styles.sheetHeaderRow}>
             <Text style={styles.selectedTitle}>{stopsTitle}</Text>
@@ -533,41 +580,50 @@ function RouteFollowUpPrompt({
 }
 
 function DiscountEligibilityCard({
-  best,
-  policyActive,
+  summary,
 }: {
-  best: StationViewModel;
-  policyActive: boolean;
+  summary: ReturnType<typeof discountEligibilitySummary> | null;
 }) {
-  const eligibilityLines = [];
-  if (best.discountCpl > 0 && best.discountLabel) {
-    eligibilityLines.push(`Selected discount applied: ${best.discountLabel}.`);
-  } else {
-    eligibilityLines.push("Pump price only. No selected discount is applied.");
-  }
-  if (best.station.membershipRequired) {
-    eligibilityLines.push("Membership or app access may be required at this stop.");
-  }
-  if (best.possibleLowerDisclosure || best.possibleLowerLabel || best.possibleLowerCpl) {
-    eligibilityLines.push(
-      best.possibleLowerDisclosure ||
-        `A lower ${best.possibleLowerLabel || "discount"} price may exist, but it is not applied unless selected and eligible.`,
-    );
-  }
-  if (policyActive) {
-    eligibilityLines.push("Policy mode is limiting recommendations to approved brands.");
-  }
+  if (!summary) return null;
 
   return (
     <View style={styles.eligibilityCard}>
       <Text style={styles.eligibilityTitle}>Eligibility before you go</Text>
-      {eligibilityLines.map((line) => (
+      {summary.lines.map((line) => (
         <Text key={line} style={styles.eligibilityLine}>
           {line}
         </Text>
       ))}
     </View>
   );
+}
+
+function discountEligibilitySummary(best: StationViewModel, policyActive: boolean) {
+  const lines = [];
+  const chips: { label: string; tone?: "caution" }[] = [];
+  if (best.discountCpl > 0 && best.discountLabel) {
+    lines.push(`Selected discount applied: ${best.discountLabel}.`);
+    chips.push({ label: "Selected discount" });
+  } else {
+    lines.push("Pump price only. No selected discount is applied.");
+    chips.push({ label: "Pump price only" });
+  }
+  if (best.station.membershipRequired) {
+    lines.push("Membership or app access may be required at this stop.");
+    chips.push({ label: "Membership needed", tone: "caution" });
+  }
+  if (best.possibleLowerDisclosure || best.possibleLowerLabel || best.possibleLowerCpl) {
+    lines.push(
+      best.possibleLowerDisclosure ||
+        `A lower ${best.possibleLowerLabel || "discount"} price may exist, but it is not applied unless selected and eligible.`,
+    );
+    chips.push({ label: "Lower price may need app", tone: "caution" });
+  }
+  if (policyActive) {
+    lines.push("Policy mode is limiting recommendations to approved brands.");
+    chips.push({ label: "Policy limited", tone: "caution" });
+  }
+  return { chips, lines };
 }
 
 function priceSavingCpl(item: StationViewModel) {
@@ -591,18 +647,13 @@ function recommendationTitle(fallback: string | undefined, savingCpl: number) {
   return fallback || "Strong savings detour";
 }
 
-function routeRecommendationNotice(
-  routeNotice: string,
-  savingCpl: number,
-  candidate?: StationViewModel,
-  fallbackDetourMinutes = 0,
-) {
-  const routeDistance = routeNotice.match(/^Route is about [^.]+\./)?.[0] || routeNotice;
-  if (!Number.isFinite(savingCpl)) return routeDistance;
-  const savingText = savingCpl > 0
-    ? `and is best by ${savingCpl.toFixed(1)} c/L`
-    : "and is the best route price found";
-  return `${routeDistance} ${routeDetourNoticePhrase(candidate, fallbackDetourMinutes)} ${savingText}.`;
+function capabilityLabelForPlan(capability: string) {
+  if (capability === "live") return "Live data";
+  if (capability === "limited") return "Limited data";
+  if (capability === "pending_access") return "Pending data";
+  if (capability === "fallback") return "Fallback data";
+  if (capability === "unsupported") return "Unsupported";
+  return "Data check";
 }
 
 function EvFallbackPanel({
@@ -847,6 +898,49 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "700",
     marginTop: 1,
+  },
+  compactChipRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 4,
+    marginTop: spacing.xs,
+  },
+  compactChip: {
+    backgroundColor: colors.greenSoft,
+    borderRadius: radii.pill,
+    color: colors.greenDark,
+    fontSize: 10,
+    fontWeight: "800",
+    overflow: "hidden",
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+  },
+  compactChipCaution: {
+    backgroundColor: colors.amberSoft,
+    color: colors.amber,
+  },
+  compactActionRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: spacing.sm,
+    justifyContent: "space-between",
+  },
+  secondaryActionButton: {
+    alignItems: "center",
+    backgroundColor: colors.greenSoft,
+    borderRadius: radii.pill,
+    minHeight: 40,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+  },
+  secondaryActionButtonDisabled: {
+    opacity: 0.7,
+  },
+  secondaryActionText: {
+    color: colors.greenDark,
+    fontSize: typeScale.caption,
+    fontWeight: "800",
   },
   emptyRouteState: {
     ...surfaces.softPanel,

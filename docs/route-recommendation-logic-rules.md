@@ -37,7 +37,15 @@ The Plan result should show:
 - station name
 - savings-detour label
 - best-price-by comparison in c/L
+- compact detour evidence in the recommendation card
+- compact eligibility chip, such as `Pump price only`, `Selected discount`, `Membership needed` or `Policy limited`
+- compact data confidence chip, such as `Live data`, `Limited data` or `Fallback data`
 - navigate arrow
+- `Why?` action to expand supporting evidence
+- compact `Save route` action when the route is not saved
+
+Expanded Plan evidence may show:
+
 - `Eligibility before you go`
 - `Why this stop`
 - `Pump`
@@ -46,7 +54,8 @@ The Plan result should show:
 - `Route-checked detour` only when the route engine checked the via-station route
 - `Estimated detour` when the stop uses smart-detour estimation or route-engine refinement is unavailable
 - one comparison sentence
-- a light follow-up prompt after the recommendation evidence:
+- route option list
+- follow-up prompt after the recommendation evidence:
   - `Save this commute` when the route is not saved
   - `Watch this route` only after the route is saved
 
@@ -63,8 +72,9 @@ The Plan result should not show:
 - user-configurable decision rules
 - route alert prompts before the route is saved
 - route tracking or beta-behaviour claims as part of the recommendation evidence
+- an always-visible route notice that repeats route distance, detour and c/L lead above the recommendation card
 
-Plan should make discount eligibility explicit before a driver acts on a recommendation. The eligibility card should state whether the displayed price is pump-only, a selected eligible discount, membership/app dependent, policy-limited, or lower-but-not-applied because the user has not selected/proven that discount.
+Plan should make discount eligibility explicit before a driver acts on a recommendation. The default recommendation card should show a compact eligibility chip. The expanded eligibility card should state whether the displayed price is pump-only, a selected eligible discount, membership/app dependent, policy-limited, or lower-but-not-applied because the user has not selected/proven that discount.
 
 Plan recommendation and station-detail sheets should size to their content. Do not use fixed tall sheet heights that leave empty white space below the evidence or detail content.
 
@@ -431,6 +441,18 @@ Fuel provider orchestration:
 ```text
 api/_backend.js
 api/score.js
+```
+
+Official live source identifiers recognised by route scoring are:
+
+```text
+api_nsw_fuelcheck
+api_qld_fuelprices
+api_wa_fuelwatch
+api_vic_servo_saver
+api_sa_fuel_price_reporting
+api_tas_fuelcheck
+api_nt_myfuel
 ```
 
 Plan route scoring may need live fuel data from more than one provider region. Independent regional provider loads should run in parallel and then be aggregated in stable provider order. This keeps multi-state route latency bounded by the slowest required provider rather than the sum of every required provider. Do not change ranking, rejection, source attribution or warning semantics just to optimise latency.

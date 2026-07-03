@@ -23,12 +23,16 @@ const required = [
   ["helper", "Route-checked"],
   ["helper", "Estimated"],
   ["sheet", "routeDetourEvidenceLine"],
-  ["sheet", "routeDetourNoticePhrase"],
+  ["sheet", "compactChipRow"],
+  ["sheet", "Why?"],
+  ["sheet", "Save route"],
   ["evidence", "routeDetourEvidenceMetricLabel"],
   ["mapper", "actualDetour: candidate.actualDetour"],
   ["mapper", "routePosition: candidate.routePosition"],
   ["doc", "`Route-checked detour`"],
   ["doc", "`Estimated detour`"],
+  ["doc", "`Why?` action"],
+  ["doc", "compact eligibility chip"],
 ];
 
 const failures = [];

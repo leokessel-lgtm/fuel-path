@@ -23,8 +23,8 @@ module.exports = async function handler(req, res) {
     const forceRefresh = req.method === "POST" ? Boolean(body.forceRefresh) : boolParam(query.forceRefresh);
     const tollPreference = normaliseTollPreference(req.method === "POST" ? body.tollPreference : stringParam(query.tollPreference, "no_preference"));
     const trafficPreference = normaliseTrafficPreference(req.method === "POST" ? body.trafficPreference : stringParam(query.trafficPreference, "unaware"));
-    const actualDetours = req.method === "POST" ? Boolean(body.actualDetours) : boolParam(query.actualDetours);
     const combinedPlanRoute = req.method === "POST" && body.from && body.to && !body.route;
+    const actualDetours = actualDetoursEnabled({ body, combinedPlanRoute, query, req });
     const routePlan = combinedPlanRoute
       ? await buildRouteAndPreloadStations({ body, source, forceRefresh, fuel, tollPreference, trafficPreference })
       : { route: req.method === "POST" ? routeFromPayload(body.route || {}) : routeFromPayloadFromQuery(query), data: null, builtRoute: null };
@@ -212,13 +212,15 @@ function normaliseTrafficPreference(value) {
 async function refineActualDetours({ actualDetours, baseRoute, buildRoute, candidates = [], trafficPreference, tollPreference }) {
   if (!actualDetours && process.env.FUEL_PATH_EXPERIMENTAL_ACTUAL_DETOURS !== "1") return candidates;
   if (typeof buildRoute !== "function" || !baseRoute?.points?.length) return candidates;
-  const limit = Math.max(1, Math.min(8, Number(process.env.FUEL_PATH_ACTUAL_DETOUR_LIMIT || 5)));
+  const limit = Math.max(1, Math.min(3, Number(process.env.FUEL_PATH_ACTUAL_DETOUR_LIMIT || 3)));
+  const timeoutMs = Math.max(400, Math.min(2500, Number(process.env.FUEL_PATH_ACTUAL_DETOUR_TIMEOUT_MS || 1800)));
   const topCandidates = candidates.slice(0, limit);
   const refined = await Promise.all(
     topCandidates.map((candidate) => refineCandidateActualDetour({
       baseRoute,
       buildRoute,
       candidate,
+      timeoutMs,
       trafficPreference,
       tollPreference,
     })),
@@ -230,24 +232,24 @@ async function refineActualDetours({ actualDetours, baseRoute, buildRoute, candi
   return sorted.map((candidate) => applyActualDetourTollCost(candidate));
 }
 
-async function refineCandidateActualDetour({ baseRoute, buildRoute, candidate, trafficPreference, tollPreference }) {
+async function refineCandidateActualDetour({ baseRoute, buildRoute, candidate, timeoutMs, trafficPreference, tollPreference }) {
   const start = baseRoute.points[0];
   const destination = baseRoute.points[baseRoute.points.length - 1];
   const station = candidate.station || {};
   if (!start || !destination || !Number.isFinite(Number(station.lat)) || !Number.isFinite(Number(station.lon))) return candidate;
   try {
-    const toStation = await buildRoute({
+    const toStation = await routeWithTimeout(buildRoute({
       from: start,
       to: { lat: Number(station.lat), lon: Number(station.lon), label: station.name || "Fuel stop" },
       trafficPreference,
       tollPreference,
-    });
-    const fromStation = await buildRoute({
+    }), timeoutMs);
+    const fromStation = await routeWithTimeout(buildRoute({
       from: { lat: Number(station.lat), lon: Number(station.lon), label: station.name || "Fuel stop" },
       to: destination,
       trafficPreference,
       tollPreference,
-    });
+    }), timeoutMs);
     const baseDistanceKm = Number(baseRoute.distanceKm || 0);
     const baseDurationMin = Number(baseRoute.durationMin || 0);
     const actualDistanceKm = Number(toStation.distanceKm || 0) + Number(fromStation.distanceKm || 0);
@@ -288,6 +290,24 @@ async function refineCandidateActualDetour({ baseRoute, buildRoute, candidate, t
       },
     };
   }
+}
+
+function actualDetoursEnabled({ body = {}, combinedPlanRoute, query = {}, req = {} } = {}) {
+  if (req.method === "POST") {
+    if (body.actualDetours === false) return false;
+    if (body.actualDetours === true) return true;
+    return Boolean(combinedPlanRoute);
+  }
+  return boolParam(query.actualDetours);
+}
+
+function routeWithTimeout(routePromise, timeoutMs) {
+  return Promise.race([
+    routePromise,
+    new Promise((_, reject) => {
+      setTimeout(() => reject(new Error(`Actual detour route timed out after ${timeoutMs}ms`)), timeoutMs);
+    }),
+  ]);
 }
 
 function routeRecommendationOrder(left, right) {
@@ -344,6 +364,8 @@ function actualDetourContext({ actualDetours, recommendations = [] }) {
   return {
     enabled: Boolean(actualDetours || process.env.FUEL_PATH_EXPERIMENTAL_ACTUAL_DETOURS === "1"),
     mode: "top_candidates_only",
+    candidateLimit: Math.max(1, Math.min(3, Number(process.env.FUEL_PATH_ACTUAL_DETOUR_LIMIT || 3))),
+    timeoutMs: Math.max(400, Math.min(2500, Number(process.env.FUEL_PATH_ACTUAL_DETOUR_TIMEOUT_MS || 1800))),
     routeEstimatedCount,
     warning: routeEstimatedCount
       ? ""

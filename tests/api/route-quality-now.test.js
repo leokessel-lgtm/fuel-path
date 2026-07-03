@@ -52,7 +52,7 @@ test("Google route requests pass avoid-tolls and traffic preference into route q
   assert.equal(route.routeQuality.tollPreference, "avoid");
 });
 
-test("score endpoint exposes route quality and keeps actual detours off by default", async () => {
+test("combined score endpoint enables top-three actual detours by default", async () => {
   const calls = [];
   const payload = await withMockedScoreBackend(calls, async (handler) =>
     callScore(handler, {
@@ -71,10 +71,33 @@ test("score endpoint exposes route quality and keeps actual detours off by defau
   assert.equal(score.context.routeQuality.level, "high");
   assert.equal(score.context.routeQuality.traffic, "traffic_aware");
   assert.equal(score.context.routeQuality.tolls, "avoid_tolls_requested");
+  assert.equal(score.context.actualDetours.enabled, true);
+  assert.equal(score.context.actualDetours.candidateLimit, 3);
+  assert.equal(score.context.actualDetours.timeoutMs, 1800);
+  assert.equal(score.context.actualDetours.routeEstimatedCount, 1);
+  assert.equal(score.recommendations[0].actualDetour.source, "route_engine_via_station");
+  assert.deepEqual(calls.map((call) => call.tollPreference), ["avoid", "avoid", "avoid"]);
+  assert.deepEqual(calls.map((call) => call.trafficPreference), ["aware", "aware", "aware"]);
+});
+
+test("combined score endpoint can explicitly disable actual detour refinement", async () => {
+  const calls = [];
+  const payload = await withMockedScoreBackend(calls, async (handler) =>
+    callScore(handler, {
+      actualDetours: false,
+      from: { lat: 0, lon: 0, label: "Start" },
+      to: { lat: 0, lon: 1, label: "End" },
+      fuel: "U91",
+      source: "sample",
+      tollPreference: "avoid",
+    }),
+  );
+
+  const score = payload.score;
   assert.equal(score.context.actualDetours.enabled, false);
+  assert.equal(score.context.actualDetours.routeEstimatedCount, 0);
   assert.equal(score.recommendations[0].actualDetour, undefined);
   assert.deepEqual(calls.map((call) => call.tollPreference), ["avoid"]);
-  assert.deepEqual(calls.map((call) => call.trafficPreference), ["aware"]);
 });
 
 test("score endpoint can refine top candidate detour through route engine behind flag", async () => {
@@ -178,6 +201,39 @@ test("actual detour mode uses provider toll delta to break equal-price ties only
   assert.equal(score.recommendations[1].station.stationCode, "TOLL-1");
   assert.equal(score.recommendations[1].actualDetour.tollCostDollars, 11);
   assert.equal(score.recommendations[1].actualDetour.tollRankingApplied, true);
+});
+
+test("actual detour refinement falls back when provider route exceeds timeout", async () => {
+  const originalTimeout = process.env.FUEL_PATH_ACTUAL_DETOUR_TIMEOUT_MS;
+  process.env.FUEL_PATH_ACTUAL_DETOUR_TIMEOUT_MS = "400";
+  const calls = [];
+  try {
+    const payload = await withMockedScoreBackend(calls, async (handler) =>
+      callScore(handler, {
+        from: { lat: 0, lon: 0, label: "Start" },
+        to: { lat: 0, lon: 1, label: "End" },
+        fuel: "U91",
+        source: "sample",
+      }),
+      {
+        routeFor: async ({ from, to, trafficPreference, tollPreference }) => {
+          if (from.label === "Start" && to.label === "End") return route(100, 60, 0, trafficPreference, tollPreference);
+          await new Promise((resolve) => setTimeout(resolve, 700));
+          return route(50, 30, 0, trafficPreference, tollPreference);
+        },
+      },
+    );
+
+    const score = payload.score;
+    assert.equal(score.context.actualDetours.enabled, true);
+    assert.equal(score.context.actualDetours.timeoutMs, 400);
+    assert.equal(score.context.actualDetours.routeEstimatedCount, 0);
+    assert.equal(score.recommendations[0].actualDetour.source, "unavailable");
+    assert.match(score.recommendations[0].actualDetour.warning, /timed out/);
+  } finally {
+    if (originalTimeout === undefined) delete process.env.FUEL_PATH_ACTUAL_DETOUR_TIMEOUT_MS;
+    else process.env.FUEL_PATH_ACTUAL_DETOUR_TIMEOUT_MS = originalTimeout;
+  }
 });
 
 async function withMockedScoreBackend(calls, run, options = {}) {

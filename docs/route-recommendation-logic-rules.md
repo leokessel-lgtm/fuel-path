@@ -275,8 +275,10 @@ origin -> destination
 
 Rules:
 
-- keep actual detour routing off by default unless explicitly requested or feature-flagged
+- keep actual detour routing off by default for score-only calls unless explicitly requested or feature-flagged
+- for combined Plan route scoring, run actual detour routing for the top 3 candidates by default unless explicitly disabled
 - cap route-engine detour checks to a small top-candidate set
+- use a strict timeout and fall back to smart detour estimates when route-engine refinement is slow or unavailable
 - record actual detour source, provider, base distance/time and via-station distance/time
 - include route-position metadata for candidates, including near-origin, mid-route, near-destination and endpoint-adjacent/backtracking-risk hints
 - include approximate same-side-road and turn-friction metadata only as route-geometry hints, not as proven navigation truth

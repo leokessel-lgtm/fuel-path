@@ -142,6 +142,30 @@ export type StationViewModel = {
   reachable?: boolean;
   warnings?: string[];
   matchesDecisionRule?: boolean;
+  actualDetour?: {
+    source: "route_engine_via_station" | "unavailable";
+    provider?: string;
+    detourKm?: number;
+    detourMinutes?: number;
+    tollCostDollars?: number;
+    tollRankingApplied?: boolean;
+    totalDetourCostDollars?: number;
+    trafficPreference?: "aware" | "unaware";
+    tollPreference?: "avoid" | "allow" | "no_preference";
+    warning?: string;
+  };
+  routePosition?: {
+    segment: "near_origin" | "mid_route" | "near_destination";
+    progressRatio: number;
+    remainingRouteKm: number;
+    endpointAdjacent: boolean;
+    backtrackingRisk: "low" | "origin_side_check" | "destination_side_check";
+    roadSide?: "left" | "right" | "on_route" | "unknown";
+    roadSideConfidence?: "low" | "medium" | "approximate";
+    turnFriction?: "none" | "low" | "medium" | "high";
+    turnFrictionReason?: string;
+    geometrySignal?: "approximate_route_segment" | "unavailable";
+  };
 };
 
 export type MapPoint = {

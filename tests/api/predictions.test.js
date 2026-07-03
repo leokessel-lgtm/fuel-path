@@ -156,6 +156,63 @@ test("prediction storage can run against a durable adapter contract", async () =
   }
 });
 
+test("prediction readiness allows accuracy claims only after durable measured evidence thresholds", async () => {
+  const original = process.env.PREDICTION_BACKTEST_WRITE_TOKEN;
+  process.env.PREDICTION_BACKTEST_WRITE_TOKEN = "durable-token";
+  const records = Array.from({ length: 60 }, (_, index) => ({
+    id: `ready-${index}`,
+    region: "WA",
+    fuel: "U91",
+    predictionDate: "2026-06-01",
+    targetDate: `2026-06-${String((index % 28) + 1).padStart(2, "0")}`,
+    modelVersion: "measured-ready-test",
+    predictedCpl: 170,
+    actualCpl: 172,
+    absoluteErrorCpl: 2,
+    predictedDirection: index < 50 ? "up" : "down",
+    actualDirection: "up",
+    directionMatched: index < 50,
+    recordedAt: "2026-06-30T00:00:00.000Z",
+  }));
+  setPredictionStorageForTests({
+    status({ maxRecords }) {
+      return {
+        mode: "postgres_neon",
+        configured: true,
+        durable: true,
+        maxRecords,
+        recordCount: records.length,
+        table: "fuel_path_prediction_backtests",
+      };
+    },
+    async append(record) {
+      records.push(record);
+      return record;
+    },
+    async list({ region = "", fuel = "", limit = 50 } = {}) {
+      return records
+        .filter((record) => (!region || record.region === region) && (!fuel || record.fuel === fuel))
+        .slice(-limit)
+        .reverse();
+    },
+  });
+
+  try {
+    const status = await callStatus();
+    const listed = await callPredictions({ mode: "backtests", region: "WA", fuel: "U91", limit: 60 });
+
+    assert.equal(status.payload.predictions.readiness.status, "ready_for_limited_cycle_guidance");
+    assert.equal(status.payload.predictions.accuracyClaimsAllowed, true);
+    assert.equal(status.payload.predictions.userFacingPredictionEnabled, false);
+    assert.deepEqual(status.payload.predictions.readiness.blockers, []);
+    assert.equal(listed.payload.summary.completedSampleSize, 60);
+  } finally {
+    setPredictionStorageForTests(null);
+    if (original === undefined) delete process.env.PREDICTION_BACKTEST_WRITE_TOKEN;
+    else process.env.PREDICTION_BACKTEST_WRITE_TOKEN = original;
+  }
+});
+
 test("prediction back-test writes require a configured token", async () => {
   const original = process.env.PREDICTION_BACKTEST_WRITE_TOKEN;
   process.env.PREDICTION_BACKTEST_WRITE_TOKEN = "secret-token";

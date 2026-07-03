@@ -279,6 +279,7 @@ Rules:
 - cap route-engine detour checks to a small top-candidate set
 - record actual detour source, provider, base distance/time and via-station distance/time
 - include route-position metadata for candidates, including near-origin, mid-route, near-destination and endpoint-adjacent/backtracking-risk hints
+- include approximate same-side-road and turn-friction metadata only as route-geometry hints, not as proven navigation truth
 - do not claim live traffic or toll-aware optimisation unless the route provider actually supplied that signal
 - keep approximate smart-detour scoring as the safe fallback when actual detour routing is unavailable
 - use dynamic corridor attempts: narrower for short urban routes and wider for long regional/remote routes
@@ -286,6 +287,10 @@ Rules:
 Traffic-aware routing may be requested only through explicit request/provider configuration. If enabled, route quality should move to `high` only when the provider returns a traffic-aware route.
 
 Toll preference may be passed to the route provider. Google toll estimates may be captured in actual-detour metadata when supplied. Toll-cost ranking may only apply inside actual-detour mode, and only using provider-supplied toll deltas. Do not claim general toll-cost optimisation until toll charges are consistently available and included in ranking.
+
+Historical/cycle intelligence remains measurement-gated. Back-test storage must be durable and meet sample-size, mean-absolute-error and direction-accuracy thresholds before limited cycle guidance can be considered. User-facing prediction copy remains disabled until those gates are met and reviewed.
+
+Personalised commute optimisation is local-behaviour gated. The app may classify readiness from aggregate behaviour such as repeated route plans, saved commutes, route alert opt-ins and navigation opens. It must not require exact saved addresses, route geometry, push tokens or provider secrets for that evidence.
 
 ## EV route fallback rules
 

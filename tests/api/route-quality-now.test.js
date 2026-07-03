@@ -141,6 +141,9 @@ test("route scoring records dynamic corridor and candidate route-position metada
   assert.equal(byCode.get("POS-1").routePosition.segment, "near_origin");
   assert.equal(byCode.get("POS-2").routePosition.segment, "mid_route");
   assert.equal(byCode.get("POS-3").routePosition.segment, "near_destination");
+  assert.equal(byCode.get("POS-2").routePosition.geometrySignal, "approximate_route_segment");
+  assert.ok(["left", "right", "on_route"].includes(byCode.get("POS-2").routePosition.roadSide));
+  assert.ok(["low", "medium", "high"].includes(byCode.get("POS-2").routePosition.turnFriction));
 });
 
 test("actual detour mode uses provider toll delta to break equal-price ties only after refinement", async () => {

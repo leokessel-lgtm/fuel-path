@@ -629,9 +629,10 @@ async function predictionStatus() {
       lastError: storageError,
     },
     writeSecurity: predictionWriteSecurity(),
-    userFacingPredictionEnabled: false,
-    accuracyClaimsAllowed: false,
-    supportedSignalLabels: ["no_cycle_signal", "backtest_required"],
+    userFacingPredictionEnabled: predictionReadiness(records, storage).userFacingPredictionEnabled,
+    accuracyClaimsAllowed: predictionReadiness(records, storage).accuracyClaimsAllowed,
+    supportedSignalLabels: ["no_cycle_signal", "backtest_required", "measured_cycle_signal_ready"],
+    readiness: predictionReadiness(records, storage),
     summary: predictionBacktestSummary(records),
   };
 }
@@ -653,6 +654,7 @@ function predictionSignal({ region = "", fuel = "", historyDays = 0, observedPri
     return noCycleSignal({ region: safeRegion, fuel: safeFuel, reason: "sparse_history" });
   }
 
+  const readiness = predictionReadiness([], { durable: false });
   return {
     region: safeRegion,
     fuel: safeFuel,
@@ -660,8 +662,9 @@ function predictionSignal({ region = "", fuel = "", historyDays = 0, observedPri
     confidence: "low",
     reasons: ["history threshold met, but measured back-test evidence is still required before guidance is enabled"],
     userFacingCopy: "No cycle guidance yet.",
-    userFacingPredictionEnabled: false,
-    accuracyClaimsAllowed: false,
+    userFacingPredictionEnabled: readiness.userFacingPredictionEnabled,
+    accuracyClaimsAllowed: readiness.accuracyClaimsAllowed,
+    readiness,
   };
 }
 
@@ -680,6 +683,7 @@ function noCycleSignal({ region, fuel, reason }) {
     userFacingCopy: "No cycle signal.",
     userFacingPredictionEnabled: false,
     accuracyClaimsAllowed: false,
+    readiness: predictionReadiness([], { durable: false }),
   };
 }
 
@@ -751,7 +755,42 @@ function predictionBacktestSummary(records = []) {
     directionSampleSize: directionRecords.length,
     directionAccuracy,
     byRegion,
-    accuracyClaimsAllowed: false,
+    accuracyClaimsAllowed: predictionReadiness(records, { durable: false }).accuracyClaimsAllowed,
+  };
+}
+
+function predictionReadiness(records = [], storage = {}) {
+  const completed = records.filter((record) => Number.isFinite(record.absoluteErrorCpl));
+  const directionRecords = records.filter((record) => typeof record.directionMatched === "boolean");
+  const meanAbsoluteErrorCpl = completed.length
+    ? round(completed.reduce((total, record) => total + Number(record.absoluteErrorCpl || 0), 0) / completed.length, 2)
+    : undefined;
+  const directionAccuracy = directionRecords.length
+    ? round(directionRecords.filter((record) => record.directionMatched).length / directionRecords.length, 3)
+    : undefined;
+  const thresholds = {
+    completedSampleSize: 60,
+    directionSampleSize: 60,
+    maxMeanAbsoluteErrorCpl: 4,
+    minDirectionAccuracy: 0.68,
+  };
+  const blockers = [
+    ...(storage.durable ? [] : ["durable_prediction_storage_missing"]),
+    ...(completed.length >= thresholds.completedSampleSize ? [] : ["prediction_completed_sample_below_threshold"]),
+    ...(directionRecords.length >= thresholds.directionSampleSize ? [] : ["prediction_direction_sample_below_threshold"]),
+    ...(Number.isFinite(meanAbsoluteErrorCpl) && meanAbsoluteErrorCpl <= thresholds.maxMeanAbsoluteErrorCpl ? [] : ["prediction_mae_above_threshold_or_missing"]),
+    ...(Number.isFinite(directionAccuracy) && directionAccuracy >= thresholds.minDirectionAccuracy ? [] : ["prediction_direction_accuracy_below_threshold_or_missing"]),
+  ];
+  return {
+    status: blockers.length ? "measurement_only" : "ready_for_limited_cycle_guidance",
+    thresholds,
+    completedSampleSize: completed.length,
+    directionSampleSize: directionRecords.length,
+    meanAbsoluteErrorCpl,
+    directionAccuracy,
+    blockers,
+    userFacingPredictionEnabled: false,
+    accuracyClaimsAllowed: blockers.length === 0,
   };
 }
 

@@ -208,7 +208,9 @@ function scoreRouteForCorridor({ source, route, stations, fuel, tankLitres, tank
     const routePosition = candidateRoutePosition({
       distanceAlongRouteKm: routeDistanceInfo.distanceAlongRouteKm,
       distanceToRouteKm: routeDistanceInfo.distanceToRouteKm,
+      points,
       routeKm: totalRouteKm(points),
+      stationPoint: { lat: Number(station.lat), lon: Number(station.lon) },
     });
     const reachable = true;
     const [, freshWarning] = freshnessPenalty(station.updatedAt, now, station.source);
@@ -290,10 +292,11 @@ function scoreRouteForCorridor({ source, route, stations, fuel, tankLitres, tank
   };
 }
 
-function candidateRoutePosition({ distanceAlongRouteKm, distanceToRouteKm, routeKm }) {
+function candidateRoutePosition({ distanceAlongRouteKm, distanceToRouteKm, points = [], routeKm, stationPoint }) {
   const along = Math.max(0, Number(distanceAlongRouteKm || 0));
   const total = Math.max(0, Number(routeKm || 0));
   const remainingKm = Math.max(0, total - along);
+  const segmentDetail = nearestRouteSegmentDetail({ distanceAlongRouteKm: along, points, stationPoint });
   const progressRatio = total > 0 ? Math.max(0, Math.min(1, along / total)) : 0;
   const endpointAdjacent = total > 0 && (along <= 1 || remainingKm <= 1) && Number(distanceToRouteKm || 0) > 0.5;
   const segment =
@@ -310,7 +313,86 @@ function candidateRoutePosition({ distanceAlongRouteKm, distanceToRouteKm, route
     remainingRouteKm: round(remainingKm, 1),
     endpointAdjacent,
     backtrackingRisk,
+    roadSide: segmentDetail.roadSide,
+    roadSideConfidence: segmentDetail.roadSideConfidence,
+    turnFriction: segmentDetail.turnFriction,
+    turnFrictionReason: segmentDetail.turnFrictionReason,
+    geometrySignal: segmentDetail.geometrySignal,
   };
+}
+
+function nearestRouteSegmentDetail({ distanceAlongRouteKm, points = [], stationPoint }) {
+  if (!Array.isArray(points) || points.length < 2 || !stationPoint) {
+    return approximateGeometrySignal("unavailable", "unknown", "none", "route geometry unavailable");
+  }
+  let travelled = 0;
+  let selected = null;
+  for (let index = 1; index < points.length; index += 1) {
+    const start = points[index - 1];
+    const end = points[index];
+    const segmentKm = distanceKm(start, end);
+    if (segmentKm <= 0) continue;
+    if (!selected || travelled + segmentKm >= distanceAlongRouteKm) {
+      selected = { end, segmentKm, start };
+      break;
+    }
+    travelled += segmentKm;
+  }
+  if (!selected) return approximateGeometrySignal("unavailable", "unknown", "none", "route segment unavailable");
+
+  const routeVector = toLocalXYKm(selected.end, selected.start);
+  const stationVector = toLocalXYKm(stationPoint, selected.start);
+  const cross = routeVector.x * stationVector.y - routeVector.y * stationVector.x;
+  const lateralKm = Math.abs(cross) / Math.max(0.001, Math.hypot(routeVector.x, routeVector.y));
+  const roadSide = Math.abs(cross) < 0.0001 ? "on_route" : cross > 0 ? "left" : "right";
+  const roadSideConfidence = lateralKm < 0.08 ? "low" : lateralKm < 0.5 ? "medium" : "approximate";
+  const turnFriction = roadSide === "on_route" || lateralKm < 0.08 ? "low" : lateralKm < 0.5 ? "medium" : "high";
+  const turnFrictionReason =
+    turnFriction === "high"
+      ? "station is laterally separated from the route segment; provider detour should confirm access"
+      : turnFriction === "medium"
+        ? "station is off-route; road-side access is approximate"
+        : "station is close to the route segment";
+  return {
+    geometrySignal: "approximate_route_segment",
+    roadSide,
+    roadSideConfidence,
+    turnFriction,
+    turnFrictionReason,
+  };
+}
+
+function approximateGeometrySignal(geometrySignal, roadSide, turnFriction, turnFrictionReason) {
+  return {
+    geometrySignal,
+    roadSide,
+    roadSideConfidence: "low",
+    turnFriction,
+    turnFrictionReason,
+  };
+}
+
+function distanceKm(a, b) {
+  const radiusKm = 6371;
+  const dLat = toRad(Number(b.lat) - Number(a.lat));
+  const dLon = toRad(Number(b.lon) - Number(a.lon));
+  const lat1 = toRad(Number(a.lat));
+  const lat2 = toRad(Number(b.lat));
+  const hav = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
+  return 2 * radiusKm * Math.asin(Math.sqrt(hav));
+}
+
+function toLocalXYKm(point, origin) {
+  const latKm = 110.574;
+  const lonKm = 111.32 * Math.cos(toRad(origin.lat));
+  return {
+    x: (Number(point.lon) - Number(origin.lon)) * lonKm,
+    y: (Number(point.lat) - Number(origin.lat)) * latKm,
+  };
+}
+
+function toRad(value) {
+  return (Number(value) * Math.PI) / 180;
 }
 
 function routeDecisionSummary(candidates, timingAdvice, context = {}) {

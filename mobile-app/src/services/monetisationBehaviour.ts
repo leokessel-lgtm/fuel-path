@@ -121,6 +121,43 @@ export function freshnessBandFromUpdatedAt(updatedAt?: string) {
   return "24h+";
 }
 
+export type PersonalisedCommuteReadiness = {
+  status: "insufficient_evidence" | "ready_for_local_personalisation";
+  blockers: string[];
+  counts: {
+    routePlans: number;
+    savedCommutes: number;
+    routeAlertOptIns: number;
+    navigationOpens: number;
+  };
+  guidance: string;
+};
+
+export function personalisedCommuteReadiness(
+  events: MonetisationBehaviourEvent[],
+  savedCommuteCount: number,
+): PersonalisedCommuteReadiness {
+  const counts = {
+    routePlans: events.filter((event) => event.eventName === "route_plan_completed").length,
+    savedCommutes: Math.max(savedCommuteCount, events.filter((event) => event.eventName === "saved_commute_created").length),
+    routeAlertOptIns: events.filter((event) => event.eventName === "route_alert_opt_in").length,
+    navigationOpens: events.filter((event) => event.eventName === "navigation_opened").length,
+  };
+  const blockers = [
+    ...(counts.routePlans >= 3 ? [] : ["repeat_route_plans_below_threshold"]),
+    ...(counts.savedCommutes >= 1 ? [] : ["saved_commute_missing"]),
+    ...(counts.routeAlertOptIns + counts.navigationOpens >= 2 ? [] : ["route_follow_through_below_threshold"]),
+  ];
+  return {
+    status: blockers.length ? "insufficient_evidence" : "ready_for_local_personalisation",
+    blockers,
+    counts,
+    guidance: blockers.length
+      ? "Keep recommendations generic until repeated route behaviour is observed."
+      : "Local personalisation can prioritise saved commute context without sending exact addresses or route geometry.",
+  };
+}
+
 async function readEvents() {
   const raw = await AsyncStorage.getItem(EVENTS_KEY);
   if (!raw) return [] as MonetisationBehaviourEvent[];

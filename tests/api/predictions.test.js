@@ -15,6 +15,12 @@ test("prediction status exposes measurement foundation without enabling claims",
   assert.equal(response.payload.predictions.storage.durable, false);
   assert.equal(response.payload.predictions.storage.health, "ok");
   assert.equal(response.payload.predictions.writeSecurity.tokenRequired, false);
+  assert.ok(response.payload.predictions.readiness.blindSpots.includes("Current storage is not durable enough for public accuracy claims."));
+  assert.ok(
+    response.payload.predictions.readiness.blindSpots.some((item) =>
+      item.includes("Mean absolute error is not measurable"),
+    ),
+  );
 });
 
 test("prediction signal returns no-cycle-signal for unsupported and sparse cases", async () => {
@@ -45,6 +51,7 @@ test("prediction signal returns no-cycle-signal for unsupported and sparse cases
     assert.equal(response.payload.signal, "no_cycle_signal");
     assert.equal(response.payload.userFacingPredictionEnabled, false);
     assert.equal(response.payload.accuracyClaimsAllowed, false);
+    assert.ok(response.payload.readiness.blindSpots.length > 0);
     assert.doesNotMatch(JSON.stringify(response.payload), /predicts|accurate/i);
   }
 });
@@ -205,6 +212,16 @@ test("prediction readiness allows accuracy claims only after durable measured ev
     assert.equal(status.payload.predictions.accuracyClaimsAllowed, true);
     assert.equal(status.payload.predictions.userFacingPredictionEnabled, false);
     assert.deepEqual(status.payload.predictions.readiness.blockers, []);
+    assert.ok(
+      status.payload.predictions.readiness.blindSpots.includes(
+        "WA tomorrow locked prices are official source data, not model prediction, and should be labelled separately.",
+      ),
+    );
+    assert.ok(
+      status.payload.predictions.readiness.blindSpots.some((item) =>
+        item.includes("No completed back-test coverage yet for NSW"),
+      ),
+    );
     assert.equal(listed.payload.summary.completedSampleSize, 60);
   } finally {
     setPredictionStorageForTests(null);

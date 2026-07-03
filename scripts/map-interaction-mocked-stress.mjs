@@ -59,9 +59,9 @@ async function runViewport(viewport) {
     if (row.metrics.afterDrag.stationMarkers < 1 && row.metrics.afterDrag.clusters < 1) row.failures.push("drag left no visible fuel markers/clusters");
 
     const firstFuel = await firstStationCode(page);
-    if (!firstFuel) row.failures.push("no clickable fuel marker found");
+    if (!firstFuel.code) row.failures.push("no clickable fuel marker found");
     else {
-      await clickStation(page, firstFuel);
+      await clickStation(page, firstFuel.code, firstFuel.x, firstFuel.y);
       await page.waitForTimeout(400);
       row.metrics.selectedFuel = await mapState(page);
       row.failures.push(...checks([
@@ -93,11 +93,12 @@ async function runViewport(viewport) {
     await page.locator("input").nth(0).fill("Sydney NSW");
     await page.locator("input").nth(1).fill("Melbourne VIC");
     await page.getByText("Plan route", { exact: true }).first().click({ timeout: 5000 });
-    await page.getByText("Why this stop", { exact: false }).first().waitFor({ timeout: 12000 });
+    await waitForPlanRecommendation(page);
     row.metrics.plan = await mapState(page);
     row.failures.push(...checks([
       [row.metrics.plan.stationMarkers >= 3, `expected Plan route markers, got ${row.metrics.plan.stationMarkers}`],
       [row.metrics.plan.text.includes("BEST PRICE BY") || row.metrics.plan.text.includes("Best price by") || row.metrics.plan.text.includes("Best route price"), "Plan best-price evidence missing"],
+      [row.metrics.plan.text.includes("Why?"), "Plan evidence action missing"],
       [!row.metrics.plan.text.includes("Suggested fuel stops"), "Suggested fuel stops copy returned in Plan"],
       [!row.metrics.plan.text.includes("Navigate to this stop"), "large navigate button returned in Plan recommendation"],
       [!row.metrics.plan.text.includes("FUEL USED"), "Fuel used evidence returned in Plan"],
@@ -118,6 +119,13 @@ async function runViewport(viewport) {
 }
 
 async function launchBrowser() { try { return await chromium.launch({ channel: "chrome", headless: true }); } catch { return chromium.launch({ headless: true }); } }
+
+async function waitForPlanRecommendation(page) {
+  await page.getByText("Why?", { exact: true }).first().waitFor({ state: "visible", timeout: 12000 });
+  await page.getByText("BEST PRICE BY", { exact: false }).first().waitFor({ state: "visible", timeout: 12000 }).catch(async () => {
+    await page.getByText("Best route price", { exact: false }).first().waitFor({ state: "visible", timeout: 12000 });
+  });
+}
 function attachConsole(page) { const messages = []; page.on("console", (message) => { if (["error", "warning"].includes(message.type())) messages.push(`${message.type()}: ${message.text()}`); }); page.on("pageerror", (error) => messages.push(`pageerror: ${error.message}`)); return messages; }
 function consoleFailures(messages) { const actionable = messages.filter((entry) => !/favicon|ResizeObserver|tile.openstreetmap.org|Cannot record touch end without a touch start/i.test(entry)); return actionable.length ? [`console/page errors: ${actionable.slice(0, 3).join(" | ")}`] : []; }
 
@@ -141,8 +149,25 @@ async function mapState(page) {
     return { text, stationMarkers: document.querySelectorAll("[data-station-code]").length, evMarkers: document.querySelectorAll(".fuel-path-ev-marker").length, clusters: document.querySelectorAll(".fuel-path-marker-cluster").length, hasZoomControls: Boolean(document.querySelector(".leaflet-control-zoom-in")) && Boolean(document.querySelector(".leaflet-control-zoom-out")), sheetTop: sheetTops.length ? Math.min(...sheetTops) : -1 };
   });
 }
-async function firstStationCode(page) { return page.evaluate(() => document.querySelector("[data-station-code]")?.getAttribute("data-station-code") || ""); }
-async function clickStation(page, code) {
+async function firstStationCode(page) {
+  return page.evaluate(() => {
+    const markers = [...document.querySelectorAll("[data-station-code]")]
+      .map((markerNode) => {
+        const target = markerNode.closest(".leaflet-marker-icon") || markerNode;
+        if (!(target instanceof HTMLElement)) return null;
+        const rect = target.getBoundingClientRect();
+        if (rect.width <= 0 || rect.height <= 0) return null;
+        const x = rect.left + rect.width / 2;
+        const y = rect.top + rect.height / 2;
+        if (x < 0 || y < 0 || x > window.innerWidth || y > window.innerHeight) return null;
+        return { code: markerNode.getAttribute("data-station-code") || "", x, y };
+      })
+      .filter(Boolean)
+      .sort((left, right) => right.y - left.y);
+    return markers[0] || { code: "", x: 0, y: 0 };
+  });
+}
+async function clickStation(page, code, x, y) {
   const box = await page.evaluate((stationCode) => {
     const marker = document.querySelector(`[data-station-code="${CSS.escape(stationCode)}"]`);
     const target = marker?.closest(".leaflet-marker-icon") || marker;
@@ -151,8 +176,11 @@ async function clickStation(page, code) {
     if (rect.width <= 0 || rect.height <= 0) return null;
     return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
   }, code);
-  if (!box) throw new Error(`could not locate visible station ${code}`);
-  await page.mouse.click(box.x, box.y);
+  const point = box || { x, y };
+  if (typeof point.x !== "number" || typeof point.y !== "number") {
+    throw new Error(`could not locate visible station ${code}`);
+  }
+  await page.mouse.click(point.x, point.y);
 }
 async function dragMap(page, viewport) { await page.mouse.move(viewport.width / 2, viewport.height / 2); await page.mouse.down(); await page.mouse.move(viewport.width / 2 - 95, viewport.height / 2 + 65, { steps: 10 }); await page.mouse.up(); await page.waitForTimeout(800); }
 async function chooseFuelMode(page, label) { await page.getByRole("button", { name: "Choose fuel or EV charging", exact: true }).click({ timeout: 5000 }); await page.getByText(label, { exact: true }).click({ timeout: 5000 }); }

@@ -7,6 +7,7 @@ import {
   stationEvidenceLine,
   stationOpenLabel,
 } from "../utils/decisionEvidence";
+import { fuelMismatchLine } from "../utils/fuelMismatch";
 import { tomorrowPriceView } from "../utils/pricing";
 import { BrandBadge } from "./BrandBadge";
 
@@ -112,6 +113,8 @@ export function StationRow({
 function stationWhyLine(item: StationViewModel) {
   const priceKind = item.discountCpl ? "your adjusted price" : "pump price";
   const fuel = item.fuel || "fuel";
+  const mismatch = fuelMismatchLine(item);
+  if (mismatch) return `${mismatch} ${priceKind}, ${item.distanceKm.toFixed(1)} km away`;
   return `${fuel} ${priceKind}, ${item.distanceKm.toFixed(1)} km away`;
 }
 
@@ -125,6 +128,9 @@ function stationRowAccessibilityLabel(item: StationViewModel) {
     `${item.adjustedCpl.toFixed(1)} cents per litre ${priceKind}`,
     stationEvidenceLine(item),
   ];
+  if (item.exactFuelMatch === false && item.requestedFuel && item.fuel) {
+    parts.push(`${item.requestedFuel} unavailable nearby, showing ${item.fuel}`);
+  }
   if (item.discountCpl) parts.push(`Confirmed discount: ${item.discountLabel}`);
   const attentionCue = stationAttentionCue(item);
   if (attentionCue) parts.push(attentionCue.label);

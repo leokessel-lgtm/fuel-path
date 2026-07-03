@@ -127,13 +127,16 @@ async function smokePlanRoute(page, row) {
   await page.locator("input").nth(1).fill("Melbourne VIC");
   await page.waitForTimeout(250);
   await page.getByText("Plan route", { exact: true }).first().click({ timeout: 5000 });
-  await page.getByText("Why this stop", { exact: false }).first().waitFor({ timeout: 12000 });
+  await waitForPlanRecommendation(page);
   await page.waitForTimeout(800);
+  await page.getByText("Why?", { exact: true }).first().click({ timeout: 5000 });
+  await page.getByText("Why this stop", { exact: false }).first().waitFor({ timeout: 5000 });
   const state = await uiState(page);
   row.metrics = state;
   row.failures.push(...checks([
     [/savings detour/i.test(state.text), "detour recommendation label missing"],
     [state.text.includes("BEST PRICE BY") || state.text.includes("Best price by") || state.text.includes("Best route price"), "best-price evidence missing"],
+    [state.text.includes("Why this stop"), "expanded evidence title missing after Why action"],
     [state.stationMarkers >= 3, `expected route station markers, got ${state.stationMarkers}`],
     [!state.text.includes("Suggested fuel stops"), "retired Suggested fuel stops copy returned"],
     [!state.text.includes("Navigate to this stop"), "large navigate button returned"],
@@ -199,6 +202,13 @@ async function chooseFuelMode(page, label) {
 async function clickBottomTab(page, label) {
   await page.getByText(label, { exact: true }).last().click({ timeout: 5000 });
   await page.waitForTimeout(350);
+}
+
+async function waitForPlanRecommendation(page) {
+  await page.getByText("Why?", { exact: true }).first().waitFor({ state: "visible", timeout: 12000 });
+  await page.getByText("BEST PRICE BY", { exact: false }).first().waitFor({ state: "visible", timeout: 12000 }).catch(async () => {
+    await page.getByText("Best route price", { exact: false }).first().waitFor({ state: "visible", timeout: 12000 });
+  });
 }
 
 async function uiState(page) {

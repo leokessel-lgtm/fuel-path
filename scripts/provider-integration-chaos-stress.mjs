@@ -27,8 +27,9 @@ const route = {
 
 const cases = [
   testCase("status-lookup-ready", "GET", "/api/status", assertStatusReady),
+  testCase("stations-act-live-or-closed", "GET", "/api/stations?source=live&lat=-35.2809&lon=149.13&label=Canberra%20ACT&fuel=U91&radiusKm=30&limit=20", assertActFuelRegionContract),
   testCase("stations-invalid-lat", "GET", "/api/stations?lat=abc&lon=151.2&fuel=U91", assertCleanClientError),
-  testCase("stations-unsupported-nt-coverage-gap", "GET", "/api/stations?source=live&lat=-19.648&lon=134.191&label=Tennant%20Creek%20NT%200860&fuel=U91&radiusKm=35&limit=20", assertUnsupportedFuelRegion),
+  testCase("stations-nt-territory-live-or-closed", "GET", "/api/stations?source=live&lat=-19.648&lon=134.191&label=Tennant%20Creek%20NT%200860&fuel=U91&radiusKm=35&limit=20", assertNtFuelRegionContract),
   testCase("stations-sample-disabled-or-explicit", "GET", "/api/stations?source=sample&lat=-33.8688&lon=151.2093&label=Sydney%20CBD%20NSW&fuel=U91&radiusKm=8&limit=5", assertSampleIsExplicit),
   testCase("ev-provider-list", "GET", "/api/ev-chargers?provider=list", assertEvProviderList),
   testCase("ev-unsupported-commercial-provider", "GET", "/api/ev-chargers?provider=plugshare&lat=-33.8688&lon=151.2093&label=Sydney%20CBD%20NSW&radiusKm=10&limit=5", assertUnsupportedEvProvider),
@@ -148,14 +149,29 @@ function assertCleanNotFound({ response, payload, text }) {
   ]);
 }
 
-function assertUnsupportedFuelRegion({ response, payload }) {
+function assertNtFuelRegionContract({ response, payload }) {
   const context = payload.context || {};
+  const ntLive = context.provider === "api_nt" && context.capability === "live";
+  const closed = ["unsupported_region", "live_unavailable", "public_demo_snapshot"].includes(context.provider);
   return checks([
     [response.ok, `HTTP ${response.status}`],
     [Array.isArray(payload.stations), "stations array missing"],
-    [payload.stations.length === 0, `expected no NT live stations, got ${payload.stations.length}`],
-    [context.provider === "unsupported_region", `provider ${context.provider || "missing"}`],
-    [/NT|live prices are not enabled|unsupported/i.test(context.warning || ""), "missing clear unsupported-region warning"],
+    [ntLive || closed, `unexpected NT provider ${context.provider || "missing"}`],
+    [!ntLive || payload.stations.every((station) => station.source === "api_nt_myfuel"), "live NT station source mismatch"],
+    [ntLive || /NT|MyFuel|credentials|provider|unavailable|not enabled|unsupported/i.test(context.warning || ""), "missing clear NT closed-state warning"],
+  ]);
+}
+
+function assertActFuelRegionContract({ response, payload }) {
+  const context = payload.context || {};
+  const actLive = context.provider === "api_nsw" && context.capability === "live";
+  const closed = ["unsupported_region", "live_unavailable", "public_demo_snapshot"].includes(context.provider);
+  return checks([
+    [response.ok, `HTTP ${response.status}`],
+    [Array.isArray(payload.stations), "stations array missing"],
+    [actLive || closed, `unexpected ACT provider ${context.provider || "missing"}`],
+    [!actLive || payload.stations.every((station) => station.source === "api_nsw_fuelcheck"), "live ACT station source mismatch"],
+    [actLive || /ACT|NSW|FuelCheck|credentials|provider|unavailable|not enabled|unsupported/i.test(context.warning || ""), "missing clear ACT closed-state warning"],
   ]);
 }
 

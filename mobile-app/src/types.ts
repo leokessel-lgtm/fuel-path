@@ -117,6 +117,9 @@ export type Station = {
   discounts?: StationDiscount[];
   pumpCpl?: number;
   distanceKm?: number;
+  requestedFuel?: string;
+  matchedFuel?: string;
+  exactFuelMatch?: boolean;
 };
 
 export type StationViewModel = {
@@ -131,6 +134,8 @@ export type StationViewModel = {
   possibleDiscountCpl?: number;
   distanceKm: number;
   fuel?: string;
+  requestedFuel?: string;
+  exactFuelMatch?: boolean;
   score?: number;
   netSaving?: number;
   detourMinutes?: number;
@@ -271,6 +276,14 @@ export type RouteDecisionSummary = {
 export type NearbyResponse = {
   context: {
     fuel: FuelCode;
+    requestedFuel?: FuelCode;
+    exactFuelMatch?: boolean;
+    fuelMatchMode?: string;
+    requestedFuelUnavailable?: boolean;
+    alternativeFuelCodes?: FuelCode[];
+    alternativeRadiusKm?: number;
+    expandedAlternativeRadius?: boolean;
+    exactStationCount?: number;
     source: string;
     provider?: string;
     capability?: RegionCapabilityStatus;
@@ -374,6 +387,15 @@ export type ScoreResponse = {
     capability?: RegionCapabilityStatus;
     regionCapabilities?: RegionCapability[];
     warning?: string;
+    requestedFuel?: FuelCode;
+    exactFuelMatch?: boolean;
+    fuelMatchMode?: string;
+    requestedFuelUnavailable?: boolean;
+    alternativeFuelCodes?: FuelCode[];
+    generatedAt?: string;
+    cacheAgeSeconds?: number;
+    cacheMode?: string;
+    degraded?: boolean;
     fuel: FuelCode;
     routeDistanceKm: number;
     baselineCpl: number;

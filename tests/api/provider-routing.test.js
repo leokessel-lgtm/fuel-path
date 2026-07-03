@@ -7,6 +7,8 @@ const {
   fuelProviderCapabilityMatrix,
   liveProviderKeysForArea,
   loadStationData,
+  normaliseNtPayload,
+  normaliseNtReferencePayload,
   pointInAct,
   pointInVic,
 } = require("../../api/_backend");
@@ -26,6 +28,8 @@ test("national capability matrix covers every Australian state and territory", (
       FUEL_PATH_NSW_ACT_USAGE_TERMS_CONFIRMED: "1",
       FUEL_PATH_QLD_USAGE_TERMS_CONFIRMED: "1",
       FUEL_PATH_TAS_USAGE_TERMS_CONFIRMED: "1",
+      NT_MYFUEL_USERNAME: "test-nt-user",
+      NT_MYFUEL_PASSWORD: "test-nt-password",
     },
     () => {
       const capabilities = fuelProviderCapabilityMatrix();
@@ -42,7 +46,7 @@ test("national capability matrix covers every Australian state and territory", (
       assert.equal(capabilities.find((item) => item.region === "VIC")?.capability, "pending_access");
       assert.equal(capabilities.find((item) => item.region === "SA")?.capability, "live");
       assert.equal(capabilities.find((item) => item.region === "TAS")?.capability, "live");
-      assert.equal(capabilities.find((item) => item.region === "NT")?.capability, "pending_access");
+      assert.equal(capabilities.find((item) => item.region === "NT")?.capability, "live");
       assert.match(
         capabilities.find((item) => item.region === "TAS")?.accessPath || "",
         /TAS nearby payloads/,
@@ -53,9 +57,9 @@ test("national capability matrix covers every Australian state and territory", (
       );
       assert.match(
         capabilities.find((item) => item.region === "NT")?.accessPath || "",
-        /Historical developer access is available.*No direct official public REST API contract is confirmed/s,
+        /approved Fuel Path access to the MyFuel NT third-party API/,
       );
-      assert.deepEqual(capabilitySummary(capabilities), { live: 6, pending_access: 2 });
+      assert.deepEqual(capabilitySummary(capabilities), { live: 7, pending_access: 1 });
     },
   );
 });
@@ -82,6 +86,23 @@ test("VIC capability uses default Servo Saver base URL when only the API key is 
       assert.equal(vic?.configured, true);
       assert.match(vic?.nextAction || "", /terms and attribution evidence/);
       assert.deepEqual(liveProviderKeysForArea([{ lat: -37.8136, lon: 144.9631 }], 8), ["vic"]);
+    },
+  );
+});
+
+test("NT capability uses MyFuel credentials and routes live provider selection", () => {
+  withEnv(
+    {
+      NT_MYFUEL_USERNAME: "test-nt-user",
+      NT_MYFUEL_PASSWORD: "test-nt-password",
+    },
+    () => {
+      const capabilities = fuelProviderCapabilityMatrix();
+      const nt = capabilities.find((item) => item.region === "NT");
+
+      assert.equal(nt?.capability, "live");
+      assert.equal(nt?.configured, true);
+      assert.deepEqual(liveProviderKeysForArea([{ lat: -12.4634, lon: 130.8456 }], 8), ["nt"]);
     },
   );
 });
@@ -121,6 +142,8 @@ test("status endpoint keeps provider and map secrets out of diagnostic payloads"
       NSW_FUEL_API_KEY: "secret-nsw-key",
       NSW_FUEL_API_SECRET: "secret-nsw-secret",
       QLD_FUEL_API_TOKEN: "secret-qld-token",
+      NT_MYFUEL_USERNAME: "secret-nt-user",
+      NT_MYFUEL_PASSWORD: "secret-nt-password",
       FUEL_PATH_GOOGLE_MAPS_API_KEY: "secret-google-map-key",
       FUEL_PATH_GOOGLE_ROUTES_API_KEY: "secret-google-routes-key",
     },
@@ -135,10 +158,185 @@ test("status endpoint keeps provider and map secrets out of diagnostic payloads"
       assert.equal(payloadText.includes("secret-nsw-key"), false);
       assert.equal(payloadText.includes("secret-nsw-secret"), false);
       assert.equal(payloadText.includes("secret-qld-token"), false);
+      assert.equal(payloadText.includes("secret-nt-user"), false);
+      assert.equal(payloadText.includes("secret-nt-password"), false);
       assert.equal(payloadText.includes("secret-google-map-key"), false);
       assert.equal(payloadText.includes("secret-google-routes-key"), false);
     },
   );
+});
+
+test("MyFuel NT adapter loads Darwin prices through token, reference and postcode endpoints", async () => {
+  await withEnv(
+    {
+      NT_MYFUEL_API_BASE_URL: "https://myfuelnt.nt.gov.au",
+      NT_MYFUEL_USERNAME: "test-nt-user",
+      NT_MYFUEL_PASSWORD: "test-nt-password",
+    },
+    async () => {
+      const mockFetch = installFetchMock(async (url, options = {}) => {
+        const parsed = new URL(String(url));
+        if (parsed.pathname === "/api/token") {
+          assert.equal(options.method, "POST");
+          assert.match(String(options.body || ""), /grant_type=password/);
+          return jsonResponse({ access_token: "nt-token", token_type: "Bearer", expires_in: 3600 });
+        }
+        if (parsed.pathname === "/api/v1/getReferenceData") {
+          return jsonResponse(ntReferencePayload());
+        }
+        if (parsed.pathname === "/api/v1/getFuelPrice/postCode") {
+          assert.equal(options.method, "POST");
+          const postCode = JSON.parse(options.body).postCode;
+          assert.match(postCode, /^\d{4}$/);
+          return jsonResponse(postCode === "0800" ? ntPostcodePayload() : { Data: [] });
+        }
+        if (parsed.pathname === "/api/v1/getFuelPrice/fuelOutletIdentifier") {
+          assert.equal(options.method, "POST");
+          return jsonResponse({ Data: [] });
+        }
+        throw new Error(`Unexpected NT endpoint: ${parsed.pathname}`);
+      });
+
+      try {
+        const data = await loadStationData({
+          requestedSource: "nt",
+          forceRefresh: true,
+          points: [{ lat: -12.4634, lon: 130.8456 }],
+          radiusKm: 8,
+          fuels: ["U91", "DL"],
+        });
+
+        assert.equal(data.source, "api_nt");
+        assert.equal(data.provider, "api_nt");
+        assert.equal(data.capability, "live");
+        assert.equal(data.degraded, false);
+        assert.equal(data.providerHealth.nt.status, "ok");
+        assert.equal(data.stations.length, 1);
+        assert.equal(data.stations[0].stationCode, "NT-DAR-001");
+        assert.equal(data.stations[0].source, "api_nt_myfuel");
+        assert.equal(data.stations[0].prices.U91, 195.7);
+        assert.equal(data.stations[0].prices.DL, 207.9);
+        assert.equal(data.stations[0].suburb, "Darwin");
+      } finally {
+        mockFetch.restore();
+      }
+    },
+  );
+});
+
+test("MyFuel NT adapter samples live prices across the territory", async () => {
+  await withEnv(
+    {
+      NT_MYFUEL_API_BASE_URL: "https://myfuelnt.nt.gov.au",
+      NT_MYFUEL_USERNAME: "test-nt-user",
+      NT_MYFUEL_PASSWORD: "test-nt-password",
+    },
+    async () => {
+      const mockFetch = installFetchMock(async (url, options = {}) => {
+        const parsed = new URL(String(url));
+        if (parsed.pathname === "/api/token") {
+          return jsonResponse({ access_token: "nt-token-wide", token_type: "Bearer", expires_in: 3600 });
+        }
+        if (parsed.pathname === "/api/v1/getReferenceData") {
+          return jsonResponse(ntTerritoryReferencePayload());
+        }
+        if (parsed.pathname === "/api/v1/getFuelPrice/postCode") {
+          const postCode = JSON.parse(options.body).postCode;
+          return jsonResponse(ntTerritoryPostcodePayload(postCode));
+        }
+        throw new Error(`Unexpected NT endpoint: ${parsed.pathname}`);
+      });
+
+      try {
+        const data = await loadStationData({
+          requestedSource: "nt",
+          forceRefresh: true,
+          points: [
+            { lat: -12.4634, lon: 130.8456 },
+            { lat: -12.486, lon: 130.9833 },
+            { lat: -14.4652, lon: 132.2635 },
+            { lat: -19.648, lon: 134.191 },
+            { lat: -23.698, lon: 133.8807 },
+            { lat: -25.242, lon: 130.9849 },
+            { lat: -12.1884, lon: 136.782 },
+          ],
+          radiusKm: 35,
+          fuels: ["U91"],
+        });
+
+        const stationCodes = data.stations.map((station) => station.stationCode).sort();
+        assert.equal(data.source, "api_nt");
+        assert.equal(data.capability, "live");
+        assert.equal(data.degraded, false);
+        assert.deepEqual(stationCodes, [
+          "NT-ASP-001",
+          "NT-DAR-001",
+          "NT-KAT-001",
+          "NT-NHU-001",
+          "NT-PAL-001",
+          "NT-TCK-001",
+          "NT-YUL-001",
+        ]);
+        assert.equal(data.stations.every((station) => station.source === "api_nt_myfuel"), true);
+        assert.equal(data.stations.every((station) => Number.isFinite(station.prices.U91)), true);
+      } finally {
+        mockFetch.restore();
+      }
+    },
+  );
+});
+
+test("MyFuel NT normalisers accept production reference and AvailableFuel payload casing", () => {
+  const referenceStations = normaliseNtReferencePayload({
+    Brands: [{ BrandIdentifier: "MET", BrandName: "Metro" }],
+    Fuels: [{ FuelCode: "U91", FuelDescription: "Unleaded 91" }],
+    Outlets: [
+      {
+        FuelOutletIdentifier: "08000008",
+        FuelOutletName: "Darwin Production Shape",
+        BrandIdentifier: "MET",
+        Suburb: "Darwin",
+        Address: "1 Smith Street, Darwin NT 0800",
+        PostCode: "0800",
+        Location: { Latitude: -12.4634, Longitude: 130.8456 },
+      },
+    ],
+  });
+  const pricedStations = normaliseNtPayload({
+    Data: [
+      {
+        FuelOutletIdentifier: "08000008",
+        FuelOutletName: "Darwin Production Shape",
+        Suburb: "Darwin",
+        Address: "1 Smith Street, Darwin NT 0800",
+        PostCode: "0800",
+        Location: { Latitude: -12.4634, Longitude: 130.8456 },
+        AvailableFuel: [
+          { FuelCode: "U91", Price: 196.3, IsAvailable: true },
+          { FuelCode: "DL", Price: 210.1, IsAvailable: false },
+        ],
+      },
+    ],
+  });
+  const priceOnlyStations = normaliseNtPayload({
+    Data: [
+      {
+        FuelOutletIdentifier: "08000008",
+        AvailableFuel: [{ FuelCode: "U91", Price: 196.3, IsAvailable: true }],
+      },
+    ],
+  }, { requireCoordinates: false });
+
+  assert.equal(referenceStations.length, 1);
+  assert.equal(referenceStations[0].stationCode, "NT-08000008");
+  assert.equal(referenceStations[0].name, "Darwin Production Shape");
+  assert.equal(referenceStations[0].postcode, "0800");
+  assert.equal(pricedStations.length, 1);
+  assert.equal(pricedStations[0].stationCode, "NT-08000008");
+  assert.equal(pricedStations[0].prices.U91, 196.3);
+  assert.equal(pricedStations[0].prices.DL, undefined);
+  assert.equal(priceOnlyStations.length, 1);
+  assert.equal(priceOnlyStations[0].prices.U91, 196.3);
 });
 
 test("status and station responses use live VIC Servo Saver when credentials are configured", async () => {
@@ -605,26 +803,126 @@ test("pending national regions return explicit capability context", async () => 
   assert.match(data.warning, /SA in the national provider matrix/);
 });
 
-test("forced NT source returns explicit pending-access context instead of pretending live coverage", async () => {
-  const response = await callStations({
-    source: "nt",
-    lat: -12.4634,
-    lon: 130.8456,
-    label: "Darwin NT",
-    fuel: "U91",
-    radiusKm: 8,
-    limit: 5,
+test("forced NT source returns explicit unavailable context when MyFuel credentials are absent", async () => {
+  await withEnv(
+    {
+      NT_MYFUEL_USERNAME: "",
+      NT_MYFUEL_PASSWORD: "",
+    },
+    async () => {
+      const response = await callStations({
+        source: "nt",
+        lat: -12.4634,
+        lon: 130.8456,
+        label: "Darwin NT",
+        fuel: "U91",
+        radiusKm: 8,
+        limit: 5,
+      });
+
+      assert.equal(response.status, 200);
+      assert.equal(response.payload.context.source, "sample_fallback");
+      assert.equal(response.payload.context.provider, "public_demo_snapshot");
+      assert.equal(response.payload.context.capability, "fallback");
+      assert.equal(response.payload.context.regionCapabilities[0].region, "NT");
+      assert.equal(response.payload.context.regionCapabilities[0].capability, "pending_access");
+      assert.equal(response.payload.context.regionCapabilities[0].provider, "api_nt_myfuel");
+      assert.match(response.payload.context.warning, /MyFuel NT credentials are not configured/);
+    },
+  );
+});
+
+test("NT station handler returns labelled available-fuel alternatives when requested fuel is unavailable", async () => {
+  await withEnv(
+    {
+      NT_MYFUEL_API_BASE_URL: "https://myfuelnt.nt.gov.au",
+      NT_MYFUEL_USERNAME: "test-nt-user",
+      NT_MYFUEL_PASSWORD: "test-nt-password",
+    },
+    async () => {
+      const mockFetch = installFetchMock(async (url, options = {}) => {
+        const parsed = new URL(String(url));
+        if (parsed.pathname === "/api/token") {
+          return jsonResponse({ access_token: "nt-token", token_type: "Bearer", expires_in: 3600 });
+        }
+        if (parsed.pathname === "/api/v1/getReferenceData") {
+          return jsonResponse(ntReferencePayload());
+        }
+        if (parsed.pathname === "/api/v1/getFuelPrice/postCode") {
+          const postCode = JSON.parse(options.body).postCode;
+          return jsonResponse(postCode === "0800" ? ntPostcodePayload() : { Data: [] });
+        }
+        if (parsed.pathname === "/api/v1/getFuelPrice/fuelOutletIdentifier") {
+          return jsonResponse({ Data: [] });
+        }
+        throw new Error(`Unexpected NT endpoint: ${parsed.pathname}`);
+      });
+
+      try {
+        const response = await callStations({
+          source: "nt",
+          lat: -12.4634,
+          lon: 130.8456,
+          label: "Darwin NT",
+          fuel: "P98",
+          radiusKm: 8,
+          limit: 5,
+          forceRefresh: "1",
+        });
+
+        assert.equal(response.status, 200);
+        assert.equal(response.payload.context.provider, "api_nt");
+        assert.equal(response.payload.context.fuelMatchMode, "alternative_available_fuel");
+        assert.equal(response.payload.context.exactFuelMatch, false);
+        assert.equal(response.payload.context.requestedFuelUnavailable, true);
+        assert.equal(response.payload.context.exactStationCount, 0);
+        assert.equal(response.payload.context.stationCount, 1);
+        assert.deepEqual(response.payload.context.alternativeFuelCodes, ["U91"]);
+        assert.match(response.payload.context.warning, /No P98 prices were found nearby/);
+        assert.equal(response.payload.stations.length, 1);
+        assert.equal(response.payload.stations[0].requestedFuel, "P98");
+        assert.equal(response.payload.stations[0].matchedFuel, "U91");
+        assert.equal(response.payload.stations[0].exactFuelMatch, false);
+        assert.equal(response.payload.stations[0].pumpCpl, 195.7);
+        assert.equal(response.payload.stations[0].prices.P98, undefined);
+      } finally {
+        mockFetch.restore();
+      }
+    },
+  );
+});
+
+test("NT normaliser drops malformed rows and preserves usable fuel prices", () => {
+  const stations = normaliseNtPayload({
+    Data: [
+      {
+        fuelOutletIdentifier: "DAR-001",
+        fuelOutletName: "Darwin MyFuel",
+        brandName: "Metro",
+        suburb: "Darwin",
+        address: "1 Smith Street, Darwin NT 0800",
+        postCode: "0800",
+        latitude: -12.4634,
+        longitude: 130.8456,
+        fuelPrices: [
+          { fuelType: "Unleaded 91", price: 195.7, lastUpdated: "2026-07-03T00:00:00Z" },
+          { fuelType: "Diesel", price: "bad" },
+        ],
+      },
+      {
+        fuelOutletIdentifier: "NULL-001",
+        fuelOutletName: "Null Island",
+        latitude: 0,
+        longitude: 0,
+        fuelPrices: [{ fuelType: "Unleaded 91", price: 1 }],
+      },
+    ],
   });
 
-  assert.equal(response.status, 200);
-  assert.equal(response.payload.context.source, "unsupported_region");
-  assert.equal(response.payload.context.provider, "unsupported_region");
-  assert.equal(response.payload.context.capability, "pending_access");
-  assert.equal(response.payload.context.stationCount, 0);
-  assert.equal(response.payload.stations.length, 0);
-  assert.equal(response.payload.context.regionCapabilities[0].region, "NT");
-  assert.equal(response.payload.context.regionCapabilities[0].provider, "api_nt_myfuel");
-  assert.match(response.payload.context.warning, /NT in the national provider matrix/);
+  assert.equal(stations.length, 1);
+  assert.equal(stations[0].stationCode, "NT-DAR-001");
+  assert.equal(stations[0].prices.U91, 195.7);
+  assert.equal(stations[0].prices.DL, undefined);
 });
 
 test("sample fallback marks data as fallback capability", async () => {
@@ -879,6 +1177,108 @@ function vicPricePayload() {
         ],
       },
     ],
+  };
+}
+
+function ntReferencePayload() {
+  return {
+    Data: [
+      {
+        fuelOutletIdentifier: "DAR-001",
+        fuelOutletName: "Darwin MyFuel",
+        brandName: "Metro",
+        suburb: "Darwin",
+        address: "1 Smith Street, Darwin NT 0800",
+        postCode: "0800",
+        latitude: -12.4634,
+        longitude: 130.8456,
+      },
+      {
+        fuelOutletIdentifier: "ASP-001",
+        fuelOutletName: "Alice Springs MyFuel",
+        brandName: "Ampol",
+        suburb: "Alice Springs",
+        address: "1 Todd Street, Alice Springs NT 0870",
+        postCode: "0870",
+        latitude: -23.698,
+        longitude: 133.8807,
+      },
+    ],
+  };
+}
+
+function ntPostcodePayload() {
+  return {
+    Data: [
+      {
+        fuelOutletIdentifier: "DAR-001",
+        fuelOutletName: "Darwin MyFuel",
+        brandName: "Metro",
+        suburb: "Darwin",
+        address: "1 Smith Street, Darwin NT 0800",
+        postCode: "0800",
+        latitude: -12.4634,
+        longitude: 130.8456,
+        fuelPrices: [
+          {
+            fuelType: "Unleaded 91",
+            price: 195.7,
+            lastUpdated: "2026-07-03T00:00:00Z",
+          },
+          {
+            fuelType: "Diesel",
+            price: 207.9,
+            lastUpdated: "2026-07-03T00:00:00Z",
+          },
+        ],
+      },
+    ],
+  };
+}
+
+function ntTerritoryReferencePayload() {
+  return {
+    Data: [
+      ntReferenceRow("DAR-001", "Darwin", "0800", -12.4634, 130.8456),
+      ntReferenceRow("PAL-001", "Palmerston", "0830", -12.486, 130.9833),
+      ntReferenceRow("KAT-001", "Katherine", "0850", -14.4652, 132.2635),
+      ntReferenceRow("TCK-001", "Tennant Creek", "0860", -19.648, 134.191),
+      ntReferenceRow("ASP-001", "Alice Springs", "0870", -23.698, 133.8807),
+      ntReferenceRow("YUL-001", "Yulara", "0872", -25.242, 130.9849),
+      ntReferenceRow("NHU-001", "Nhulunbuy", "0880", -12.1884, 136.782),
+    ],
+  };
+}
+
+function ntTerritoryPostcodePayload(postCode) {
+  const row = ntTerritoryReferencePayload().Data.find((item) => item.postCode === postCode);
+  if (!row) return { Data: [] };
+  return {
+    Data: [
+      {
+        ...row,
+        fuelPrices: [
+          {
+            fuelType: "Unleaded 91",
+            price: 190 + Number(postCode.slice(-2)) / 10,
+            lastUpdated: "2026-07-03T00:00:00Z",
+          },
+        ],
+      },
+    ],
+  };
+}
+
+function ntReferenceRow(id, suburb, postCode, latitude, longitude) {
+  return {
+    fuelOutletIdentifier: id,
+    fuelOutletName: `${suburb} MyFuel`,
+    brandName: "Metro",
+    suburb,
+    address: `1 Main Street, ${suburb} NT ${postCode}`,
+    postCode,
+    latitude,
+    longitude,
   };
 }
 

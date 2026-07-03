@@ -90,3 +90,47 @@ test("official live SA prices older than 48 hours remain eligible", () => {
   assert.equal(scored.candidates.length, 1);
   assert.equal(scored.candidates[0].station.stationCode, "SA-123");
 });
+
+test("official live NT prices older than 48 hours remain eligible", () => {
+  const scored = scoreRoute({
+    source: "live",
+    route: {
+      id: "official-nt-route",
+      name: "Official NT route",
+      defaultCorridorKm: 3,
+      defaultDetourSpeedKmh: 80,
+      points: [
+        { lat: -12.4634, lon: 130.8456, label: "Darwin" },
+        { lat: -12.486, lon: 130.9833, label: "Palmerston" },
+      ],
+    },
+    stations: [
+      {
+        stationCode: "NT-DAR-123",
+        name: "Darwin Reliable Fuel",
+        brand: "Independent",
+        lat: -12.4634,
+        lon: 130.8456,
+        openNow: true,
+        source: "api_nt_myfuel",
+        updatedAt: "2026-06-08T21:29:04+00:00",
+        prices: {
+          U91: 195.7,
+        },
+      },
+    ],
+    fuel: "U91",
+    tankLitres: 55,
+    tankPercent: 45,
+    economy: 8.2,
+    reserveKm: 35,
+    corridorKm: 3,
+    eligibleDiscounts: new Set(),
+    includeMemberPrices: false,
+    includeClosed: false,
+  });
+
+  assert.equal(scored.context.staleExcludedCandidates, 0);
+  assert.equal(scored.candidates.length, 1);
+  assert.equal(scored.candidates[0].station.stationCode, "NT-DAR-123");
+});

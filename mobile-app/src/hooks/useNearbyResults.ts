@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 
 import { getNearbyEvChargers, getNearbyStations } from "../api/fuelPathApi";
 import { evPowerOptions, NearbyMode } from "../components/NearbyEvControls";
-import { AppPreferences, EvCharger, EvConnector, EvPowerMode, MapPoint, StationViewModel } from "../types";
+import { AppPreferences, EvCharger, EvConnector, EvPowerMode, MapPoint, NearbyResponse, StationViewModel } from "../types";
 import { stationPriceView } from "../utils/pricing";
 
 const emptyMapRetryRadiusKm = 32;
@@ -27,6 +27,7 @@ export function useNearbyResults({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [stationNotice, setStationNotice] = useState("");
+  const [stationContext, setStationContext] = useState<NearbyResponse["context"]>();
   const [evNotice, setEvNotice] = useState("");
 
   useEffect(() => {
@@ -34,6 +35,7 @@ export function useNearbyResults({
     setLoading(true);
     setError("");
     setStationNotice("");
+    setStationContext(undefined);
     setEvNotice("");
     async function loadStations() {
       const shouldLoadChargers = nearbyMode === "ev" || nearbyMode === "both";
@@ -58,7 +60,8 @@ export function useNearbyResults({
           radiusKm: nearbyRadiusKm,
           limit: stationLimitForRadius(nearbyRadiusKm),
         });
-        let notice = stationContextNotice(response.context);
+        let context = response.context;
+        let notice = stationContextNotice(context);
         let priced = response.stations
           .map((station) => stationPriceView(station, preferences.fuel, preferences))
           .filter((item): item is StationViewModel => Boolean(item));
@@ -69,6 +72,7 @@ export function useNearbyResults({
             radiusKm: emptyMapRetryRadiusKm,
             limit: stationLimitForRadius(emptyMapRetryRadiusKm),
           });
+          context = retryResponse.context;
           notice = stationContextNotice(retryResponse.context) || notice;
           priced = retryResponse.stations
             .map((station) => stationPriceView(station, preferences.fuel, preferences))
@@ -77,14 +81,15 @@ export function useNearbyResults({
         if (!priced.length && !notice) {
           notice = `No ${preferences.fuel} prices found around ${centre.label}.`;
         }
-        return { notice, priced };
+        return { context, notice, priced };
       };
 
       const [stationResult, chargerResult] = await Promise.all([
-        shouldLoadStations ? loadPricedStations() : Promise.resolve({ notice: "", priced: [] }),
+        shouldLoadStations ? loadPricedStations() : Promise.resolve({ context: undefined, notice: "", priced: [] }),
         shouldLoadChargers ? loadChargers() : Promise.resolve({ notice: "", chargers: [] }),
       ]);
       return {
+        context: stationResult.context,
         notice: stationResult.notice,
         priced: stationResult.priced,
         chargers: chargerResult.chargers,
@@ -93,10 +98,11 @@ export function useNearbyResults({
     }
 
     loadStations()
-      .then(({ notice, priced, chargers, evNotice }) => {
+      .then(({ context, notice, priced, chargers, evNotice }) => {
         if (!active) return;
         setStations(priced);
         setChargers(chargers);
+        setStationContext(context);
         setStationNotice(notice);
         setEvNotice(nearbyMode === "ev" || nearbyMode === "both" ? evNotice : "");
       })
@@ -111,7 +117,7 @@ export function useNearbyResults({
     };
   }, [centre, evConnectors, evPowerMode, nearbyMode, nearbyRadiusKm, preferences]);
 
-  return { chargers, error, evNotice, loading, stationNotice, stations };
+  return { chargers, error, evNotice, loading, stationContext, stationNotice, stations };
 }
 
 function sortChargersForPreference(

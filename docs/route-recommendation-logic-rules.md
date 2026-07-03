@@ -40,6 +40,7 @@ The Plan result should show:
 - compact detour evidence in the recommendation card
 - compact eligibility chip, such as `Pump price only`, `Selected discount`, `Membership needed` or `Policy limited`
 - compact data confidence chip, such as `Live data`, `Limited data` or `Fallback data`
+- compact result context strip, where available, below the recommendation and below any fuel-match warning: cheapest, typical price, spread, station count, source and freshness
 - navigate arrow
 - `Why?` action to expand supporting evidence
 - compact `Save route` action when the route is not saved
@@ -53,6 +54,11 @@ Expanded Plan evidence may show:
 - `Best price by`
 - `Route-checked detour` only when the route engine checked the via-station route
 - `Estimated detour` when the stop uses smart-detour estimation or route-engine refinement is unavailable
+- station source and freshness detail:
+  - source/provider
+  - station update age
+  - provider state/cache state
+  - exact, alternative or fallback price match
 - one comparison sentence
 - route option list
 - follow-up prompt after the recommendation evidence:
@@ -73,6 +79,7 @@ The Plan result should not show:
 - route alert prompts before the route is saved
 - route tracking or beta-behaviour claims as part of the recommendation evidence
 - an always-visible route notice that repeats route distance, detour and c/L lead above the recommendation card
+- a result context strip above or visually competing with the main recommendation
 
 Plan should make discount eligibility explicit before a driver acts on a recommendation. The default recommendation card should show a compact eligibility chip. The expanded eligibility card should state whether the displayed price is pump-only, a selected eligible discount, membership/app dependent, policy-limited, or lower-but-not-applied because the user has not selected/proven that discount.
 
@@ -90,6 +97,10 @@ Selected station-detail sheets opened from the Plan route map should stay minima
 Plan route maps should keep the recommended station plus the next three route candidates as direct price markers where possible. Do not let marker clustering hide those first four route candidates, because they are the stations users compare immediately after a route recommendation.
 
 Plan route failure states should never show raw JavaScript errors, undefined route-shape errors or provider stack details. If scoring returns a valid score payload without a route shape, the frontend should preserve the route endpoints and show the score result or an empty recommendation state rather than crashing. If routing or scoring is unavailable, show a plain recovery message that points users back to retrying, editing the route or checking Nearby fuel.
+
+Nearby NT station search may return labelled available-fuel alternatives when the requested fuel has no exact MyFuel NT price within the search area. If the strict search radius would otherwise return nothing, NT may expand the alternative-fuel radius and must disclose the expanded radius in the response context and warning. Alternative results must keep the real available fuel and price, set an explicit non-exact match signal, and warn that the requested fuel was not found nearby. Do not copy, infer or relabel an alternative fuel price as the requested fuel price.
+
+When exact fuel is unavailable but alternatives are shown, the UI must explicitly say the exact requested fuel is unavailable and name the alternative fuel being shown. Example: if the user asks for `PDL` and only `DL` is available, the price tile, row, selected card, result notice and result context strip must show `DL` as the displayed fuel and must not make the alternative diesel price look like `PDL`. In Plan route contexts, the notice should say the fuel is unavailable `on this route`; in Nearby contexts it should say `nearby`.
 
 ## Frontend display rules
 
@@ -210,6 +221,21 @@ Do not add a separate `Detour` eyebrow above these labels.
 
 For the Plan recommendation card, these labels should be based on the displayed `Best price by` c/L lead, not the backend internal dollar scoring estimate. If the c/L lead is zero or unavailable, show `Best route price` rather than a savings-detour label.
 
+### Result context strip
+
+The result context strip is secondary context, not a ranking explanation. When data is available, it may show:
+
+- cheapest displayed candidate price, labelled with the displayed alternative fuel when exact fuel is unavailable
+- typical displayed candidate price, labelled with the displayed alternative fuel when exact fuel is unavailable
+- displayed candidate price spread
+- station or eligible-candidate count
+- provider/source
+- freshness/cache age
+
+These values describe the returned result set and provider context. They must not override the recommendation, create a new savings claim, or imply wider market coverage than the returned candidate/context data supports.
+
+The strip must not present alternative-fuel prices as if they were exact requested-fuel prices.
+
 ## Backend scoring rules
 
 Primary scoring file:
@@ -228,6 +254,8 @@ A candidate can be excluded or effectively rejected for:
 
 Do not reject or down-rank solely because of stale price age.
 
+Sample-data runs should remain deterministic by setting `FUEL_PATH_SAMPLE_NOW` so sample freshness behaviour is reproducible under local performance and production-similar hardening checks.
+
 Price age may be shown as context elsewhere, but it should not decide the winner.
 
 ### Smart detour thresholds
@@ -241,6 +269,13 @@ The current smart detour thresholds widen as route value increases:
 < $20.00 estimated route value: 18 min
 >= $20.00 estimated route value: 30 min
 ```
+
+`api/score` also accepts optional decision-rule overrides for explicit API callers:
+
+- `minSavingDollars` — minimum after-detour savings threshold required for a station to count as a viable match (defaults to $1.50; values below 0 are treated as 0).
+- `maxDetourMinutes` — hard upper bound for detour pass/fail even when the smart rule would permit more (defaults to 30; bounded to 1..30).
+
+These values are intentionally not user-facing controls in current UI patterns, but scoring contexts and recommendation evidence must preserve them.
 
 These values are backend scoring aids. They should not become user-facing controls.
 
@@ -321,6 +356,18 @@ Traffic-aware routing may be requested only through explicit request/provider co
 Toll preference may be passed to the route provider. Google toll estimates may be captured in actual-detour metadata when supplied. Toll-cost ranking may only apply inside actual-detour mode, and only using provider-supplied toll deltas. Do not claim general toll-cost optimisation until toll charges are consistently available and included in ranking.
 
 Historical/cycle intelligence remains measurement-gated. Back-test storage must be durable and meet sample-size, mean-absolute-error and direction-accuracy thresholds before limited cycle guidance can be considered. User-facing prediction copy remains disabled until those gates are met and reviewed.
+
+Prediction or cycle guidance must not be added to Nearby, Plan, alerts, saved routes or marketing copy unless the prediction readiness API reports:
+
+- `status: ready_for_limited_cycle_guidance`
+- `accuracyClaimsAllowed: true`
+- durable prediction back-test storage
+- completed sample size and direction sample size at or above the configured thresholds
+- mean absolute error at or below the configured threshold
+- directional accuracy at or above the configured threshold
+- clear blind spots covering uncovered regions/fuels, provider staleness/outages, station-level variance and WA tomorrow-price labelling
+
+Even when those gates pass, `userFacingPredictionEnabled` must remain `false` until a separate product review approves the exact copy and scope. Any user-facing prediction copy must show the measured sample size, directional accuracy, mean absolute error, model horizon, region/fuel scope and blind spots. WA tomorrow locked prices are official source data, not model prediction, and must be labelled separately.
 
 Personalised commute optimisation is local-behaviour gated. The app may classify readiness from aggregate behaviour such as repeated route plans, saved commutes, route alert opt-ins and navigation opens. It must not require exact saved addresses, route geometry, push tokens or provider secrets for that evidence.
 

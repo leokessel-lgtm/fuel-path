@@ -37,6 +37,8 @@ export function isOfficialLivePriceSource(source?: string) {
     "api_sa",
     "api_tas_fuelcheck",
     "api_tas",
+    "api_nt_myfuel",
+    "api_nt",
   ]).has(String(source || "").toLowerCase());
 }
 
@@ -51,13 +53,30 @@ export function stationSourceLabel(source?: string) {
   return "Source unknown";
 }
 
-export function stationProviderLabel(source?: string) {
+export function stationProviderLabel(source?: string): string {
+  return fuelProviderLabel(source);
+}
+
+export function fuelProviderLabel(source?: string): string {
   const value = String(source || "").toLowerCase();
-  if (value.includes("vic")) return "Servo Saver";
-  if (value.includes("fuelcheck") || value.includes("nsw") || value.includes("tas")) return "FuelCheck";
+  if (!value) return "";
+  const parts = value.split("+").filter(Boolean);
+  if (parts.length > 1) {
+    return parts
+      .map((part) => fuelProviderLabel(part))
+      .filter(Boolean)
+      .join(" + ");
+  }
+  if (value.includes("nsw")) return "NSW FuelCheck";
+  if (value.includes("tas")) return "TAS FuelCheck";
+  if (value.includes("fuelcheck")) return "FuelCheck";
+  if (value.includes("vic")) return "VIC Servo Saver";
   if (value.includes("qld")) return "Queensland Fuel Prices";
-  if (value.includes("wa")) return "FuelWatch";
+  if (value.includes("wa")) return "WA FuelWatch";
   if (value.includes("sa")) return "SA Fuel Pricing";
+  if (value.includes("nt") || value.includes("myfuel")) return "MyFuel NT";
+  if (value.includes("mock")) return "Test data";
+  if (value.includes("sample") || value.includes("fallback")) return "Fallback data";
   return "";
 }
 

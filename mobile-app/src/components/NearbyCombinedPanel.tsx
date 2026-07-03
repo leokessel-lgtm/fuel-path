@@ -7,9 +7,11 @@ import {
   NearbyMode,
   vehicleProfileHint,
 } from "./NearbyEvControls";
+import { ResultContextStrip } from "./ResultContextStrip";
 import { StationRow } from "./StationRow";
 import { colors, radii, shadow, spacing, surfaces, typeScale } from "../theme";
-import { AppPreferences, EvCharger, EvConnector, EvPowerMode, FuelCode, NearbySheetSnap, StationViewModel } from "../types";
+import { AppPreferences, EvCharger, EvConnector, EvPowerMode, FuelCode, NearbyResponse, NearbySheetSnap, StationViewModel } from "../types";
+import { fuelMismatchContextLine } from "../utils/fuelMismatch";
 
 const nearbySheetBottomOffset = 8;
 
@@ -39,6 +41,8 @@ export function NearbyCombinedPanel({
   sheetSnap,
   sheetExpanded,
   sortedStations,
+  stationContext,
+  stationNotice,
 }: {
   chargers: EvCharger[];
   connectors: EvConnector[];
@@ -65,6 +69,8 @@ export function NearbyCombinedPanel({
   sheetSnap: NearbySheetSnap;
   sheetExpanded: boolean;
   sortedStations: StationViewModel[];
+  stationContext?: NearbyResponse["context"];
+  stationNotice?: string;
 }) {
   const combinedRows = combinedNearbyRows(sortedStations, chargers, connectors, preferences.evChargingPreference);
   const selectedRows = combinedRows.filter((row) => row.id === selectedCode);
@@ -78,6 +84,7 @@ export function NearbyCombinedPanel({
   const showEvControls = mode === "ev" || preferences.vehicleEnergyType === "electric" || preferences.vehicleEnergyType === "hybrid";
   const isPeek = sheetSnap === "peek";
   const isFull = sheetSnap === "full";
+  const fuelNotice = fuelMismatchContextLine(stationContext) || stationNotice || "";
   const requestSnap = (snap: NearbySheetSnap) => {
     if (onSnapChange) {
       onSnapChange(snap);
@@ -139,6 +146,7 @@ export function NearbyCombinedPanel({
       </View>
 
       {error && isFull ? <Text style={styles.notice}>{error}</Text> : null}
+      {!error && fuelNotice && !isPeek ? <Text style={styles.notice}>{fuelNotice}</Text> : null}
       {!error && evNotice && !isPeek ? <Text style={styles.notice}>{evNotice}</Text> : null}
 
       {!isPeek ? (
@@ -159,6 +167,13 @@ export function NearbyCombinedPanel({
           onToggleConnector={onToggleConnector}
           powerMode={powerMode}
           showAdvanced={isFull}
+        />
+      ) : null}
+      {!loading && !error && !isPeek && sortedStations.length ? (
+        <ResultContextStrip
+          context={stationContext}
+          label="Fuel result context"
+          stations={sortedStations}
         />
       ) : null}
 

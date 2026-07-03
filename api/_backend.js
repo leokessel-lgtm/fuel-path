@@ -34,6 +34,7 @@ const {
   hasAnyLiveCredentials,
   hasNswActUsageTermsConfirmed,
   hasLiveCredentials,
+  hasNtCredentials,
   hasQldCredentials,
   hasQldUsageTermsConfirmed,
   hasSaCredentials,
@@ -87,6 +88,12 @@ const {
   normaliseTasPayload,
 } = createNswFuelCheckAdapter({ decorateStation: stationWithDiscountRules });
 const { loadLiveVicStations } = createVicServoSaverAdapter({ decorateStation: stationWithDiscountRules });
+const {
+  createMyFuelNtProvider,
+  normaliseNtPayload,
+  normaliseNtReferencePayload,
+} = require("./_ntMyFuelProvider");
+const { loadLiveNtStations } = createMyFuelNtProvider({ decorateStation: stationWithDiscountRules });
 const { geocode, geocodeProviderStatus } = createGeocoder({
   fetchJson,
   loadStationData,
@@ -302,21 +309,6 @@ async function loadLiveStationsForArea({ forceRefresh = false, points = [], radi
       warning: capabilityWarning(regionCapabilities),
     };
   }
-  if (providers.length === 1 && providers[0] === "nt") {
-    return {
-      stations: [],
-      source: "unsupported_region",
-      provider: "unsupported_region",
-      capability: primaryCapability(regionCapabilities),
-      regionCapabilities,
-      cacheHit: false,
-      cacheAgeSeconds: 0,
-      cacheMode: "none",
-      degraded: false,
-      providerHealth: {},
-      warning: capabilityWarning(regionCapabilities),
-    };
-  }
   const stations = [];
   const loadedProviders = [];
   const errors = [];
@@ -348,6 +340,9 @@ async function loadLiveStationsForArea({ forceRefresh = false, points = [], radi
           } else if (provider === "sa") {
             live = await loadLiveSaStations({ forceRefresh });
             loadedProvider = "api_sa";
+          } else if (provider === "nt") {
+            live = await loadLiveNtStations({ forceRefresh, points, radiusKm, fuels });
+            loadedProvider = "api_nt";
           } else if (provider === "nsw") {
             if (productionRuntime() && !hasNswActUsageTermsConfirmed()) {
               throw new Error("FuelCheck NSW/ACT public usage, caching and attribution terms are not confirmed.");
@@ -620,6 +615,7 @@ async function predictionStatus() {
   } catch (error) {
     storageError = error instanceof Error ? error.message : "Prediction storage is unavailable";
   }
+  const readiness = predictionReadiness(records, storage);
   return {
     mode: "measurement_foundation",
     storage: {
@@ -629,10 +625,10 @@ async function predictionStatus() {
       lastError: storageError,
     },
     writeSecurity: predictionWriteSecurity(),
-    userFacingPredictionEnabled: predictionReadiness(records, storage).userFacingPredictionEnabled,
-    accuracyClaimsAllowed: predictionReadiness(records, storage).accuracyClaimsAllowed,
+    userFacingPredictionEnabled: readiness.userFacingPredictionEnabled,
+    accuracyClaimsAllowed: readiness.accuracyClaimsAllowed,
     supportedSignalLabels: ["no_cycle_signal", "backtest_required", "measured_cycle_signal_ready"],
-    readiness: predictionReadiness(records, storage),
+    readiness,
     summary: predictionBacktestSummary(records),
   };
 }
@@ -789,9 +785,31 @@ function predictionReadiness(records = [], storage = {}) {
     meanAbsoluteErrorCpl,
     directionAccuracy,
     blockers,
+    blindSpots: predictionBlindSpots({ records, storage, meanAbsoluteErrorCpl, directionAccuracy }),
     userFacingPredictionEnabled: false,
     accuracyClaimsAllowed: blockers.length === 0,
   };
+}
+
+function predictionBlindSpots({ records = [], storage = {}, meanAbsoluteErrorCpl, directionAccuracy } = {}) {
+  const regions = Array.from(new Set(records.map((record) => record.region).filter(Boolean)));
+  const fuels = Array.from(new Set(records.map((record) => record.fuel).filter(Boolean)));
+  const missingRegions = REGION_ORDER.filter((region) => !regions.includes(region));
+  const coreFuels = ["U91", "P95", "P98", "DL", "PDL"];
+  const missingCoreFuels = coreFuels.filter((fuel) => !fuels.includes(fuel));
+  const blindSpots = [
+    "Predictions are blocked unless durable back-test storage is configured.",
+    "Directional accuracy proves only up/down/flat direction, not the exact pump price a driver will see.",
+    "Station-level prices can move differently from region averages and must not be presented as guaranteed.",
+    "Provider outages, stale cache, delayed official feeds or station corrections can invalidate a cycle signal.",
+    "WA tomorrow locked prices are official source data, not model prediction, and should be labelled separately.",
+  ];
+  if (!storage.durable) blindSpots.push("Current storage is not durable enough for public accuracy claims.");
+  if (missingRegions.length) blindSpots.push(`No completed back-test coverage yet for ${missingRegions.join(", ")}.`);
+  if (missingCoreFuels.length) blindSpots.push(`Sparse or missing fuel-grade coverage for ${missingCoreFuels.join(", ")}.`);
+  if (!Number.isFinite(meanAbsoluteErrorCpl)) blindSpots.push("Mean absolute error is not measurable until completed prediction/actual pairs exist.");
+  if (!Number.isFinite(directionAccuracy)) blindSpots.push("Directional accuracy is not measurable until direction-labelled back-tests exist.");
+  return Array.from(new Set(blindSpots));
 }
 
 async function listPredictionBacktests({ region = "", fuel = "", limit = 50 } = {}) {
@@ -927,6 +945,7 @@ module.exports = {
   hasAnyLiveCredentials,
   hasNswActUsageTermsConfirmed,
   hasLiveCredentials,
+  hasNtCredentials,
   hasQldCredentials,
   hasQldUsageTermsConfirmed,
   hasSaCredentials,
@@ -939,6 +958,8 @@ module.exports = {
   liveProviderKeysForArea,
   methodAllowed,
   normaliseQldPayload,
+  normaliseNtPayload,
+  normaliseNtReferencePayload,
   normaliseSaPayload,
   normaliseTasPayload,
   normaliseWaFuelWatchPayloads,

@@ -8,7 +8,8 @@ export function stationPriceView(
   fuel: string,
   preferences: AppPreferences,
 ): StationViewModel | null {
-  const pumpCpl = Number(station.pumpCpl ?? station.prices?.[fuel]);
+  const matchedFuel = station.matchedFuel || fuel;
+  const pumpCpl = Number(station.pumpCpl ?? station.prices?.[matchedFuel]);
   if (!Number.isFinite(pumpCpl)) return null;
 
   let discountCpl = 0;
@@ -47,7 +48,9 @@ export function stationPriceView(
         : undefined,
     possibleDiscountCpl: possibleLowerCpl !== undefined ? possibleDiscountCpl : undefined,
     distanceKm: Number(station.distanceKm || 0),
-    fuel,
+    fuel: matchedFuel,
+    requestedFuel: station.requestedFuel || fuel,
+    exactFuelMatch: station.exactFuelMatch !== false && matchedFuel === fuel,
   };
 }
 

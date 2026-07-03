@@ -4,6 +4,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { colors, radii, shadow, spacing, surfaces, typeScale, typography } from "../theme";
 import { EvCharger, ScoreResponse, StationViewModel } from "../types";
 import { stationTimestampLine } from "../utils/decisionEvidence";
+import { fuelMismatchContextLine, fuelMismatchLine } from "../utils/fuelMismatch";
 import { tomorrowPriceView } from "../utils/pricing";
 import {
   routeDetourEvidenceLine,
@@ -12,6 +13,7 @@ import {
 } from "../utils/routeEvidenceCopy";
 import { BrandBadge } from "./BrandBadge";
 import { DecisionEvidencePanel } from "./DecisionEvidencePanel";
+import { ResultContextStrip } from "./ResultContextStrip";
 import { StationRow } from "./StationRow";
 import { openDirections } from "../screens/NearbyScreen.utils";
 
@@ -39,6 +41,7 @@ export function PlanRouteSheet({
   recommendationCopy,
   routeEndpointsPresent,
   routeNotice,
+  resultContext,
   routeSheetMinimised,
   routeSummary,
   selected,
@@ -73,6 +76,7 @@ export function PlanRouteSheet({
   recommendationCopy: { title: string; reason: string } | null;
   routeEndpointsPresent: boolean;
   routeNotice: string;
+  resultContext?: ScoreResponse["context"];
   routeSheetMinimised: boolean;
   routeSummary: string;
   selected?: StationViewModel;
@@ -164,6 +168,7 @@ export function PlanRouteSheet({
               recommendationCopy={recommendationCopy}
               routeEndpointsPresent={routeEndpointsPresent}
               routeNotice={routeNotice}
+              resultContext={resultContext}
               selectedCode={selectedCode}
               showStopsList={showStopsList}
               stopsTitle={stopsTitle}
@@ -190,6 +195,7 @@ function StationDetailPanel({
   selected: StationViewModel;
   selectedTomorrow: ReturnType<typeof tomorrowPriceView>;
 }) {
+  const mismatchLine = fuelMismatchLine(selected, { scope: "route" });
   return (
     <View style={styles.stationDetailPanel}>
       <View style={styles.sheetHeaderRow}>
@@ -204,6 +210,11 @@ function StationDetailPanel({
         </Pressable>
       </View>
       <StationRow hideWhyLine item={selected} selected onPress={onNavigate} />
+      {mismatchLine ? (
+        <View style={styles.noticeCard}>
+          <Text style={styles.noticeText}>{mismatchLine}</Text>
+        </View>
+      ) : null}
       <View style={styles.stationFacts}>
         <View style={styles.factPill}>
           <Text style={styles.factLabel}>Pump</Text>
@@ -264,6 +275,7 @@ function RouteResultsPanel({
   recommendationCopy,
   routeEndpointsPresent,
   routeNotice,
+  resultContext,
   selectedCode,
   showStopsList = true,
   stopsTitle = "Route options",
@@ -292,6 +304,7 @@ function RouteResultsPanel({
   recommendationCopy: { title: string; reason: string } | null;
   routeEndpointsPresent: boolean;
   routeNotice: string;
+  resultContext?: ScoreResponse["context"];
   selectedCode?: string;
   showStopsList?: boolean;
   stopsTitle?: string;
@@ -303,6 +316,7 @@ function RouteResultsPanel({
   const recommendationFuel = best?.fuel || "fuel";
   const [evidenceExpanded, setEvidenceExpanded] = useState(false);
   const eligibility = best ? discountEligibilitySummary(best, policyActive) : null;
+  const routeFuelMismatch = fuelMismatchLine(best, { scope: "route" }) || fuelMismatchContextLine(resultContext, { scope: "route" });
 
   return (
     <>
@@ -402,6 +416,16 @@ function RouteResultsPanel({
               ) : null}
             </View>
           </Pressable>
+          {routeFuelMismatch ? (
+            <View style={styles.noticeCard}>
+              <Text style={styles.noticeText}>{routeFuelMismatch}</Text>
+            </View>
+          ) : null}
+          <ResultContextStrip
+            context={resultContext}
+            label="Route result context"
+            stations={candidates}
+          />
           <View style={styles.compactActionRow}>
             <Pressable
               accessibilityLabel={evidenceExpanded ? "Hide route evidence" : "Show route evidence"}
@@ -433,6 +457,7 @@ function RouteResultsPanel({
                 candidate={best}
                 capability={statusCapability}
                 decisionSummary={decisionSummary}
+                resultContext={resultContext}
               />
               <RouteFollowUpPrompt
                 currentRouteSaved={currentRouteSaved}

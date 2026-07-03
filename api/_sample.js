@@ -2,6 +2,186 @@ const stationsPayload = require("../prototype/data/sample-stations.json");
 const demoStationsPayload = require("../prototype/data/vercel-demo-stations.json");
 const routesPayload = require("../prototype/data/routes.json");
 
+function parseSampleScale(value = process.env.FUEL_PATH_SAMPLE_SCALE) {
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed) || parsed < 1) return 1;
+  return Math.max(1, Math.min(parsed, 200));
+}
+
+function parseSampleSeed(value = process.env.FUEL_PATH_SAMPLE_SEED) {
+  if (!value && value !== "0") return 1729;
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed)) return 1729;
+  return parsed;
+}
+
+function parseSampleJitterKm(value = process.env.FUEL_PATH_SAMPLE_JITTER_KM) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return 0.25;
+  return Math.max(0.05, Math.min(parsed, 3));
+}
+
+function normaliseText(value, fallback = "") {
+  const text = String(value || "").trim();
+  return text || fallback;
+}
+
+function normaliseLatLon(value, isLat = false) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return NaN;
+  const max = isLat ? 90 : 180;
+  return Math.abs(parsed) <= max ? parsed : NaN;
+}
+
+function normaliseDateIso(value) {
+  const text = normaliseText(value);
+  if (!text) return "";
+  const parsed = new Date(text);
+  return Number.isNaN(parsed.getTime()) ? "" : parsed.toISOString();
+}
+
+function normalisePrices(prices = {}) {
+  const output = {};
+  for (const [key, value] of Object.entries(prices)) {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed) || parsed <= 0 || parsed >= 500) continue;
+    output[String(key)] = round(parsed, 2);
+  }
+  return output;
+}
+
+function normaliseDiscount(discount = {}) {
+  const id = normaliseText(discount.id);
+  if (!id) return null;
+  const centsPerLitre = Number(discount.centsPerLitre);
+  return {
+    id,
+    label: normaliseText(discount.label, id),
+    centsPerLitre: Number.isFinite(centsPerLitre) ? centsPerLitre : 0,
+    inferred: Boolean(discount.inferred),
+  };
+}
+
+function normaliseDiscounts(discounts = []) {
+  const filtered = [];
+  const seen = new Set();
+  for (const discount of discounts) {
+    const normalised = normaliseDiscount(discount);
+    if (!normalised) continue;
+    if (seen.has(normalised.id)) continue;
+    seen.add(normalised.id);
+    filtered.push(normalised);
+  }
+  return filtered;
+}
+
+function normaliseStation(station = {}) {
+  const stationCode = normaliseText(station.stationCode);
+  if (!stationCode) return null;
+  const lat = normaliseLatLon(station.lat, true);
+  const lon = normaliseLatLon(station.lon);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+
+  const prices = normalisePrices(station.prices);
+  if (!Object.keys(prices).length) return null;
+
+  const suburb = normaliseText(station.suburb);
+  const address = normaliseText(station.address, `${suburb || "NSW"} sample address`);
+  const state = normaliseState(station.state || station.region || inferStateFromAddress(address));
+
+  return {
+    stationCode,
+    name: normaliseText(station.name, stationCode),
+    brand: normaliseText(station.brand, "Unknown"),
+    suburb,
+    address,
+    state,
+    lat,
+    lon,
+    openNow: typeof station.openNow === "boolean" ? station.openNow : true,
+    membershipRequired: Boolean(station.membershipRequired),
+    updatedAt: normaliseDateIso(station.updatedAt),
+    source: normaliseText(station.source, "public_demo_snapshot"),
+    prices,
+    discounts: normaliseDiscounts(station.discounts || []),
+  };
+}
+
+function inferStateFromAddress(address = "") {
+  const normalised = normaliseText(address).toUpperCase();
+  const match = normalised.match(/\b(NSW|VIC|QLD|SA|WA|TAS|NT|ACT|ACT)\b/);
+  if (match) return match[1];
+  return "NSW";
+}
+
+function normaliseState(value) {
+  const state = normaliseText(value).toUpperCase();
+  const known = new Set(["NSW", "VIC", "QLD", "SA", "WA", "TAS", "NT", "ACT"]);
+  return known.has(state) ? state : "NSW";
+}
+
+function dedupeByCode(stations = []) {
+  const byCode = new Map();
+  for (const station of stations) {
+    byCode.set(station.stationCode, station);
+  }
+  return [...byCode.values()];
+}
+
+function seededRandom(seed) {
+  let state = Number.isFinite(seed) ? (Number(seed) >>> 0) : 1729;
+  return () => {
+    state = (state * 1664525 + 1013904223) >>> 0;
+    return state / 4294967296;
+  };
+}
+
+function jitterPoint(station, index, random, jitterKm = 0.25) {
+  const latBase = Number(station.lat);
+  const lonBase = Number(station.lon);
+  const offsetKmX = (random() - 0.5) * 2 * jitterKm * 1000;
+  const offsetKmY = (random() - 0.5) * 2 * jitterKm * 1000;
+  const lat = latBase + (offsetKmY / 110574);
+  const lonScale = 111320 * Math.cos((Math.PI / 180) * latBase);
+  const lon = lonBase + (offsetKmX / Math.max(lonScale, 1));
+  const normalisedLon = normaliseLatLon(lon, false);
+  const normalisedLat = normaliseLatLon(lat, true);
+  const latOffset = Number((index + 1).toString().slice(-6)) / 10000000;
+  if (!Number.isFinite(normalisedLat) || !Number.isFinite(normalisedLon)) return station;
+  const roundedLat = round(normalisedLat + (latOffset / 10000000), 6);
+  const roundedLon = round(normalisedLon + (latOffset / 10000000), 6);
+  return {
+    ...station,
+    lat: roundedLat,
+    lon: roundedLon,
+  };
+}
+
+function cloneWithSuffix(station, suffix, random, jitterKm) {
+  const jittered = jitterPoint(station, suffix, random, jitterKm);
+  return {
+    ...jittered,
+    stationCode: `${jittered.stationCode}-${suffix.toString().padStart(4, "0")}`,
+    source: "public_demo_snapshot.synthetic",
+    address: jittered.address,
+    synthetic: true,
+  };
+}
+
+function scaleStations(stations = [], scale = 1, seed = 1729, jitterKm = 0.25) {
+  const requested = Math.max(1, Math.floor(Number(scale || 1)));
+  if (!Number.isFinite(requested) || requested <= 1) return stations;
+  const random = seededRandom(seed);
+  const scaled = [];
+  for (const station of stations) {
+    scaled.push(station);
+    for (let offset = 1; offset < requested; offset += 1) {
+      scaled.push(cloneWithSuffix(station, offset, random, jitterKm));
+    }
+  }
+  return scaled;
+}
+
 const places = [
   { label: "66B Easton Avenue, Sylvania NSW 2224", lat: -34.0114122, lon: 151.0993847 },
   { label: "Sylvania NSW, Australia", lat: -34.0128, lon: 151.1056 },
@@ -37,18 +217,22 @@ function stringParam(value, fallback = "") {
   return value || fallback;
 }
 
-function sampleStations({ includeFixtureFallback = true } = {}) {
+function sampleStations({
+  includeFixtureFallback = true,
+  scale = parseSampleScale(),
+  seed = parseSampleSeed(),
+  jitterKm = parseSampleJitterKm(),
+} = {}) {
   const stationsByCode = new Map();
   const sourceStations = includeFixtureFallback
     ? [...demoStationsPayload.stations, ...stationsPayload.stations]
     : demoStationsPayload.stations;
   for (const station of sourceStations) {
-    stationsByCode.set(station.stationCode, station);
+    const normalised = normaliseStation(station);
+    if (normalised) stationsByCode.set(normalised.stationCode, normalised);
   }
-  return [...stationsByCode.values()].map((station) => ({
-    ...station,
-    address: station.address || `${station.suburb || "NSW"} sample address`,
-  }));
+  const deduped = dedupeByCode([...stationsByCode.values()]);
+  return scaleStations(deduped, scale, seed, jitterKm);
 }
 
 function distanceKm(a, b) {
@@ -140,6 +324,11 @@ function scoreStation(station, fuel, routePoints, eligibleDiscounts, index) {
     reachable: true,
     warnings: station.openNow === false ? ["Closed in sample data"] : [],
   };
+}
+
+function round(value, decimals = 0) {
+  const factor = 10 ** decimals;
+  return Math.round(Number(value) * factor) / factor;
 }
 
 module.exports = {

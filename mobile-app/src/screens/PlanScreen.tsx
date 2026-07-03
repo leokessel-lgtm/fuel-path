@@ -640,6 +640,7 @@ export function PlanScreen({
           recommendationCopy={recommendationCopy}
           routeEndpointsPresent={Boolean(routeData.endpoints)}
           routeNotice={routeNotice}
+          resultContext={result?.context}
           routeSheetMinimised={routeSheetMinimised}
           routeSummary={routeSummary}
           selected={selected}

@@ -11,15 +11,17 @@ import {
 } from "react-native";
 
 import { colors, radii, shadow, spacing, surfaces, typeScale, typography } from "../theme";
-import { NearbySheetSnap, StationViewModel } from "../types";
+import { NearbyResponse, NearbySheetSnap, StationViewModel } from "../types";
 import {
   predictionDisciplineCue,
   stationAttentionCue,
   stationEvidenceLine,
   stationTimestampLine,
 } from "../utils/decisionEvidence";
+import { fuelMismatchContextLine, fuelMismatchLine } from "../utils/fuelMismatch";
 import { tomorrowPriceView } from "../utils/pricing";
 import { BrandBadge } from "./BrandBadge";
+import { ResultContextStrip } from "./ResultContextStrip";
 import { StationRow } from "./StationRow";
 
 export type NearbySortMode = "distance" | "price" | "value";
@@ -56,6 +58,7 @@ export function NearbyStationSheet({
   sheetExpanded,
   sortedStations,
   sortMode,
+  stationContext,
   stationNotice,
   stations,
   topControls,
@@ -74,6 +77,7 @@ export function NearbyStationSheet({
   sheetExpanded: boolean;
   sortedStations: StationViewModel[];
   sortMode?: NearbySortMode;
+  stationContext?: NearbyResponse["context"];
   stationNotice: string;
   stations: StationViewModel[];
   topControls?: ReactNode;
@@ -85,6 +89,7 @@ export function NearbyStationSheet({
   const activeSnap = sheetSnap || (sheetExpanded ? "full" : "browse");
   const isPeek = activeSnap === "peek";
   const isFull = activeSnap === "full";
+  const visibleStationNotice = fuelMismatchContextLine(stationContext) || stationNotice;
 
   const requestSnap = (snap: NearbySheetSnap) => {
     if (onSnapChange) {
@@ -255,6 +260,19 @@ export function NearbyStationSheet({
               />
             </>
           ) : null}
+          {!isPeek && stations.length && visibleStationNotice ? (
+            <View style={styles.noticeState}>
+              <Text style={styles.noticeTitle}>Fuel match</Text>
+              <Text style={styles.muted}>{visibleStationNotice}</Text>
+            </View>
+          ) : null}
+          {!isPeek && stations.length ? (
+            <ResultContextStrip
+              context={stationContext}
+              label="Nearby result context"
+              stations={stations}
+            />
+          ) : null}
           {(isFull || !selected || selected) ? <View style={styles.sortRow}>
             {nearbySortOptions.map((option) => {
               const selectedSort = !selected && sortMode === option.key;
@@ -321,6 +339,7 @@ function SelectedStationCard({
   const selectedAttentionCue = stationAttentionCue(selected);
   const selectedPredictionCue = predictionDisciplineCue(selected);
   const selectedFuelLabel = selected.fuel || "fuel";
+  const mismatchLine = fuelMismatchLine(selected);
   const selectedMetaLine = [stationTimestampLine(selected.station)]
     .filter(Boolean)
     .join(" | ");
@@ -351,6 +370,11 @@ function SelectedStationCard({
             <Text numberOfLines={1} style={styles.selectedMetaRest}>
               {selectedMetaLine || stationEvidenceLine(selected)}
             </Text>
+            {mismatchLine ? (
+              <Text numberOfLines={2} style={styles.selectedMismatch}>
+                {mismatchLine}
+              </Text>
+            ) : null}
             {selected.discountCpl ? (
               <Text numberOfLines={1} style={styles.selectedDiscount}>
                 Confirmed: {selected.discountLabel}
@@ -619,6 +643,13 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontSize: 10,
     fontWeight: "400",
+    marginTop: 2,
+  },
+  selectedMismatch: {
+    color: colors.amber,
+    fontSize: 10,
+    fontWeight: "800",
+    lineHeight: 14,
     marginTop: 2,
   },
   selectedDiscount: {

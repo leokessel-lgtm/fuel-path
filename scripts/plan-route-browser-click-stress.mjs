@@ -9,7 +9,7 @@ const appUrl = process.env.FUEL_PATH_PLAN_BROWSER_STRESS_URL || "https://fuel-pa
 const pairCount = Number(process.env.FUEL_PATH_PLAN_BROWSER_STRESS_PAIRS || 30);
 const clickCount = Number(process.env.FUEL_PATH_PLAN_BROWSER_STRESS_CLICK_STATIONS || 3);
 const caseTimeoutMs = Number(process.env.FUEL_PATH_PLAN_BROWSER_STRESS_CASE_TIMEOUT_MS || 24000);
-const resultTimeoutMs = Number(process.env.FUEL_PATH_PLAN_BROWSER_STRESS_RESULT_TIMEOUT_MS || 12000);
+const resultTimeoutMs = Number(process.env.FUEL_PATH_PLAN_BROWSER_STRESS_RESULT_TIMEOUT_MS || 24000);
 const snapshotCount = Number(process.env.FUEL_PATH_PLAN_BROWSER_STRESS_SNAPSHOTS || 0);
 const runId = new Date().toISOString().replace(/[:.]/g, "-");
 const outputDir = path.resolve("tmp");
@@ -134,6 +134,7 @@ async function runBrowserCase(activePage, pair, index) {
 
     const recommendationState = await extractVisibleState(activePage);
     if (recommendationState.hasBadZeroSavingsDetour) row.failures.push("visible recommendation shows zero best-price lead with savings-detour label");
+    if (!recommendationState.hasWhyAction) row.failures.push("Plan evidence action missing");
     if (recommendationState.hasSuggestedFuelStops) row.failures.push("suggested fuel stops visible in Plan result");
     if (recommendationState.hasLargeNavigateButton) row.failures.push("large Navigate to this stop button visible");
 
@@ -229,7 +230,7 @@ async function waitForText(activePage, text) {
 }
 
 async function waitForPlanResult(activePage) {
-  await activePage.getByText("Why this stop", { exact: false }).first().waitFor({ state: "visible", timeout: resultTimeoutMs });
+  await activePage.getByText("Why?", { exact: true }).first().waitFor({ state: "visible", timeout: resultTimeoutMs });
   await activePage.getByText("BEST PRICE BY", { exact: false }).first().waitFor({ state: "visible", timeout: resultTimeoutMs }).catch(async () => {
     await activePage.getByText("Best route price", { exact: false }).first().waitFor({ state: "visible", timeout: resultTimeoutMs });
   });
@@ -254,6 +255,7 @@ async function extractVisibleState(activePage) {
     return {
       text,
       hasBadZeroSavingsDetour: text.includes("Best price by 0.0 c/L") && /savings detour/i.test(text),
+      hasWhyAction: text.includes("Why?"),
       hasSuggestedFuelStops: text.includes("Suggested fuel stops"),
       hasLargeNavigateButton: text.includes("Navigate to this stop"),
     };

@@ -59,6 +59,7 @@ export function NearbyScreen({
   const [nearbyRadiusKm, setNearbyRadiusKm] = useState(defaultNearbyRadiusKm);
   const [cameraFocusVersion, setCameraFocusVersion] = useState(0);
   const [selectedCode, setSelectedCode] = useState<string>();
+  const [selectedStation, setSelectedStation] = useState<StationViewModel>();
   const [selectionDismissed, setSelectionDismissed] = useState(false);
   const [visibleStationCodes, setVisibleStationCodes] = useState<string[]>([]);
   const [sortMode, setSortMode] = useState<NearbySortMode | undefined>(undefined);
@@ -95,7 +96,7 @@ export function NearbyScreen({
     () => ({ near: centre, nearRadiusKm: Math.max(nearbyRadiusKm, minMapSearchRadiusKm) }),
     [centre, nearbyRadiusKm],
   );
-  const { chargers, error, evNotice, loading, stationNotice, stations } = useNearbyResults({
+  const { chargers, error, evNotice, loading, stationContext, stationNotice, stations } = useNearbyResults({
     centre,
     evConnectors,
     evPowerMode,
@@ -235,6 +236,7 @@ export function NearbyScreen({
     [listSourceStations, sortMode],
   );
   const selected = stations.find((item) => item.station.stationCode === selectedCode);
+  const selectedForPanel = selectedStation && selectedStation.station.stationCode === selectedCode ? selectedStation : selected;
   const selectedCharger = chargers.find((item) => item.id === selectedCode) || chargers[0];
   const selectedPlaceActive = locationQuery.trim().length > 0 && locationQuery.trim() === centre.label;
 
@@ -265,6 +267,7 @@ export function NearbyScreen({
   const handleCloseSelectedStation = useCallback(() => {
     setSelectedCode(undefined);
     setSelectionDismissed(true);
+    setSelectedStation(undefined);
   }, []);
 
   const handleNavigateToStation = useCallback(async (item: StationViewModel) => {
@@ -280,6 +283,7 @@ export function NearbyScreen({
     if (nearbyMode !== "fuel") return;
     if (!sortedStations.length) {
       setSelectedCode(undefined);
+      setSelectedStation(undefined);
       return;
     }
     const selectedExists = stations.some((item) => item.station.stationCode === selectedCode);
@@ -291,6 +295,21 @@ export function NearbyScreen({
     if (selectionDismissed && !selectedCode) return;
     previousSortMode.current = sortMode;
   }, [nearbyMode, selectedCode, selectionDismissed, sortMode, sortedStations, stations]);
+
+  useEffect(() => {
+    if (!selectedCode) {
+      setSelectedStation(undefined);
+      return;
+    }
+    const stationMatch = stations.find((item) => item.station.stationCode === selectedCode);
+    if (stationMatch) {
+      setSelectedStation(stationMatch);
+      return;
+    }
+    setSelectedStation((current) =>
+      current?.station.stationCode === selectedCode ? current : undefined,
+    );
+  }, [selectedCode, stations]);
 
   return (
     <View style={styles.screen}>
@@ -345,12 +364,13 @@ export function NearbyScreen({
           onSortPress={handleSortPress}
           onSnapChange={setSheetSnap}
           onToggleExpanded={setSheetExpanded}
-          selected={selected}
+          selected={selectedForPanel}
           selectedCode={selectedCode}
           sheetSnap={sheetSnap}
           sheetExpanded={sheetExpanded}
           sortedStations={sortedStations}
           sortMode={sortMode}
+          stationContext={stationContext}
           stationNotice={stationNotice}
           stations={stations}
         />
@@ -377,10 +397,12 @@ export function NearbyScreen({
           preferences={preferences}
           selectedCharger={selectedCharger}
           selectedCode={selectedCode}
-          selectedStation={selected}
+          selectedStation={selectedForPanel}
           sheetSnap={sheetSnap}
           sheetExpanded={sheetExpanded}
           sortedStations={sortedStations}
+          stationContext={stationContext}
+          stationNotice={stationNotice}
         />
       ) : (
         <EvChargerPanel

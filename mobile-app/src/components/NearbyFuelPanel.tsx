@@ -1,5 +1,5 @@
 import { NearbySortMode, NearbyStationSheet } from "./NearbyStationSheet";
-import { NearbySheetSnap, StationViewModel } from "../types";
+import { NearbyResponse, NearbySheetSnap, StationViewModel } from "../types";
 
 export function NearbyFuelPanel({
   error,
@@ -16,6 +16,7 @@ export function NearbyFuelPanel({
   sheetExpanded,
   sortedStations,
   sortMode,
+  stationContext,
   stationNotice,
   stations,
 }: {
@@ -33,6 +34,7 @@ export function NearbyFuelPanel({
   sheetExpanded: boolean;
   sortedStations: StationViewModel[];
   sortMode?: NearbySortMode;
+  stationContext?: NearbyResponse["context"];
   stationNotice: string;
   stations: StationViewModel[];
 }) {
@@ -52,6 +54,7 @@ export function NearbyFuelPanel({
       sheetExpanded={sheetExpanded}
       sortedStations={sortedStations}
       sortMode={sortMode}
+      stationContext={stationContext}
       stationNotice={stationNotice}
       stations={stations}
     />

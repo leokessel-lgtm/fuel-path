@@ -422,7 +422,7 @@ function RouteResultsPanel({
                   currentRouteSaved && styles.secondaryActionButtonDisabled,
                 ]}
               >
-                <Text style={styles.secondaryActionText}>{currentRouteSaved ? "Saved" : "Save route"}</Text>
+                <Text style={styles.secondaryActionText}>{currentRouteSaved ? "Saved" : "Save"}</Text>
               </Pressable>
             ) : null}
           </View>
@@ -925,15 +925,18 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: spacing.sm,
     justifyContent: "space-between",
-    minHeight: 32,
+    minHeight: 30,
   },
   secondaryActionButton: {
     alignItems: "center",
     backgroundColor: colors.greenSoft,
     borderRadius: radii.pill,
+    height: 34,
     justifyContent: "center",
+    minHeight: 0,
+    minWidth: 74,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
+    paddingVertical: 0,
   },
   secondaryActionButtonDisabled: {
     opacity: 0.7,

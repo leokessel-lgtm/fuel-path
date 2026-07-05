@@ -7,6 +7,18 @@ Fuel Path is ready for a controlled real-user beta checkpoint. The current provi
 
 This is not a full public-launch approval. Public live-price claims remain limited to WA, and broad native performance claims should wait for lower-end Android and signed iOS device evidence.
 
+## Current production deployment - 2026-07-06 07:48 AEST
+
+Current production is verified back on the Settings-era build after the stale Account-era production rollback was corrected.
+
+- Production deployment: `dpl_C7uWcRYtvhjYK8B1ZZPx5ER5UPJ1`.
+- Vercel status: `Ready`, target `production`.
+- Production aliases include `https://fuel-path.vercel.app`.
+- Production HTML loads `_expo/static/js/web/index-d6c83cddce364d5235b117bba42f70fa.js`.
+- In-app browser verification on `https://fuel-path.vercel.app/` shows the corrected bottom nav as `Plan`, `Nearby`, `Setting(s)`, with no visible `Account` text.
+- Opening Settings shows the current Settings hub, including `Vehicle & fuel`, `Savings`, `Stations & brands`, `Places`, `Alerts` and `Support`.
+- Raw production bundle string scan still contains internal `Account` strings, but the verified rendered production flow does not expose the old Account tab/screen.
+
 ## Current decision criteria status
 - **Beta readiness gate**: `ready`, zero blockers, next action: "Phase 0 beta readiness gates are clear for controlled real-user testing."
 - **Provider terms and access**: provider terms evidence passes for configured regions; public live-price claims are allowed for WA only.

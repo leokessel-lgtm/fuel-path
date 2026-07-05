@@ -22,6 +22,7 @@ const {
 } = require("./_routeScoring");
 const { createGeocoder } = require("./_geocode");
 const { createAlertOrchestration } = require("./_alertOrchestration");
+const DISCOUNT_RULES = require("../shared/discountRegistry.json");
 const { createWaFuelWatchAdapter } = require("./_waFuelWatch");
 const { createFppDirectProvider } = require("./_fppDirectProvider");
 const { createNswFuelCheckAdapter } = require("./_nswFuelCheck");
@@ -129,68 +130,25 @@ function sampleSourceAllowed() {
   return !productionRuntime();
 }
 
-const DISCOUNT_RULES = [
-  {
-    id: "everyday_rewards",
-    label: "Everyday Rewards",
-    centsPerLitre: 4,
-    brandIncludes: ["eg ampol", "ampol", "caltex"],
-  },
-  {
-    id: "flybuys",
-    label: "Flybuys docket",
-    centsPerLitre: 4,
-    brandIncludes: ["shell", "reddy", "coles express"],
-  },
-  {
-    id: "nrma_ampol",
-    label: "NRMA / Ampol",
-    centsPerLitre: 5,
-    brandIncludes: ["ampol", "caltex"],
-  },
-  {
-    id: "rac_member",
-    label: "RAC-style member",
-    centsPerLitre: 4,
-    brandIncludes: ["ampol", "caltex", "bp", "shell", "reddy", "vibe", "puma"],
-  },
-  {
-    id: "costco_member",
-    label: "Costco member",
-    centsPerLitre: 6,
-    brandIncludes: ["costco"],
-  },
-  {
-    id: "seven_eleven_lock",
-    label: "7-Eleven manual lock",
-    centsPerLitre: 4,
-    brandIncludes: ["7-eleven", "seven eleven"],
-  },
-  {
-    id: "fleet_card",
-    label: "Fleet card",
-    centsPerLitre: 3,
-    brandIncludes: ["ampol", "caltex", "bp", "shell", "reddy", "united", "metro", "mobil"],
-  },
-  {
-    id: "linkt_rewards",
-    label: "Linkt Rewards",
-    centsPerLitre: 6,
-    brandIncludes: ["7-eleven"],
-  },
-  {
-    id: "linkt_bonus",
-    label: "Linkt toll-trip bonus",
-    centsPerLitre: 26,
-    brandIncludes: ["7-eleven"],
-  },
-];
+function applyCors(req, res) {
+  const origin = req?.headers?.origin || req?.headers?.Origin || "";
+  if (!/^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$/i.test(String(origin))) return;
+  res.setHeader("Access-Control-Allow-Origin", origin);
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,DELETE,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Fuel-Path-Alerts-Token, X-Fuel-Path-Prediction-Token");
+  res.setHeader("Access-Control-Max-Age", "600");
+}
 
 function sendJson(res, status, payload) {
   res.status(status).json(payload);
 }
 
 function methodAllowed(req, res, methods = ["GET"]) {
+  applyCors(req, res);
+  if (req.method === "OPTIONS") {
+    res.status(204).end();
+    return false;
+  }
   if (methods.includes(req.method)) return true;
   sendJson(res, 405, { error: "Method not allowed" });
   return false;
@@ -275,16 +233,38 @@ function stationWithDiscountRules(station) {
   }
   const text = stationBrandText(station);
   for (const rule of DISCOUNT_RULES) {
+    if (!isActiveDirectDiscountRule(rule)) continue;
     if (rule.brandIncludes.some((needle) => text.includes(needle))) {
       byId.set(rule.id, {
         id: rule.id,
         label: rule.label,
         centsPerLitre: rule.centsPerLitre,
+        fuelTypeCentsPerLitre: rule.fuelTypeCentsPerLitre,
+        maxLitresPerTransaction: rule.maxLitresPerTransaction,
+        maxTransactionsPer24h: rule.maxTransactionsPer24h,
+        excludedFuelTypes: rule.excludedFuelTypes,
+        excludedStates: rule.excludedStates,
+        includedStates: rule.includedStates,
+        notStackableWith: rule.notStackableWith,
+        requiresBarcode: rule.requiresBarcode,
+        participatingStationScope: rule.participatingStationScope,
+        sourceUrl: rule.sourceUrl,
         inferred: true,
       });
     }
   }
   return { ...station, discounts: [...byId.values()] };
+}
+
+function isActiveDirectDiscountRule(rule) {
+  if (rule.discountType !== "direct_cpl") return false;
+  if (Number(rule.centsPerLitre || 0) <= 0) return false;
+  if (!rule.expiryDate) return true;
+  return rule.expiryDate >= todayIsoDate();
+}
+
+function todayIsoDate() {
+  return new Date().toISOString().slice(0, 10);
 }
 
 function loadSampleStations() {

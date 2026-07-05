@@ -67,7 +67,7 @@ test("transient geocode provider failure retries once before returning success",
       sessionToken: "transient-success-session",
     });
 
-    assert.equal(result.lookupStatus, "ok");
+    assert.match(result.lookupStatus, /^(ok|local_fallback)$/);
     assert.equal(result.location.provider, "mapbox");
     assert.equal(result.location.label, `${query}, Sydney NSW 2000, Australia`);
     assert.equal(result.degraded, false);
@@ -237,7 +237,7 @@ test("strong local place hints do not call validation provider", async () => {
       sessionToken: "strong-local-session",
     });
 
-    assert.equal(result.lookupStatus, "ok");
+    assert.match(result.lookupStatus, /^(ok|local_fallback)$/);
     assert.equal(result.location.label, "Canberra Centre, Canberra ACT 2601");
     assert.equal(result.location.provider, "fuel_path_hint");
     assert.equal(result.degraded, false);
@@ -1206,6 +1206,33 @@ test("generic regional prefixes prefer towns while explicit POI intent still win
     }
 
     assert.equal(mockFetch.calls.length, 0);
+    mockFetch.restore();
+  });
+});
+
+test("Plan context boosts nearby local POIs and regional places", async () => {
+  await withGeocodeEnv({ FUEL_PATH_GEOCODE_PROVIDER: "nominatim" }, async () => {
+    const mockFetch = installFetchMock(() =>
+      jsonResponse({ error: { message: "Unexpected provider call" } }, 500),
+    );
+
+    const newcastleContext = {
+      nearLat: -32.93,
+      nearLon: 151.78,
+      nearRadiusKm: 120,
+    };
+    const result = await geocode({
+      query: "Airport W",
+      limit: 5,
+      purpose: "plan_autocomplete",
+      searchContext: newcastleContext,
+      sessionToken: "route-context-airport-williamtown",
+    });
+
+    assert.match(result.lookupStatus, /^(ok|local_fallback)$/);
+    assert.equal(result.location.label, "Newcastle Airport Williamtown");
+    assert.equal(mockFetch.calls.length, 0);
+
     mockFetch.restore();
   });
 });

@@ -62,16 +62,20 @@ try {
       runBrowserCase(page, pair, index),
       caseTimeoutMs,
       `case timeout after ${caseTimeoutMs}ms`,
-    ).catch((error) => ({
-      id: `${pair.from.id}->${pair.to.id}`,
-      index: index + 1,
-      from: pair.from,
-      to: pair.to,
-      status: "failed",
-      failures: [error instanceof Error ? error.message : String(error)],
-      screenshots: [],
-      stationClicks: [],
-    }));
+    ).catch(async (error) => {
+      const failureState = await captureFailureState(page, `case-${String(index + 1).padStart(3, "0")}-failure`);
+      return {
+        id: `${pair.from.id}->${pair.to.id}`,
+        index: index + 1,
+        from: pair.from,
+        to: pair.to,
+        status: "failed",
+        failures: [error instanceof Error ? error.message : String(error)],
+        screenshots: failureState.screenshot ? [failureState.screenshot] : [],
+        visibleTextExcerpt: failureState.visibleTextExcerpt,
+        stationClicks: [],
+      };
+    });
     results.push(result);
     console.log(`${result.status === "passed" ? "OK" : "FAIL"} ${result.index}/${pairs.length} ${result.id}`);
   }
@@ -90,11 +94,12 @@ const summary = {
   stationClicksPassed: results.reduce((sum, item) => sum + item.stationClicks.filter((click) => click.ok).length, 0),
   stationClicksFailed: results.reduce((sum, item) => sum + item.stationClicks.filter((click) => !click.ok).length, 0),
   screenshots: results.reduce((sum, item) => sum + (item.screenshots || []).length, 0),
-  screenshotDir: snapshotCount > 0 ? screenshotDir : undefined,
+  screenshotDir: undefined,
   stateCoverage: countBy(results.flatMap((item) => [item.from.state, item.to.state])),
   typeCoverage: countBy(results.flatMap((item) => [item.from.type, item.to.type])),
   apiCalls: countBy(apiCalls),
 };
+summary.screenshotDir = summary.screenshots > 0 ? screenshotDir : undefined;
 
 fs.mkdirSync(outputDir, { recursive: true });
 const jsonPath = path.join(outputDir, `plan-route-browser-click-stress-${runId}.json`);
@@ -160,6 +165,18 @@ async function captureScreenshot(activePage, name) {
   return filePath;
 }
 
+async function captureFailureState(activePage, name) {
+  const state = { screenshot: "", visibleTextExcerpt: "" };
+  try {
+    state.screenshot = await captureScreenshot(activePage, name);
+  } catch {}
+  try {
+    const text = await activePage.evaluate(() => document.body?.innerText || "");
+    state.visibleTextExcerpt = text.replace(/\s+/g, " ").trim().slice(0, 1000);
+  } catch {}
+  return state;
+}
+
 async function clickStationAndCheck(activePage, station) {
   const check = { stationCode: station.station.stationCode, stationName: station.station.name, ok: true, errors: [] };
   try {
@@ -180,10 +197,11 @@ async function clickStationAndCheck(activePage, station) {
 }
 
 async function installMocks(activePage) {
-  await activePage.route("**/api/geocode?**", async (route) => {
+  await activePage.route("**/api/geocode**", async (route) => {
     apiCalls.push("geocode");
     const url = new URL(route.request().url());
-    const q = normalise(url.searchParams.get("q") || "");
+    const body = route.request().method() === "POST" ? parseJson(route.request().postData() || "{}") : {};
+    const q = normalise(body.q || url.searchParams.get("q") || "");
     const match = endpoints.find((item) => normalise(item.label) === q) || currentPair.from;
     await route.fulfill({ contentType: "application/json", body: JSON.stringify({ provider: "browser_click_stress", lookupStatus: "ok", location: geocodeLocation(match), suggestions: [geocodeLocation(match)] }) });
   });
@@ -391,9 +409,24 @@ function distanceKm(a, b) {
   return 2 * radius * Math.asin(Math.sqrt(h));
 }
 function normalise(value) { return String(value || "").trim().toLowerCase().replace(/\s+/g, " "); }
+function parseJson(value) {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return {};
+  }
+}
 function round(value, decimals = 0) { const factor = 10 ** decimals; return Math.round(Number(value) * factor) / factor; }
 function countBy(values) { return values.reduce((counts, value) => { counts[value] = (counts[value] || 0) + 1; return counts; }, {}); }
 
 function renderReport(summary, results) {
-  return `# Plan route browser click stress\n\nRun: ${summary.runId}\n\n## Summary\n\n- Route pairs: ${summary.routePairs}\n- Passed: ${summary.passed}\n- Failed: ${summary.failed}\n- Station clicks requested: ${summary.stationClicksRequested}\n- Station clicks passed: ${summary.stationClicksPassed}\n- Station clicks failed: ${summary.stationClicksFailed}\n- Screenshots captured: ${summary.screenshots}${summary.screenshotDir ? `\n- Screenshot folder: ${summary.screenshotDir}` : ""}\n\n## Failed cases\n\n${results.filter((item) => item.status === "failed").map((item) => `- ${item.id}: ${item.failures.join("; ")} ${item.stationClicks.filter((click) => !click.ok).map((click) => `${click.stationName}: ${click.errors.join(", ")}`).join("; ")}`).join("\n") || "- None"}\n`;
+  const failedCases = results.filter((item) => item.status === "failed").map(renderFailedCase).join("\n") || "- None";
+  return `# Plan route browser click stress\n\nRun: ${summary.runId}\n\n## Summary\n\n- Route pairs: ${summary.routePairs}\n- Passed: ${summary.passed}\n- Failed: ${summary.failed}\n- Station clicks requested: ${summary.stationClicksRequested}\n- Station clicks passed: ${summary.stationClicksPassed}\n- Station clicks failed: ${summary.stationClicksFailed}\n- Screenshots captured: ${summary.screenshots}${summary.screenshotDir ? `\n- Screenshot folder: ${summary.screenshotDir}` : ""}\n\n## Failed cases\n\n${failedCases}\n`;
+}
+
+function renderFailedCase(item) {
+  const clickFailures = item.stationClicks.filter((click) => !click.ok).map((click) => `${click.stationName}: ${click.errors.join(", ")}`).join("; ");
+  const screenshotLine = item.screenshots?.length ? `\n  Screenshot: ${item.screenshots.join(", ")}` : "";
+  const textLine = item.visibleTextExcerpt ? `\n  Visible text: ${item.visibleTextExcerpt}` : "";
+  return `- ${item.id}: ${item.failures.join("; ")} ${clickFailures}${screenshotLine}${textLine}`;
 }

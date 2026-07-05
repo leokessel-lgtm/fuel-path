@@ -1,0 +1,135 @@
+[
+  {
+    "id": "nsw_sylvania_suburb",
+    "category": "suburb",
+    "query": "Sylvania NSW",
+    "expectedState": "NSW",
+    "expectedTerms": ["Sylvania NSW"]
+  },
+  {
+    "id": "nsw_newcastle_suburb",
+    "category": "suburb",
+    "query": "Newcastle NSW",
+    "expectedState": "NSW",
+    "expectedTerms": ["Newcastle NSW"]
+  },
+  {
+    "id": "nsw_katoomba_town",
+    "category": "town",
+    "query": "Katoomba NSW",
+    "expectedState": "NSW",
+    "expectedTerms": ["Katoomba NSW"]
+  },
+  {
+    "id": "nsw_service_nsw_sylvania",
+    "category": "government_service",
+    "query": "Service NSW Sylvania",
+    "expectedState": "NSW",
+    "expectedTerms": ["Service NSW"]
+  },
+  {
+    "id": "nsw_hyde_park",
+    "category": "park",
+    "query": "Hyde Park Sydney",
+    "expectedState": "NSW",
+    "expectedTerms": ["Hyde Park"]
+  },
+  {
+    "id": "act_canberra_city",
+    "category": "city",
+    "query": "Canberra ACT",
+    "expectedState": "ACT",
+    "expectedTerms": ["Canberra ACT"]
+  },
+  {
+    "id": "vic_melbourne_cbd",
+    "category": "city",
+    "query": "Melbourne CBD",
+    "expectedState": "VIC",
+    "expectedTerms": ["Melbourne CBD", "Melbourne VIC"]
+  },
+  {
+    "id": "vic_flinders_street_station",
+    "category": "transit",
+    "query": "Flinders Street Station Melbourne",
+    "expectedState": "VIC",
+    "expectedTerms": ["Flinders Street Station"]
+  },
+  {
+    "id": "vic_prince_hotel_st_kilda",
+    "category": "hotel",
+    "query": "Prince Hotel St Kilda",
+    "expectedState": "VIC",
+    "expectedTerms": ["Prince Hotel", "The Prince"]
+  },
+  {
+    "id": "qld_aussie_world",
+    "category": "attraction",
+    "query": "Aussie World Sunshine Coast",
+    "expectedState": "QLD",
+    "expectedTerms": ["Aussie World"]
+  },
+  {
+    "id": "qld_cairns_airport",
+    "category": "airport",
+    "query": "Cairns Airport QLD",
+    "expectedState": "QLD",
+    "expectedTerms": ["Cairns Airport"]
+  },
+  {
+    "id": "wa_perth_cbd",
+    "category": "city",
+    "query": "Perth CBD",
+    "expectedState": "WA",
+    "expectedTerms": ["Perth CBD", "Perth WA"]
+  },
+  {
+    "id": "wa_kings_park",
+    "category": "park",
+    "query": "Kings Park Perth",
+    "expectedState": "WA",
+    "expectedTerms": ["Kings Park"]
+  },
+  {
+    "id": "sa_monarto_safari_park",
+    "category": "attraction",
+    "query": "Monarto Safari Park",
+    "expectedState": "SA",
+    "expectedTerms": ["Monarto Safari Park"]
+  },
+  {
+    "id": "sa_coober_pedy_town",
+    "category": "town",
+    "query": "Coober Pedy SA",
+    "expectedState": "SA",
+    "expectedTerms": ["Coober Pedy SA"]
+  },
+  {
+    "id": "tas_hobart_city",
+    "category": "city",
+    "query": "Hobart TAS",
+    "expectedState": "TAS",
+    "expectedTerms": ["Hobart TAS"]
+  },
+  {
+    "id": "tas_cradle_mountain",
+    "category": "attraction",
+    "query": "Cradle Mountain TAS",
+    "expectedState": "TAS",
+    "expectedTerms": ["Cradle Mountain"]
+  },
+  {
+    "id": "nt_darwin_city",
+    "category": "city",
+    "query": "Darwin NT",
+    "expectedState": "NT",
+    "expectedTerms": ["Darwin NT"]
+  },
+  {
+    "id": "nt_kakadu_visitor_centre",
+    "category": "attraction",
+    "query": "Kakadu Visitor Centre",
+    "expectedState": "NT",
+    "expectedTerms": ["Kakadu Visitor Centre"]
+  }
+]

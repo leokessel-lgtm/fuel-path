@@ -82,6 +82,22 @@ FUEL_PATH_GOOGLE_PLACES_API_KEY
 FUEL_PATH_MAPBOX_ACCESS_TOKEN
 FUEL_PATH_HERE_API_KEY
 FUEL_PATH_GEOAPIFY_API_KEY
+FUEL_PATH_TOMTOM_API_KEY
+```
+
+Named POI provider evaluation:
+
+```text
+npm run test:named-poi-provider-bakeoff
+```
+
+The bake-off compares Google Places, HERE and TomTom for named Plan destinations such as schools, hotels, parks, hospitals, shopping centres, airports and civic locations. It skips providers without keys, keeps Google Place Details disabled unless explicitly enabled, and only fills cost estimates when current per-1,000 pricing is provided through:
+
+```text
+FUEL_PATH_GOOGLE_PLACES_AUTOCOMPLETE_PER_1000_USD
+FUEL_PATH_GOOGLE_PLACE_DETAILS_PER_1000_USD
+FUEL_PATH_HERE_SEARCH_PER_1000_USD
+FUEL_PATH_TOMTOM_SEARCH_PER_1000_USD
 ```
 
 Routing:

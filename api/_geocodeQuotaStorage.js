@@ -82,6 +82,41 @@ async function reserveGeocodeQuota({
   };
 }
 
+async function getGeocodeQuotaUsage({
+  quotaKey = DEFAULT_QUOTA_KEY,
+  date = new Date().toISOString().slice(0, 10),
+} = {}) {
+  if (testStorage?.usage) return testStorage.usage({ quotaKey, date });
+
+  const safeDate = normaliseDate(date);
+  const safeQuotaKey = String(quotaKey || DEFAULT_QUOTA_KEY).trim() || DEFAULT_QUOTA_KEY;
+
+  if (!databaseUrl()) {
+    const key = `${safeQuotaKey}:${safeDate}`;
+    return {
+      quotaKey: safeQuotaKey,
+      date: safeDate,
+      calls: Number(memoryQuotas.get(key) || 0),
+      durable: false,
+    };
+  }
+
+  const sql = await getSql();
+  const rows = await sql`
+    SELECT calls
+    FROM fuel_path_geocode_quotas
+    WHERE quota_key = ${safeQuotaKey}
+      AND quota_date = ${safeDate}
+    LIMIT 1
+  `;
+  return {
+    quotaKey: safeQuotaKey,
+    date: safeDate,
+    calls: Number(rows[0]?.calls || 0),
+    durable: true,
+  };
+}
+
 async function getSql() {
   if (sqlClient) return sqlClient;
   const { neon } = require("@neondatabase/serverless");
@@ -137,6 +172,7 @@ function setGeocodeQuotaStorageForTests(storage) {
 module.exports = {
   geocodeQuotaStorageStatus,
   reserveGeocodeQuota,
+  getGeocodeQuotaUsage,
   resetMemoryGeocodeQuotaForTests,
   setGeocodeQuotaStorageForTests,
 };

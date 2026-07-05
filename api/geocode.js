@@ -29,6 +29,8 @@ module.exports = async function handler(req, res) {
       limit,
       sessionToken: stringParam(params.sessionToken),
       provider: stringParam(params.provider),
+      providerPlaceId: stringParam(params.providerPlaceId),
+      purpose: stringParam(params.purpose),
       searchContext: {
         nearLat: numberParam(params.nearLat, NaN),
         nearLon: numberParam(params.nearLon, NaN),

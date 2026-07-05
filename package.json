@@ -1,7 +1,7 @@
 {
   "private": true,
   "scripts": {
-    "test": "node --test --test-concurrency=1 tests/api/provider-routing.test.js tests/api/provider-terms-readiness.test.js tests/api/store-publishing-readiness.test.js tests/api/support-readiness.test.js tests/api/beta-readiness.test.js tests/api/route-quality-now.test.js tests/api/predictions.test.js",
+    "test": "node --test --test-concurrency=1 tests/api/provider-routing.test.js tests/api/provider-terms-readiness.test.js tests/api/store-publishing-readiness.test.js tests/api/support-readiness.test.js tests/api/beta-readiness.test.js tests/api/route-quality-now.test.js tests/api/predictions.test.js tests/api/discount-registry.test.js",
     "validate:tas-v2": "node scripts/validate-api-nsw-v2-tas.mjs",
     "validate:vic-servo-saver": "node scripts/validate-vic-servo-saver-smoke.mjs",
     "validate:vic-servo-saver:matrix": "node scripts/validate-vic-servo-saver-smoke.mjs --matrix",
@@ -11,6 +11,8 @@
     "test:geocode-matrix:local": "FUEL_PATH_MATRIX_MODE=module FUEL_PATH_MATRIX_PROVIDER_FAILURE=rate_limit node scripts/geocode-matrix.mjs",
     "test:geocode-regional-hard": "node scripts/geocode-regional-hard-matrix.mjs",
     "test:geocode-regional-hard:local": "FUEL_PATH_MATRIX_MODE=module FUEL_PATH_MATRIX_PROVIDER_FAILURE=rate_limit node scripts/geocode-regional-hard-matrix.mjs",
+    "test:geocode-national-places:local": "node scripts/geocode-national-place-10k-stress.mjs",
+    "test:named-poi-provider-bakeoff": "node scripts/named-poi-provider-bakeoff.mjs",
     "test:geocode-route-fields:local": "node scripts/geocode-route-field-stress.mjs",
     "test:geocode-route-exact-addresses:local": "node scripts/geocode-route-exact-address-field-stress.mjs",
     "test:plan-route-recommendations:local": "node scripts/plan-route-recommendation-stress.mjs",
@@ -52,6 +54,7 @@
     "start:gnaf-api": "node scripts/oracle/gnaf-api-server.mjs",
     "load:gnaf-compact-postgres": "node scripts/load-gnaf-compact-postgres.mjs",
     "test:geocode-focused-regression": "node scripts/geocode-focused-regression.mjs",
+    "test:geocode-quality-regression": "node scripts/geocode-quality-regression.mjs",
     "test:poi-autocomplete-budget": "node scripts/check-poi-autocomplete-budget.mjs",
     "check:production-lookup-monitor": "node scripts/check-production-lookup-monitor.mjs",
     "test:map-interactions": "node scripts/map-interaction-stress.mjs",
@@ -61,14 +64,18 @@
     "test:route-adversarial": "node scripts/route-recommendation-adversarial-stress.mjs",
     "test:map-density": "node scripts/map-density-performance-stress.mjs",
     "test:claim-safety": "node scripts/claim-safety-audit-stress.mjs",
+    "test:card-copy": "node scripts/check-card-copy-regression.mjs",
+    "test:plan-card-copy": "node scripts/check-plan-card-copy-regression.mjs",
     "test:production-smoke-matrix": "node scripts/production-smoke-matrix-stress.mjs",
+    "test:ev-route-production-matrix": "node scripts/ev-route-production-matrix.mjs",
     "test:map-interactions:mocked": "node scripts/map-interaction-mocked-stress.mjs",
     "sample:fleet-lite-report": "node scripts/generate-fleet-lite-sample-report.mjs",
     "check:production-fuel-readiness-canary": "node scripts/production-fuel-readiness-canary.mjs",
     "report:production-readiness-pack": "node scripts/production-readiness-pack.mjs",
     "report:prediction-proof": "node scripts/build-prediction-backtest-proof-report.mjs",
     "report:route-output-benchmark": "node scripts/build-route-output-benchmark-report.mjs",
-    "check:route-example-page-gate": "node scripts/check-route-example-page-gate.mjs"
+    "check:route-example-page-gate": "node scripts/check-route-example-page-gate.mjs",
+    "test:map-geocode-cost-guardrails": "node --test tests/api/google-provider-mock.test.js tests/api/lookup-readiness.test.js tests/api/provider-observability.test.js tests/api/geocode-fallback-policy-guard.test.js"
   },
   "engines": {
     "node": "22.x"

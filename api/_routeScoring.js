@@ -103,9 +103,13 @@ function median(values) {
   return ordered.length % 2 ? ordered[middle] : (ordered[middle - 1] + ordered[middle]) / 2;
 }
 
-function bestDiscount(station, eligibleDiscounts) {
-  const eligible = (station.discounts || []).filter((discount) => eligibleDiscounts.has(discount.id));
-  return eligible.sort((a, b) => Number(b.centsPerLitre) - Number(a.centsPerLitre))[0];
+function bestDiscount(station, eligibleDiscounts, { fillLitres = ASSUMED_ROUTE_FILL_LITRES, fuel } = {}) {
+  const eligible = (station.discounts || [])
+    .filter((discount) => eligibleDiscounts.has(discount.id))
+    .filter((discount) => discountAppliesToStation(discount, station))
+    .map((discount) => discountForFill(discount, { fillLitres, fuel }))
+    .filter((discount) => Number(discount.effectiveCentsPerLitre || 0) > 0);
+  return eligible.sort((a, b) => Number(b.effectiveCentsPerLitre) - Number(a.effectiveCentsPerLitre))[0];
 }
 
 function adaptiveCorridorAttempts(routeDistanceKm, requestedCorridorKm) {
@@ -204,8 +208,8 @@ function scoreRouteForCorridor({ source, route, stations, fuel, tankLitres, tank
     if (!includeMemberPrices && station.membershipRequired) continue;
 
     const pumpCpl = Number(station.prices[fuel]);
-    const discount = bestDiscount(station, eligibleDiscounts);
-    const discountCpl = Number(discount?.centsPerLitre || 0);
+    const discount = bestDiscount(station, eligibleDiscounts, { fillLitres, fuel });
+    const discountCpl = Number(discount?.effectiveCentsPerLitre || 0);
     const adjustedCpl = Math.max(0, pumpCpl - discountCpl);
     const detourKm = routeDistanceInfo.distanceToRouteKm * 2 * 1.35;
     const detourMinutes = (detourKm / Number(route.defaultDetourSpeedKmh || 45)) * 60;
@@ -227,7 +231,12 @@ function scoreRouteForCorridor({ source, route, stations, fuel, tankLitres, tank
     const matchesDetourRule = detourMinutes <= effectiveDetourLimitMinutes;
     const matchesDecisionRule = matchesSavingRule && matchesDetourRule && reachable && station.openNow !== false;
     const warnings = [];
-    if (discount) warnings.push(`discount applied: ${discount.label}`);
+    if (discount) {
+      warnings.push(`discount applied: ${discount.label}`);
+      if (discount.maxLitresPerTransaction && discount.appliedLitres < fillLitres) {
+        warnings.push(`discount capped at ${discount.appliedLitres.toFixed(1)} L`);
+      }
+    }
     if (station.membershipRequired) warnings.push("membership-only price included");
     if (station.openNow === false) warnings.push("station marked closed");
     if (!matchesSavingRule) warnings.push("small saving after detour fuel");
@@ -245,6 +254,8 @@ function scoreRouteForCorridor({ source, route, stations, fuel, tankLitres, tank
       discountCpl: round(discountCpl, 1),
       discountLabel: discount?.label,
       discountLabels: discount ? [discount.label] : [],
+      discountAppliedLitres: discount ? round(discount.appliedLitres, 1) : 0,
+      discountMaxLitres: discount?.maxLitresPerTransaction,
       detourKm: round(detourKm, 2),
       detourMinutes: round(detourMinutes, 1),
       detourFuelLitres: round(detourFuelLitres, 2),
@@ -503,6 +514,8 @@ function decisionEconomics(candidate, { baselineCpl, fillLitres, candidates = []
     comparisonKind: Number.isFinite(comparisonCpl) ? "next_best_viable" : "none",
     pumpCpl: candidate.pumpCpl,
     adjustedCpl: candidate.adjustedCpl,
+    discountAppliedLitres: candidate.discountAppliedLitres,
+    discountMaxLitres: candidate.discountMaxLitres,
     fillLitres: candidate.fillLitres,
     grossFuelSaving: round(grossFuelSaving, 2),
     detourKm: candidate.detourKm,
@@ -514,6 +527,51 @@ function decisionEconomics(candidate, { baselineCpl, fillLitres, candidates = []
     netSavingAfterDetourFuel: candidate.netSaving,
     netSavingAfterDetourFuelAndTime: candidate.netAfterDetourAndTimeCost,
   };
+}
+
+function discountForFill(discount, { fillLitres, fuel } = {}) {
+  const rawCpl = discountCentsForFuel(discount, fuel);
+  const litres = Number(fillLitres || ASSUMED_ROUTE_FILL_LITRES);
+  const maxLitres = Number(discount.maxLitresPerTransaction || litres);
+  const appliedLitres = Math.max(0, Math.min(litres, Number.isFinite(maxLitres) ? maxLitres : litres));
+  const effectiveCentsPerLitre = litres > 0 ? rawCpl * (appliedLitres / litres) : rawCpl;
+  return {
+    ...discount,
+    centsPerLitre: rawCpl,
+    effectiveCentsPerLitre,
+    appliedLitres,
+  };
+}
+
+function discountCentsForFuel(discount, fuel) {
+  const fuelSpecific = discount?.fuelTypeCentsPerLitre?.[fuel];
+  if (Number.isFinite(Number(fuelSpecific))) return Number(fuelSpecific);
+  return Number(discount?.centsPerLitre || 0);
+}
+
+function discountAppliesToStation(discount, station) {
+  const state = stationState(station);
+  if (state && Array.isArray(discount.includedStates) && discount.includedStates.length && !discount.includedStates.includes(state)) {
+    return false;
+  }
+  if (state && Array.isArray(discount.excludedStates) && discount.excludedStates.includes(state)) {
+    return false;
+  }
+  return true;
+}
+
+function stationState(station) {
+  const source = String(station?.source || "");
+  if (source.includes("_sa_")) return "SA";
+  if (source.includes("_tas_")) return "TAS";
+  if (source.includes("_wa_")) return "WA";
+  if (source.includes("_nt_")) return "NT";
+  if (source.includes("_qld_")) return "QLD";
+  if (source.includes("_vic_")) return "VIC";
+  if (source.includes("_nsw_")) return "NSW";
+  const text = ` ${station?.address || ""} ${station?.suburb || ""} ${station?.name || ""} `.toUpperCase();
+  const match = text.match(/\b(NSW|ACT|VIC|QLD|SA|WA|TAS|NT)\b/);
+  return match?.[1] || "";
 }
 
 function nextBestViableComparisonCpl(selectedCandidate, candidates = []) {
@@ -770,4 +828,10 @@ module.exports = {
   routeContextStations,
   scoreRoute,
   stationPayload,
+  _discountTermsForTests: {
+    discountAppliesToStation,
+    discountCentsForFuel,
+    discountForFill,
+    stationState,
+  },
 };

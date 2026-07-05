@@ -80,6 +80,25 @@ test("combined score endpoint enables top-three actual detours by default", asyn
   assert.deepEqual(calls.map((call) => call.trafficPreference), ["aware", "aware", "aware"]);
 });
 
+test("score endpoint preserves legacy route endpoint behaviour for Vercel rewrite", async () => {
+  const calls = [];
+  const payload = await withMockedScoreBackend(calls, async (handler) =>
+    callRouteEndpoint(handler, {
+      __endpoint: "route",
+      fromLat: "0",
+      fromLon: "0",
+      fromLabel: "Start",
+      toLat: "0",
+      toLon: "1",
+      toLabel: "End",
+    }),
+  );
+
+  assert.equal(payload.provider, "mock_routes");
+  assert.equal(payload.distanceKm, 100);
+  assert.deepEqual(calls, [{ from: "Start", to: "End", trafficPreference: undefined, tollPreference: undefined }]);
+});
+
 test("combined score endpoint can explicitly disable actual detour refinement", async () => {
   const calls = [];
   const payload = await withMockedScoreBackend(calls, async (handler) =>
@@ -272,6 +291,31 @@ function callScore(handler, body) {
       body,
       method: "POST",
       query: {},
+    };
+    const res = {
+      statusCode: 200,
+      status(status) {
+        this.statusCode = status;
+        return this;
+      },
+      json(payload) {
+        if (this.statusCode >= 400) {
+          reject(new Error(payload.error || `HTTP ${this.statusCode}`));
+          return;
+        }
+        resolve(payload);
+      },
+    };
+    Promise.resolve(handler(req, res)).catch(reject);
+  });
+}
+
+function callRouteEndpoint(handler, query) {
+  return new Promise((resolve, reject) => {
+    const req = {
+      body: {},
+      method: "GET",
+      query,
     };
     const res = {
       statusCode: 200,

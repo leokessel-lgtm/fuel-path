@@ -4,6 +4,20 @@
   "buildCommand": "npm run test:poi-autocomplete-budget && sh scripts/build-vercel-static.sh",
   "outputDirectory": "public",
   "cleanUrls": true,
+  "rewrites": [
+    {
+      "source": "/api/route",
+      "destination": "/api/score?__endpoint=route"
+    },
+    {
+      "source": "/api/saved-routes",
+      "destination": "/api/alerts?__endpoint=saved-routes"
+    },
+    {
+      "source": "/api/internal/jobs/:job",
+      "destination": "/api/jobs?job=:job"
+    }
+  ],
   "crons": [
     {
       "path": "/api/cron/evaluate-route-alerts",

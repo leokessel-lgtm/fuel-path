@@ -191,7 +191,7 @@ function stationContextNotice(context: {
   if (shouldShowCacheNotice(context)) {
     const age = Number(context.cacheAgeSeconds || 0);
     const ageText = age > 0 ? ` Cached ${formatCacheAge(age)} ago.` : "";
-    notices.push(`Price feed is degraded or stale.${ageText} Confirm before choosing a stop.`);
+    notices.push(`Price feed is stale.${ageText} Confirm before choosing a stop.`);
   }
   const limited = context.regionCapabilities?.find((item) =>
     ["limited", "pending_access", "fallback", "unsupported"].includes(item.capability),
@@ -218,7 +218,6 @@ function shouldShowProviderWarning(warning: string) {
 }
 
 function shouldShowCacheNotice(context: { cacheAgeSeconds?: number; cacheMode?: string; degraded?: boolean }) {
-  if (context.degraded) return true;
   if (context.cacheMode !== "stale") return false;
   const age = Number(context.cacheAgeSeconds || 0);
   return Number.isFinite(age) && age >= 30 * 60;

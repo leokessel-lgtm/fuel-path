@@ -323,6 +323,24 @@ const checks = [
       !nearbyStationSheet.includes("noticeText"),
   },
   {
+    label: "nearby station sheet keeps an explicit map escape control before full expansion",
+    ok:
+      nearbyStationSheet.includes("const requestMap = () => {") &&
+      nearbyStationSheet.includes('requestSnap(isFull ? "browse" : "peek");') &&
+      nearbyStationSheet.includes("!isPeek ? (") &&
+      nearbyStationSheet.includes('accessibilityLabel={isFull ? "Show map" : "Dismiss station list and show map"}') &&
+      nearbyStationSheet.includes("styles.headerActions") &&
+      nearbyStationSheet.includes("<Text style={styles.mapButtonText}>Map</Text>"),
+  },
+  {
+    label: "fresh degraded provider warnings do not masquerade as stale cache",
+    ok:
+      nearbyResults.includes('if (context.cacheMode !== "stale") return false;') &&
+      nearbyResults.includes("return Number.isFinite(age) && age >= 30 * 60;") &&
+      !nearbyResults.includes("context.degraded === true") &&
+      !nearbyResults.includes("Price feed is degraded or stale."),
+  },
+  {
     label: "nearby map selection clears sort highlight and uses row-style selected card",
     ok:
       nearbyScreen.includes("const [sortMode, setSortMode] = useState<NearbySortMode | undefined>(undefined);") &&

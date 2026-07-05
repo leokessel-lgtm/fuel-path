@@ -95,6 +95,10 @@ export function NearbyStationSheet({
     }
     onToggleExpanded(snap === "full");
   };
+  const requestMap = () => {
+    if (selected && !isFull) onCloseSelectedStation();
+    requestSnap(isFull ? "browse" : "peek");
+  };
 
   const settleSheetDrag = (dy: number, toggleOnTap = true) => {
     setDragOffsetY(0);
@@ -202,28 +206,30 @@ export function NearbyStationSheet({
         >
           <View style={styles.grabber} />
         </Pressable>
-        {isFull ? (
-          <Pressable
-            accessibilityLabel="Show map"
-            accessibilityRole="button"
-            hitSlop={10}
-            onPress={() => requestSnap("browse")}
-            style={styles.mapButton}
-          >
-            <Text style={styles.mapButtonText}>Map</Text>
-          </Pressable>
-        ) : null}
-        {!isFull && selected ? (
-          <Pressable
-            accessibilityLabel="Close selected station"
-            accessibilityRole="button"
-            hitSlop={10}
-            onPress={onCloseSelectedStation}
-            style={styles.mapButton}
-          >
-            <Text style={styles.mapButtonText}>Close</Text>
-          </Pressable>
-        ) : null}
+        <View style={styles.headerActions}>
+          {!isPeek ? (
+            <Pressable
+              accessibilityLabel={isFull ? "Show map" : "Dismiss station list and show map"}
+              accessibilityRole="button"
+              hitSlop={10}
+              onPress={requestMap}
+              style={styles.mapButton}
+            >
+              <Text style={styles.mapButtonText}>Map</Text>
+            </Pressable>
+          ) : null}
+          {!isFull && selected ? (
+            <Pressable
+              accessibilityLabel="Close selected station"
+              accessibilityRole="button"
+              hitSlop={10}
+              onPress={onCloseSelectedStation}
+              style={styles.mapButton}
+            >
+              <Text style={styles.mapButtonText}>Close</Text>
+            </Pressable>
+          ) : null}
+        </View>
       </View>
 
       {loading ? (
@@ -424,6 +430,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     minHeight: 20,
   },
+  headerActions: {
+    flexDirection: "row",
+    gap: spacing.xs,
+    position: "absolute",
+    right: 0,
+  },
   grabberTouch: {
     alignItems: "center",
     flex: 1,
@@ -436,8 +448,6 @@ const styles = StyleSheet.create({
     borderRadius: radii.pill,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
-    position: "absolute",
-    right: 0,
   },
   listButton: {
     backgroundColor: colors.black,

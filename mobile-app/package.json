@@ -35,10 +35,12 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "doctor": "npm_config_cache=.npm-cache npx expo-doctor",
-    "test": "npm run typecheck && npm run perf:deps && npm run arch:screens && npm run test:map-camera && npm run test:route-evidence-copy",
+    "test": "npm run typecheck && npm run perf:deps && npm run arch:screens && npm run test:map-camera && npm run test:settings-ux && npm run test:route-evidence-copy",
     "smoke:plan-fields": "node scripts/smoke-plan-fields.mjs",
     "stress:plan-fields": "node scripts/stress-plan-fields.mjs",
-    "build:web": "EXPO_PUBLIC_FUEL_PATH_API_BASE_URL=__SAME_ORIGIN__ npm_config_cache=.npm-cache npx expo export --platform web --output-dir dist",
+    "stress:settings-flows": "node scripts/stress-settings-flows.mjs",
+    "sync:discounts": "node scripts/sync-discount-registry.mjs",
+    "build:web": "npm run sync:discounts && EXPO_PUBLIC_FUEL_PATH_API_BASE_URL=__SAME_ORIGIN__ npm_config_cache=.npm-cache npx expo export --platform web --output-dir dist",
     "budget:size": "node scripts/check-bundle-budget.mjs",
     "budget:native": "node scripts/check-bundle-budget.mjs",
     "arch:screens": "node scripts/check-screen-complexity.mjs",
@@ -65,8 +67,10 @@
     "baseline:eas": "node scripts/record-preview-baseline.mjs",
     "perf:deps": "npm ls --depth=0",
     "test:map-camera": "node scripts/check-map-camera-guards.mjs",
+    "test:settings-ux": "node scripts/check-settings-ux-guards.mjs",
     "test:route-evidence-copy": "node scripts/check-route-evidence-copy-guards.mjs",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "npm run sync:discounts && tsc --noEmit",
+    "native:map-geocode-parity": "node scripts/native-map-geocode-parity-check.mjs"
   },
   "private": true
 }

@@ -1,14 +1,13 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { discountPrograms } from "../data/discountPrograms";
+import { activeDirectDiscountPrograms } from "../data/discountPrograms";
 import { colors, radii, shadow, spacing, surfaces, typeScale, typography } from "../theme";
 import { AppPreferences } from "../types";
-import { discountRedemptionLabel } from "../utils/discountRedemptions";
 
 export function DiscountWalletCard({
   preferences,
   onToggleDiscount,
-  onToggleDiscountRedemption,
+  onToggleDiscountRedemption: _onToggleDiscountRedemption,
 }: {
   preferences: AppPreferences;
   onToggleDiscount: (discountId: string) => void;
@@ -17,62 +16,45 @@ export function DiscountWalletCard({
   return (
     <View style={styles.card}>
       <Text style={styles.eyebrow}>Discount wallet</Text>
-      <Text style={styles.title}>Your real price</Text>
+      <Text style={styles.title}>Eligible discounts</Text>
       <Text style={styles.muted}>
-        Select programs you actually use. The app keeps pump price, confirmed wallet price
-        and possible lower offers separate.
+        Turn on the offers you can actually use. Fuel Path applies them only at matching station brands.
       </Text>
       <View style={styles.discountList}>
-        {discountPrograms.map((program) => {
+        {activeDirectDiscountPrograms.map((program) => {
           const selected = preferences.selectedDiscounts.includes(program.id);
-          const redemptionLabel = discountRedemptionLabel(preferences, program.id);
-          const redeemed = redemptionLabel === "Used today";
           return (
-            <View
+            <Pressable
+              accessibilityLabel={`${selected ? "Disable" : "Enable"} ${program.shortLabel}. Applies at ${discountBrandSummary(program.stationBrands)}.`}
+              accessibilityRole="switch"
+              accessibilityState={{ checked: selected }}
               key={program.id}
+              onPress={() => onToggleDiscount(program.id)}
               style={[styles.discountRow, selected && styles.discountRowSelected]}
             >
-              <Pressable
-                accessibilityLabel={`${selected ? "Remove" : "Add"} ${program.shortLabel}`}
-                accessibilityRole="switch"
-                accessibilityState={{ checked: selected }}
-                onPress={() => onToggleDiscount(program.id)}
-                style={styles.discountToggleArea}
-              >
-                <View>
+              <View style={styles.discountMain}>
+                <View style={styles.discountTitleRow}>
                   <Text style={styles.discountName}>{program.shortLabel}</Text>
-                  <Text style={styles.muted}>{program.centsPerLitre.toFixed(0)} c/L guide</Text>
+                  <Text style={styles.discountValue}>{program.centsPerLitre.toFixed(0)} c/L</Text>
                 </View>
-                <Text style={[styles.discountState, selected && styles.discountStateSelected]}>
-                  {selected ? "On" : "Off"}
+                <Text numberOfLines={2} style={styles.discountBrands}>
+                  {discountBrandSummary(program.stationBrands)}
                 </Text>
-              </Pressable>
-              {selected ? (
-                <Pressable
-                  accessibilityLabel={`${program.shortLabel} redemption state ${redemptionLabel}`}
-                  accessibilityRole="button"
-                  onPress={() => onToggleDiscountRedemption(program.id)}
-                  style={[
-                    styles.redemptionButton,
-                    redeemed && styles.redemptionButtonRedeemed,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.redemptionButtonText,
-                      redeemed && styles.redemptionButtonTextRedeemed,
-                    ]}
-                  >
-                    {redemptionLabel}
-                  </Text>
-                </Pressable>
-              ) : null}
-            </View>
+              </View>
+              <View style={[styles.switchTrack, selected && styles.switchTrackOn]}>
+                <View style={[styles.switchKnob, selected && styles.switchKnobOn]} />
+              </View>
+            </Pressable>
           );
         })}
       </View>
     </View>
   );
+}
+
+function discountBrandSummary(brands?: string[]) {
+  if (!brands?.length) return "Matching stations only";
+  return brands.join(", ");
 }
 
 const styles = StyleSheet.create({
@@ -100,56 +82,63 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   discountRow: {
+    alignItems: "center",
     ...surfaces.softPanel,
     borderRadius: radii.xl,
+    flexDirection: "row",
+    gap: spacing.md,
+    justifyContent: "space-between",
     padding: spacing.md,
   },
   discountRowSelected: {
     backgroundColor: colors.greenSoft,
     borderColor: colors.green,
   },
-  discountToggleArea: {
+  discountMain: {
+    flex: 1,
+    minWidth: 0,
+  },
+  discountTitleRow: {
     alignItems: "center",
     flexDirection: "row",
-    gap: spacing.md,
+    gap: spacing.sm,
     justifyContent: "space-between",
   },
   discountName: {
     color: colors.ink,
     fontSize: typeScale.body,
-    fontWeight: "600",
+    fontWeight: "800",
   },
-  discountState: {
-    color: colors.muted,
-    fontSize: typeScale.body,
-    fontWeight: "500",
-  },
-  discountStateSelected: {
-    color: colors.greenDark,
-    fontWeight: "700",
-  },
-  redemptionButton: {
-    alignItems: "center",
-    alignSelf: "flex-start",
-    backgroundColor: colors.white,
-    borderColor: colors.green,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    marginTop: spacing.sm,
-    minHeight: 34,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-  },
-  redemptionButtonRedeemed: {
-    backgroundColor: colors.amberSoft,
-    borderColor: colors.amber,
-  },
-  redemptionButtonText: {
+  discountValue: {
     color: colors.greenDark,
     fontSize: typeScale.caption,
-    fontWeight: "600",
+    fontWeight: "900",
   },
-  redemptionButtonTextRedeemed: {
-    color: colors.amber,
+  discountBrands: {
+    color: colors.muted,
+    fontSize: typeScale.caption,
+    fontWeight: "500",
+    lineHeight: 17,
+    marginTop: 2,
+  },
+  switchTrack: {
+    backgroundColor: colors.line,
+    borderRadius: radii.pill,
+    height: 30,
+    justifyContent: "center",
+    paddingHorizontal: 3,
+    width: 52,
+  },
+  switchTrackOn: {
+    backgroundColor: colors.green,
+  },
+  switchKnob: {
+    backgroundColor: colors.white,
+    borderRadius: radii.pill,
+    height: 24,
+    width: 24,
+  },
+  switchKnobOn: {
+    transform: [{ translateX: 22 }],
   },
 });

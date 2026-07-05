@@ -4,7 +4,7 @@ Fuel Path is app-first, so iOS and Android builds need separate validation from 
 
 ## Current Status
 
-Last reviewed: 1 July 2026, Australia/Sydney.
+Last reviewed: 5 July 2026, Australia/Sydney.
 
 - TypeScript: passed.
 - Expo Doctor: passed, 21 of 21 checks.
@@ -15,8 +15,8 @@ Last reviewed: 1 July 2026, Australia/Sydney.
 - EAS preview env: production API URL, preview alerts validation token and Android Maps key configured.
 - Vercel production env: `ALERTS_CLIENT_WRITE_ENABLED` and `ALERTS_CLIENT_WRITE_TOKEN` configured for preview validation without reusing `ALERTS_WRITE_TOKEN`.
 - iOS source-level simulator validation: passed through `npm run native:ios-validation-report` on iPhone 17 Pro / iOS 26.5 simulator, with Plan, Nearby and Account screenshots. This is Expo Go/source evidence, not signed iOS preview-build evidence.
-- Android installed APK validation: the current localParity build exists, but beta readiness still needs a fresh physical-device pass for that artefact. Older Android physical evidence remains useful history only.
-- Device validation: source-level iOS simulator evidence exists; fresh Android installed-build and physical-device performance evidence remain active blockers for beta readiness.
+- Android installed APK validation: physical-device smoke now passes on Pixel 9 Pro `49231FDAP0017N` for fresh EAS localParity build `81613239-1a07-4dfc-84f5-64e71c883458`, downloaded as `fuel-path-preview-android-localParity-81613239.apk`.
+- Device validation: source-level iOS simulator evidence exists; Android physical-device container, map/performance and EV Plan route evidence are current as of 5 July 2026.
 - Push-token readiness: native config injects `extra.eas.projectId` when `EXPO_PUBLIC_EAS_PROJECT_ID`, `EAS_PROJECT_ID` or the static EAS project id is set; strict preview-environment preflight now passes through `npm run native:preflight`.
 - Local shell strict preflight remains blocked unless `EXPO_PUBLIC_FUEL_PATH_API_BASE_URL`, `EXPO_PUBLIC_FUEL_PATH_ALERTS_VALIDATION_TOKEN` and `FUEL_PATH_ANDROID_GOOGLE_MAPS_API_KEY` are exported locally.
 
@@ -85,7 +85,12 @@ Current local machine finding:
 - Native warning overlay fixed by replacing deprecated React Native `SafeAreaView` with `react-native-safe-area-context`; the corrected Android smoke no longer captures the SafeArea warning screen.
 - iOS simulator control is available through full Xcode at `/Applications/Xcode.app/Contents/Developer`.
 - Local shell native env values are not exported; preview EAS env still passes `npm run native:preflight`.
-- Latest Android physical readiness rerun with Pixel 9 Pro connected passes Android device detection. Current-build physical performance still needs to be rerun against the latest localParity APK.
+- Latest Android physical readiness rerun with Pixel 9 Pro connected passes Android device detection.
+- Latest Android EAS localParity build: `0c679a29-86c0-4141-bffd-19b4c690485e`, completed 5 July 2026, downloaded to `mobile-app/native-artifacts/fuel-path-preview-android-localParity-0c679a29.apk`.
+- Latest Android installed preview APK physical smoke on Pixel 9 Pro `49231FDAP0017N`: `tmp/native-smoke/android-preview-smoke-2026-07-05T05-44-27-665Z.md`, status `passed`. Artifact `fuel-path-preview-android-localParity-0c679a29.apk`, package `com.fuelpath.app`, SHA-1 `cbd45223bd0f8a6791c9ab9d783ff895736ac39e`, SHA-256 `8af30be0bd2ec9740cfa2ed85392a52b0bf78f61a18e4a3074068dca656ab368`. Plan, Nearby, Nearby-after-pan and Account screenshots were captured. Plan/Nearby/Nearby-after-pan map screenshots all report `blank=false`; there were no Maps key warning lines; measured frame evidence was 191 total frames, 2 janky frames, 1% jank, p90 8 ms, p95 9 ms and p99 17 ms. Performance summary `tmp/native-smoke/android-performance-summary-2026-07-05T05-45-27-984Z.md` also passed with no blockers.
+- Lock-screen caveat: an earlier run of the same fresh APK, `tmp/native-smoke/android-preview-smoke-2026-07-05T04-28-44-304Z.md`, reported `partial` because the Pixel was dozing and `NotificationShade` had focus. After waking/dismissing the keyguard, the same APK passed. Treat the `partial` result as invalid smoke setup evidence, not an app render failure.
+- Latest Android EV Plan native route check on Pixel 9 Pro: `tmp/native-smoke/android-pixel-ev-route-result-2026-07-05.png` and `tmp/native-smoke/android-pixel-ev-route-result-2026-07-05.xml`. EV was selectable from `PLAN WITH` as `EV charge`; the vehicle chip displayed `EV | 400 km | Connectors not set`; Sylvania NSW and Newcastle NSW suggestions appeared; `Check route range` returned `Route charger options`, `10 options`, `179 km route. 400 km selected range`, a connector setup warning and visible charger rows with power, connector, detour estimate and navigation arrow.
+- Native map/geocode parity evidence is guarded by `npm run native:map-geocode-parity`. This checks the current Android Pixel evidence packet for physical-device identification, EV Plan selector visibility, From/To suggestion evidence, route charger result evidence and route range text.
 - Latest Android ARM64 AVD setup plan: `npm run native:android-avd-plan` passes SDK root, Command-line Tools, Android 35 platform, Android 35 ARM64 image, ARM64-compatible AVD and Android emulator checks.
 - Latest iOS simulator setup plan: `npm run native:ios-simulator-plan` passes with full Xcode and an iOS 26.5 simulator runtime. The matching source-level iOS validation report is `tmp/native-smoke/ios-validation-2026-06-30T23-16-23-867Z.md`.
 
@@ -103,6 +108,7 @@ npm run native:android-physical-readiness
 FUEL_PATH_NATIVE_ARTIFACT=native-artifacts/fuel-path-preview-android-local-parity-8199f828.apk npm run native:android-performance-smoke
 npm run native:android-performance-summary
 FUEL_PATH_NATIVE_ARTIFACT=native-artifacts/fuel-path-preview-android-local-parity-8199f828.apk npm run native:android-maps-key-fix
+npm run native:map-geocode-parity
 npm run native:blocker-packet
 npm run native:readiness -- --strict
 ```

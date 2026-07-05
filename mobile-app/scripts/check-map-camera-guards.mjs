@@ -16,11 +16,13 @@ const locationSuggestionDisplay = read("src/utils/locationSuggestionDisplay.ts")
 const savedCommuteShortcuts = read("src/components/SavedCommuteShortcuts.tsx");
 const planRouteSheet = read("src/components/PlanRouteSheet.tsx");
 const planRouteEditorCard = read("src/components/PlanRouteEditorCard.tsx");
-const policyModeCard = read("src/components/PolicyModeCard.tsx");
 const nearbyLocationSearch = read("src/components/NearbyLocationSearch.tsx");
 const nearbyStationSheet = read("src/components/NearbyStationSheet.tsx");
 const savedPlaceEditor = read("src/components/SavedPlaceEditor.tsx");
+const savedPlacesCard = read("src/components/SavedPlacesCard.tsx");
 const savedRouteAlertsCard = read("src/components/SavedRouteAlertsCard.tsx");
+const vehicleFuelCard = read("src/components/VehicleFuelCard.tsx");
+const accountDetailScreen = read("src/components/settings/AccountDetailScreen.tsx");
 const weeklyReportCard = read("src/components/WeeklyReportCard.tsx");
 const routeAddressSuggestionHook = read("src/hooks/useRouteAddressSuggestions.ts");
 const theme = read("src/theme.ts");
@@ -32,6 +34,7 @@ const stationRow = read("src/components/StationRow.tsx");
 const brandBadge = read("src/components/BrandBadge.tsx");
 const betaPrivacyCard = read("src/components/BetaPrivacyCard.tsx");
 const discountPrograms = read("src/data/discountPrograms.ts");
+const discountRegistry = read("src/data/discountRegistry.generated.json");
 const fuelPathApi = read("src/api/fuelPathApi.ts");
 const types = read("src/types.ts");
 const locationEvidence = read("src/utils/locationEvidence.ts");
@@ -321,7 +324,6 @@ const checks = [
       nearbyStationSheet.includes('accessibilityLabel="Close selected station"') &&
       nearbyStationSheet.includes("<Text style={styles.mapButtonText}>Close</Text>") &&
       nearbyStationSheet.includes("styles.selectedCardShell") &&
-      nearbyStationSheet.includes("stationEvidenceLine(selected)") &&
       !nearbyStationSheet.includes("styles.closeButton") &&
       !nearbyStationSheet.includes("closeButtonText") &&
       !nearbyStationSheet.includes("selectedActions") &&
@@ -344,9 +346,8 @@ const checks = [
     ok:
       nearbyStationSheet.includes("{selected && !sheetExpanded ? (") &&
       nearbyStationSheet.includes("sheetExpanded: {") &&
-      nearbyStationSheet.includes("top: 140") &&
+      nearbyStationSheet.includes("top: nearbySheetExpandedTop") &&
       nearbyStationSheet.includes("bottom: 8") &&
-      !nearbyStationSheet.includes("sheetExpanded={sheetExpanded}") &&
       !nearbyStationSheet.includes("selected,\n  sheetExpanded,"),
   },
   {
@@ -421,15 +422,13 @@ const checks = [
   {
     label: "plan evidence shows four compact route decision metrics",
     ok:
-      types.includes("detourFuelLitres?: number") &&
-      types.includes("timeCost?: number") &&
-      types.includes("netAfterDetourAndTimeCost?: number") &&
-      (planScreen.includes("detourFuelLitres") || planScreenUtils.includes("detourFuelLitres")) &&
-      decisionEvidencePanel.includes("decisionSummary?.economics") &&
+      types.includes("decisionSummary?: RouteDecisionSummary;") &&
+      decisionEvidencePanel.includes("const economics = decisionSummary?.economics;") &&
       decisionEvidencePanel.includes('label="Pump"') &&
       decisionEvidencePanel.includes('label="Your price"') &&
       decisionEvidencePanel.includes('label="Best price by"') &&
-      decisionEvidencePanel.includes('label="Detour"') &&
+      decisionEvidencePanel.includes("routeDetourEvidenceMetricLabel(candidate)") &&
+      decisionEvidencePanel.includes('label="Pump price"') &&
       decisionEvidencePanel.includes("routeComparisonCpl") &&
       decisionEvidencePanel.includes("savingCpl.toFixed(1)} c/L") &&
       !decisionEvidencePanel.includes('label="Fuel used"') &&
@@ -487,44 +486,40 @@ const checks = [
       planRouteEditorCard.includes("styles.routeError"),
   },
   {
-    label: "fleet-lite policy mode filters route scoring to approved brands",
+    label: "settings keep vehicle profiles lightweight and account-level places separate",
     ok:
-      types.includes("fuelPolicyEnabled: boolean") &&
-      types.includes("approvedPolicyBrands: string[]") &&
-      preferencesStore.includes('fuelPolicyEnabled: false') &&
-      preferencesStore.includes('approvedPolicyBrands: ["Ampol", "BP", "Shell"]') &&
-      accountScreen.includes("PolicyModeCard") &&
-      policyModeCard.includes("Policy mode") &&
-      policyModeCard.includes("Approved fuel stops") &&
-      policyModeCard.includes("onToggleFuelPolicy") &&
-      policyModeCard.includes("onTogglePolicyBrand") &&
-      fuelPathApi.includes("approvedPolicyBrands") &&
-      fuelPathApi.includes("brandFilter: policyBrands.length > 0") &&
-      fuelPathApi.includes("brands: policyBrands") &&
-      planScreen.includes("Policy mode active") &&
-      !decisionEvidencePanel.includes('label="Policy"') &&
-      appShell.includes("toggleFuelPolicy") &&
-      appShell.includes("togglePolicyBrand"),
+      types.includes("export type VehicleProfile = {") &&
+      types.includes("activeVehicleId: string;") &&
+      types.includes("vehicles: VehicleProfile[];") &&
+      preferencesStore.includes("const vehicles = normaliseVehicleProfiles(preferences.vehicles, legacyVehicle);") &&
+      preferencesStore.includes("fuelPolicyEnabled: false") &&
+      preferencesStore.includes("activeVehicleId: activeVehicle.id") &&
+      vehicleFuelCard.includes("const maxVehicleProfiles = 5;") &&
+      vehicleFuelCard.includes("preferences.vehicles.map") &&
+      vehicleFuelCard.includes("onSelectVehicle(vehicle.id)") &&
+      vehicleFuelCard.includes("Five vehicles keeps switching quick") &&
+      accountDetailScreen.includes("<VehicleFuelCard") &&
+      accountDetailScreen.includes("<SavedPlacesCard") &&
+      savedPlacesCard.includes("Favourite routes") &&
+      savedPlacesCard.includes("onRenameCommute") &&
+      savedPlacesCard.includes("onSaveNamedPlace(\"home\", commute.from)") &&
+      savedPlacesCard.includes("onSaveNamedPlace(\"work\", commute.to)") &&
+      !accountScreen.includes("PolicyModeCard") &&
+      !appShell.includes("toggleFuelPolicy") &&
+      !appShell.includes("togglePolicyBrand"),
   },
   {
-    label: "fleet-lite weekly report stays driver-facing and outcome based",
+    label: "legacy weekly report stays unmounted from streamlined Settings",
     ok:
-      decisionEvidence.includes("weeklyFleetLiteReportSummary") &&
-      decisionEvidence.includes("send alert, watch only, skip alert, quiet today, range first") &&
-      decisionEvidence.includes("activeRouteCount") &&
-      decisionEvidence.includes("backendSyncedRouteCount") &&
-      decisionEvidence.includes("localOnlyRouteCount") &&
-      accountScreen.includes("WeeklyReportCard") &&
       weeklyReportCard.includes("Weekly report") &&
-      weeklyReportCard.includes("Fleet-lite summary") &&
       weeklyReportCard.includes("No payroll, accounting or admin tools") &&
-      weeklyReportCard.includes("WeeklyReportMetric") &&
-      weeklyReportCard.includes("Policy brands:"),
+      !accountScreen.includes("WeeklyReportCard") &&
+      !accountDetailScreen.includes("WeeklyReportCard"),
   },
   {
     label: "saved route alerts avoid per-route decision rule controls",
     ok:
-      accountScreen.includes("SavedRouteAlertsCard") &&
+      accountDetailScreen.includes("SavedRouteAlertsCard") &&
       !savedRouteAlertsCard.includes("RouteAlertRuleSelector") &&
       !savedRouteAlertsCard.includes("ruleKey=\"minSavingDollars\"") &&
       !savedRouteAlertsCard.includes("ruleKey=\"maxDetourMinutes\"") &&
@@ -546,24 +541,21 @@ const checks = [
       appShell.includes("onToggleCommuteAlert={toggleCommuteAlert}"),
   },
   {
-    label: "account beta evidence copy excludes sensitive route data",
+    label: "support settings copy excludes sensitive route data collection claims",
     ok:
-      accountScreen.includes("BetaPrivacyCard") &&
-      betaPrivacyCard.includes("Behaviour, not tracking") &&
-      betaPrivacyCard.includes("repeat route plans") &&
-      betaPrivacyCard.includes("saved commutes") &&
-      betaPrivacyCard.includes("route watches") &&
-      betaPrivacyCard.includes("navigation opens") &&
-      betaPrivacyCard.includes("exact Home or Work addresses") &&
-      betaPrivacyCard.includes("route geometry") &&
-      betaPrivacyCard.includes("push tokens"),
+      accountDetailScreen.includes("Privacy & support") &&
+      accountDetailScreen.includes("Data used for better route decisions") &&
+      accountDetailScreen.includes("aggregate product signals like saved routes, route watches and navigation opens") &&
+      !accountDetailScreen.includes("route geometry") &&
+      !accountDetailScreen.includes("push tokens"),
   },
   {
     label: "EV fallback confidence chips avoid live availability claims",
     ok:
-      planRouteSheet.includes("Directory data") &&
-      planRouteSheet.includes("No live bays") &&
-      planRouteSheet.includes("Confirm tariff, access and live bay status in the network app.") &&
+      planRouteSheet.includes("Route charger options") &&
+      planRouteSheet.includes("Use Nearby EV charging or your network app before driving.") &&
+      planRouteSheet.includes("Set your EV connectors in Settings for better matching.") &&
+      planRouteSheet.includes('return "Here";') &&
       !planRouteSheet.includes("Live chargers available now") &&
       !planRouteSheet.includes("Best charging stop for your route") &&
       !planRouteSheet.includes("Guaranteed available charger"),
@@ -580,7 +572,7 @@ const checks = [
       quickPlaceShortcuts.includes('accessibilityLabel="Clear recent route locations"') &&
       quickPlaceShortcuts.includes("onRemoveRecent") &&
       planScreen.includes("onRemoveRecentLocation") &&
-      accountScreen.includes("onRemoveCommute"),
+      accountDetailScreen.includes("onRemoveCommute"),
   },
   {
     label: "backend alert identity stays local generated and non-contact",
@@ -704,7 +696,7 @@ const checks = [
       nearbyScreen.includes("const selectedPlaceActive = locationQuery.trim().length > 0 && locationQuery.trim() === centre.label;") &&
       nearbyScreen.includes("showCentreMarker={selectedPlaceActive}") &&
       nearbyLocationSearch.includes("styles.inputShell") &&
-      nearbyLocationSearch.includes("styles.currentLocationButton") &&
+      nearbyLocationSearch.includes("CurrentLocationFieldButton") &&
       nearbyLocationSearch.includes("locationInputWithIcon") &&
       locationSuggestionDisplay.includes("titleConsumesStreetNumber(parts)") &&
       locationSuggestionDisplay.includes("isStreetNumberFragment") &&
@@ -729,10 +721,10 @@ const checks = [
   {
     label: "account wallet separates discount selection from redemption state",
     ok:
-      accountScreen.includes("DiscountWalletCard") &&
+      accountDetailScreen.includes("DiscountWalletCard") &&
       discountWalletCard.includes("onToggleDiscountRedemption") &&
-      discountWalletCard.includes("discountRedemptionLabel") &&
-      discountWalletCard.includes("Used today"),
+      discountWalletCard.includes("onToggleDiscountRedemption: _onToggleDiscountRedemption") &&
+      discountWalletCard.includes("activeDirectDiscountPrograms"),
   },
   {
     label: "wallet separates pump confirmed and possible lower prices",
@@ -748,22 +740,21 @@ const checks = [
       !stationRow.includes("Possible, not guaranteed:") &&
       !stationRow.includes("possible only") &&
       !planRouteSheet.includes(">Possible only<") &&
-      discountWalletCard.includes("pump price, confirmed wallet price") &&
-      discountPrograms.includes("costco_member") &&
-      discountPrograms.includes("seven_eleven_lock") &&
-      discountPrograms.includes("rac_member"),
+      discountWalletCard.includes("Turn on the offers you can actually use") &&
+      discountRegistry.includes('"id": "linkt_7eleven"') &&
+      discountRegistry.includes('"id": "rac_wa_caltex"'),
   },
   {
-    label: "manual discount wallet stays scoped to starter programs",
+    label: "discount wallet uses active direct programmes from generated registry",
     ok:
-      discountPrograms.includes("everyday_rewards") &&
-      discountPrograms.includes("flybuys") &&
-      discountPrograms.includes("nrma_ampol") &&
-      discountPrograms.includes("rac_member") &&
-      discountPrograms.includes("costco_member") &&
-      discountPrograms.includes("seven_eleven_lock") &&
-      discountPrograms.includes("fleet_card") &&
-      !discountPrograms.includes("linkt_rewards") &&
+      discountPrograms.includes("discountRegistry.generated.json") &&
+      discountPrograms.includes('program.discountType !== "direct_cpl"') &&
+      discountRegistry.includes('"id": "everyday_rewards"') &&
+      discountRegistry.includes('"id": "flybuys"') &&
+      discountRegistry.includes('"id": "nrma_ampol"') &&
+      discountRegistry.includes('"id": "rac_wa_caltex"') &&
+      discountRegistry.includes('"id": "linkt_7eleven"') &&
+      !discountRegistry.includes('"id": "fleet_card"') &&
       !discountPrograms.toLowerCase().includes("oauth") &&
       !discountPrograms.toLowerCase().includes("cashback"),
   },

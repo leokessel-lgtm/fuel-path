@@ -11,6 +11,9 @@ Support readiness is not yet cleared for public beta. This runbook defines the m
 Support contact must be a monitored Fuel Path contact method, not a personal temporary address or generic public form URL. URL contacts must be on a Fuel Path-owned host. The same contact must appear in the privacy policy, store listings and support evidence file.
 Do not clear support readiness with a public personal inbox or a generic owner such as "support team" or "release owner"; the review must identify an accountable owner. The final runbook must publish the values on labelled lines such as `Support contact:` and `Support owner:` so warning/example mentions cannot clear the gate.
 
+Support contact: support@fuelpath.app
+Support owner: Leo Kesselring
+
 Every inbound issue should capture:
 
 - date received

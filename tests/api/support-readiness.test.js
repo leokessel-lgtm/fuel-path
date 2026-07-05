@@ -265,10 +265,21 @@ test("support readiness accepts Fuel Path-owned support contact URLs", async () 
 });
 
 test("support readiness requires claimed contact and owner in the runbook", async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-support-readiness-"));
+  const runbook = path.join(tmp, "SUPPORT-RUNBOOK.md");
+  fs.copyFileSync(READY_SUPPORT_RUNBOOK_SOURCE, runbook);
+  const withoutPublishedLines = fs
+    .readFileSync(runbook, "utf8")
+    .replace(/^Support contact:.*\n/gm, "")
+    .replace(/^Support owner:.*\n/gm, "");
+  fs.writeFileSync(runbook, withoutPublishedLines);
+
   const { stdout } = await execFileAsync(
     process.execPath,
     [
       "scripts/check-support-readiness.mjs",
+      "--runbook",
+      runbook,
       "--support-contact",
       "support@fuelpath.app",
       "--support-owner",

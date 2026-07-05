@@ -12,6 +12,7 @@ import { NearbySortMode } from "../components/NearbyStationSheet";
 import { StationMap } from "../components/StationMap";
 import { useNearbyLocationSearch } from "../hooks/useNearbyLocationSearch";
 import { useNearbyResults } from "../hooks/useNearbyResults";
+import { useVisibleStationCodes } from "../hooks/useVisibleStationCodes";
 import { getCurrentMapPoint, getGrantedCurrentMapPoint } from "../services/currentLocation";
 import { spacing } from "../theme";
 import { AppPreferences, EvCharger, EvConnector, EvPowerMode, FuelCode, MapPoint, NearbySheetSnap, StationViewModel } from "../types";
@@ -26,7 +27,6 @@ import {
   distanceKm,
   openDirections,
   preferredNearbyMode,
-  sameStationCodes,
   shortLocationLabel,
   toggleConnectorFilter,
 } from "./NearbyScreen.utils";
@@ -61,7 +61,6 @@ export function NearbyScreen({
   const [selectedCode, setSelectedCode] = useState<string>();
   const [selectedStation, setSelectedStation] = useState<StationViewModel>();
   const [selectionDismissed, setSelectionDismissed] = useState(false);
-  const [visibleStationCodes, setVisibleStationCodes] = useState<string[]>([]);
   const [sortMode, setSortMode] = useState<NearbySortMode | undefined>(undefined);
   const [sheetSnap, setSheetSnap] = useState<NearbySheetSnap>("browse");
   const previousSortMode = useRef<NearbySortMode | undefined>(sortMode);
@@ -70,6 +69,7 @@ export function NearbyScreen({
   const [evConnectors, setEvConnectors] = useState<EvConnector[]>(preferences.evConnectors || []);
   const [evPowerMode, setEvPowerMode] = useState<EvPowerMode>("");
   const [energySelectorOpen, setEnergySelectorOpen] = useState(false);
+  const { handleViewportStationsChange, visibleStationCodes } = useVisibleStationCodes();
   const sheetExpanded = sheetSnap === "full";
   const setSheetExpanded = (expanded: boolean) => {
     setSheetSnap(expanded ? "full" : "browse");
@@ -96,6 +96,15 @@ export function NearbyScreen({
     () => ({ near: centre, nearRadiusKm: Math.max(nearbyRadiusKm, minMapSearchRadiusKm) }),
     [centre, nearbyRadiusKm],
   );
+
+  useEffect(() => {
+    setNearbyMode(preferredNearbyMode(preferences));
+    setEvConnectors(preferences.evConnectors || []);
+    setSelectedCode(undefined);
+    setSelectionDismissed(false);
+    setSortMode(undefined);
+  }, [preferences.activeVehicleId]);
+
   const { chargers, error, evNotice, loading, stationContext, stationNotice, stations } = useNearbyResults({
     centre,
     evConnectors,
@@ -169,12 +178,6 @@ export function NearbyScreen({
       setResolvingLocation(false);
     }
   };
-
-  const handleViewportStationsChange = useCallback((stationCodes: string[]) => {
-    setVisibleStationCodes((current) =>
-      sameStationCodes(current, stationCodes) ? current : stationCodes,
-    );
-  }, []);
 
   const handleMapSearchAreaChange = useCallback((area: MapSearchArea) => {
     const nextRadiusKm = Math.max(

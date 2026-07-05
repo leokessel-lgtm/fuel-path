@@ -251,11 +251,11 @@ export function EvChargerPanel({
         ) : null}
       </View>
       <View style={styles.evPanelTitleRow}>
-        <Text style={styles.evPanelTitle}>{loading ? "Finding chargers..." : `${chargers.length} directory chargers`}</Text>
+        <Text style={styles.evPanelTitle}>{loading ? "Finding chargers..." : chargerCountTitle(chargers.length)}</Text>
       </View>
       {!isPeek && error ? <Text style={styles.evPanelNotice}>{error}</Text> : null}
       {!isPeek && !error && !loading && chargers.length ? (
-        <Text style={styles.evPanelNotice}>{conciseEvNotice(notice) || "Directory data only. Confirm access, tariff and live bay status in the charging network app."}</Text>
+        <Text style={styles.evPanelNotice}>{conciseEvNotice(notice) || "Check charger details in the network app before driving."}</Text>
       ) : null}
       {!isPeek && controls ? <View style={styles.controlDeck}>{controls}</View> : null}
       {isFull ? (
@@ -420,9 +420,6 @@ export function vehicleProfileHint(
   if (energyType === "electric") {
     return `Best for your EV: ${connectorLabel}, ${evChargingPreferenceLabel(chargingPreference)} charging.`;
   }
-  if (energyType === "hybrid") {
-    return `Best for your hybrid: ${fuel} plus ${connectorLabel}, ${evChargingPreferenceLabel(chargingPreference)} charging.`;
-  }
   return `Best for your vehicle: ${fuel}.`;
 }
 
@@ -477,14 +474,11 @@ export function EvChargerRow({
         <Text numberOfLines={1} style={styles.evCardTitle}>{charger.name}</Text>
         <Text numberOfLines={1} style={styles.evCardMeta}>{charger.address || charger.operator}</Text>
         <View style={styles.evCardChipRow}>
-          <Text numberOfLines={1} style={styles.evConfidenceBadge}>Directory data</Text>
           <Text numberOfLines={1} style={styles.evConnectorBadge}>{chargerConnectorSummary(charger)}</Text>
         </View>
-        <Text numberOfLines={1} style={styles.evWhyLine}>{evWhyLine(charger)}</Text>
         {rankReason ? (
           <Text numberOfLines={1} style={styles.evRankReason}>{rankReason}</Text>
         ) : null}
-        <Text numberOfLines={1} style={styles.evCardTrust}>{charger.availabilityLabel}</Text>
       </View>
       <View style={styles.evActionColumn}>
         <Pressable
@@ -504,6 +498,7 @@ export function EvChargerRow({
 
 function formatEvDistance(distanceKm: number | undefined, suffix = "") {
   if (!Number.isFinite(distanceKm)) return suffix ? "distance unknown" : "Distance unknown";
+  if (Number(distanceKm) < 0.05) return suffix ? "at this point" : "Here";
   return `${Number(distanceKm).toFixed(1)} km${suffix ? ` ${suffix}` : ""}`;
 }
 
@@ -516,12 +511,6 @@ function chargerConnectorSummary(charger: EvCharger) {
   return labels.length ? labels.join(" | ") : "Connector details unknown";
 }
 
-function evWhyLine(charger: EvCharger) {
-  const connector = charger.connectors[0] || charger.connections[0]?.connectorLabel || "Connector unknown";
-  const speed = charger.maxPowerKw ? `${Math.round(charger.maxPowerKw)} kW` : powerBandLabel(charger.powerBand);
-  return [connector, speed, formatEvDistance(charger.distanceKm, "away")].filter(Boolean).join(", ");
-}
-
 function powerBandLabel(powerBand: EvCharger["powerBand"]) {
   if (powerBand === "ultra_fast") return "ultra-fast";
   if (powerBand === "dc_fast") return "fast";
@@ -531,13 +520,21 @@ function powerBandLabel(powerBand: EvCharger["powerBand"]) {
 
 function conciseEvNotice(notice: string) {
   if (!notice) return "";
+  if (/sanitised local prototype|prototype EV charger|no configured EV directory provider/i.test(notice)) {
+    return "Check charger details in the network app before driving.";
+  }
   if (notice.includes("API Ninjas")) {
-    return "API Ninjas directory data. Confirm live bay status.";
+    return "Check live bay status in the network app.";
   }
   if (notice.includes("Open Charge Map")) {
-    return "Open Charge Map directory data. Confirm live bay status.";
+    return "Check live bay status in the network app.";
   }
   return notice;
+}
+
+function chargerCountTitle(count: number) {
+  if (count === 1) return "1 charger";
+  return `${count} chargers`;
 }
 
 function chargerRowAccessibilityLabel(charger: EvCharger) {
@@ -550,7 +547,6 @@ function chargerRowAccessibilityLabel(charger: EvCharger) {
     chargerConnectorSummary(charger),
     power,
     formatEvDistance(charger.distanceKm, "away"),
-    "Directory data",
     charger.availabilityLabel,
   ].filter(Boolean).join(". ");
 }

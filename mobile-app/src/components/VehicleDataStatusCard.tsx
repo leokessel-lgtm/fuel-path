@@ -1,20 +1,22 @@
 import { StyleSheet, Text, View } from "react-native";
 
 import { colors, radii, shadow, spacing, surfaces, typeScale, typography } from "../theme";
-import { EvChargingStatus, FuelProviderStatus } from "../api/fuelPathApi";
+import { EvChargingStatus, FuelProviderStatus, ProviderObservabilityStatus } from "../api/fuelPathApi";
 import { VehicleEnergyType } from "../types";
 
 export function VehicleDataStatusCard({
   evStatus,
   fuelStatus,
+  providerObservability,
   vehicleEnergyType,
 }: {
   evStatus?: EvChargingStatus;
   fuelStatus?: FuelProviderStatus;
+  providerObservability?: ProviderObservabilityStatus;
   vehicleEnergyType: VehicleEnergyType;
 }) {
   const showsFuel = vehicleEnergyType !== "electric";
-  const showsEv = vehicleEnergyType === "electric" || vehicleEnergyType === "hybrid";
+  const showsEv = vehicleEnergyType === "electric";
   const fuelLiveRegions = fuelStatus?.capabilitySummary.live || 0;
   const fuelLimitedRegions = fuelStatus?.capabilitySummary.limited || 0;
   const fuelPendingRegions = fuelStatus?.capabilitySummary.pending_access || 0;
@@ -44,6 +46,11 @@ export function VehicleDataStatusCard({
         {showsFuel && fuelLimitedRegions ? <Text style={styles.metaPill}>{fuelLimitedRegions} limited</Text> : null}
         {showsEv ? <Text style={styles.metaPill}>{evProviderLabel}</Text> : null}
         {showsEv ? <Text style={styles.metaPill}>No live bay claims</Text> : null}
+        {providerObservability ? (
+          <Text style={[styles.metaPill, providerObservability.status === "stopped" ? styles.metaPillBlocked : providerObservability.status === "watch" ? styles.metaPillWatch : null]}>
+            {providerSafetyLabel(providerObservability)}
+          </Text>
+        ) : null}
       </View>
       <Text style={styles.muted}>
         {vehicleDataWarning({ evStatus, fuelStatus, showsEv, showsFuel })}
@@ -52,9 +59,14 @@ export function VehicleDataStatusCard({
   );
 }
 
+function providerSafetyLabel(status: ProviderObservabilityStatus) {
+  if (status.status === "stopped") return "Provider stop active";
+  if (status.status === "watch") return "Provider watch";
+  return status.activePaidLookupCount ? "Provider caps OK" : "Local-first lookup";
+}
+
 function vehicleDataTitle(vehicleEnergyType: VehicleEnergyType) {
   if (vehicleEnergyType === "electric") return "EV charger directory status";
-  if (vehicleEnergyType === "hybrid") return "Fuel and charging data status";
   return "Fuel price data status";
 }
 
@@ -173,6 +185,14 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
+  },
+  metaPillBlocked: {
+    backgroundColor: colors.amberSoft,
+    color: colors.amber,
+  },
+  metaPillWatch: {
+    backgroundColor: colors.amberSoft,
+    color: colors.amber,
   },
   muted: {
     color: colors.muted,

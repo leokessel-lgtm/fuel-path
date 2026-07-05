@@ -221,13 +221,14 @@ export function StationMap({
         ? L.latLngBounds(cameraPoints).pad(0.12)
         : currentMapBounds;
     const groupingUsesCameraBounds = groupingBounds !== currentMapBounds;
+    const markerStations = prioritiseSelectedStations(stations, selectedStationCode);
     const markerGroups = routeEndpoints
       ? {
-          priceMarkers: stations.slice(0, maxPriceMarkers),
+          priceMarkers: markerStations.slice(0, maxPriceMarkers),
           clusterMarkers: [],
         }
       : visibleMarkerGroups(
-          stations.slice(0, maxStationMarkers),
+          markerStations.slice(0, maxStationMarkers),
           groupingBounds,
           selectedStationCode,
           chargers.length > 0,
@@ -308,7 +309,7 @@ export function StationMap({
       fitPoints.push([item.station.lat, item.station.lon]);
     });
 
-    chargers.slice(0, maxEvMarkers).forEach((charger) => {
+    prioritiseSelectedChargers(chargers, selectedChargerId).slice(0, maxEvMarkers).forEach((charger) => {
       const selected = charger.id === selectedChargerId;
       const marker = L.marker([charger.lat, charger.lon], {
         icon: L.divIcon({
@@ -557,6 +558,20 @@ function evChargerMarkerHtml(charger: EvCharger, selected: boolean) {
       ${label ? `<span class="fuel-path-ev-marker-label">${escapeHtml(label)}</span>` : ""}
     </div>
   `;
+}
+
+function prioritiseSelectedStations(stations: StationViewModel[], selectedStationCode?: string) {
+  if (!selectedStationCode) return stations;
+  const selected = stations.find((item) => item.station.stationCode === selectedStationCode);
+  if (!selected) return stations;
+  return [selected, ...stations.filter((item) => item.station.stationCode !== selectedStationCode)];
+}
+
+function prioritiseSelectedChargers(chargers: EvCharger[], selectedChargerId?: string) {
+  if (!selectedChargerId) return chargers;
+  const selected = chargers.find((charger) => charger.id === selectedChargerId);
+  if (!selected) return chargers;
+  return [selected, ...chargers.filter((charger) => charger.id !== selectedChargerId)];
 }
 
 function visibleMarkerGroups(

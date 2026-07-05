@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { colors, radii, shadow, spacing, surfaces, typeScale } from "../theme";
 import { MapPoint } from "../types";
 import { locationSuggestionDisplay } from "../utils/locationSuggestionDisplay";
+import { CurrentLocationFieldButton, currentLocationFieldInset } from "./CurrentLocationFieldButton";
 
 export function NearbyLocationSearch({
   locationError,
@@ -46,23 +47,11 @@ export function NearbyLocationSearch({
             returnKeyType="search"
             style={[styles.locationInput, styles.locationInputWithIcon]}
           />
-          <Pressable
+          <CurrentLocationFieldButton
             accessibilityLabel="Use current location"
-            onPress={onUseCurrentLocation}
             disabled={resolvingLocation}
-            hitSlop={8}
-            style={({ pressed }) => [
-              styles.currentLocationButton,
-              pressed && styles.currentLocationButtonPressed,
-              resolvingLocation && styles.buttonDisabled,
-            ]}
-          >
-            <View style={styles.currentLocationIcon}>
-              <View style={styles.currentLocationLineVertical} />
-              <View style={styles.currentLocationLineHorizontal} />
-              <View style={styles.currentLocationDot} />
-            </View>
-          </Pressable>
+            onPress={onUseCurrentLocation}
+          />
         </View>
         {locationQuery.trim() || resolvingLocation ? (
           <Pressable
@@ -176,7 +165,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
   },
   locationInputWithIcon: {
-    paddingRight: 52,
+    paddingRight: currentLocationFieldInset,
   },
   locationButton: {
     alignItems: "center",
@@ -262,53 +251,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "400",
     marginTop: 1,
-  },
-  currentLocationButton: {
-    alignItems: "center",
-    backgroundColor: colors.white,
-    borderColor: colors.line,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    bottom: 0,
-    height: 44,
-    justifyContent: "center",
-    position: "absolute",
-    right: spacing.xs,
-    top: 0,
-    width: 44,
-  },
-  currentLocationButtonPressed: {
-    backgroundColor: colors.greenSoft,
-    borderColor: colors.green,
-  },
-  currentLocationIcon: {
-    alignItems: "center",
-    borderColor: colors.green,
-    borderRadius: 9,
-    borderWidth: 2,
-    height: 18,
-    justifyContent: "center",
-    width: 18,
-  },
-  currentLocationLineVertical: {
-    backgroundColor: colors.green,
-    height: 24,
-    position: "absolute",
-    width: 2,
-  },
-  currentLocationLineHorizontal: {
-    backgroundColor: colors.green,
-    height: 2,
-    position: "absolute",
-    width: 24,
-  },
-  currentLocationDot: {
-    backgroundColor: colors.green,
-    borderColor: colors.white,
-    borderRadius: 4,
-    borderWidth: 1,
-    height: 8,
-    width: 8,
   },
   locationError: {
     color: colors.red,

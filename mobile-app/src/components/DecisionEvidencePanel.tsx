@@ -1,4 +1,5 @@
-import { StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useState } from "react";
 
 import { colors, radii, spacing, surfaces, typeScale } from "../theme";
 import { ScoreResponse, StationViewModel } from "../types";
@@ -25,6 +26,7 @@ export function DecisionEvidencePanel({
   decisionSummary?: ScoreResponse["context"]["decisionSummary"];
   resultContext?: ScoreResponse["context"];
 }) {
+  const [detailsExpanded, setDetailsExpanded] = useState(false);
   const economics = decisionSummary?.economics;
   const routeComparisonCpl = Number(economics?.comparisonCpl);
   const savingCpl = Number.isFinite(routeComparisonCpl) && routeComparisonCpl > 0
@@ -33,41 +35,60 @@ export function DecisionEvidencePanel({
   const detour = routeDetourMinutes(candidate, economics?.detourMinutes ?? 0);
   const capabilityLabel = capability ? capabilityLabelFor(capability) : "Live data";
   const sourceDetails = priceSourceDetails(candidate, resultContext, capability);
+  const hasAppliedDiscount = Number(candidate.discountCpl || 0) > 0 &&
+    Number(candidate.adjustedCpl || 0) !== Number(candidate.pumpCpl || 0);
+  const showSavingMetric = savingCpl > 0.05;
+  const showCapabilityChip = capability && capability !== "live";
 
   return (
     <View style={styles.evidencePanel}>
       <View style={styles.evidencePanelHeader}>
         <Text style={styles.evidencePanelTitle}>Why this stop</Text>
-        <Text
-          style={[
-            styles.capabilityChip,
-            capability && capability !== "live" ? styles.capabilityChipCaution : null,
-          ]}
-        >
-          {capabilityLabel}
-        </Text>
+        {showCapabilityChip ? (
+          <Text style={[styles.capabilityChip, styles.capabilityChipCaution]}>
+            {capabilityLabel}
+          </Text>
+        ) : null}
       </View>
       <View style={styles.evidenceGrid}>
-        <EvidenceMetric label="Pump" value={`${candidate.pumpCpl.toFixed(1)} c/L`} />
-        <EvidenceMetric label="Your price" value={`${candidate.adjustedCpl.toFixed(1)} c/L`} />
-        <EvidenceMetric label="Best price by" value={`${savingCpl.toFixed(1)} c/L`} />
+        {hasAppliedDiscount ? (
+          <>
+            <EvidenceMetric label="Pump" value={`${candidate.pumpCpl.toFixed(1)} c/L`} />
+            <EvidenceMetric label="Your price" value={`${candidate.adjustedCpl.toFixed(1)} c/L`} />
+          </>
+        ) : (
+          <EvidenceMetric label="Pump price" value={`${candidate.pumpCpl.toFixed(1)} c/L`} />
+        )}
+        {showSavingMetric ? <EvidenceMetric label="Best price by" value={`${savingCpl.toFixed(1)} c/L`} /> : null}
         <EvidenceMetric label={routeDetourEvidenceMetricLabel(candidate)} value={`${detour.toFixed(1)} min`} />
       </View>
       <Text numberOfLines={2} style={styles.savingSourceLine}>
-        {Number.isFinite(routeComparisonCpl) && routeComparisonCpl > 0
+        {showSavingMetric && Number.isFinite(routeComparisonCpl) && routeComparisonCpl > 0
           ? `Compared with the next-best route option at ${routeComparisonCpl.toFixed(1)} c/L. Only selected eligible discounts are applied.`
           : candidate.discountCpl
             ? `Your price includes selected ${candidate.discountLabel}. Pump price is ${candidate.pumpCpl.toFixed(1)} c/L.`
             : "Your price is the current pump price."}
       </Text>
-      <View style={styles.sourceDetails}>
-        {sourceDetails.map((detail) => (
-          <View key={detail.label} style={styles.sourceDetailRow}>
-            <Text style={styles.sourceDetailLabel}>{detail.label}</Text>
-            <Text numberOfLines={2} style={styles.sourceDetailValue}>{detail.value}</Text>
-          </View>
-        ))}
-      </View>
+      {sourceDetails.length ? (
+        <Pressable
+          accessibilityLabel={detailsExpanded ? "Hide price source details" : "Show price source details"}
+          accessibilityRole="button"
+          onPress={() => setDetailsExpanded((value) => !value)}
+          style={styles.detailsToggle}
+        >
+          <Text style={styles.detailsToggleText}>{detailsExpanded ? "Hide source details" : "Source details"}</Text>
+        </Pressable>
+      ) : null}
+      {detailsExpanded ? (
+        <View style={styles.sourceDetails}>
+          {sourceDetails.map((detail) => (
+            <View key={detail.label} style={styles.sourceDetailRow}>
+              <Text style={styles.sourceDetailLabel}>{detail.label}</Text>
+              <Text numberOfLines={2} style={styles.sourceDetailValue}>{detail.value}</Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -100,12 +121,29 @@ function priceSourceDetails(
   const source = stationProviderLabel(candidate.station.source) ||
     fuelProviderLabel(context?.provider || context?.source) ||
     stationSourceLabel(candidate.station.source);
-  return [
+  const details = [
     { label: "Source", value: source },
     { label: "Updated", value: stationTimestampLine(candidate.station) },
-    { label: "Provider state", value: providerStateLine(context, capability) },
     { label: "Price match", value: priceMatchLine(candidate, context) },
-  ].filter((item) => item.value);
+  ];
+  const providerState = providerStateLine(context, capability);
+  if (shouldShowProviderState(context, capability, providerState)) {
+    details.splice(2, 0, { label: "Provider state", value: providerState });
+  }
+  return details.filter((item) => item.value);
+}
+
+function shouldShowProviderState(
+  context: ScoreResponse["context"] | undefined,
+  capability: string | undefined,
+  providerState: string,
+) {
+  const activeCapability = capability || context?.capability || "live";
+  if (!providerState) return false;
+  if (context?.degraded) return true;
+  if (activeCapability && activeCapability !== "live") return true;
+  if (/stale|error|fallback|pending|unsupported|limited/i.test(providerState)) return true;
+  return false;
 }
 
 function providerStateLine(context?: ScoreResponse["context"], capability?: string) {
@@ -219,6 +257,20 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: "700",
     lineHeight: 14,
+  },
+  detailsToggle: {
+    alignSelf: "flex-start",
+    backgroundColor: colors.white,
+    borderColor: colors.line,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  detailsToggleText: {
+    color: colors.greenDark,
+    fontSize: 10,
+    fontWeight: "800",
   },
   sourceDetails: {
     backgroundColor: colors.white,

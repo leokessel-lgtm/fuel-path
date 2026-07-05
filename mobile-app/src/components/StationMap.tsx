@@ -73,6 +73,11 @@ export function StationMap({
         })),
       ];
   const bounds = boundingBox(points);
+  const visibleStations = prioritiseSelectedStations(
+    stations,
+    selectedStationCode,
+  ).slice(0, chargers.length ? mixedEnergyMaxStationMarkers : maxStationMarkers);
+  const visibleChargers = prioritiseSelectedChargers(chargers, selectedChargerId).slice(0, maxStationMarkers);
 
   return (
     <View style={styles.map}>
@@ -93,7 +98,7 @@ export function StationMap({
           style={[styles.routeDot, positionForPoint(point, bounds, activeInsets)]}
         />
       ))}
-      {stations.slice(0, chargers.length ? mixedEnergyMaxStationMarkers : maxStationMarkers).map((item) => {
+      {visibleStations.map((item) => {
         const selected = item.station.stationCode === selectedStationCode;
         return (
           <Pressable
@@ -112,7 +117,7 @@ export function StationMap({
           </Pressable>
         );
       })}
-      {chargers.slice(0, maxStationMarkers).map((charger) => {
+      {visibleChargers.map((charger) => {
         const selected = charger.id === selectedChargerId;
         const label = charger.maxPowerKw ? `${Math.round(charger.maxPowerKw)}kW` : "";
         return (
@@ -143,6 +148,20 @@ export function StationMap({
       ) : null}
     </View>
   );
+}
+
+function prioritiseSelectedStations(stations: StationViewModel[], selectedStationCode?: string) {
+  if (!selectedStationCode) return stations;
+  const selected = stations.find((item) => item.station.stationCode === selectedStationCode);
+  if (!selected) return stations;
+  return [selected, ...stations.filter((item) => item.station.stationCode !== selectedStationCode)];
+}
+
+function prioritiseSelectedChargers(chargers: EvCharger[], selectedChargerId?: string) {
+  if (!selectedChargerId) return chargers;
+  const selected = chargers.find((charger) => charger.id === selectedChargerId);
+  if (!selected) return chargers;
+  return [selected, ...chargers.filter((charger) => charger.id !== selectedChargerId)];
 }
 
 function boundingBox(points: MapPoint[]) {
@@ -303,10 +322,13 @@ const styles = StyleSheet.create({
     padding: 4,
     paddingRight: spacing.sm,
     position: "absolute",
+    zIndex: 20,
   },
   pinSelected: {
     backgroundColor: colors.black,
+    elevation: 8,
     transform: [{ scale: 1.05 }],
+    zIndex: 70,
   },
   pinPrice: {
     color: colors.greenDark,
@@ -331,11 +353,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: 8,
     position: "absolute",
+    zIndex: 30,
   },
   evPinSelected: {
     backgroundColor: colors.black,
     borderColor: colors.black,
+    elevation: 8,
     transform: [{ scale: 1.05 }],
+    zIndex: 80,
   },
   evPinIcon: {
     color: "#ffd166",

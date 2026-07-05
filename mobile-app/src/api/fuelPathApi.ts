@@ -25,6 +25,9 @@ type GeocodeResponse = {
 export type LocationSearchContext = {
   near?: MapPoint;
   nearRadiusKm?: number;
+  providerPlaceId?: string;
+  provider?: string;
+  purpose?: "plan_autocomplete";
 };
 
 type RouteResponse = {
@@ -58,6 +61,27 @@ export type EvChargingStatus = {
   liveAvailabilityClaimsAllowed: boolean;
   coverage: string;
   warning: string;
+};
+
+export type ProviderObservabilityStatus = {
+  status: "normal" | "watch" | "stopped";
+  summary: string;
+  activePaidLookupCount: number;
+  paidLookups: Array<{
+    key: string;
+    label: string;
+    enabled: boolean;
+    configured: boolean;
+    status: "normal" | "watch" | "stopped" | "configured_off" | "not_configured";
+    cap: number;
+    used: number;
+    remaining: number;
+    usagePercent: number;
+    blockers: string[];
+    warnings: string[];
+  }>;
+  blockers: string[];
+  warnings: string[];
 };
 
 type LookupReadiness = {
@@ -135,6 +159,7 @@ export async function getApiStatus() {
       mapboxConfigured: boolean;
       lookupReadiness?: LookupReadiness;
     };
+    providerObservability?: ProviderObservabilityStatus;
   }>("/api/status");
 }
 
@@ -198,14 +223,16 @@ export async function getNearbyEvChargers({
 
 export async function getRouteEvFallbackChargers({
   connectors = [],
-  limit = 3,
-  radiusKm = 18,
+  limit = 10,
+  radiusKm = 30,
   route,
+  selectedRangeKm = 0,
 }: {
   connectors?: string[];
   limit?: number;
   radiusKm?: number;
   route: RouteResponse;
+  selectedRangeKm?: number;
 }) {
   return fetchJson<EvChargerResponse>("/api/ev-chargers", {
     method: "POST",
@@ -215,9 +242,11 @@ export async function getRouteEvFallbackChargers({
     body: JSON.stringify({
       connectors,
       limit,
-      mode: "route_fallback",
+      mode: "route_charging",
       radiusKm,
+      selectedRangeKm,
       route: {
+        distanceKm: route.distanceKm,
         id: "native-ev-route",
         name: "Native EV planned route",
         provider: route.provider,
@@ -259,6 +288,9 @@ export async function searchLocations(label: string, limit = 5, sessionToken?: s
         nearLat: context?.near?.lat,
         nearLon: context?.near?.lon,
         nearRadiusKm: context?.nearRadiusKm,
+        providerPlaceId: context?.providerPlaceId,
+        provider: context?.provider,
+        purpose: context?.purpose,
       }),
     });
   } catch (error) {
@@ -285,11 +317,14 @@ export async function searchLocations(label: string, limit = 5, sessionToken?: s
 }
 
 function locationSearchContextKey(context?: LocationSearchContext) {
-  if (!context?.near) return "none";
+  if (!context?.near && !context?.providerPlaceId && !context?.purpose) return "none";
   return [
-    context.near.lat.toFixed(3),
-    context.near.lon.toFixed(3),
+    context.near?.lat?.toFixed(3) || "",
+    context.near?.lon?.toFixed(3) || "",
     Math.round(context.nearRadiusKm || 40),
+    context.provider || "",
+    context.providerPlaceId || "",
+    context.purpose || "",
   ].join(":");
 }
 
@@ -354,7 +389,9 @@ function lookupSourceLabel(provider?: string, matchType?: string, lookupStatus?:
     return "Suburb/area";
   }
   if (provider === "fuel_path") return "Fuel station";
-  if (provider === "google" || provider === "addressr") return "External lookup";
+  if (provider === "google") return "Google Places";
+  if (provider === "here") return "HERE Places";
+  if (provider === "addressr") return "External lookup";
   if (provider === "nominatim") {
     if (addressLikeQuery(queryText)) return "Needs confirmation";
     return "Validation lookup";

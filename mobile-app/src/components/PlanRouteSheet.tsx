@@ -2,7 +2,7 @@ import { useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { colors, radii, shadow, spacing, surfaces, typeScale, typography } from "../theme";
-import { EvCharger, ScoreResponse, StationViewModel } from "../types";
+import { EvCharger, EvChargerResponse, ScoreResponse, StationViewModel, VehicleEnergyType } from "../types";
 import { stationTimestampLine } from "../utils/decisionEvidence";
 import { fuelMismatchContextLine, fuelMismatchLine } from "../utils/fuelMismatch";
 import { tomorrowPriceView } from "../utils/pricing";
@@ -13,7 +13,6 @@ import {
 } from "../utils/routeEvidenceCopy";
 import { BrandBadge } from "./BrandBadge";
 import { DecisionEvidencePanel } from "./DecisionEvidencePanel";
-import { ResultContextStrip } from "./ResultContextStrip";
 import { StationRow } from "./StationRow";
 import { openDirections } from "../screens/NearbyScreen.utils";
 
@@ -25,6 +24,7 @@ export function PlanRouteSheet({
   error,
   emptyRouteTitle,
   evFallbackChargers,
+  evRouteContext,
   evFallbackError,
   evFallbackLoading,
   loading,
@@ -33,6 +33,7 @@ export function PlanRouteSheet({
   onNavigationOpened,
   onSaveCommute,
   onSelectStation,
+  onSelectCharger,
   onShowStops,
   onWatchRoute,
   onRestore,
@@ -45,6 +46,7 @@ export function PlanRouteSheet({
   routeSheetMinimised,
   routeSummary,
   selected,
+  selectedChargerId,
   selectedCode,
   showStopsList,
   stationPanelOpen,
@@ -52,6 +54,7 @@ export function PlanRouteSheet({
   statusCapability,
   watchRouteDisabled,
   watchRouteEnabled,
+  vehicleEnergyType,
 }: {
   best?: StationViewModel;
   candidates: StationViewModel[];
@@ -60,6 +63,7 @@ export function PlanRouteSheet({
   error: string;
   emptyRouteTitle?: string;
   evFallbackChargers?: EvCharger[];
+  evRouteContext?: EvChargerResponse["context"] | null;
   evFallbackError?: string;
   evFallbackLoading?: boolean;
   loading: boolean;
@@ -69,6 +73,7 @@ export function PlanRouteSheet({
   onRestore: () => void;
   onSaveCommute: () => void;
   onSelectStation: (stationCode: string) => void;
+  onSelectCharger?: (chargerId: string) => void;
   onShowStops: () => void;
   onWatchRoute?: () => void;
   policyActive: boolean;
@@ -80,6 +85,7 @@ export function PlanRouteSheet({
   routeSheetMinimised: boolean;
   routeSummary: string;
   selected?: StationViewModel;
+  selectedChargerId?: string;
   selectedCode?: string;
   showStopsList?: boolean;
   stationPanelOpen: boolean;
@@ -87,6 +93,7 @@ export function PlanRouteSheet({
   statusCapability?: string;
   watchRouteDisabled?: boolean;
   watchRouteEnabled?: boolean;
+  vehicleEnergyType?: VehicleEnergyType;
 }) {
   const bestTomorrow = best ? tomorrowPriceView(best) : null;
   const selectedTomorrow = selected ? tomorrowPriceView(selected) : null;
@@ -156,6 +163,7 @@ export function PlanRouteSheet({
               error={error}
               emptyRouteTitle={emptyRouteTitle}
               evFallbackChargers={evFallbackChargers}
+              evRouteContext={evRouteContext}
               evFallbackError={evFallbackError}
               evFallbackLoading={evFallbackLoading}
               loading={loading}
@@ -163,6 +171,7 @@ export function PlanRouteSheet({
               onSaveCommute={onSaveCommute}
               onNavigationOpened={onNavigationOpened}
               onSelectStation={onSelectStation}
+              onSelectCharger={onSelectCharger}
               policyActive={policyActive}
               policyNotice={policyNotice}
               recommendationCopy={recommendationCopy}
@@ -170,12 +179,14 @@ export function PlanRouteSheet({
               routeNotice={routeNotice}
               resultContext={resultContext}
               selectedCode={selectedCode}
+              selectedChargerId={selectedChargerId}
               showStopsList={showStopsList}
               stopsTitle={stopsTitle}
               statusCapability={statusCapability}
               onWatchRoute={onWatchRoute}
               watchRouteDisabled={watchRouteDisabled}
               watchRouteEnabled={watchRouteEnabled}
+              vehicleEnergyType={vehicleEnergyType}
             />
           )}
         </>
@@ -196,6 +207,7 @@ function StationDetailPanel({
   selectedTomorrow: ReturnType<typeof tomorrowPriceView>;
 }) {
   const mismatchLine = fuelMismatchLine(selected, { scope: "route" });
+  const showDiscountRows = selected.discountCpl > 0 && selected.discountLabel;
   return (
     <View style={styles.stationDetailPanel}>
       <View style={styles.sheetHeaderRow}>
@@ -216,18 +228,27 @@ function StationDetailPanel({
         </View>
       ) : null}
       <View style={styles.stationFacts}>
-        <View style={styles.factPill}>
-          <Text style={styles.factLabel}>Pump</Text>
-          <Text style={styles.factValue}>{selected.pumpCpl.toFixed(1)} c/L</Text>
-        </View>
-        <View style={styles.factPill}>
-          <Text style={styles.factLabel}>Your price</Text>
-          <Text style={styles.factValue}>{selected.adjustedCpl.toFixed(1)} c/L</Text>
-        </View>
-        <View style={styles.factPill}>
-          <Text style={styles.factLabel}>Saving</Text>
-          <Text style={styles.factValue}>{priceSavingCpl(selected).toFixed(1)} c/L</Text>
-        </View>
+        {showDiscountRows ? (
+          <>
+            <View style={styles.factPill}>
+              <Text style={styles.factLabel}>Pump</Text>
+              <Text style={styles.factValue}>{selected.pumpCpl.toFixed(1)} c/L</Text>
+            </View>
+            <View style={styles.factPill}>
+              <Text style={styles.factLabel}>Your price</Text>
+              <Text style={styles.factValue}>{selected.adjustedCpl.toFixed(1)} c/L</Text>
+            </View>
+            <View style={styles.factPill}>
+              <Text style={styles.factLabel}>Saving</Text>
+              <Text style={styles.factValue}>{priceSavingCpl(selected).toFixed(1)} c/L</Text>
+            </View>
+          </>
+        ) : (
+          <View style={styles.factPill}>
+            <Text style={styles.factLabel}>Price</Text>
+            <Text style={styles.factValue}>{selected.adjustedCpl.toFixed(1)} c/L</Text>
+          </View>
+        )}
         <View style={styles.factPill}>
           <Text style={styles.factLabel}>{routeDetourEvidenceMetricLabel(selected)}</Text>
           <Text style={styles.factValue}>{routeDetourMinutes(selected).toFixed(1)} min</Text>
@@ -262,6 +283,7 @@ function RouteResultsPanel({
   error,
   emptyRouteTitle,
   evFallbackChargers = [],
+  evRouteContext = null,
   evFallbackError = "",
   evFallbackLoading = false,
   loading,
@@ -269,6 +291,7 @@ function RouteResultsPanel({
   onSaveCommute,
   onNavigationOpened,
   onSelectStation,
+  onSelectCharger,
   onWatchRoute,
   policyActive,
   policyNotice,
@@ -277,11 +300,13 @@ function RouteResultsPanel({
   routeNotice,
   resultContext,
   selectedCode,
+  selectedChargerId,
   showStopsList = true,
   stopsTitle = "Route options",
   statusCapability,
   watchRouteDisabled = false,
   watchRouteEnabled = false,
+  vehicleEnergyType = "petrol",
 }: {
   best?: StationViewModel;
   bestTomorrow: ReturnType<typeof tomorrowPriceView>;
@@ -291,6 +316,7 @@ function RouteResultsPanel({
   error: string;
   emptyRouteTitle?: string;
   evFallbackChargers?: EvCharger[];
+  evRouteContext?: EvChargerResponse["context"] | null;
   evFallbackError?: string;
   evFallbackLoading?: boolean;
   loading: boolean;
@@ -298,6 +324,7 @@ function RouteResultsPanel({
   onSaveCommute: () => void;
   onNavigationOpened?: (station: StationViewModel) => void;
   onSelectStation: (stationCode: string) => void;
+  onSelectCharger?: (chargerId: string) => void;
   onWatchRoute?: () => void;
   policyActive: boolean;
   policyNotice: string;
@@ -306,14 +333,17 @@ function RouteResultsPanel({
   routeNotice: string;
   resultContext?: ScoreResponse["context"];
   selectedCode?: string;
+  selectedChargerId?: string;
   showStopsList?: boolean;
   stopsTitle?: string;
   statusCapability?: string;
   watchRouteDisabled?: boolean;
   watchRouteEnabled?: boolean;
+  vehicleEnergyType?: VehicleEnergyType;
 }) {
   const recommendationSavingCpl = best ? routeSavingCpl(best, decisionSummary) : 0;
   const recommendationFuel = best?.fuel || "fuel";
+  const showStatusChip = statusCapability && statusCapability !== "live";
   const [evidenceExpanded, setEvidenceExpanded] = useState(false);
   const eligibility = best ? discountEligibilitySummary(best, policyActive) : null;
   const routeFuelMismatch = fuelMismatchLine(best, { scope: "route" }) || fuelMismatchContextLine(resultContext, { scope: "route" });
@@ -359,9 +389,11 @@ function RouteResultsPanel({
               <Text numberOfLines={2} style={styles.compactDecisionTitle}>
                 {recommendationTitle(recommendationCopy?.title, recommendationSavingCpl)}
               </Text>
-              <Text numberOfLines={1} style={styles.compactSavingLine}>
-                Best price by {recommendationSavingCpl.toFixed(1)} c/L
-              </Text>
+              {recommendationSavingCpl > 0.05 ? (
+                <Text numberOfLines={1} style={styles.compactSavingLine}>
+                  Best price by {recommendationSavingCpl.toFixed(1)} c/L
+                </Text>
+              ) : null}
               <Text numberOfLines={1} style={styles.compactDetourLine}>
                 {routeDetourEvidenceLine(best, decisionSummary?.economics?.detourMinutes)}
               </Text>
@@ -378,15 +410,14 @@ function RouteResultsPanel({
                     {chip.label}
                   </Text>
                 ))}
-                <Text
-                  numberOfLines={1}
-                  style={[
-                    styles.compactChip,
-                    statusCapability && statusCapability !== "live" ? styles.compactChipCaution : null,
-                  ]}
-                >
-                  {statusCapability ? capabilityLabelForPlan(statusCapability) : "Live data"}
-                </Text>
+                {showStatusChip ? (
+                  <Text
+                    numberOfLines={1}
+                    style={[styles.compactChip, styles.compactChipCaution]}
+                  >
+                    {capabilityLabelForPlan(statusCapability)}
+                  </Text>
+                ) : null}
               </View>
             </View>
             <View style={styles.recommendationRouteValue}>
@@ -421,11 +452,6 @@ function RouteResultsPanel({
               <Text style={styles.noticeText}>{routeFuelMismatch}</Text>
             </View>
           ) : null}
-          <ResultContextStrip
-            context={resultContext}
-            label="Route result context"
-            stations={candidates}
-          />
           <View style={styles.compactActionRow}>
             <Pressable
               accessibilityLabel={evidenceExpanded ? "Hide route evidence" : "Show route evidence"}
@@ -451,7 +477,11 @@ function RouteResultsPanel({
             ) : null}
           </View>
           {evidenceExpanded ? (
-            <>
+            <ScrollView
+              contentContainerStyle={styles.expandedEvidenceContent}
+              showsVerticalScrollIndicator
+              style={styles.expandedEvidenceScroll}
+            >
               <DiscountEligibilityCard summary={eligibility} />
               <DecisionEvidencePanel
                 candidate={best}
@@ -459,32 +489,59 @@ function RouteResultsPanel({
                 decisionSummary={decisionSummary}
                 resultContext={resultContext}
               />
+              {currentRouteSaved ? (
               <RouteFollowUpPrompt
                 currentRouteSaved={currentRouteSaved}
                 onSaveCommute={onSaveCommute}
                 onWatchRoute={onWatchRoute}
                 routeEndpointsPresent={routeEndpointsPresent}
+                hideSavePrompt={routeEndpointsPresent && !currentRouteSaved}
                 watchRouteDisabled={watchRouteDisabled}
                 watchRouteEnabled={watchRouteEnabled}
               />
-            </>
+              ) : null}
+              {showStopsList ? (
+                <>
+                  <View style={styles.sheetHeaderRow}>
+                    <Text style={styles.selectedTitle}>{stopsTitle}</Text>
+                    <Text style={styles.muted}>Tap for detail</Text>
+                  </View>
+                  {candidates.map((item) => (
+                    <StationRow
+                      item={item}
+                      key={item.station.stationCode}
+                      selected={item.station.stationCode === selectedCode}
+                      onPress={() => onSelectStation(item.station.stationCode)}
+                    />
+                  ))}
+                </>
+              ) : null}
+            </ScrollView>
           ) : null}
         </>
       ) : null}
       {!loading && !error && routeEndpointsPresent && !best ? (
         <View style={styles.emptyRouteState}>
-          <Text style={styles.decisionTitle}>{emptyRouteTitle || "No fuel stops found"}</Text>
-          <Text style={styles.muted}>
-            {routeNotice ||
-              (policyActive
-                ? "Route found, but no approved brands match this fuel, freshness and open-station settings."
-                : "Route found, but no eligible stations match this fuel, freshness and open-station settings.")}
-          </Text>
+          {vehicleEnergyType !== "electric" ? (
+            <>
+              <Text style={styles.decisionTitle}>{emptyRouteTitle || "No fuel stops found"}</Text>
+              <Text style={styles.muted}>
+                {routeNotice ||
+                  (policyActive
+                    ? "Route found, but no approved brands match this fuel, freshness and open-station settings."
+                    : "Route found, but no eligible stations match this fuel, freshness and open-station settings.")}
+              </Text>
+            </>
+          ) : null}
           {!showStopsList ? (
-            <EvFallbackPanel
+            <EvRoutePlanPanel
               chargers={evFallbackChargers}
+              context={evRouteContext}
               error={evFallbackError}
               loading={evFallbackLoading}
+              onSelectCharger={onSelectCharger}
+              selectedChargerId={selectedChargerId}
+              vehicleEnergyType={vehicleEnergyType}
             />
           ) : null}
         </View>
@@ -498,7 +555,7 @@ function RouteResultsPanel({
         </View>
       ) : null}
 
-      {showStopsList && (!best || evidenceExpanded) ? (
+      {showStopsList && !best ? (
         <>
           <View style={styles.sheetHeaderRow}>
             <Text style={styles.selectedTitle}>{stopsTitle}</Text>
@@ -546,6 +603,7 @@ function RouteFollowUpPrompt({
   onSaveCommute,
   onWatchRoute,
   routeEndpointsPresent,
+  hideSavePrompt = false,
   watchRouteDisabled,
   watchRouteEnabled,
 }: {
@@ -553,10 +611,12 @@ function RouteFollowUpPrompt({
   onSaveCommute: () => void;
   onWatchRoute?: () => void;
   routeEndpointsPresent: boolean;
+  hideSavePrompt?: boolean;
   watchRouteDisabled: boolean;
   watchRouteEnabled: boolean;
 }) {
   if (!routeEndpointsPresent) return null;
+  if (hideSavePrompt) return null;
   if (!currentRouteSaved) {
     return (
       <View style={styles.followUpCard}>
@@ -681,38 +741,75 @@ function capabilityLabelForPlan(capability: string) {
   return "Data check";
 }
 
-function EvFallbackPanel({
+function EvRoutePlanPanel({
   chargers,
+  context,
   error,
   loading,
+  onSelectCharger,
+  selectedChargerId,
+  vehicleEnergyType,
 }: {
   chargers: EvCharger[];
+  context?: EvChargerResponse["context"] | null;
   error: string;
   loading: boolean;
+  onSelectCharger?: (chargerId: string) => void;
+  selectedChargerId?: string;
+  vehicleEnergyType: VehicleEnergyType;
 }) {
   if (loading) {
-    return <Text style={styles.fallbackMeta}>Looking for compatible fallback chargers...</Text>;
+    return <Text style={styles.fallbackMeta}>Looking for compatible route chargers...</Text>;
   }
+  const routeTitle = evRouteTitle();
+  const routeMeta = evRouteMeta(context, vehicleEnergyType);
+  const selectedCharger = chargers.find((charger) => charger.id === selectedChargerId);
+  const missingConnectorFilters = !Array.isArray(context?.filters?.connectors) ||
+    context.filters.connectors.length === 0;
+  const visibleLimit = 1;
+  const visibleChargers = selectedCharger
+    ? [selectedCharger, ...chargers.filter((charger) => charger.id !== selectedCharger.id)].slice(0, visibleLimit + 1)
+    : chargers.slice(0, visibleLimit);
+  const hiddenChargerCount = Math.max(0, chargers.length - visibleChargers.length);
   if (error) {
-    return <Text style={styles.fallbackMeta}>Fallback charger lookup failed. Use Nearby or your charging network app before driving.</Text>;
-  }
-  if (!chargers.length) {
-    return <Text style={styles.fallbackMeta}>No compatible fallback chargers found near sampled route points in directory data.</Text>;
+    return (
+      <View style={styles.evPlanCard}>
+        <Text style={styles.evPlanTitle}>{routeTitle}</Text>
+        <Text style={styles.fallbackMeta}>{routeMeta}</Text>
+        <Text style={styles.fallbackTrust}>Use Nearby EV charging or your network app before driving.</Text>
+      </View>
+    );
   }
   return (
     <View style={styles.fallbackPanel}>
       <View style={styles.sheetHeaderRow}>
-        <Text style={styles.fallbackTitle}>Charging fallback</Text>
+        <Text style={styles.evPlanTitle}>{routeTitle}</Text>
         <View style={styles.fallbackBadgeRow}>
-          <Text style={styles.fallbackBadge}>Directory data</Text>
-          <Text style={styles.fallbackCautionBadge}>No live bays</Text>
+          {chargers.length ? (
+            <Text style={styles.fallbackBadge}>{chargers.length} option{chargers.length === 1 ? "" : "s"}</Text>
+          ) : (
+            <Text style={styles.fallbackBadge}>None found</Text>
+          )}
         </View>
       </View>
-      <Text style={styles.fallbackMeta}>
-        Compatible chargers near sampled route points. Detour time is route-estimated where available, otherwise a rough straight-line fallback. Confirm tariff, access and live bay status in the network app.
-      </Text>
-      {chargers.map((charger) => (
-        <View key={charger.id} style={styles.fallbackRow}>
+      <Text style={styles.fallbackMeta}>{routeMeta}</Text>
+      {missingConnectorFilters ? (
+        <Text style={styles.fallbackConnectorWarning}>Set your EV connectors in Settings for better matching.</Text>
+      ) : null}
+      {!chargers.length ? (
+        <Text style={styles.fallbackMeta}>No charger rows came back for this route. Try Nearby EV charging or clear connector filters.</Text>
+      ) : null}
+      {visibleChargers.map((charger) => {
+        const selected = charger.id === selectedChargerId;
+        return (
+        <Pressable
+          accessibilityLabel={`Select ${charger.name}`}
+          accessibilityRole="button"
+          accessibilityState={{ selected }}
+          key={charger.id}
+          onPress={() => onSelectCharger?.(charger.id)}
+          style={[styles.fallbackRow, selected && styles.fallbackRowSelected]}
+        >
           <View style={styles.fallbackPowerTile}>
             {charger.maxPowerKw ? (
               <>
@@ -729,14 +826,49 @@ function EvFallbackPanel({
           <View style={styles.fallbackMain}>
             <Text numberOfLines={1} style={styles.fallbackName}>{charger.name}</Text>
             <Text numberOfLines={1} style={styles.fallbackMeta}>
-              {chargerConnectorSummary(charger)} | {chargerRouteDistanceLabel(charger)}
+              {chargerLocationLabel(charger)}
             </Text>
-            <Text numberOfLines={1} style={styles.fallbackTrust}>{charger.availabilityLabel}</Text>
+            <Text numberOfLines={1} style={styles.fallbackConnectorLine}>
+              {chargerConnectorSummary(charger)}
+            </Text>
+            <Text numberOfLines={1} style={styles.fallbackDistanceLine}>
+              {chargerRouteDistanceLabel(charger)}
+            </Text>
           </View>
-        </View>
-      ))}
+          <Pressable
+            accessibilityLabel={`Navigate to ${charger.name}`}
+            accessibilityRole="button"
+            onPress={(event) => {
+              event.stopPropagation();
+              openDirections(charger.lat, charger.lon, charger.address || charger.name);
+            }}
+            style={styles.fallbackNavigateButton}
+          >
+            <Text style={styles.fallbackNavigateText}>↗</Text>
+          </Pressable>
+        </Pressable>
+        );
+      })}
+      {hiddenChargerCount ? (
+        <Text style={styles.fallbackMeta}>+{hiddenChargerCount} more shown on the map.</Text>
+      ) : null}
     </View>
   );
+}
+
+function evRouteTitle() {
+  return "Route charger options";
+}
+
+function evRouteMeta(context?: EvChargerResponse["context"] | null, vehicleEnergyType?: VehicleEnergyType) {
+  const routeKm = Number(context?.routeDistanceKm || 0);
+  const rangeKm = Number(context?.selectedRangeKm || 0);
+  const count = Number(context?.chargerCount || 0);
+  const parts = [];
+  if (routeKm) parts.push(`${Math.round(routeKm)} km route`);
+  if (rangeKm) parts.push(`${Math.round(rangeKm)} km selected range`);
+  if (!parts.length) return count ? `${count} charger option${count === 1 ? "" : "s"}` : "No charger options returned";
+  return parts.join(". ");
 }
 
 function chargerConnectorSummary(charger: EvCharger) {
@@ -746,6 +878,10 @@ function chargerConnectorSummary(charger: EvCharger) {
     .filter(Boolean)
     .slice(0, 2);
   return labels.length ? labels.join(" | ") : "Connector unknown";
+}
+
+function chargerLocationLabel(charger: EvCharger) {
+  return charger.address || charger.operator || "Location details unknown";
 }
 
 function chargerRouteDistanceLabel(charger: EvCharger) {
@@ -761,8 +897,10 @@ function chargerRouteDistanceLabel(charger: EvCharger) {
     const distanceLabel = typeof detourDistance === "number" && Number.isFinite(detourDistance)
       ? `est ${detourDistance.toFixed(1)} km detour`
       : `approx ${routeDistance.toFixed(1)} km off route`;
+    if (Number(detourDistance || routeDistance) < 0.05) return "At route point";
     return `${distanceLabel}${timeLabel}`;
   }
+  if (Number(charger.distanceKm) < 0.05) return "Here";
   return `${charger.distanceKm.toFixed(1)} km from sampled route point`;
 }
 
@@ -952,6 +1090,13 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     minHeight: 30,
   },
+  expandedEvidenceScroll: {
+    maxHeight: 220,
+  },
+  expandedEvidenceContent: {
+    gap: spacing.sm,
+    paddingBottom: spacing.md,
+  },
   secondaryActionButton: {
     alignItems: "center",
     backgroundColor: colors.greenSoft,
@@ -980,6 +1125,20 @@ const styles = StyleSheet.create({
   fallbackPanel: {
     gap: spacing.xs,
     marginTop: spacing.sm,
+  },
+  evPlanCard: {
+    backgroundColor: colors.white,
+    borderColor: colors.line,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    gap: spacing.xs,
+    padding: spacing.sm,
+  },
+  evPlanTitle: {
+    color: colors.ink,
+    flex: 1,
+    fontSize: typeScale.body,
+    fontWeight: "900",
   },
   fallbackTitle: {
     color: colors.ink,
@@ -1021,6 +1180,10 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     padding: spacing.xs,
   },
+  fallbackRowSelected: {
+    borderColor: colors.green,
+    borderWidth: 2,
+  },
   fallbackPowerTile: {
     alignItems: "center",
     backgroundColor: colors.blueSoft,
@@ -1046,7 +1209,6 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontSize: 9,
     fontWeight: "800",
-    textTransform: "uppercase",
   },
   fallbackMain: {
     flex: 1,
@@ -1062,6 +1224,42 @@ const styles = StyleSheet.create({
     fontSize: typeScale.caption,
     fontWeight: "500",
     lineHeight: 17,
+  },
+  fallbackConnectorLine: {
+    color: colors.ink,
+    fontSize: 11,
+    fontWeight: "800",
+    marginTop: 1,
+  },
+  fallbackDistanceLine: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: "700",
+    marginTop: 1,
+  },
+  fallbackConnectorWarning: {
+    backgroundColor: colors.amberSoft,
+    borderRadius: radii.md,
+    color: colors.amber,
+    fontSize: 10,
+    fontWeight: "800",
+    overflow: "hidden",
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 5,
+  },
+  fallbackNavigateButton: {
+    alignItems: "center",
+    backgroundColor: colors.black,
+    borderRadius: radii.pill,
+    height: 34,
+    justifyContent: "center",
+    width: 34,
+  },
+  fallbackNavigateText: {
+    color: colors.white,
+    fontSize: 18,
+    fontWeight: "800",
+    lineHeight: 20,
   },
   fallbackTrust: {
     color: colors.amber,

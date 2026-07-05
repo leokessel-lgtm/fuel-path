@@ -8,10 +8,12 @@ import {
 
 import { geocodeAddress, getRoute, getRouteEvFallbackChargers, planFuelRoute } from "../api/fuelPathApi";
 import { PlanRouteEditorCard } from "../components/PlanRouteEditorCard";
+import { PlanRouteSummaryCard } from "../components/PlanRouteSummaryCard";
 import { PlanRouteSheet } from "../components/PlanRouteSheet";
 import { QuickPlace } from "../components/QuickPlaceShortcuts";
 import { routeInputPrecisionHint } from "../components/RouteAddressSuggestions";
 import { StationMap } from "../components/StationMap";
+import { usePlanSheetState } from "../hooks/usePlanSheetState";
 import { useRouteAddressSuggestions } from "../hooks/useRouteAddressSuggestions";
 import { getCurrentMapPoint } from "../services/currentLocation";
 import {
@@ -20,10 +22,11 @@ import {
   recordRoutePlanCompletedEvidence,
   recordSavedCommuteCreatedEvidence,
 } from "./PlanScreen.behaviour";
-import { colors, radii, shadow, spacing, surfaces, typeScale, typography } from "../theme";
+import { spacing } from "../theme";
 import {
   AppPreferences,
   EvCharger,
+  EvChargerResponse,
   FuelCode,
   MapPoint,
   SavedCommute,
@@ -43,7 +46,6 @@ import {
   shortPointName,
   uniqueStations,
   vehiclePlanNotice,
-  vehiclePlanSummary,
   vehicleRouteCapacityNotice,
   vehicleRouteRangeNotice,
 } from "./PlanScreen.utils";
@@ -51,6 +53,7 @@ import {
 type PlanScreenProps = {
   preferences: AppPreferences;
   onFuelChange: (fuel: FuelCode) => void;
+  onVehicleEnergyTypeChange: (vehicleEnergyType: AppPreferences["vehicleEnergyType"]) => void;
   onAddRecentLocation?: (point: MapPoint) => void;
   onClearRecentLocations?: () => void;
   onRemoveRecentLocation?: (point: MapPoint) => void;
@@ -77,7 +80,12 @@ const defaultPlanCentre: MapPoint = {
 };
 
 const emptyRoute = { endpoints: undefined, points: [], distanceKm: null } as { endpoints?: { from: MapPoint; to: MapPoint }; points: MapPoint[]; distanceKm: number | null };
-const emptyEvFallback = { chargers: [], loading: false, error: "" } as { chargers: EvCharger[]; loading: boolean; error: string };
+const emptyEvFallback = { chargers: [], context: null, loading: false, error: "" } as {
+  chargers: EvCharger[];
+  context: EvChargerResponse["context"] | null;
+  loading: boolean;
+  error: string;
+};
 const evRoutePlanningUnavailable =
   "EV route charging is not available yet. Use Nearby EV charging for compatible chargers while route charger planning is added.";
 
@@ -87,6 +95,7 @@ export function PlanScreen({
   onAddRecentLocation,
   onClearRecentLocations,
   onFuelChange,
+  onVehicleEnergyTypeChange,
   onRemoveRecentLocation,
   onSaveCommute,
   onToggleCommuteAlert,
@@ -102,12 +111,20 @@ export function PlanScreen({
   const [routeData, setRouteData] = useState(emptyRoute);
   const [evFallback, setEvFallback] = useState(emptyEvFallback);
   const [selectedCode, setSelectedCode] = useState<string>();
+  const [selectedChargerId, setSelectedChargerId] = useState<string>();
   const [loading, setLoading] = useState(false);
   const [locatingFrom, setLocatingFrom] = useState(false);
   const [routeControlsCollapsed, setRouteControlsCollapsed] = useState(false);
-  const [stationPanelOpen, setStationPanelOpen] = useState(false);
-  const [routeSheetMinimised, setRouteSheetMinimised] = useState(false);
   const [error, setError] = useState("");
+  const {
+    closePanels,
+    openStationPanel,
+    restoreRouteSheet,
+    routeSheetMinimised,
+    setRouteSheetMinimised,
+    setStationPanelOpen,
+    stationPanelOpen,
+  } = usePlanSheetState();
   const routeEditVersionRef = useRef(0);
   const routeRequestIdRef = useRef(0);
   const fromSearchContext = useMemo(
@@ -140,7 +157,6 @@ export function PlanScreen({
     ? preferences.approvedPolicyBrands
     : [];
   const routePlanningBlocked = false;
-  const vehicleSummary = vehiclePlanSummary(preferences);
   const vehicleRouteNotice = vehiclePlanNotice(preferences.vehicleEnergyType);
 
   const loadRoute = async ({
@@ -194,14 +210,17 @@ export function PlanScreen({
       if (preferences.vehicleEnergyType === "electric") {
         const route = await getRoute(resolvedFromPoint, resolvedToPoint);
         let fallbackChargers: EvCharger[] = [];
+        let fallbackContext: EvChargerResponse["context"] | null = null;
         let fallbackError = "";
         setEvFallback((current) => ({ ...current, loading: true, error: "" }));
         try {
           const fallbackResponse = await getRouteEvFallbackChargers({
             connectors: preferences.evConnectors,
             route,
+            selectedRangeKm: preferences.evRangeKm,
           });
           fallbackChargers = fallbackResponse.chargers;
+          fallbackContext = fallbackResponse.context;
         } catch (fallbackErr) {
           fallbackError = fallbackErr instanceof Error
             ? fallbackErr.message
@@ -220,13 +239,13 @@ export function PlanScreen({
         setFrom(displayLocationLabel(resolvedFromPoint, fromLabel));
         setTo(displayLocationLabel(resolvedToPoint, toLabel));
         setRouteData({ endpoints: { from: resolvedFromPoint, to: resolvedToPoint }, points: route.points, distanceKm: route.distanceKm });
-        setEvFallback({ chargers: fallbackChargers, loading: false, error: fallbackError });
+        setEvFallback({ chargers: fallbackChargers, context: fallbackContext, loading: false, error: fallbackError });
         setResult(null);
         setSelectedCode(undefined);
+        setSelectedChargerId(fallbackChargers[0]?.id);
         onAddRecentLocation?.(resolvedFromPoint);
         onAddRecentLocation?.(resolvedToPoint);
-        setStationPanelOpen(false);
-        setRouteSheetMinimised(false);
+        closePanels();
         setRouteControlsCollapsed(collapseOnSuccess);
         resetAddressSessionToken("from");
         resetAddressSessionToken("to");
@@ -256,8 +275,7 @@ export function PlanScreen({
       setSelectedCode(planned.score.recommendations[0]?.station.stationCode);
       onAddRecentLocation?.(resolvedFromPoint);
       onAddRecentLocation?.(resolvedToPoint);
-      setStationPanelOpen(false);
-      setRouteSheetMinimised(false);
+      closePanels();
       setRouteControlsCollapsed(collapseOnSuccess);
       resetAddressSessionToken("from");
       resetAddressSessionToken("to");
@@ -272,8 +290,7 @@ export function PlanScreen({
       setEvFallback(emptyEvFallback);
       setResult(null);
       setRouteControlsCollapsed(false);
-      setStationPanelOpen(false);
-      setRouteSheetMinimised(false);
+      closePanels();
       setError(routePlanningErrorMessage(err));
     } finally {
       if (requestId === routeRequestIdRef.current) {
@@ -308,33 +325,49 @@ export function PlanScreen({
 
   const reopenRouteEditor = () => {
     setRouteControlsCollapsed(false);
-    setStationPanelOpen(false);
-    setRouteSheetMinimised(false);
+    closePanels();
   };
 
   const handleFromChange = (value: string) => {
     markRouteEdited();
+    setActiveAddressField("from");
     setFrom(value);
     setFromPoint(undefined);
+    if (!value.trim()) resetAddressSessionToken("from");
     reopenRouteEditor();
   };
 
   const handleToChange = (value: string) => {
     markRouteEdited();
+    setActiveAddressField("to");
     setTo(value);
     setToPoint(undefined);
+    if (!value.trim()) resetAddressSessionToken("to");
     reopenRouteEditor();
   };
 
-  const selectAddressSuggestion = (field: "from" | "to", point: MapPoint) => {
+  const selectAddressSuggestion = async (field: "from" | "to", point: MapPoint) => {
     markRouteEdited();
-    const label = displayLocationLabel(point, field === "from" ? from : to);
+    const query = field === "from" ? from : to;
+    let resolvedPoint = point;
+    if (!Number.isFinite(point.lat) || !Number.isFinite(point.lon)) {
+      try {
+        resolvedPoint = await geocodeAddress(point.label, getAddressSessionToken(field), {
+          provider: point.provider,
+          providerPlaceId: point.providerId,
+        });
+      } catch {
+        setError("Choose another suggestion, or try a fuller address, suburb or place.");
+        return;
+      }
+    }
+    const label = displayLocationLabel(resolvedPoint, query);
     if (field === "from") {
       setFrom(label);
-      setFromPoint(point);
+      setFromPoint(resolvedPoint);
     } else {
       setTo(label);
-      setToPoint(point);
+      setToPoint(resolvedPoint);
     }
     clearAddressSuggestions(field);
     setActiveAddressField(null);
@@ -405,8 +438,7 @@ export function PlanScreen({
       setResult(null);
       setRouteData((current) => ({ ...current, points: [] }));
       setSelectedCode(undefined);
-      setStationPanelOpen(false);
-      setRouteSheetMinimised(false);
+      closePanels();
       setRouteControlsCollapsed(false);
       setError(evRoutePlanningUnavailable);
       return;
@@ -491,8 +523,14 @@ export function PlanScreen({
   const routeSummary = `${from} to ${to}`;
   const handleStationSelect = (stationCode: string) => {
     setSelectedCode(stationCode);
-    setStationPanelOpen(true);
-    setRouteSheetMinimised(false);
+    setSelectedChargerId(undefined);
+    openStationPanel();
+  };
+
+  const handleChargerSelect = (chargerId: string) => {
+    setSelectedChargerId(chargerId);
+    setSelectedCode(undefined);
+    closePanels();
   };
 
   const handleSaveCurrentCommute = () => {
@@ -546,36 +584,23 @@ export function PlanScreen({
           routePoints={routeData.points}
           cameraInsets={routeCameraInsets}
           chargers={preferences.vehicleEnergyType === "electric" ? evFallback.chargers : []}
-          selectedChargerId={preferences.vehicleEnergyType === "electric" ? evFallback.chargers[0]?.id : undefined}
+          selectedChargerId={preferences.vehicleEnergyType === "electric" ? selectedChargerId : undefined}
+          onSelectCharger={handleChargerSelect}
           showCentreMarker={Boolean(fromPoint)}
         />
       </View>
 
       <View style={[styles.topControls, !routeStarted && styles.topControlsOnly]}>
         {routeControlsCollapsed && routeData.endpoints && !error ? (
-          <Pressable
-            accessibilityLabel="Edit planned route"
-            accessibilityRole="button"
+          <PlanRouteSummaryCard
+            policyActive={preferences.fuelPolicyEnabled}
+            routeSummary={routeSummary}
             onPress={() => setRouteControlsCollapsed(false)}
-            style={styles.routeSummaryCard}
-          >
-            <View style={styles.routeSummaryMain}>
-              <Text style={styles.eyebrow}>Plan trip</Text>
-              <Text numberOfLines={1} style={styles.routeSummaryTitle}>
-                {routeSummary}
-              </Text>
-              <Text numberOfLines={1} style={styles.routeSummaryMeta}>
-                {vehicleSummary}
-                {preferences.fuelPolicyEnabled ? " | Policy" : ""}
-              </Text>
-            </View>
-            <Text style={styles.editChip}>Edit</Text>
-          </Pressable>
+          />
         ) : (
           <PlanRouteEditorCard
             activeAddressField={activeAddressField}
             canPlanRoute={canPlanRoute}
-            evConnectors={preferences.evConnectors}
             fuel={preferences.fuel}
             from={from}
             fromSuggestions={fromSuggestions}
@@ -585,6 +610,7 @@ export function PlanScreen({
             onFromChange={handleFromChange}
             onFromFocus={() => setActiveAddressField("from")}
             onFuelChange={onFuelChange}
+            onVehicleEnergyTypeChange={onVehicleEnergyTypeChange}
             onPlanRoute={() => loadRoute()}
             onRemoveRecentLocation={onRemoveRecentLocation}
             onSelectAddressSuggestion={selectAddressSuggestion}
@@ -606,7 +632,6 @@ export function PlanScreen({
             toSuggestions={toSuggestions}
             vehicleEnergyType={preferences.vehicleEnergyType}
             vehicleRouteNotice={vehicleRouteNotice}
-            vehicleSummary={vehicleSummary}
           />
         )}
       </View>
@@ -617,13 +642,16 @@ export function PlanScreen({
           candidates={candidates}
           currentRouteSaved={currentRouteSaved}
           decisionSummary={backendDecisionSummary}
-          emptyRouteTitle={preferences.vehicleEnergyType === "electric" ? "Route range check" : undefined}
+          emptyRouteTitle={preferences.vehicleEnergyType === "electric" ? "Route charger options" : undefined}
           evFallbackChargers={evFallback.chargers}
+          evRouteContext={evFallback.context}
           evFallbackError={evFallback.error}
           evFallbackLoading={evFallback.loading}
+          selectedChargerId={selectedChargerId}
+          onSelectCharger={handleChargerSelect}
           error={error}
           loading={loading}
-          loadingLabel={preferences.vehicleEnergyType === "electric" ? "Checking route range..." : undefined}
+          loadingLabel={preferences.vehicleEnergyType === "electric" ? "Finding route chargers..." : undefined}
           onMinimise={() => setRouteSheetMinimised(true)}
           onRestore={() => setRouteSheetMinimised(false)}
           onSaveCommute={handleSaveCurrentCommute}
@@ -649,6 +677,7 @@ export function PlanScreen({
           stationPanelOpen={stationPanelOpen}
           stopsTitle="Route options"
           statusCapability={result?.context.capability}
+          vehicleEnergyType={preferences.vehicleEnergyType}
           watchRouteDisabled={currentRouteWatchDisabled}
           watchRouteEnabled={currentRouteWatched}
         />
@@ -677,43 +706,6 @@ const styles = StyleSheet.create({
     zIndex: 5,
   },
   topControlsOnly: {
-    top: spacing.lg,
-  },
-  routeSummaryCard: {
-    ...shadow.float,
-    ...surfaces.floating,
-    alignItems: "center",
-    borderRadius: radii.xxl,
-    flexDirection: "row",
-    gap: spacing.md,
-    minHeight: 66,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-  },
-  routeSummaryMain: {
-    flex: 1,
-    minWidth: 0,
-  },
-  routeSummaryTitle: {
-    ...typography.bodyStrong,
-    marginTop: 2,
-  },
-  routeSummaryMeta: {
-    ...typography.bodyMuted,
-    marginTop: 2,
-  },
-  editChip: {
-    backgroundColor: colors.greenSoft,
-    borderRadius: radii.pill,
-    color: colors.greenDark,
-    fontSize: typeScale.caption,
-    fontWeight: "700",
-    overflow: "hidden",
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-  },
-  eyebrow: {
-    ...typography.eyebrow,
-    textTransform: "uppercase",
+    top: spacing.md,
   },
 });

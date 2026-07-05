@@ -58,12 +58,36 @@ export function useSavedCommutes() {
     });
   }, []);
 
+  const renameCommute = useCallback((commuteId: string, name: string) => {
+    const safeName = name.trim();
+    setSavedCommutes((current) =>
+      current.map((commute) =>
+        commute.id === commuteId
+          ? {
+            ...commute,
+            name: safeName || commuteName(commute.from, commute.to),
+            updatedAt: new Date().toISOString(),
+          }
+          : commute,
+      ),
+    );
+  }, []);
+
   return {
     loaded,
+    renameCommute,
     saveCommute,
     savedCommutes,
     setSavedCommutes,
   };
+}
+
+function commuteName(from: MapPoint, to: MapPoint) {
+  return `${shortPointName(from)} to ${shortPointName(to)}`;
+}
+
+function shortPointName(point: MapPoint) {
+  return point.displayTitle || point.label.split(",")[0] || "Saved place";
 }
 
 function sameCommute(

@@ -11,9 +11,12 @@ import {
   FuelCode,
   HomeChargingAccess,
   MapPoint,
+  VehicleProfile,
   VehicleEnergyType,
 } from "../types";
 import { isDiscountRedeemedToday } from "../utils/discountRedemptions";
+
+const maxVehicleProfiles = 5;
 
 export function useAppPreferences() {
   const [preferences, setPreferences] = useState<AppPreferences>(defaultPreferences);
@@ -37,18 +40,22 @@ export function useAppPreferences() {
   }, [loaded, preferences]);
 
   const updateFuel = useCallback((fuel: FuelCode) => {
-    setPreferences((current) => ({ ...current, fuel }));
+    setPreferences((current) => updateActiveVehicle(current, {
+      fuel,
+      vehicleEnergyType: fuel === "DL" || fuel === "PDL" ? "diesel" : "petrol",
+    }));
   }, []);
 
   const updateVehicleEnergyType = useCallback((vehicleEnergyType: VehicleEnergyType) => {
     setPreferences((current) => {
+      const updates: Partial<VehicleProfile> = { vehicleEnergyType };
       if (vehicleEnergyType === "diesel" && current.fuel !== "DL" && current.fuel !== "PDL") {
-        return { ...current, fuel: "DL", vehicleEnergyType };
+        updates.fuel = "DL";
       }
       if (vehicleEnergyType === "petrol" && (current.fuel === "DL" || current.fuel === "PDL")) {
-        return { ...current, fuel: "U91", vehicleEnergyType };
+        updates.fuel = "U91";
       }
-      return { ...current, vehicleEnergyType };
+      return updateActiveVehicle(current, updates);
     });
   }, []);
 
@@ -60,10 +67,7 @@ export function useAppPreferences() {
       } else {
         selected.add(connector);
       }
-      return {
-        ...current,
-        evConnectors: Array.from(selected),
-      };
+      return updateActiveVehicle(current, { evConnectors: Array.from(selected) });
     });
   }, []);
 
@@ -71,14 +75,47 @@ export function useAppPreferences() {
     updates: Partial<Pick<
       AppPreferences,
       "evBatteryKwh" | "evRangeKm" | "fuelTankLitres" | "homeChargingAccess"
-        | "evChargingPreference"
+        | "evChargingPreference" | "vehicleName" | "vehicleRego"
     >>,
   ) => {
-    setPreferences((current) => ({ ...current, ...updates }));
+    setPreferences((current) => updateActiveVehicle(current, vehicleProfileUpdates(updates)));
   }, []);
 
   const updateHomeChargingAccess = useCallback((homeChargingAccess: HomeChargingAccess) => {
-    setPreferences((current) => ({ ...current, homeChargingAccess }));
+    setPreferences((current) => updateActiveVehicle(current, { homeChargingAccess }));
+  }, []);
+
+  const selectVehicle = useCallback((vehicleId: string) => {
+    setPreferences((current) => {
+      const vehicle = current.vehicles.find((item) => item.id === vehicleId);
+      if (!vehicle) return current;
+      return applyActiveVehicle({ ...current, activeVehicleId: vehicle.id, vehicles: current.vehicles }, vehicle);
+    });
+  }, []);
+
+  const addVehicle = useCallback((vehicleEnergyType: VehicleEnergyType = "petrol") => {
+    setPreferences((current) => {
+      if (current.vehicles.length >= maxVehicleProfiles) return current;
+      const vehicle = createVehicleProfile(vehicleEnergyType);
+      return applyActiveVehicle({
+        ...current,
+        activeVehicleId: vehicle.id,
+        vehicles: [...current.vehicles, vehicle],
+      }, vehicle);
+    });
+  }, []);
+
+  const removeVehicle = useCallback((vehicleId: string) => {
+    setPreferences((current) => {
+      if (current.vehicles.length <= 1) return current;
+      const vehicles = current.vehicles.filter((vehicle) => vehicle.id !== vehicleId);
+      const activeVehicle = vehicles.find((vehicle) => vehicle.id === current.activeVehicleId) || vehicles[0];
+      return applyActiveVehicle({
+        ...current,
+        activeVehicleId: activeVehicle.id,
+        vehicles,
+      }, activeVehicle);
+    });
   }, []);
 
   const updateDecisionRule = useCallback((
@@ -132,30 +169,6 @@ export function useAppPreferences() {
     });
   }, []);
 
-  const toggleFuelPolicy = useCallback(() => {
-    setPreferences((current) => ({
-      ...current,
-      fuelPolicyEnabled: !current.fuelPolicyEnabled,
-    }));
-  }, []);
-
-  const togglePolicyBrand = useCallback((brand: string) => {
-    setPreferences((current) => {
-      const selected = new Set(current.approvedPolicyBrands);
-      if (selected.has(brand)) {
-        selected.delete(brand);
-      } else {
-        selected.add(brand);
-      }
-      return {
-        ...current,
-        approvedPolicyBrands: selected.size
-          ? Array.from(selected)
-          : current.approvedPolicyBrands,
-      };
-    });
-  }, []);
-
   const saveNamedPlace = useCallback((kind: "home" | "work", point: MapPoint) => {
     setPreferences((current) => ({
       ...current,
@@ -174,16 +187,89 @@ export function useAppPreferences() {
     clearNamedPlace,
     loaded,
     preferences,
+    addVehicle,
+    removeVehicle,
     saveNamedPlace,
+    selectVehicle,
     toggleDiscount,
     toggleDiscountRedemption,
-    toggleFuelPolicy,
-    togglePolicyBrand,
     toggleEvConnector,
     updateDecisionRule,
     updateFuel,
     updateHomeChargingAccess,
     updateVehicleProfile,
     updateVehicleEnergyType,
+  };
+}
+
+function updateActiveVehicle(
+  preferences: AppPreferences,
+  updates: Partial<VehicleProfile>,
+) {
+  const activeVehicle = preferences.vehicles.find((vehicle) => vehicle.id === preferences.activeVehicleId)
+    || preferences.vehicles[0];
+  if (!activeVehicle) return preferences;
+  const nextVehicle = { ...activeVehicle, ...updates };
+  const vehicles = preferences.vehicles.map((vehicle) =>
+    vehicle.id === activeVehicle.id ? nextVehicle : vehicle,
+  );
+  return applyActiveVehicle({
+    ...preferences,
+    activeVehicleId: nextVehicle.id,
+    vehicles,
+  }, nextVehicle);
+}
+
+function applyActiveVehicle(preferences: AppPreferences, vehicle: VehicleProfile): AppPreferences {
+  return {
+    ...preferences,
+    activeVehicleId: vehicle.id,
+    vehicleName: vehicle.name,
+    vehicleRego: vehicle.rego,
+    vehicleEnergyType: vehicle.vehicleEnergyType,
+    fuel: vehicle.fuel,
+    evConnectors: vehicle.evConnectors,
+    fuelTankLitres: vehicle.fuelTankLitres,
+    evBatteryKwh: vehicle.evBatteryKwh,
+    evRangeKm: vehicle.evRangeKm,
+    homeChargingAccess: vehicle.homeChargingAccess,
+    evChargingPreference: vehicle.evChargingPreference,
+  };
+}
+
+function vehicleProfileUpdates(
+  updates: Partial<Pick<
+    AppPreferences,
+    "evBatteryKwh" | "evRangeKm" | "fuelTankLitres" | "homeChargingAccess"
+      | "evChargingPreference" | "vehicleName" | "vehicleRego"
+  >>,
+) {
+  const next: Partial<VehicleProfile> = {
+    evBatteryKwh: updates.evBatteryKwh,
+    evRangeKm: updates.evRangeKm,
+    fuelTankLitres: updates.fuelTankLitres,
+    homeChargingAccess: updates.homeChargingAccess,
+    evChargingPreference: updates.evChargingPreference,
+  };
+  if (updates.vehicleName !== undefined) next.name = updates.vehicleName;
+  if (updates.vehicleRego !== undefined) next.rego = updates.vehicleRego;
+  return Object.fromEntries(
+    Object.entries(next).filter(([, value]) => value !== undefined),
+  ) as Partial<VehicleProfile>;
+}
+
+function createVehicleProfile(vehicleEnergyType: VehicleEnergyType): VehicleProfile {
+  return {
+    id: `vehicle-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+    name: "",
+    rego: "",
+    vehicleEnergyType,
+    fuel: vehicleEnergyType === "diesel" ? "DL" : "U91",
+    evConnectors: [],
+    fuelTankLitres: 55,
+    evBatteryKwh: 75,
+    evRangeKm: 400,
+    homeChargingAccess: "unknown",
+    evChargingPreference: "balanced",
   };
 }

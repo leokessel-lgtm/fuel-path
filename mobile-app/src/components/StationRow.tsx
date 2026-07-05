@@ -26,7 +26,6 @@ export function StationRow({
 }) {
   const tomorrow = tomorrowPriceView(item);
   const attentionCue = stationAttentionCue(item);
-  const showAttentionCue = attentionCue && attentionCue.label !== stationOpenLabel(item.station.openNow);
   const fuelLabel = item.fuel || "fuel";
   return (
     <Pressable
@@ -81,30 +80,6 @@ export function StationRow({
         <View style={styles.actionDistancePill}>
           <Text style={styles.actionDistanceText}>{item.distanceKm.toFixed(1)} km</Text>
         </View>
-        {showAttentionCue ? (
-          <Text
-            numberOfLines={1}
-            style={[
-              styles.confidence,
-              attentionCue.level === "low" && styles.confidenceLow,
-              attentionCue.level === "medium" && styles.confidenceMedium,
-            ]}
-          >
-            {attentionCue.label}
-          </Text>
-        ) : null}
-        {tomorrow ? (
-          <Text
-            numberOfLines={1}
-            style={[
-              styles.tomorrowPrice,
-              tomorrow.direction === "down" && styles.tomorrowPriceDown,
-              tomorrow.direction === "up" && styles.tomorrowPriceUp,
-            ]}
-          >
-            {tomorrow.shortLabel}
-          </Text>
-        ) : null}
       </View>
     </Pressable>
   );

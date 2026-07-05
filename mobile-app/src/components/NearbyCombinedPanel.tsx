@@ -7,13 +7,13 @@ import {
   NearbyMode,
   vehicleProfileHint,
 } from "./NearbyEvControls";
-import { ResultContextStrip } from "./ResultContextStrip";
 import { StationRow } from "./StationRow";
 import { colors, radii, shadow, spacing, surfaces, typeScale } from "../theme";
 import { AppPreferences, EvCharger, EvConnector, EvPowerMode, FuelCode, NearbyResponse, NearbySheetSnap, StationViewModel } from "../types";
 import { fuelMismatchContextLine } from "../utils/fuelMismatch";
 
 const nearbySheetBottomOffset = 8;
+const nearbySheetExpandedTop = 80;
 
 export function NearbyCombinedPanel({
   chargers,
@@ -81,7 +81,7 @@ export function NearbyCombinedPanel({
     preferences.evChargingPreference,
     preferences.vehicleEnergyType,
   );
-  const showEvControls = mode === "ev" || preferences.vehicleEnergyType === "electric" || preferences.vehicleEnergyType === "hybrid";
+  const showEvControls = mode === "ev" || preferences.vehicleEnergyType === "electric";
   const isPeek = sheetSnap === "peek";
   const isFull = sheetSnap === "full";
   const fuelNotice = fuelMismatchContextLine(stationContext) || stationNotice || "";
@@ -169,14 +169,6 @@ export function NearbyCombinedPanel({
           showAdvanced={isFull}
         />
       ) : null}
-      {!loading && !error && !isPeek && sortedStations.length ? (
-        <ResultContextStrip
-          context={stationContext}
-          label="Fuel result context"
-          stations={sortedStations}
-        />
-      ) : null}
-
       {!loading && !error && !isFull
         ? (
           <>
@@ -373,7 +365,7 @@ const styles = StyleSheet.create({
   },
   sheetExpanded: {
     bottom: 8,
-    top: 140,
+    top: nearbySheetExpandedTop,
   },
   sheetHeader: {
     alignItems: "center",

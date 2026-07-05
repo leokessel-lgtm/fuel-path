@@ -29,7 +29,7 @@ declare const process:
 const tabs: Array<{ key: TabKey; label: string; hint: string }> = [
   { key: "plan", label: "Plan", hint: "Trip" },
   { key: "nearby", label: "Nearby", hint: "Map" },
-  { key: "account", label: "Account", hint: "You" },
+  { key: "account", label: "Settings", hint: "You" },
 ];
 const chromeTextScale = 1.2;
 
@@ -84,12 +84,13 @@ export default function App() {
   const {
     clearNamedPlace,
     preferences,
+    addVehicle,
+    removeVehicle,
     saveNamedPlace,
+    selectVehicle,
     toggleDiscount,
     toggleDiscountRedemption,
     toggleEvConnector,
-    toggleFuelPolicy,
-    togglePolicyBrand,
     updateDecisionRule,
     updateFuel,
     updateHomeChargingAccess,
@@ -103,6 +104,7 @@ export default function App() {
     removeRecentLocation,
   } = useRecentLocations();
   const {
+    renameCommute,
     saveCommute,
     savedCommutes,
     setSavedCommutes,
@@ -180,6 +182,7 @@ export default function App() {
             <PlanScreen
               preferences={preferences}
               onFuelChange={updateFuel}
+              onVehicleEnergyTypeChange={updateVehicleEnergyType}
               onAddRecentLocation={addRecentLocation}
               onClearRecentLocations={clearRecentLocations}
               onRemoveRecentLocation={removeRecentLocation}
@@ -205,13 +208,15 @@ export default function App() {
               onToggleEvConnector={toggleEvConnector}
               onVehicleProfileChange={updateVehicleProfile}
               onVehicleEnergyTypeChange={updateVehicleEnergyType}
+              onAddVehicle={addVehicle}
+              onRemoveVehicle={removeVehicle}
+              onSelectVehicle={selectVehicle}
               onRequestNotifications={requestNotifications}
               onClearNamedPlace={clearNamedPlace}
               onSaveNamedPlace={saveNamedPlace}
+              onRenameCommute={renameCommute}
               onToggleDiscount={toggleDiscount}
               onToggleDiscountRedemption={toggleDiscountRedemption}
-              onToggleFuelPolicy={toggleFuelPolicy}
-              onTogglePolicyBrand={togglePolicyBrand}
               onToggleCommuteAlert={toggleCommuteAlert}
               onRemoveCommute={removeCommute}
               savedCommutes={savedCommutes}
@@ -247,7 +252,6 @@ export default function App() {
 
 function vehicleEnergyLabel(value: string) {
   if (value === "electric") return "EV";
-  if (value === "hybrid") return "Hybrid";
   if (value === "diesel") return "Diesel";
   return "Fuel";
 }
@@ -262,11 +266,6 @@ function vehicleProfileShortLabel(preferences: {
   if (preferences.vehicleEnergyType === "electric") {
     const connectors = preferences.evConnectors?.length ? preferences.evConnectors.join("/") : "Connectors not set";
     return preferences.evRangeKm ? `${preferences.evRangeKm} km | ${connectors}` : connectors;
-  }
-  if (preferences.vehicleEnergyType === "hybrid") {
-    const ev = preferences.evConnectors?.length ? ` + ${preferences.evConnectors.join("/")}` : "";
-    const range = preferences.evRangeKm ? ` | ${preferences.evRangeKm} km EV` : "";
-    return `${preferences.fuel}${range}${ev}`;
   }
   return preferences.fuel;
 }

@@ -8,26 +8,22 @@ import {
   Text,
   View,
   type GestureResponderEvent,
+  useWindowDimensions,
 } from "react-native";
 
 import { colors, radii, shadow, spacing, surfaces, typeScale, typography } from "../theme";
 import { NearbyResponse, NearbySheetSnap, StationViewModel } from "../types";
-import {
-  predictionDisciplineCue,
-  stationAttentionCue,
-  stationEvidenceLine,
-  stationTimestampLine,
-} from "../utils/decisionEvidence";
+import { stationEvidenceLine } from "../utils/decisionEvidence";
 import { fuelMismatchContextLine, fuelMismatchLine } from "../utils/fuelMismatch";
-import { tomorrowPriceView } from "../utils/pricing";
 import { BrandBadge } from "./BrandBadge";
-import { ResultContextStrip } from "./ResultContextStrip";
 import { StationRow } from "./StationRow";
 
 export type NearbySortMode = "distance" | "price" | "value";
 
 export const defaultNearbySortMode: NearbySortMode = "value";
 const nearbySheetBottomOffset = 8;
+const nearbySheetExpandedTop = 80;
+const nearbySheetExpandedTopCompact = 62;
 const sheetDragActivatePx = 8;
 const sheetExpandDragPx = -60;
 const sheetCollapseDragPx = 70;
@@ -82,6 +78,7 @@ export function NearbyStationSheet({
   stations: StationViewModel[];
   topControls?: ReactNode;
 }) {
+  const { height } = useWindowDimensions();
   const [dragOffsetY, setDragOffsetY] = useState(0);
   const dragStartYRef = useRef(0);
   const dragMovedRef = useRef(false);
@@ -170,7 +167,8 @@ export function NearbyStationSheet({
     <View
       style={[
         styles.sheet,
-        isFull ? styles.sheetExpanded : isPeek ? styles.sheetPeek : styles.sheetCollapsed,
+        isFull ? [styles.sheetExpanded, { top: height <= 780 ? nearbySheetExpandedTopCompact : nearbySheetExpandedTop }] : isPeek ? styles.sheetPeek : styles.sheetCollapsed,
+        selected && !isFull && !isPeek ? styles.sheetCollapsedWithSelection : null,
         dragOffsetY !== 0 && { transform: [{ translateY: dragOffsetY }] },
       ]}
     >
@@ -266,13 +264,6 @@ export function NearbyStationSheet({
               <Text style={styles.muted}>{visibleStationNotice}</Text>
             </View>
           ) : null}
-          {!isPeek && stations.length ? (
-            <ResultContextStrip
-              context={stationContext}
-              label="Nearby result context"
-              stations={stations}
-            />
-          ) : null}
           {(isFull || !selected || selected) ? <View style={styles.sortRow}>
             {nearbySortOptions.map((option) => {
               const selectedSort = !selected && sortMode === option.key;
@@ -335,14 +326,8 @@ function SelectedStationCard({
   onNavigate: () => void;
   selected: StationViewModel;
 }) {
-  const selectedTomorrow = tomorrowPriceView(selected);
-  const selectedAttentionCue = stationAttentionCue(selected);
-  const selectedPredictionCue = predictionDisciplineCue(selected);
   const selectedFuelLabel = selected.fuel || "fuel";
   const mismatchLine = fuelMismatchLine(selected);
-  const selectedMetaLine = [stationTimestampLine(selected.station)]
-    .filter(Boolean)
-    .join(" | ");
 
   return (
     <View style={styles.selectedCardShell}>
@@ -367,9 +352,6 @@ function SelectedStationCard({
             <Text numberOfLines={1} style={styles.selectedStatusLine}>
               {stationOpenLabel(selected.station.openNow)}
             </Text>
-            <Text numberOfLines={1} style={styles.selectedMetaRest}>
-              {selectedMetaLine || stationEvidenceLine(selected)}
-            </Text>
             {mismatchLine ? (
               <Text numberOfLines={2} style={styles.selectedMismatch}>
                 {mismatchLine}
@@ -379,20 +361,6 @@ function SelectedStationCard({
               <Text numberOfLines={1} style={styles.selectedDiscount}>
                 Confirmed: {selected.discountLabel}
               </Text>
-            ) : null}
-            {selectedAttentionCue || selectedPredictionCue ? (
-              <View style={styles.evidenceRow}>
-                {selectedAttentionCue ? (
-                  <Text numberOfLines={1} style={styles.evidenceChip}>
-                    {selectedAttentionCue.label}
-                  </Text>
-                ) : null}
-                {selectedPredictionCue ? (
-                  <Text numberOfLines={1} style={styles.evidenceChip}>
-                    {selectedPredictionCue}
-                  </Text>
-                ) : null}
-              </View>
             ) : null}
           </View>
           <View style={styles.selectedActionColumn}>
@@ -406,18 +374,6 @@ function SelectedStationCard({
             <View style={styles.distanceBadge}>
               <Text style={styles.distanceBadgeText}>{selected.distanceKm.toFixed(1)} km</Text>
             </View>
-            {selectedTomorrow ? (
-              <Text
-                numberOfLines={1}
-                style={[
-                  styles.selectedTomorrowPrice,
-                  selectedTomorrow.direction === "down" && styles.tomorrowPriceDown,
-                  selectedTomorrow.direction === "up" && styles.tomorrowPriceUp,
-                ]}
-              >
-                {selectedTomorrow.detailLabel}
-              </Text>
-            ) : null}
           </View>
         </View>
       </View>
@@ -448,6 +404,9 @@ const styles = StyleSheet.create({
     maxHeight: 275,
     overflow: "hidden",
   },
+  sheetCollapsedWithSelection: {
+    maxHeight: 340,
+  },
   sheetPeek: {
     bottom: 18,
     maxHeight: 205,
@@ -455,7 +414,7 @@ const styles = StyleSheet.create({
   },
   sheetExpanded: {
     bottom: 8,
-    top: 140,
+    top: nearbySheetExpandedTop,
   },
   sheetHeader: {
     alignItems: "center",
@@ -639,12 +598,7 @@ const styles = StyleSheet.create({
     fontWeight: "400",
     marginTop: 2,
   },
-  selectedMetaRest: {
-    color: colors.muted,
-    fontSize: 10,
-    fontWeight: "400",
-    marginTop: 2,
-  },
+
   selectedMismatch: {
     color: colors.amber,
     fontSize: 10,
@@ -682,13 +636,6 @@ const styles = StyleSheet.create({
     flexShrink: 0,
     gap: 2,
     minWidth: 58,
-  },
-  selectedTomorrowPrice: {
-    color: colors.muted,
-    fontSize: 10,
-    fontWeight: "700",
-    marginTop: 2,
-    maxWidth: 76,
   },
   tomorrowPriceDown: {
     color: colors.greenDark,

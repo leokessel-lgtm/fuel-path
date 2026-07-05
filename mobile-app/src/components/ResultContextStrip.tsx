@@ -2,7 +2,6 @@ import { StyleSheet, Text, View } from "react-native";
 
 import { colors, radii, spacing, typeScale } from "../theme";
 import { FuelCode, StationViewModel } from "../types";
-import { fuelProviderLabel } from "../utils/decisionEvidence";
 
 type ResultContext = {
   alternativeFuelCodes?: FuelCode[];
@@ -62,11 +61,7 @@ function resultContextMetrics(stations: StationViewModel[], context?: ResultCont
   }
   const count = stationCount(stations, context, fuelContext.isFallback);
   if (count > 0) metrics.push({ label: "Stations", value: String(Math.round(count)) });
-  const provider = fuelProviderLabel(context?.provider || context?.source) || providerFallbackLabel(context?.provider || context?.source);
-  if (provider) metrics.push({ label: "Source", value: provider });
-  const freshness = freshnessLabel(context);
-  if (freshness) metrics.push({ label: "Freshness", value: freshness });
-  return metrics.slice(0, 6);
+  return metrics.slice(0, 4);
 }
 
 function resultFuelContext(stations: StationViewModel[], context?: ResultContext) {
@@ -113,40 +108,6 @@ function median(values: number[]) {
 function firstFinite(...values: Array<number | undefined>) {
   const match = values.find((value) => Number.isFinite(Number(value)));
   return Number(match || 0);
-}
-
-function providerFallbackLabel(provider?: string): string {
-  const value = String(provider || "").toLowerCase();
-  if (!value) return "";
-  const parts = value.split("+");
-  if (parts.length > 1) return parts.map(providerFallbackLabel).filter(Boolean).join(" + ");
-  return value
-    .replace(/^api_/, "")
-    .replace(/_/g, " ")
-    .replace(/\b\w/g, (letter) => letter.toUpperCase());
-}
-
-function freshnessLabel(context?: ResultContext) {
-  if (!context) return "";
-  const age = Number(context.cacheAgeSeconds);
-  if (Number.isFinite(age) && age >= 0) {
-    const cacheLabel = context.degraded || context.capability !== "live";
-    return `${cacheLabel ? "Cache" : "Fresh"} ${formatAge(age)}`;
-  }
-  if (!context.generatedAt) return "";
-  const generatedAt = new Date(context.generatedAt);
-  if (Number.isNaN(generatedAt.getTime())) return "";
-  const seconds = Math.max(0, Math.round((Date.now() - generatedAt.getTime()) / 1000));
-  return `Checked ${formatAge(seconds)}`;
-}
-
-function formatAge(seconds: number) {
-  if (seconds < 60) return "now";
-  const minutes = Math.round(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 48) return `${hours}h ago`;
-  return `${Math.round(hours / 24)}d ago`;
 }
 
 const styles = StyleSheet.create({

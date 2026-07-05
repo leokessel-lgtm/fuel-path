@@ -818,6 +818,12 @@ test("beta readiness can load privacy contact and store links from an evidence f
     reviewedAt: "2026-06-19",
     reviewer: "Leo Kesselring",
   });
+  const supportEvidence = writeJson(path.join(tmp, "support-evidence.json"), {
+    runbook: READY_SUPPORT_RUNBOOK_SOURCE,
+    supportContact: "privacy@fuelpath.app",
+    supportOwner: "Leo Kesselring",
+    reviewedAt: "2026-06-20",
+  });
 
   const { stdout } = await execFileAsync(
     process.execPath,
@@ -833,14 +839,8 @@ test("beta readiness can load privacy contact and store links from an evidence f
       nativeBlockerPacket,
       "--store-evidence-json",
       storeEvidence,
-      "--support-contact",
-      "privacy@fuelpath.app",
-      "--support-owner",
-      "Leo Kesselring",
-      "--support-reviewed-at",
-      "2026-06-20",
-      "--support-runbook",
-      READY_SUPPORT_RUNBOOK_SOURCE,
+      "--support-evidence-json",
+      supportEvidence,
     ],
     { cwd: ROOT, timeout: 10_000 },
   );
@@ -851,6 +851,8 @@ test("beta readiness can load privacy contact and store links from an evidence f
   assert.equal(payload.store.storeListingLinksConfirmed, true);
   assert.equal(payload.store.appStoreListingReady, true);
   assert.equal(payload.store.googlePlayListingReady, true);
+  assert.equal(payload.support.evidence.provided, true);
+  assert.equal(payload.supportContactMatchesPrivacyContact, true);
 });
 
 test("beta readiness requires support readiness when support process is claimed ready", async () => {

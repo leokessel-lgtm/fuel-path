@@ -3,12 +3,13 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const args = parseArgs(process.argv.slice(2));
-const runbookPath = args.runbook || "SUPPORT-RUNBOOK.md";
+const evidence = readEvidence();
+const runbookPath = args.runbook || evidence.runbook || "SUPPORT-RUNBOOK.md";
 const resolvedRunbook = resolve(runbookPath);
 const runbook = existsSync(resolvedRunbook) ? readFileSync(resolvedRunbook, "utf8") : "";
-const supportContact = textArg("support-contact", "FUEL_PATH_SUPPORT_CONTACT", "");
-const supportOwner = textArg("support-owner", "FUEL_PATH_SUPPORT_OWNER", "");
-const reviewedAt = textArg("reviewed-at", "FUEL_PATH_SUPPORT_REVIEWED_AT", "");
+const supportContact = textArg("support-contact", "FUEL_PATH_SUPPORT_CONTACT", evidence.supportContact);
+const supportOwner = textArg("support-owner", "FUEL_PATH_SUPPORT_OWNER", evidence.supportOwner);
+const reviewedAt = textArg("reviewed-at", "FUEL_PATH_SUPPORT_REVIEWED_AT", evidence.reviewedAt);
 const reviewAgeDays = reviewAgeInDays(reviewedAt);
 const reviewFresh = reviewAgeDays !== null && reviewAgeDays <= supportReviewMaxAgeDays();
 const supportContactReady = validSupportContact(supportContact);
@@ -71,6 +72,10 @@ const payload = {
   status: blockers.length ? "blocked" : "ready",
   blockers,
   runbook: runbookPath,
+  evidence: {
+    provided: Boolean(args["evidence-json"]),
+    source: args["evidence-json"] || "",
+  },
   requiredSections,
   missingSections,
   requiredEvidenceScopes: requiredEvidenceScopes.map((scope) => scope.label),
@@ -220,6 +225,18 @@ function reviewAgeInDays(value) {
 function supportReviewMaxAgeDays() {
   const value = Number(args["support-review-max-age-days"] || process.env.FUEL_PATH_SUPPORT_REVIEW_MAX_AGE_DAYS || 30);
   return Number.isFinite(value) && value > 0 && value <= 90 ? value : 30;
+}
+
+function readEvidence() {
+  const evidencePath = args["evidence-json"];
+  if (!evidencePath) return {};
+  const resolvedEvidence = resolve(evidencePath);
+  if (!existsSync(resolvedEvidence)) return {};
+  try {
+    return JSON.parse(readFileSync(resolvedEvidence, "utf8"));
+  } catch {
+    return {};
+  }
 }
 
 function textArg(name, envName, fallback = "") {

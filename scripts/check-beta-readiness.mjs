@@ -163,6 +163,7 @@ function readStoreStatus() {
 function readSupportStatus() {
   const commandArgs = ["scripts/check-support-readiness.mjs", "--allow-blocked"];
   if (args.supportRunbook) commandArgs.push("--runbook", args.supportRunbook);
+  if (args.supportEvidenceJson) commandArgs.push("--evidence-json", args.supportEvidenceJson);
   if (args["support-contact"]) commandArgs.push("--support-contact", args["support-contact"]);
   if (args["support-owner"]) commandArgs.push("--support-owner", args["support-owner"]);
   if (args["reviewed-at"]) commandArgs.push("--reviewed-at", args["reviewed-at"]);
@@ -676,6 +677,9 @@ function parseArgs(values) {
       index += 1;
     } else if (value === "--support-reviewed-at") {
       result["support-reviewed-at"] = values[index + 1] || "";
+      index += 1;
+    } else if (value === "--support-evidence-json") {
+      result.supportEvidenceJson = values[index + 1] || "";
       index += 1;
     } else if (value === "--support-review-max-age-days") {
       result["support-review-max-age-days"] = values[index + 1] || "";

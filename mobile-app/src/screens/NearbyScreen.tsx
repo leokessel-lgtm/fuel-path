@@ -1,27 +1,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  StyleSheet,
-  View,
-} from "react-native";
+import { StyleSheet, View } from "react-native";
 
 import { geocodeAddress } from "../api/fuelPathApi";
 import { NearbyLocationSearch } from "../components/NearbyLocationSearch";
 import { NearbyCombinedPanel } from "../components/NearbyCombinedPanel";
 import { NearbyFuelPanel } from "../components/NearbyFuelPanel";
 import { NearbySortMode } from "../components/NearbyStationSheet";
+import { StationBrandFilterPill } from "../components/StationBrandFilterPill";
 import { StationMap } from "../components/StationMap";
 import { useNearbyLocationSearch } from "../hooks/useNearbyLocationSearch";
 import { useNearbyResults } from "../hooks/useNearbyResults";
+import { useStationBrandFilterOverride } from "../hooks/useStationBrandFilterOverride";
 import { useVisibleStationCodes } from "../hooks/useVisibleStationCodes";
 import { getCurrentMapPoint, getGrantedCurrentMapPoint } from "../services/currentLocation";
 import { spacing } from "../theme";
 import { AppPreferences, EvCharger, EvConnector, EvPowerMode, FuelCode, MapPoint, NearbySheetSnap, StationViewModel } from "../types";
-import {
-  EvChargerPanel,
-  NearbyEnergyChoice,
-  NearbyEnergySelector,
-  NearbyMode,
-} from "../components/NearbyEvControls";
+import { EvChargerPanel, NearbyEnergyChoice, NearbyEnergySelector, NearbyMode } from "../components/NearbyEvControls";
 import { sortStations } from "../utils/pricing";
 import {
   distanceKm,
@@ -105,6 +99,13 @@ export function NearbyScreen({
     setSortMode(undefined);
   }, [preferences.activeVehicleId]);
 
+  const {
+    brandFilterActive,
+    preferredBrands,
+    setShowAllStationBrandsOnce,
+    showAllStationBrandsOnce,
+    stationBrandFilterLabel,
+  } = useStationBrandFilterOverride({ centre, preferences });
   const { chargers, error, evNotice, loading, stationContext, stationNotice, stations } = useNearbyResults({
     centre,
     evConnectors,
@@ -112,6 +113,7 @@ export function NearbyScreen({
     nearbyMode,
     nearbyRadiusKm,
     preferences,
+    showAllStationBrandsOnce,
   });
   const {
     addRecentLocation,
@@ -128,7 +130,6 @@ export function NearbyScreen({
     suggestionsLoading,
     updateLocationQuery,
   } = useNearbyLocationSearch(locationSearchContext);
-
 
   const applyLocationSearch = async () => {
     const query = locationQuery.trim();
@@ -376,6 +377,15 @@ export function NearbyScreen({
           stationContext={stationContext}
           stationNotice={stationNotice}
           stations={stations}
+          topControls={
+            preferredBrands.length ? (
+              <StationBrandFilterPill
+                active={brandFilterActive}
+                label={stationBrandFilterLabel}
+                onPress={() => setShowAllStationBrandsOnce((current) => !current)}
+              />
+            ) : null
+          }
         />
       ) : nearbyMode === "both" ? (
         <NearbyCombinedPanel
@@ -442,10 +452,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   mapLayer: { bottom: 0,
-    left: 0,
-    position: "absolute",
-    right: 0,
-    top: 0,
+    left: 0, position: "absolute", right: 0, top: 0,
   },
   topControls: {
     gap: spacing.sm,

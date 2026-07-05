@@ -6,6 +6,7 @@ import {
   MapPoint,
   NotificationPermissionState,
   SavedCommute,
+  StationBrandMode,
   VehicleEnergyType,
 } from "../types";
 
@@ -31,6 +32,13 @@ export type AccountScreenProps = {
   onRenameCommute: (commuteId: string, name: string) => void;
   onRemoveCommute: (commuteId: string) => void;
   onToggleCommuteAlert: (commuteId: string) => void;
+  onUpdateCommuteAlertSettings: (
+    commuteId: string,
+    updates: Partial<Pick<SavedCommute, "alertDays" | "alertTime" | "localReminderEnabled" | "maxDetourMinutes" | "minSavingDollars" | "tankThresholdPercent" | "vehicleId">>,
+  ) => void;
   onToggleDiscount: (discountId: string) => void;
   onToggleDiscountRedemption: (discountId: string) => void;
+  onSetStationBrandMode: (mode: StationBrandMode) => void;
+  onSetPreferredStationBrands: (brands: string[]) => void;
+  onTogglePreferredStationBrand: (brand: string) => void;
 };

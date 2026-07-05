@@ -10,10 +10,14 @@ const files = {
   planEditor: read("src/components/PlanRouteEditorCard.tsx"),
   savedPlaceEditor: read("src/components/SavedPlaceEditor.tsx"),
   savedPlacesCard: read("src/components/SavedPlacesCard.tsx"),
+  savedRouteAlertsCard: read("src/components/SavedRouteAlertsCard.tsx"),
+  stationBrandsCard: read("src/components/StationBrandsCard.tsx"),
   savedCommutesHook: read("src/hooks/useSavedCommutes.ts"),
+  settingsSections: read("src/components/settings/settingsSections.ts"),
   accountDetail: read("src/components/settings/AccountDetailScreen.tsx"),
   app: read("App.tsx"),
   packageJson: read("package.json"),
+  brandAssets: read("src/data/brandAssets.ts"),
 };
 
 const checks = [
@@ -69,6 +73,48 @@ const checks = [
       files.app.includes("onRenameCommute={renameCommute}"),
   },
   {
+    label: "Stations and brands settings use searchable preferred-brand controls",
+    ok:
+      files.settingsSections.includes('if (section === "stations") return "Stations & brands";') &&
+      files.settingsSections.includes("stationBrandSettingsSummary") &&
+      files.stationBrandsCard.includes("Search station brands") &&
+      files.stationBrandsCard.includes("Preferred only") &&
+      files.stationBrandsCard.includes("All brands") &&
+      files.stationBrandsCard.includes("Select common station brands") &&
+      files.stationBrandsCard.includes("Clear preferred station brands") &&
+      files.accountDetail.includes("<StationBrandsCard") &&
+      files.accountDetail.includes("onSetMode={onSetStationBrandMode}") &&
+      files.accountDetail.includes("onToggleBrand={onTogglePreferredStationBrand}") &&
+      files.app.includes("onSetStationBrandMode={setStationBrandMode}") &&
+      files.app.includes("onTogglePreferredStationBrand={togglePreferredStationBrand}"),
+  },
+  {
+    label: "Stations and brands settings have icon coverage for every first-class brand",
+    ok: stationBrandIconCoverage(files.brandAssets).missing.length === 0 &&
+      stationBrandIconCoverage(files.brandAssets).generic.length === 0,
+  },
+  {
+    label: "Notifications settings use route-watch wording and compact controls",
+    ok:
+      files.settingsSections.includes('if (section === "alerts") return "Notifications";') &&
+      files.settingsSections.includes("alerts only when worth it") &&
+      files.savedRouteAlertsCard.includes("Watch saved routes") &&
+      files.savedRouteAlertsCard.includes("Only alert when worth it") &&
+      files.savedRouteAlertsCard.includes("Route notification settings") &&
+      files.savedRouteAlertsCard.includes("Commute days") &&
+      files.savedRouteAlertsCard.includes("Minimum saving") &&
+      files.savedRouteAlertsCard.includes("Save a route from Plan to watch it for useful fuel alerts.") &&
+      files.accountDetail.includes("onUpdateCommuteAlertSettings={onUpdateCommuteAlertSettings}") &&
+      files.app.includes("onUpdateCommuteAlertSettings={updateCommuteAlertSettings}"),
+  },
+  {
+    label: "new saved routes default to active vehicle and weekday route watches",
+    ok:
+      files.savedCommutesHook.includes("vehicleId") &&
+      files.savedCommutesHook.includes("defaultCommuteAlertDays") &&
+      files.app.includes("onSaveCommute={saveCommute}"),
+  },
+  {
     label: "Settings UX guards run in the mobile test chain",
     ok:
       files.packageJson.includes('"test:settings-ux": "node scripts/check-settings-ux-guards.mjs"') &&
@@ -88,4 +134,21 @@ if (failed.length) {
 
 function read(relativePath) {
   return fs.readFileSync(path.join(root, relativePath), "utf8");
+}
+
+function stationBrandIconCoverage(source) {
+  const listMatch = source.match(/export const stationBrandStyles: BrandStyle\[] = \[([\s\S]*?)\];/);
+  if (!listMatch) return { missing: ["stationBrandStyles"] };
+  const blocks = Array.from(listMatch[1].matchAll(/\{\n\s*label: "([^"]+)"[\s\S]*?\n\s*\}/g)).map((match) => ({
+    label: match[1],
+    source: match[0],
+  }));
+  return {
+    missing: blocks
+      .filter((block) => !block.source.includes("icon: require("))
+      .map((block) => block.label),
+    generic: blocks
+      .filter((block) => block.label !== "Fuel retailer" && block.source.includes("generic-fuel.png"))
+      .map((block) => block.label),
+  };
 }

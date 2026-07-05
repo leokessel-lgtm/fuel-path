@@ -164,6 +164,15 @@ function savingsDetourLabel(saving: number) {
 
 export function routeContextNotice(context: ScoreResponse["context"]) {
   if (context.warning) return context.warning;
+  if (context.brandFilter && context.brands?.length) {
+    const brandText = context.brands.length <= 3
+      ? context.brands.join(", ")
+      : `${context.brands.length} preferred brands`;
+    if (context.eligibleCandidates === 0) {
+      return `No preferred station brands found on this route. Show all brands in Settings to compare every station.`;
+    }
+    return `Filtered to ${brandText}.`;
+  }
   const limited = context.regionCapabilities?.find((item) =>
     ["limited", "pending_access", "fallback", "unsupported"].includes(item.capability),
   );

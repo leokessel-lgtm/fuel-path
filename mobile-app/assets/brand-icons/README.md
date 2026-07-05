@@ -12,6 +12,15 @@ for Shell, Speedway, Pearl Energy, U-GO, Enhance, ARKO, Liberty, Ultra, APW,
 Inland Petroleum, APCO and ASTRON. Independent and generic-fuel are neutral
 prototype marks for FuelCheck brands without a dependable public logo source.
 
+The July 2026 station-brand settings pass adds prototype icons for the remaining
+first-class preferred-brand options. FuelRadar brand pages and CDN resources were
+used as visual references for brands where a brand logo resource was exposed:
+Gull, Hope Energy, LMCT+, Petrogas, Phoenix Fuels, Prime Petroleum and Westside.
+Apollo Fuel, FastFuel 24/7, Fuel Zone, MATEX, Payless Fuel, Sinopec, METCO,
+dayef, Des Brown Service Centre, Powerfuel, Roo Petroleum and Supreme Fuel use
+Fuel Path-generated wordmark tiles because a dependable public logo asset was not
+exposed during the audit. Fuel retailer remains the neutral catch-all mark.
+
 Before any public or commercial release, confirm each brand's trademark and logo
 usage requirements or replace these files with licensed assets supplied through
 brand/media request channels.

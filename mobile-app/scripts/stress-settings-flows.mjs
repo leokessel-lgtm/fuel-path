@@ -31,6 +31,8 @@ const seededPreferences = {
   maxDetourMinutes: 8,
   fuelPolicyEnabled: false,
   approvedPolicyBrands: ["Ampol", "BP", "Shell"],
+  stationBrandMode: "preferred_only",
+  preferredStationBrands: ["BP", "Shell"],
   activeVehicleId: "petrol-car",
   vehicles: [
     {
@@ -84,8 +86,11 @@ const seededCommute = {
   from: homeLocation,
   to: workLocation,
   fuel: "P98",
+  vehicleId: "petrol-car",
   alertEnabled: false,
   alertTime: "07:30",
+  alertDays: ["mon", "tue", "wed", "thu", "fri"],
+  localReminderEnabled: true,
   minSavingDollars: 5,
   maxDetourMinutes: 8,
   tankThresholdPercent: 45,
@@ -98,13 +103,16 @@ const seededCommute = {
 const browser = await chromium.launch({ headless: true });
 try {
   const page = await browser.newPage({ viewport });
+  await installSeedState(page);
   await seedState(page);
 
   const vehicleResults = await exerciseVehicleSwitching(page);
+  const stationBrandResults = await exerciseStationBrands(page);
   const routeResults = await exerciseSavedRouteAlerts(page);
 
   console.log(JSON.stringify({
     ok: true,
+    stationBrandResults,
     vehicleResults,
     routeResults,
   }, null, 2));
@@ -114,7 +122,11 @@ try {
 
 async function seedState(page) {
   await page.goto(baseUrl, { waitUntil: "domcontentloaded" });
-  await page.evaluate(({ preferencesKey, savedCommutesKey, preferences, commute }) => {
+  await page.waitForTimeout(800);
+}
+
+async function installSeedState(page) {
+  await page.addInitScript(({ preferencesKey, savedCommutesKey, preferences, commute }) => {
     localStorage.clear();
     localStorage.setItem(preferencesKey, JSON.stringify(preferences));
     localStorage.setItem(savedCommutesKey, JSON.stringify([commute]));
@@ -124,8 +136,6 @@ async function seedState(page) {
     preferences: seededPreferences,
     commute: seededCommute,
   });
-  await page.reload({ waitUntil: "domcontentloaded" });
-  await page.waitForTimeout(800);
 }
 
 async function exerciseVehicleSwitching(page) {
@@ -181,14 +191,24 @@ async function exerciseSavedRouteAlerts(page) {
   await clickVisible(page, "← Settings");
   await openSettingsSection(page, "Alerts");
   await assertText(page, "Renamed Freo run");
-  await page.locator('[aria-label="Enable Renamed Freo run route alert"]').click({ timeout: 5_000 });
+  await page.locator('[aria-label="Edit notification settings for Renamed Freo run"]').click({ timeout: 5_000 });
+  await assertText(page, "Route notification settings");
+  await page.locator('[aria-label="Use DSL456 for this route"]').click({ timeout: 5_000 });
+  await page.locator('[aria-label="Set alert time to 08:30"]').click({ timeout: 5_000 });
+  await page.locator('[aria-label="Increase minimum saving"]').click({ timeout: 5_000 });
+  await waitForStorage(page, savedCommutesKey, (commutes) =>
+    commutes[0]?.vehicleId === "diesel-ute" &&
+    commutes[0]?.alertTime === "08:30" &&
+    commutes[0]?.minSavingDollars === 6);
+
+  await page.locator('[aria-label="Watch Renamed Freo run"]').click({ timeout: 5_000 });
   await waitForStorage(page, savedCommutesKey, (commutes) =>
     commutes[0]?.name === "Renamed Freo run" &&
     commutes[0]?.alertEnabled === false &&
     commutes[0]?.alertStatus === "unavailable");
   await assertText(page, "Route alerts need an iOS or Android build.");
 
-  await page.locator('[aria-label="Remove saved commute Renamed Freo run"]').click({ timeout: 5_000 });
+  await page.locator('[aria-label="Remove saved route Renamed Freo run"]').click({ timeout: 5_000 });
   await waitForStorage(page, savedCommutesKey, (commutes) => Array.isArray(commutes) && commutes.length === 0);
   await clickVisible(page, "← Settings");
   await openSettingsSection(page, "Places");
@@ -199,7 +219,54 @@ async function exerciseSavedRouteAlerts(page) {
   return {
     remainingRoutes: commutes.length,
     removedFromAlertsAlsoClearsPlaces: commutes.length === 0,
+    routeAlertSettingsEdited: true,
     webAlertToggleBlockedAsExpected: true,
+  };
+}
+
+async function exerciseStationBrands(page) {
+  await openSettingsSection(page, "Stations");
+  await assertText(page, "Choose what appears on the map");
+  await assertText(page, "BP");
+  await assertText(page, "Shell");
+
+  await page.locator('input[aria-label="Search station brands"]').fill("Ampol");
+  await page.locator('[aria-label="Add Ampol preferred station brand"]').click({ timeout: 5_000 });
+  await waitForStorage(page, preferencesKey, (preferences) =>
+    preferences.stationBrandMode === "preferred_only" &&
+    preferences.preferredStationBrands?.includes("Ampol"));
+
+  await page.locator('[aria-label="Clear preferred station brands"]').click({ timeout: 5_000 });
+  await waitForStorage(page, preferencesKey, (preferences) =>
+    preferences.stationBrandMode === "all" &&
+    Array.isArray(preferences.preferredStationBrands) &&
+    preferences.preferredStationBrands.length === 0);
+
+  await page.locator('[aria-label="Preferred only"]').click({ timeout: 5_000 });
+  await waitForStorage(page, preferencesKey, (preferences) =>
+    preferences.stationBrandMode === "preferred_only" &&
+    preferences.preferredStationBrands?.includes("Ampol") &&
+    preferences.preferredStationBrands?.includes("BP") &&
+    preferences.preferredStationBrands?.includes("Shell"));
+
+  await clickVisible(page, "← Settings");
+  await openSettingsSection(page, "Vehicle & fuel");
+  await clickVisible(page, "Petrol hatch");
+  await waitForStorage(page, preferencesKey, (preferences) => preferences.activeVehicleId === "petrol-car");
+
+  await clickVisible(page, "Nearby", viewport.height - 130);
+  await page.locator('[aria-label="Show all station brands once"]').waitFor({ state: "visible", timeout: 15_000 });
+  await assertText(page, "5 preferred brands");
+  await page.locator('[aria-label="Show all station brands once"]').click({ timeout: 5_000 });
+  await page.locator('[aria-label="Use preferred station brands"]').waitFor({ state: "visible", timeout: 15_000 });
+  await waitForVisibleText(page, "All brands for this search");
+
+  const preferences = await storageJson(page, preferencesKey);
+  return {
+    mode: preferences.stationBrandMode,
+    preferredBrands: preferences.preferredStationBrands,
+    nearbyOverrideVisible: true,
+    searchableBrandAdded: preferences.preferredStationBrands.includes("Ampol"),
   };
 }
 
@@ -256,6 +323,14 @@ async function visibleText(page) {
 async function assertText(page, text) {
   const body = await visibleText(page);
   assertIncludes(body, text);
+}
+
+async function waitForVisibleText(page, text) {
+  await page.waitForFunction(
+    (expected) => (document.body.innerText || "").includes(expected),
+    text,
+    { timeout: 15_000 },
+  );
 }
 
 function assertIncludes(value, expected) {

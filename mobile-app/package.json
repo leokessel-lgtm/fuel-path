@@ -39,6 +39,8 @@
     "smoke:plan-fields": "node scripts/smoke-plan-fields.mjs",
     "stress:plan-fields": "node scripts/stress-plan-fields.mjs",
     "stress:settings-flows": "node scripts/stress-settings-flows.mjs",
+    "stress:route-notification-schedule": "node scripts/stress-route-notification-schedule.mjs",
+    "audit:station-brands": "node scripts/audit-station-brand-coverage.mjs",
     "sync:discounts": "node scripts/sync-discount-registry.mjs",
     "build:web": "npm run sync:discounts && EXPO_PUBLIC_FUEL_PATH_API_BASE_URL=__SAME_ORIGIN__ npm_config_cache=.npm-cache npx expo export --platform web --output-dir dist",
     "budget:size": "node scripts/check-bundle-budget.mjs",

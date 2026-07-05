@@ -7,6 +7,7 @@ import {
   alertSettingsSummary,
   placesSettingsSummary,
   SettingsSection,
+  stationBrandSettingsSummary,
   vehicleSettingsSummary,
 } from "./settingsSections";
 
@@ -41,6 +42,12 @@ export function AccountRootScreen({
           title="Discounts & eligibility"
         />
         <SettingsRow
+          label="Stations"
+          onPress={() => onSelectSection("stations")}
+          summary={stationBrandSettingsSummary(preferences)}
+          title="Stations & brands"
+        />
+        <SettingsRow
           label="Places"
           onPress={() => onSelectSection("places")}
           summary={placesSettingsSummary(preferences, savedCommutes)}
@@ -50,7 +57,7 @@ export function AccountRootScreen({
           label="Alerts"
           onPress={() => onSelectSection("alerts")}
           summary={alertSettingsSummary(notificationPermission, savedCommutes)}
-          title="Route notifications"
+          title="Notifications"
         />
         <SettingsRow
           label="Support"

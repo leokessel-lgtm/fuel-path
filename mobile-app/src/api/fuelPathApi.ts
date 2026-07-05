@@ -1,4 +1,5 @@
 import { API_BASE_URL } from "../config";
+import { stationBrandFilterValues } from "../data/brandAssets";
 import {
   FuelCode,
   EvChargerResponse,
@@ -164,16 +165,19 @@ export async function getApiStatus() {
 }
 
 export async function getNearbyStations({
+  brands = [],
   fuel,
   centre,
   radiusKm = 8,
   limit = 160,
 }: {
+  brands?: string[];
   fuel: FuelCode;
   centre: MapPoint;
   radiusKm?: number;
   limit?: number;
 }) {
+  const selectedBrands = brands.map((brand) => brand.trim()).filter(Boolean);
   return fetchJson<NearbyResponse>(
     `/api/stations?${query({
       source: "live",
@@ -185,6 +189,8 @@ export async function getNearbyStations({
       includeMemberPrices: 0,
       includeClosed: 0,
       limit,
+      brandFilter: selectedBrands.length > 0,
+      brands: selectedBrands.join(","),
     })}`,
   );
 }
@@ -434,16 +440,21 @@ export async function getRoute(from: MapPoint, to: MapPoint) {
 
 export async function scoreRoute({
   approvedPolicyBrands = [],
+  stationBrands,
   fuel,
   eligibleDiscounts,
   route,
 }: {
   approvedPolicyBrands?: string[];
+  stationBrands?: string[];
   fuel: FuelCode;
   eligibleDiscounts: string[];
   route: RouteResponse;
 }) {
   const policyBrands = approvedPolicyBrands.map((brand) => brand.trim()).filter(Boolean);
+  const preferredBrands = stationBrands?.map((brand) => brand.trim()).filter(Boolean) || [];
+  const selectedBrands = preferredBrands.length ? stationBrandFilterValues(preferredBrands) : policyBrands;
+  const selectedBrandLabels = preferredBrands.length ? preferredBrands : policyBrands;
   return fetchJson<ScoreResponse>("/api/score", {
     method: "POST",
     headers: {
@@ -465,8 +476,9 @@ export async function scoreRoute({
       reserveKm: 35,
       corridorKm: 2.5,
       eligibleDiscounts,
-      brandFilter: policyBrands.length > 0,
-      brands: policyBrands,
+      brandFilter: selectedBrands.length > 0,
+      brandLabels: selectedBrandLabels,
+      brands: selectedBrands,
       includeMemberPrices: false,
       includeClosed: false,
     }),
@@ -478,15 +490,20 @@ export async function planFuelRoute({
   eligibleDiscounts,
   from,
   fuel,
+  stationBrands,
   to,
 }: {
   approvedPolicyBrands?: string[];
   eligibleDiscounts: string[];
   from: MapPoint;
   fuel: FuelCode;
+  stationBrands?: string[];
   to: MapPoint;
 }) {
   const policyBrands = approvedPolicyBrands.map((brand) => brand.trim()).filter(Boolean);
+  const preferredBrands = stationBrands?.map((brand) => brand.trim()).filter(Boolean) || [];
+  const selectedBrands = preferredBrands.length ? stationBrandFilterValues(preferredBrands) : policyBrands;
+  const selectedBrandLabels = preferredBrands.length ? preferredBrands : policyBrands;
   const payload = await fetchJson<PlanRouteResponse | ScoreResponse>("/api/score", {
     method: "POST",
     headers: {
@@ -503,8 +520,9 @@ export async function planFuelRoute({
       corridorKm: 2.5,
       detourSpeedKmh: 80,
       eligibleDiscounts,
-      brandFilter: policyBrands.length > 0,
-      brands: policyBrands,
+      brandFilter: selectedBrands.length > 0,
+      brandLabels: selectedBrandLabels,
+      brands: selectedBrands,
       includeMemberPrices: false,
       includeClosed: false,
     }),

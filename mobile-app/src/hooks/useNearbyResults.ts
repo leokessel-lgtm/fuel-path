@@ -4,6 +4,11 @@ import { getNearbyEvChargers, getNearbyStations } from "../api/fuelPathApi";
 import { evPowerOptions, NearbyMode } from "../components/NearbyEvControls";
 import { AppPreferences, EvCharger, EvConnector, EvPowerMode, MapPoint, NearbyResponse, StationViewModel } from "../types";
 import { stationPriceView } from "../utils/pricing";
+import {
+  activePreferredStationBrands,
+  filterStationsByPreferredBrands,
+  stationBrandFilterNotice,
+} from "../utils/stationBrandPreferences";
 
 const emptyMapRetryRadiusKm = 32;
 
@@ -14,6 +19,7 @@ export function useNearbyResults({
   nearbyMode,
   nearbyRadiusKm,
   preferences,
+  showAllStationBrandsOnce = false,
 }: {
   centre: MapPoint;
   evConnectors: EvConnector[];
@@ -21,6 +27,7 @@ export function useNearbyResults({
   nearbyMode: NearbyMode;
   nearbyRadiusKm: number;
   preferences: AppPreferences;
+  showAllStationBrandsOnce?: boolean;
 }) {
   const [stations, setStations] = useState<StationViewModel[]>([]);
   const [chargers, setChargers] = useState<EvCharger[]>([]);
@@ -54,6 +61,7 @@ export function useNearbyResults({
         return { notice, chargers: sortChargersForPreference(response.chargers, preferences.evChargingPreference) };
       };
       const loadPricedStations = async () => {
+        const preferredBrands = showAllStationBrandsOnce ? [] : activePreferredStationBrands(preferences);
         const response = await getNearbyStations({
           fuel: preferences.fuel,
           centre,
@@ -62,10 +70,11 @@ export function useNearbyResults({
         });
         let context = response.context;
         let notice = stationContextNotice(context);
-        let priced = response.stations
+        let pricedAll = response.stations
           .map((station) => stationPriceView(station, preferences.fuel, preferences))
           .filter((item): item is StationViewModel => Boolean(item));
-        if (!priced.length && nearbyRadiusKm < emptyMapRetryRadiusKm) {
+        let priced = filterStationsByPreferredBrands(pricedAll, preferredBrands);
+        if (!pricedAll.length && nearbyRadiusKm < emptyMapRetryRadiusKm) {
           const retryResponse = await getNearbyStations({
             fuel: preferences.fuel,
             centre,
@@ -74,11 +83,17 @@ export function useNearbyResults({
           });
           context = retryResponse.context;
           notice = stationContextNotice(retryResponse.context) || notice;
-          priced = retryResponse.stations
+          pricedAll = retryResponse.stations
             .map((station) => stationPriceView(station, preferences.fuel, preferences))
             .filter((item): item is StationViewModel => Boolean(item));
+          priced = filterStationsByPreferredBrands(pricedAll, preferredBrands);
         }
-        if (!priced.length && !notice) {
+        const hiddenCount = Math.max(0, pricedAll.length - priced.length);
+        const brandNotice = stationBrandFilterNotice(preferredBrands, hiddenCount);
+        if (brandNotice) notice = [brandNotice, notice].filter(Boolean).join(" ");
+        if (!priced.length && preferredBrands.length) {
+          notice = `No preferred brands found around ${centre.label}. Show all brands once to compare every station.`;
+        } else if (!priced.length && !notice) {
           notice = `No ${preferences.fuel} prices found around ${centre.label}.`;
         }
         return { context, notice, priced };
@@ -115,7 +130,7 @@ export function useNearbyResults({
     return () => {
       active = false;
     };
-  }, [centre, evConnectors, evPowerMode, nearbyMode, nearbyRadiusKm, preferences]);
+  }, [centre, evConnectors, evPowerMode, nearbyMode, nearbyRadiusKm, preferences, showAllStationBrandsOnce]);
 
   return { chargers, error, evNotice, loading, stationContext, stationNotice, stations };
 }

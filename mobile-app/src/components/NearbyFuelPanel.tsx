@@ -1,4 +1,5 @@
 import { NearbySortMode, NearbyStationSheet } from "./NearbyStationSheet";
+import { ReactNode } from "react";
 import { NearbyResponse, NearbySheetSnap, StationViewModel } from "../types";
 
 export function NearbyFuelPanel({
@@ -19,6 +20,7 @@ export function NearbyFuelPanel({
   stationContext,
   stationNotice,
   stations,
+  topControls,
 }: {
   error: string;
   loading: boolean;
@@ -37,6 +39,7 @@ export function NearbyFuelPanel({
   stationContext?: NearbyResponse["context"];
   stationNotice: string;
   stations: StationViewModel[];
+  topControls?: ReactNode;
 }) {
   return (
     <NearbyStationSheet
@@ -57,6 +60,7 @@ export function NearbyFuelPanel({
       stationContext={stationContext}
       stationNotice={stationNotice}
       stations={stations}
+      topControls={topControls}
     />
   );
 }

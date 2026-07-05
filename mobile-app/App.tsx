@@ -88,9 +88,12 @@ export default function App() {
     removeVehicle,
     saveNamedPlace,
     selectVehicle,
+    setPreferredStationBrands,
+    setStationBrandMode,
     toggleDiscount,
     toggleDiscountRedemption,
     toggleEvConnector,
+    togglePreferredStationBrand,
     updateDecisionRule,
     updateFuel,
     updateHomeChargingAccess,
@@ -116,6 +119,7 @@ export default function App() {
     removeCommute,
     requestNotifications,
     toggleCommuteAlert,
+    updateCommuteAlertSettings,
     updateCommuteAlertRule,
   } = useRouteAlerts({
     preferences,
@@ -217,7 +221,11 @@ export default function App() {
               onRenameCommute={renameCommute}
               onToggleDiscount={toggleDiscount}
               onToggleDiscountRedemption={toggleDiscountRedemption}
+              onSetStationBrandMode={setStationBrandMode}
+              onSetPreferredStationBrands={setPreferredStationBrands}
+              onTogglePreferredStationBrand={togglePreferredStationBrand}
               onToggleCommuteAlert={toggleCommuteAlert}
+              onUpdateCommuteAlertSettings={updateCommuteAlertSettings}
               onRemoveCommute={removeCommute}
               savedCommutes={savedCommutes}
             />

@@ -14,6 +14,10 @@ export type HomeChargingAccess = "unknown" | "yes" | "no";
 
 export type EvChargingPreference = "balanced" | "cheap" | "fast" | "reliable" | "nearby";
 
+export type Weekday = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
+
+export type StationBrandMode = "all" | "preferred_only";
+
 export type VehicleProfile = {
   id: string;
   name: string;
@@ -43,6 +47,8 @@ export type AppPreferences = {
   maxDetourMinutes: number;
   fuelPolicyEnabled: boolean;
   approvedPolicyBrands: string[];
+  stationBrandMode: StationBrandMode;
+  preferredStationBrands: string[];
   activeVehicleId: string;
   vehicles: VehicleProfile[];
   selectedDiscounts: string[];
@@ -72,8 +78,11 @@ export type SavedCommute = {
   from: MapPoint;
   to: MapPoint;
   fuel: FuelCode;
+  vehicleId?: string;
   alertEnabled: boolean;
   alertTime: string;
+  alertDays?: Weekday[];
+  localReminderEnabled?: boolean;
   minSavingDollars: number;
   maxDetourMinutes: number;
   tankThresholdPercent: number;
@@ -83,6 +92,7 @@ export type SavedCommute = {
   createdAt: string;
   nextAlertAt?: string;
   scheduledNotificationId?: string;
+  scheduledNotificationIds?: string[];
   updatedAt?: string;
 };
 

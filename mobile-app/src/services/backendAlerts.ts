@@ -2,7 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
 
 import { ALERTS_SYNC_TOKEN, API_BASE_URL, EAS_PROJECT_ID } from "../config";
-import { AppPreferences, SavedCommute } from "../types";
+import { AppPreferences, SavedCommute, VehicleProfile } from "../types";
 import { eligibleDiscountIds } from "../utils/discountRedemptions";
 
 type AlertIdentity = {
@@ -32,7 +32,7 @@ export async function syncSavedRouteAlert({
   if (!ALERTS_SYNC_TOKEN) {
     return {
       status: "skipped",
-      message: "Backend alert sync needs a validation build token.",
+      message: "Smart route checks need a validation build.",
     };
   }
 
@@ -58,14 +58,14 @@ export async function syncSavedRouteAlert({
     return {
       status: "synced",
       message: enabled
-        ? "Price-triggered backend alert synced."
-        : "Backend route alert turned off.",
+        ? "Smart route watch updated."
+        : "Route watch turned off.",
       syncedAt: new Date().toISOString(),
     };
   } catch {
     return {
       status: "failed",
-      message: "Backend alert sync failed. Local reminder state was kept.",
+      message: "Smart route watch could not update. Reminder state was kept.",
     };
   }
 }
@@ -78,7 +78,7 @@ export async function deleteBackendSavedRoute({
   if (!ALERTS_SYNC_TOKEN) {
     return {
       status: "skipped",
-      message: "Backend alert sync needs a validation build token.",
+      message: "Smart route checks need a validation build.",
     };
   }
 
@@ -90,13 +90,13 @@ export async function deleteBackendSavedRoute({
     });
     return {
       status: "synced",
-      message: "Backend route alert deleted.",
+      message: "Route watch deleted.",
       syncedAt: new Date().toISOString(),
     };
   } catch {
     return {
       status: "failed",
-      message: "Backend route delete failed. Saved route was kept so you can retry.",
+      message: "Route watch delete failed. Saved route was kept so you can retry.",
     };
   }
 }
@@ -141,26 +141,59 @@ function backendSavedRoutePayload({
   identity: AlertIdentity;
   preferences: AppPreferences;
 }) {
+  const vehicle = routeVehicle(commute, preferences);
+  const routeFuel = vehicle.vehicleEnergyType === "electric" ? commute.fuel : vehicle.fuel;
   return {
     id: commute.id,
     userId: identity.userId,
     name: commute.name,
     from: commute.from,
     to: commute.to,
-    fuel: commute.fuel,
+    fuel: routeFuel,
+    vehicleId: vehicle.id,
+    vehicleEnergyType: vehicle.vehicleEnergyType,
     alertEnabled: enabled,
     alertTimeLocal: commute.alertTime,
+    alertDays: commute.alertDays,
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "Australia/Sydney",
     minSavingDollars: commute.minSavingDollars ?? preferences.minSavingDollars,
     maxDetourMinutes: commute.maxDetourMinutes ?? preferences.maxDetourMinutes,
     eligibleDiscounts: eligibleDiscountIds(preferences),
-    tankLitres: 55,
+    tankLitres: vehicle.fuelTankLitres || preferences.fuelTankLitres || 55,
     tankPercent: commute.tankThresholdPercent ?? 45,
-    economy: 8.2,
+    economy: estimatedEconomy(vehicle),
     reserveKm: 35,
+    evBatteryKwh: vehicle.evBatteryKwh,
+    evRangeKm: vehicle.evRangeKm,
+    evConnectors: vehicle.evConnectors,
     createdAt: commute.createdAt,
     updatedAt: new Date().toISOString(),
   };
+}
+
+function routeVehicle(commute: SavedCommute, preferences: AppPreferences): VehicleProfile {
+  return preferences.vehicles.find((vehicle) => vehicle.id === commute.vehicleId)
+    || preferences.vehicles.find((vehicle) => vehicle.id === preferences.activeVehicleId)
+    || preferences.vehicles[0]
+    || {
+      id: preferences.activeVehicleId || "vehicle-default",
+      name: preferences.vehicleName,
+      rego: "",
+      vehicleEnergyType: preferences.vehicleEnergyType,
+      fuel: preferences.fuel,
+      evConnectors: preferences.evConnectors,
+      fuelTankLitres: preferences.fuelTankLitres,
+      evBatteryKwh: preferences.evBatteryKwh,
+      evRangeKm: preferences.evRangeKm,
+      homeChargingAccess: preferences.homeChargingAccess,
+      evChargingPreference: preferences.evChargingPreference,
+    };
+}
+
+function estimatedEconomy(vehicle: VehicleProfile) {
+  if (vehicle.vehicleEnergyType === "diesel") return 7.4;
+  if (vehicle.vehicleEnergyType === "electric") return 0;
+  return 8.2;
 }
 
 async function postAlertJson(path: string, body: unknown) {

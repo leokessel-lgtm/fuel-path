@@ -9,9 +9,11 @@ import {
   FuelCode,
   HomeChargingAccess,
   MapPoint,
+  StationBrandMode,
   VehicleProfile,
   VehicleEnergyType,
 } from "../types";
+import { normalisePreferredStationBrands } from "../utils/stationBrandPreferences";
 
 const PREFERENCES_KEY = "fuel-path:preferences:v1";
 const DEFAULT_VEHICLE_ID = "vehicle-default";
@@ -20,6 +22,7 @@ const evConnectors: EvConnector[] = ["CCS2", "CHADEMO", "TYPE2", "TESLA", "NACS"
 const vehicleEnergyTypes: VehicleEnergyType[] = ["petrol", "diesel", "electric"];
 const homeChargingAccessValues: HomeChargingAccess[] = ["unknown", "yes", "no"];
 const evChargingPreferences: EvChargingPreference[] = ["balanced", "cheap", "fast", "reliable", "nearby"];
+const stationBrandModes: StationBrandMode[] = ["all", "preferred_only"];
 const discountIds = new Set(activeDirectDiscountPrograms.map((program) => program.id));
 
 export const defaultPreferences: AppPreferences = {
@@ -37,6 +40,8 @@ export const defaultPreferences: AppPreferences = {
   maxDetourMinutes: 8,
   fuelPolicyEnabled: false,
   approvedPolicyBrands: ["Ampol", "BP", "Shell"],
+  stationBrandMode: "all",
+  preferredStationBrands: [],
   activeVehicleId: DEFAULT_VEHICLE_ID,
   vehicles: [
     {
@@ -137,6 +142,10 @@ function normalisePreferences(preferences: Partial<AppPreferences>): AppPreferen
     ),
     fuelPolicyEnabled: false,
     approvedPolicyBrands: defaultPreferences.approvedPolicyBrands,
+    stationBrandMode: stationBrandModes.includes(preferences.stationBrandMode as StationBrandMode)
+      ? (preferences.stationBrandMode as StationBrandMode)
+      : defaultPreferences.stationBrandMode,
+    preferredStationBrands: normalisePreferredStationBrands(preferences.preferredStationBrands),
     activeVehicleId: activeVehicle.id,
     vehicles,
     selectedDiscounts: normaliseSelectedDiscounts(preferences.selectedDiscounts),

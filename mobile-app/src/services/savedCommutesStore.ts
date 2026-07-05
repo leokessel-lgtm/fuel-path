@@ -1,10 +1,13 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-import { FuelCode, MapPoint, SavedCommute } from "../types";
+import { FuelCode, MapPoint, SavedCommute, Weekday } from "../types";
 
 const SAVED_COMMUTES_KEY = "fuel-path:saved-commutes:v1";
 const MAX_SAVED_COMMUTES = 20;
 const fuelCodes: FuelCode[] = ["E10", "U91", "P95", "P98", "DL", "PDL"];
+const weekdays: Weekday[] = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
+export const defaultCommuteAlertDays: Weekday[] = ["mon", "tue", "wed", "thu", "fri"];
+export const migratedCommuteAlertDays: Weekday[] = weekdays;
 
 export async function loadSavedCommutes(): Promise<SavedCommute[]> {
   try {
@@ -34,8 +37,11 @@ function normaliseSavedCommute(commute: SavedCommute): SavedCommute {
     from: normaliseMapPoint(commute.from),
     to: normaliseMapPoint(commute.to),
     fuel: commute.fuel,
+    vehicleId: typeof commute.vehicleId === "string" ? commute.vehicleId : undefined,
     alertEnabled: Boolean(commute.alertEnabled),
     alertTime: normaliseAlertTime(commute.alertTime),
+    alertDays: normaliseAlertDays(commute.alertDays, migratedCommuteAlertDays),
+    localReminderEnabled: commute.localReminderEnabled ?? true,
     minSavingDollars: boundedNumber(commute.minSavingDollars, 1, 25, 5),
     maxDetourMinutes: boundedNumber(commute.maxDetourMinutes, 1, 30, 8),
     tankThresholdPercent: boundedNumber(commute.tankThresholdPercent, 5, 95, 45),
@@ -45,6 +51,9 @@ function normaliseSavedCommute(commute: SavedCommute): SavedCommute {
     createdAt: commute.createdAt || now,
     nextAlertAt: commute.nextAlertAt,
     scheduledNotificationId: commute.scheduledNotificationId,
+    scheduledNotificationIds: Array.isArray(commute.scheduledNotificationIds)
+      ? commute.scheduledNotificationIds.filter((id) => typeof id === "string")
+      : undefined,
     updatedAt: commute.updatedAt || commute.createdAt || now,
   };
 }
@@ -59,6 +68,13 @@ function normaliseMapPoint(point: MapPoint): MapPoint {
 
 function normaliseAlertTime(value: string) {
   return /^([01]\d|2[0-3]):[0-5]\d$/.test(value) ? value : "07:30";
+}
+
+function normaliseAlertDays(value: unknown, fallback: Weekday[]) {
+  if (!Array.isArray(value)) return fallback;
+  const selected = new Set(value.filter((day): day is Weekday => weekdays.includes(day)));
+  const days = weekdays.filter((day) => selected.has(day));
+  return days.length ? days : fallback;
 }
 
 function boundedNumber(value: unknown, min: number, max: number, fallback: number) {

@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
 
 import {
+  defaultCommuteAlertDays,
   loadSavedCommutes,
   persistSavedCommutes,
 } from "../services/savedCommutesStore";
 import { FuelCode, MapPoint, SavedCommute } from "../types";
 
-type SaveCommuteInput = Pick<SavedCommute, "from" | "fuel" | "name" | "to">;
+type SaveCommuteInput = Pick<SavedCommute, "from" | "fuel" | "name" | "to"> & {
+  vehicleId?: string;
+};
 
 export function useSavedCommutes() {
   const [savedCommutes, setSavedCommutes] = useState<SavedCommute[]>([]);
@@ -29,7 +32,7 @@ export function useSavedCommutes() {
     persistSavedCommutes(savedCommutes).catch(() => {});
   }, [loaded, savedCommutes]);
 
-  const saveCommute = useCallback(({ from, fuel, name, to }: SaveCommuteInput) => {
+  const saveCommute = useCallback(({ from, fuel, name, to, vehicleId }: SaveCommuteInput) => {
     setSavedCommutes((current) => {
       const existing = current.find((commute) =>
         sameCommute(commute, { from, fuel, to }),
@@ -43,8 +46,11 @@ export function useSavedCommutes() {
           from,
           to,
           fuel,
+          vehicleId,
           alertEnabled: false,
           alertTime: "07:30",
+          alertDays: defaultCommuteAlertDays,
+          localReminderEnabled: true,
           minSavingDollars: 5,
           maxDetourMinutes: 8,
           tankThresholdPercent: 45,

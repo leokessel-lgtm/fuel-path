@@ -238,22 +238,22 @@ export function predictionDisciplineCue(item: StationViewModel) {
 
 export function alertGateSummary(notificationPermission: NotificationPermissionState) {
   if (notificationPermission === "granted") {
-    return "Route watches are on this device; delivery still needs native push and backend evidence before beta.";
+    return "Fuel Path checks watched routes for useful savings, fresh prices and sensible detours before interrupting you.";
   }
   if (notificationPermission === "unavailable") {
-    return "Backend checks route value, freshness, region access and duplicates, but push delivery needs a supported native build.";
+    return "Notifications need a supported iOS or Android build. You can still save routes here.";
   }
-  return "Push delivery is blocked until notification permission and native token checks pass.";
+  return "Turn this on from a saved route when you want useful fuel alerts before a regular drive.";
 }
 
 export function commuteAlertRuleLine(commute: SavedCommute) {
-  if (!commute.alertEnabled) return "No alert checks while this route is off.";
-  const routeRule = "Checks route value with smart detour rules and fresh price data.";
+  if (!commute.alertEnabled) return "No notifications while this route is off.";
+  const routeRule = "Only alerts when the saving clears your rule, the price is fresh and the detour is sensible.";
   if (commute.alertStatus === "backend_synced") {
-    return `${routeRule} Backend also checks freshness, duplicate cooldown and one alert per run.`;
+    return routeRule;
   }
   if (commute.alertStatus === "scheduled") {
-    return `${routeRule} Local reminder only until backend push sync is ready.`;
+    return `${routeRule} Reminder is scheduled for selected days.`;
   }
   if (commute.alertStatus === "needs_permission") {
     return "Blocked until notification permission is granted.";

@@ -35,6 +35,7 @@ import {
 } from "../types";
 import { eligibleDiscountIds } from "../utils/discountRedemptions";
 import { routeCameraInsets as resolveRouteCameraInsets } from "../utils/routeCameraInsets";
+import { activePreferredStationBrands } from "../utils/stationBrandPreferences";
 import {
   commuteName,
   displayLocationLabel,
@@ -58,7 +59,9 @@ type PlanScreenProps = {
   onClearRecentLocations?: () => void;
   onRemoveRecentLocation?: (point: MapPoint) => void;
   onSaveNamedPlace?: (kind: "home" | "work", point: MapPoint) => void;
-  onSaveCommute: (commute: Pick<SavedCommute, "from" | "fuel" | "name" | "to">) => void;
+  onSaveCommute: (commute: Pick<SavedCommute, "from" | "fuel" | "name" | "to"> & {
+    vehicleId?: string;
+  }) => void;
   onToggleCommuteAlert?: (commuteId: string) => void;
   alertSyncingCommuteId?: string | null;
   recentLocations?: MapPoint[];
@@ -156,6 +159,7 @@ export function PlanScreen({
   const approvedPolicyBrands = preferences.fuelPolicyEnabled
     ? preferences.approvedPolicyBrands
     : [];
+  const preferredStationBrands = activePreferredStationBrands(preferences);
   const routePlanningBlocked = false;
   const vehicleRouteNotice = vehiclePlanNotice(preferences.vehicleEnergyType);
 
@@ -256,6 +260,7 @@ export function PlanScreen({
         fuel: preferences.fuel,
         eligibleDiscounts: eligiblePreferenceDiscounts,
         from: resolvedFromPoint,
+        stationBrands: preferredStationBrands,
         to: resolvedToPoint,
       });
       recordRoutePlanCompletedEvidence(planned, preferences);
@@ -449,6 +454,8 @@ export function PlanScreen({
     eligiblePreferenceDiscounts.join("|"),
     approvedPolicyBrands.join("|"),
     preferences.fuelPolicyEnabled,
+    preferredStationBrands.join("|"),
+    preferences.stationBrandMode,
     preferences.fuel,
     preferences.evConnectors.join("|"),
     preferences.evRangeKm,
@@ -540,6 +547,7 @@ export function PlanScreen({
       fuel: preferences.fuel,
       name: commuteName(routeData.endpoints.from, routeData.endpoints.to),
       to: routeData.endpoints.to,
+      vehicleId: preferences.activeVehicleId,
     });
     recordSavedCommuteCreatedEvidence({
       best,

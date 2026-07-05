@@ -3,6 +3,7 @@ import { Platform, Pressable, ScrollView, Text, View } from "react-native";
 import { DiscountWalletCard } from "../DiscountWalletCard";
 import { SavedPlacesCard } from "../SavedPlacesCard";
 import { SavedRouteAlertsCard } from "../SavedRouteAlertsCard";
+import { StationBrandsCard } from "../StationBrandsCard";
 import { VehicleFuelCard } from "../VehicleFuelCard";
 import { AccountScreenProps } from "../../screens/AccountScreen.types";
 import { SettingsSection, settingsSectionTitle } from "./settingsSections";
@@ -21,15 +22,19 @@ export function AccountDetailScreen({
   onRequestNotifications,
   onRenameCommute,
   onSaveNamedPlace,
+  onSetPreferredStationBrands,
+  onSetStationBrandMode,
   onToggleCommuteAlert,
   onToggleDiscount,
   onToggleDiscountRedemption,
   onToggleEvConnector,
+  onTogglePreferredStationBrand,
   onAddVehicle,
   onRemoveVehicle,
   onSelectVehicle,
   onVehicleEnergyTypeChange,
   onVehicleProfileChange,
+  onUpdateCommuteAlertSettings,
   preferences,
   savedCommutes,
 }: AccountScreenProps & {
@@ -72,6 +77,15 @@ export function AccountDetailScreen({
         />
       ) : null}
 
+      {activeSection === "stations" ? (
+        <StationBrandsCard
+          preferences={preferences}
+          onSetMode={onSetStationBrandMode}
+          onSetPreferredBrands={onSetPreferredStationBrands}
+          onToggleBrand={onTogglePreferredStationBrand}
+        />
+      ) : null}
+
       {activeSection === "places" ? (
         <SavedPlacesCard
           homeLocation={preferences.homeLocation}
@@ -89,10 +103,12 @@ export function AccountDetailScreen({
           alertSyncingCommuteId={alertSyncingCommuteId}
           notificationMessage={notificationMessage}
           notificationPermission={notificationPermission}
+          preferences={preferences}
           savedCommutes={savedCommutes}
           onRemoveCommute={onRemoveCommute}
           onRequestNotifications={onRequestNotifications}
           onToggleCommuteAlert={onToggleCommuteAlert}
+          onUpdateCommuteAlertSettings={onUpdateCommuteAlertSettings}
         />
       ) : null}
 

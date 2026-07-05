@@ -27,6 +27,9 @@ const weeklyReportCard = read("src/components/WeeklyReportCard.tsx");
 const routeAddressSuggestionHook = read("src/hooks/useRouteAddressSuggestions.ts");
 const theme = read("src/theme.ts");
 const nearbyScreen = read("src/screens/NearbyScreen.tsx");
+const nearbyResults = read("src/hooks/useNearbyResults.ts");
+const stationBrandFilterPill = read("src/components/StationBrandFilterPill.tsx");
+const stationBrandFilterOverride = read("src/hooks/useStationBrandFilterOverride.ts");
 const planScreen = read("src/screens/PlanScreen.tsx");
 const planScreenUtils = read("src/screens/PlanScreen.utils.ts");
 const accountScreen = read("src/screens/AccountScreen.tsx");
@@ -527,16 +530,32 @@ const checks = [
       !accountDetailScreen.includes("WeeklyReportCard"),
   },
   {
-    label: "saved route alerts avoid per-route decision rule controls",
+    label: "saved route alerts expose compact route watch controls",
     ok:
       accountDetailScreen.includes("SavedRouteAlertsCard") &&
+      savedRouteAlertsCard.includes("Route notification settings") &&
+      savedRouteAlertsCard.includes("Commute days") &&
+      savedRouteAlertsCard.includes("Minimum saving") &&
+      savedRouteAlertsCard.includes("Vehicle") &&
       !savedRouteAlertsCard.includes("RouteAlertRuleSelector") &&
-      !savedRouteAlertsCard.includes("ruleKey=\"minSavingDollars\"") &&
-      !savedRouteAlertsCard.includes("ruleKey=\"maxDetourMinutes\"") &&
       !savedRouteAlertsCard.includes("ruleKey=\"tankThresholdPercent\"") &&
-      !appShell.includes("onUpdateCommuteAlertRule") &&
-      decisionEvidence.includes("smart detour rules") &&
-      decisionEvidence.includes("one alert per run"),
+      appShell.includes("onUpdateCommuteAlertSettings") &&
+      decisionEvidence.includes("Only alerts when the saving clears your rule"),
+  },
+  {
+    label: "station brand preferences filter Nearby and Plan without reviving policy controls",
+    ok:
+      preferencesStore.includes("stationBrandMode") &&
+      preferencesStore.includes("preferredStationBrands") &&
+      stationBrandFilterPill.includes("Show all station brands once") &&
+      stationBrandFilterOverride.includes("preferredStationBrandSummary") &&
+      nearbyResults.includes("activePreferredStationBrands") &&
+      nearbyResults.includes("filterStationsByPreferredBrands") &&
+      planScreen.includes("stationBrands: preferredStationBrands") &&
+      planScreenUtils.includes("Filtered to") &&
+      fuelPathApi.includes("brandFilter: selectedBrands.length > 0") &&
+      !appShell.includes("toggleFuelPolicy") &&
+      !appShell.includes("togglePolicyBrand"),
   },
   {
     label: "plan recommendation follow-up keeps save before watch",
@@ -777,9 +796,9 @@ const checks = [
       routeNotifications.includes("Android Expo Go cannot schedule route notifications. Use a development or preview build.") &&
       routeNotifications.includes("remotePushUnavailableInExpoGo") &&
       routeNotifications.includes('Constants.appOwnership === "expo"') &&
-      routeNotifications.includes("Backend push alerts need a development or preview build, not Expo Go.") &&
+      routeNotifications.includes("Smart route notifications need a development or preview build, not Expo Go.") &&
       routeNotifications.includes("Route alert permission is enabled on this validation build.") &&
-      routeNotifications.includes("Validation push token ready for backend alert sync.") &&
+      routeNotifications.includes("Smart route notifications are ready for this build.") &&
       savedRouteAlertsCard.includes('? "Permission enabled"') &&
       !savedRouteAlertsCard.includes('? "Alerts enabled"') &&
       !routeNotifications.includes("Push token ready.") &&
@@ -803,8 +822,8 @@ const checks = [
       !planScreen.includes('"Alerts on"') &&
       !savedCommuteShortcuts.includes('"Alerts on"') &&
       savedRouteAlertsCard.includes('? "Watching"') &&
-      decisionEvidence.includes("Route watches are on this device; delivery still needs native push and backend evidence before beta.") &&
-      !decisionEvidence.includes("Alerts can send only when route value"),
+      decisionEvidence.includes("Fuel Path checks watched routes for useful savings") &&
+      !decisionEvidence.includes("delivery still needs native push"),
   },
   {
     label: "Android map smoke captures native render and frame evidence",

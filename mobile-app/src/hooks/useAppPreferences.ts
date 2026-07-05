@@ -11,6 +11,7 @@ import {
   FuelCode,
   HomeChargingAccess,
   MapPoint,
+  StationBrandMode,
   VehicleProfile,
   VehicleEnergyType,
 } from "../types";
@@ -183,6 +184,34 @@ export function useAppPreferences() {
     }));
   }, []);
 
+  const setStationBrandMode = useCallback((stationBrandMode: StationBrandMode) => {
+    setPreferences((current) => ({ ...current, stationBrandMode }));
+  }, []);
+
+  const togglePreferredStationBrand = useCallback((brand: string) => {
+    setPreferences((current) => {
+      const selected = new Set(current.preferredStationBrands);
+      if (selected.has(brand)) {
+        selected.delete(brand);
+      } else {
+        selected.add(brand);
+      }
+      return {
+        ...current,
+        preferredStationBrands: Array.from(selected),
+        stationBrandMode: selected.size ? current.stationBrandMode : "all",
+      };
+    });
+  }, []);
+
+  const setPreferredStationBrands = useCallback((brands: string[]) => {
+    setPreferences((current) => ({
+      ...current,
+      preferredStationBrands: brands,
+      stationBrandMode: brands.length ? current.stationBrandMode : "all",
+    }));
+  }, []);
+
   return {
     clearNamedPlace,
     loaded,
@@ -191,9 +220,12 @@ export function useAppPreferences() {
     removeVehicle,
     saveNamedPlace,
     selectVehicle,
+    setPreferredStationBrands,
+    setStationBrandMode,
     toggleDiscount,
     toggleDiscountRedemption,
     toggleEvConnector,
+    togglePreferredStationBrand,
     updateDecisionRule,
     updateFuel,
     updateHomeChargingAccess,

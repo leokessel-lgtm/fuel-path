@@ -154,7 +154,7 @@ export default function App() {
       <SafeAreaView edges={["top", "left", "right", "bottom"]} style={styles.safeArea}>
         <StatusBar style="dark" />
         <View style={styles.appShell}>
-        <View style={styles.header}>
+        <View role="banner" style={styles.header}>
           <View style={styles.brandLockup}>
             <FuelPathLogo />
             <View style={styles.brandText}>
@@ -164,6 +164,7 @@ export default function App() {
           </View>
           <Pressable
             accessibilityLabel={hasNamedVehicle ? "View vehicle profile" : "View fuel profile"}
+            accessibilityRole="button"
             onPress={() => setActiveTab("account")}
             style={({ pressed }) => [styles.vehiclePill, pressed && styles.vehiclePillPressed]}
           >
@@ -181,7 +182,7 @@ export default function App() {
           </Pressable>
         </View>
 
-        <View style={styles.content}>
+        <View role="main" style={styles.content}>
           {activeTab === "plan" ? (
             <PlanScreen
               preferences={preferences}
@@ -232,25 +233,27 @@ export default function App() {
           ) : null}
         </View>
 
-        <View style={styles.tabBar}>
-          {tabs.map((tab) => {
-            const selected = activeTab === tab.key;
-            return (
-              <Pressable
-                accessibilityRole="tab"
-                accessibilityState={{ selected }}
-                hitSlop={8}
-                key={tab.key}
-                onPress={() => setActiveTab(tab.key)}
-                style={[styles.tabButton, selected && styles.tabButtonSelected]}
-              >
-                <View style={[styles.tabIconShell, selected && styles.tabIconShellSelected]}>
-                  <TabIcon tab={tab.key} selected={selected} />
-                </View>
-                <Text maxFontSizeMultiplier={chromeTextScale} numberOfLines={1} style={[styles.tabLabel, selected && styles.tabLabelSelected]}>{tab.label}</Text>
-              </Pressable>
-            );
-          })}
+        <View role="navigation">
+          <View accessibilityRole="tablist" style={styles.tabBar}>
+            {tabs.map((tab) => {
+              const selected = activeTab === tab.key;
+              return (
+                <Pressable
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected }}
+                  hitSlop={8}
+                  key={tab.key}
+                  onPress={() => setActiveTab(tab.key)}
+                  style={[styles.tabButton, selected && styles.tabButtonSelected]}
+                >
+                  <View style={[styles.tabIconShell, selected && styles.tabIconShellSelected]}>
+                    <TabIcon tab={tab.key} selected={selected} />
+                  </View>
+                  <Text maxFontSizeMultiplier={chromeTextScale} numberOfLines={1} style={[styles.tabLabel, selected && styles.tabLabelSelected]}>{tab.label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
         </View>
         </View>
       </SafeAreaView>

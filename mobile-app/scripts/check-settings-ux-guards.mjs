@@ -18,6 +18,8 @@ const files = {
   app: read("App.tsx"),
   packageJson: read("package.json"),
   brandAssets: read("src/data/brandAssets.ts"),
+  nearbyStationSheet: read("src/components/NearbyStationSheet.tsx"),
+  theme: read("src/theme.ts"),
 };
 
 const checks = [
@@ -113,6 +115,30 @@ const checks = [
       files.savedCommutesHook.includes("vehicleId") &&
       files.savedCommutesHook.includes("defaultCommuteAlertDays") &&
       files.app.includes("onSaveCommute={saveCommute}"),
+  },
+  {
+    label: "bottom navigation exposes valid tablist semantics",
+    ok:
+      files.app.includes('<View role="banner" style={styles.header}>') &&
+      files.app.includes('<View role="main" style={styles.content}>') &&
+      files.app.includes('<View role="navigation">') &&
+      files.app.includes('<View accessibilityRole="tablist" style={styles.tabBar}>') &&
+      files.app.includes('accessibilityRole="tab"') &&
+      files.app.includes("accessibilityState={{ selected }}"),
+  },
+  {
+    label: "labelled app chrome pressables expose button semantics",
+    ok:
+      files.app.includes('accessibilityLabel={hasNamedVehicle ? "View vehicle profile" : "View fuel profile"}') &&
+      files.app.includes('accessibilityRole="button"') &&
+      files.nearbyStationSheet.includes("accessibilityLabel={option.accessibilityLabel}") &&
+      files.nearbyStationSheet.includes('accessibilityRole="button"'),
+  },
+  {
+    label: "muted and amber text tokens meet AA contrast on app panels",
+    ok:
+      files.theme.includes('muted: "#5f6c65"') &&
+      files.theme.includes('amber: "#9a5b00"'),
   },
   {
     label: "Settings UX guards run in the mobile test chain",

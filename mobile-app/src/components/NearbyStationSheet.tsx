@@ -270,6 +270,7 @@ export function NearbyStationSheet({
               return (
                 <Pressable
                   accessibilityLabel={option.accessibilityLabel}
+                  accessibilityRole="button"
                   key={option.key}
                   onPress={() => onSortPress(option.key)}
                   style={[styles.sortButton, selectedSort && styles.sortButtonSelected]}

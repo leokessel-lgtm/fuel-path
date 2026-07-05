@@ -271,6 +271,7 @@ export function NearbyStationSheet({
                 <Pressable
                   accessibilityLabel={option.accessibilityLabel}
                   accessibilityRole="button"
+                  accessibilityState={{ selected: selectedSort }}
                   key={option.key}
                   onPress={() => onSortPress(option.key)}
                   style={[styles.sortButton, selectedSort && styles.sortButtonSelected]}
@@ -479,19 +480,22 @@ const styles = StyleSheet.create({
   sortButton: {
     alignItems: "center",
     backgroundColor: colors.panelStrong,
+    borderColor: colors.line,
     borderRadius: radii.pill,
+    borderWidth: 1,
     flex: 1,
     justifyContent: "center",
     minHeight: 44,
     paddingVertical: spacing.sm,
   },
   sortButtonSelected: {
+    borderColor: colors.black,
     backgroundColor: colors.black,
   },
   sortText: {
     color: colors.ink,
     fontSize: typeScale.caption,
-    fontWeight: "500",
+    fontWeight: "700",
   },
   sortTextSelected: {
     color: colors.white,

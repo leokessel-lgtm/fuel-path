@@ -132,7 +132,16 @@ const checks = [
       files.app.includes('accessibilityLabel={hasNamedVehicle ? "View vehicle profile" : "View fuel profile"}') &&
       files.app.includes('accessibilityRole="button"') &&
       files.nearbyStationSheet.includes("accessibilityLabel={option.accessibilityLabel}") &&
-      files.nearbyStationSheet.includes('accessibilityRole="button"'),
+      files.nearbyStationSheet.includes('accessibilityRole="button"') &&
+      files.nearbyStationSheet.includes("accessibilityState={{ selected: selectedSort }}"),
+  },
+  {
+    label: "Nearby sort buttons keep visible button affordance",
+    ok:
+      files.nearbyStationSheet.includes("borderColor: colors.line") &&
+      files.nearbyStationSheet.includes("borderWidth: 1") &&
+      files.nearbyStationSheet.includes("borderColor: colors.black") &&
+      files.nearbyStationSheet.includes('fontWeight: "700"'),
   },
   {
     label: "muted and amber text tokens meet AA contrast on app panels",

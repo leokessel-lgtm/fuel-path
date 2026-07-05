@@ -45,9 +45,13 @@ module.exports = async function handler(req, res) {
       req.method === "POST"
         ? new Set((body.brands || []).map(String).filter(Boolean))
         : setParam(query.brands);
+    const brandLabels =
+      req.method === "POST"
+        ? new Set((body.brandLabels || []).map(String).filter(Boolean))
+        : brands;
     const brandFilter = req.method === "POST" ? Boolean(body.brandFilter) : boolParam(query.brandFilter);
     const stations = brandFilter
-      ? data.stations.filter((station) => brands.has(String(station.brand || "Unknown")))
+      ? data.stations.filter((station) => stationMatchesBrandFilter(station, brands))
       : data.stations;
     const scored = scoreRoute({
       source: data.source,
@@ -89,7 +93,7 @@ module.exports = async function handler(req, res) {
         trafficPreference,
         actualDetours: actualDetourContext({ actualDetours, recommendations: refinedRecommendations }),
         brandFilter,
-        brands: brandFilter ? Array.from(brands) : [],
+        brands: brandFilter ? Array.from(brandLabels.size ? brandLabels : brands) : [],
         generatedAt: new Date().toISOString(),
         cacheHit: data.cacheHit,
         cacheAgeSeconds: data.cacheAgeSeconds,
@@ -371,6 +375,19 @@ function actualDetourContext({ actualDetours, recommendations = [] }) {
       ? ""
       : "Exact detour routing is off or unavailable; recommendations use smart detour estimates.",
   };
+}
+
+function normaliseBrand(value) {
+  return String(value || "").toLowerCase().replace(/&/g, "and").replace(/[^a-z0-9]+/g, "");
+}
+
+function stationMatchesBrandFilter(station, brands) {
+  const candidates = [station.brand, station.name].map(normaliseBrand).filter(Boolean);
+  return Array.from(brands).some((brand) => {
+    const normalised = normaliseBrand(brand);
+    if (!normalised) return false;
+    return candidates.some((candidate) => candidate === normalised || candidate.includes(normalised));
+  });
 }
 
 function routeQualityFromRoute(route) {

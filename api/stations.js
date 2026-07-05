@@ -4,6 +4,7 @@ const {
   loadStationData,
   methodAllowed,
   pointInNt,
+  recordPredictionMarketObservation,
   sendJson,
   setParam,
   stationPayload,
@@ -35,7 +36,14 @@ module.exports = async function handler(req, res) {
       radiusKm: providerRadiusKm,
       fuels: allowNtAlternativeFuels ? [] : [fuel],
     });
-    const allCandidateStations = data.stations
+    if (!allowNtAlternativeFuels) {
+      recordPredictionMarketObservation({
+        points: [centre],
+        fuels: [fuel],
+        data,
+      }).catch(() => {});
+    }
+    const stationPool = data.stations
       .map((station) => ({
         ...station,
         distanceKm: distanceKm(centre, station),
@@ -43,9 +51,14 @@ module.exports = async function handler(req, res) {
       .filter((station) => {
         if (!includeClosed && station.openNow === false) return false;
         if (!includeMemberPrices && station.membershipRequired) return false;
-        if (brandFilter && !brands.has(String(station.brand || "Unknown"))) return false;
         return true;
       });
+    const allCandidateStations = brandFilter
+      ? stationPool.filter((station) => stationMatchesBrandFilter(station, brands))
+      : stationPool;
+    const brandHiddenCount = brandFilter
+      ? stationPool.filter((station) => station.distanceKm <= radiusKm && !stationMatchesBrandFilter(station, brands)).length
+      : 0;
     const candidateStations = allCandidateStations.filter((station) => station.distanceKm <= radiusKm);
     const exactStations = candidateStations
       .filter((station) => station.prices?.[fuel])
@@ -99,6 +112,9 @@ module.exports = async function handler(req, res) {
         exactStationCount: exactStations.length,
         stationCount: stations.length,
         returnedCount: selected.length,
+        brandFilter,
+        brands: brandFilter ? Array.from(brands) : [],
+        brandHiddenCount,
         generatedAt: new Date().toISOString(),
         cacheHit: data.cacheHit,
         cacheAgeSeconds: data.cacheAgeSeconds,
@@ -134,6 +150,19 @@ module.exports = async function handler(req, res) {
 function coordinateParam(value, name, min, max) {
   if (value === undefined || value === null || value === "") throw new Error(`${name} is required`);
   return boundedNumberParam(value, name, undefined, { min, max, clampMax: false });
+}
+
+function normaliseBrand(value) {
+  return String(value || "").toLowerCase().replace(/&/g, "and").replace(/[^a-z0-9]+/g, "");
+}
+
+function stationMatchesBrandFilter(station, brands) {
+  const candidates = [station.brand, station.name].map(normaliseBrand).filter(Boolean);
+  return Array.from(brands).some((brand) => {
+    const normalised = normaliseBrand(brand);
+    if (!normalised) return false;
+    return candidates.some((candidate) => candidate === normalised || candidate.includes(normalised));
+  });
 }
 
 function ntLiveResult(data) {

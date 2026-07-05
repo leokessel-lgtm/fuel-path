@@ -48,7 +48,7 @@ const ACT_BOUNDS = {
 };
 const CAPABILITY_LABELS = ["live", "limited", "pending_access", "fallback", "unsupported"];
 const REGION_ORDER = ["NSW", "ACT", "QLD", "WA", "VIC", "SA", "TAS", "NT"];
-const TERMS_GATED_PUBLIC_REGIONS = ["NSW", "ACT", "QLD", "VIC", "TAS", "NT"];
+const TERMS_GATED_PUBLIC_REGIONS = ["NSW", "ACT", "QLD", "VIC", "SA", "TAS", "NT"];
 const NT_MYFUEL_ACCESS_PATH =
   "NT Consumer Affairs has approved Fuel Path access to the MyFuel NT third-party API. The backend uses the approved token, postcode, outlet-identifier and reference-data endpoints with server-side credentials.";
 const NSW_VIC_BORDER_POINTS = [

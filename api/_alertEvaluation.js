@@ -55,7 +55,7 @@ function buildSavedRouteAlertEvaluation({
     freshnessMinutes: optionalNumber(candidate.freshnessMinutes),
     messageTitle: status === "send_alert" ? "Fuel worth checking before your drive" : undefined,
     messageBody: status === "send_alert"
-      ? `${route.fuel} is worth checking${candidate.stationName ? ` near ${candidate.stationName}` : ""} before your ${route.alertTimeLocal} drive.`
+      ? alertMessageBody({ route, candidate })
       : undefined,
     evaluatedAt,
     pushDeliveryEnabled,
@@ -117,6 +117,16 @@ function alertOutcomeDetail({ outcome, status, route = {}, candidate = {} } = {}
     label: "Watch only",
     summary: watchOnlySummary(status),
   };
+}
+
+function alertMessageBody({ route = {}, candidate = {} } = {}) {
+  const station = candidate.stationName ? ` near ${candidate.stationName}` : "";
+  const saving = optionalNumber(candidate.estimatedSavingDollars);
+  const detour = optionalNumber(candidate.detourMinutes);
+  if (Number.isFinite(saving)) {
+    return `${route.fuel} may save about ${formatMoney(saving)}${Number.isFinite(detour) ? ` after ${formatMinutes(detour)} detour` : ""}${station}.`;
+  }
+  return `${route.fuel} is worth checking${station} before your ${route.alertTimeLocal || "usual"} drive.`;
 }
 
 function skipAlertSummary(status, { route = {}, candidate = {} } = {}) {

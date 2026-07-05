@@ -1,5 +1,7 @@
 const {
   listPredictionBacktests,
+  boolParam,
+  cronAuthorised,
   methodAllowed,
   numberParam,
   predictionSignal,
@@ -7,6 +9,7 @@ const {
   predictionWriteAuthorised,
   predictionWriteSecurity,
   recordPredictionBacktest,
+  runPredictionMarketBacktestJob,
   sendJson,
   stringParam,
 } = require("./_backend");
@@ -31,12 +34,38 @@ module.exports = async function handler(req, res) {
     }
 
     const mode = stringParam(req.query.mode, "status");
+    if (mode === "collect") {
+      if (!cronAuthorised(req) && !predictionWriteAuthorised(req)) {
+        const writeSecurity = predictionWriteSecurity();
+        sendJson(res, 401, {
+          error: writeSecurity.tokenConfigured
+            ? "Prediction back-test collection requires CRON_SECRET or a valid prediction write token."
+            : "Prediction back-test collection requires CRON_SECRET or PREDICTION_BACKTEST_WRITE_TOKEN.",
+          predictions: await predictionStatus(),
+        });
+        return;
+      }
+      const body = req.body || {};
+      sendJson(
+        res,
+        202,
+        await runPredictionMarketBacktestJob({
+          limit: req.query.limit || body.limit,
+          now: stringParam(req.query.now || body.now),
+          forceRefresh: boolParam(req.query.forceRefresh || body.forceRefresh),
+          dryRun: boolParam(req.query.dryRun || body.dryRun),
+        }),
+      );
+      return;
+    }
+
     if (mode === "signal") {
       sendJson(
         res,
         200,
         predictionSignal({
           region: stringParam(req.query.region),
+          market: stringParam(req.query.market),
           fuel: stringParam(req.query.fuel),
           historyDays: numberParam(req.query.historyDays, 0),
           observedPriceCount: numberParam(req.query.observedPriceCount, 0),

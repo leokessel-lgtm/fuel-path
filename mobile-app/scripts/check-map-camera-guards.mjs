@@ -377,10 +377,10 @@ const checks = [
   {
     label: "nearby expanded station list removes duplicate selected card and grows upward",
     ok:
-      nearbyStationSheet.includes("const nearbySheetExpandedTop = 280;") &&
-      nearbyStationSheet.includes("const nearbySheetExpandedTopCompact = 236;") &&
-      nearbyCombinedPanel.includes("const nearbySheetExpandedTop = 280;") &&
-      nearbyEvControls.includes("top: 280") &&
+      nearbyStationSheet.includes("const nearbySheetExpandedTop = 180;") &&
+      nearbyStationSheet.includes("const nearbySheetExpandedTopCompact = 149;") &&
+      nearbyCombinedPanel.includes("const nearbySheetExpandedTop = 180;") &&
+      nearbyEvControls.includes("top: 180") &&
       nearbyStationSheet.includes("{selected && !sheetExpanded ? (") &&
       nearbyStationSheet.includes("sheetExpanded: {") &&
       nearbyStationSheet.includes("top: nearbySheetExpandedTop") &&

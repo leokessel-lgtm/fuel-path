@@ -757,7 +757,7 @@ const styles = StyleSheet.create({
   },
   evPanelExpanded: {
     bottom: 8,
-    top: 280,
+    top: 180,
   },
   evSheetHeader: {
     alignItems: "center",

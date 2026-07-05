@@ -107,7 +107,7 @@ function buildProviderTermsReadiness(capabilities, evidenceState = { provided: f
       provided: Boolean(evidenceState.provided),
       source: evidenceState.path || "",
     },
-    confirmationChecklist: confirmationChecklist(termsBlocked),
+    confirmationChecklist: confirmationChecklist([...termsBlocked, ...evidenceBlocked]),
     nextAction: blockers.length
       ? "Confirm provider usage, caching, attribution and access terms before public live-price claims."
       : "Provider terms and access gates are ready for current configured regions.",
@@ -116,7 +116,7 @@ function buildProviderTermsReadiness(capabilities, evidenceState = { provided: f
 
 function providerEvidenceBlockers(regions, evidenceState) {
   const gatedRegions = regions.filter((entry) =>
-    ["NSW", "ACT", "QLD", "VIC", "TAS"].includes(entry.region) &&
+    ["NSW", "ACT", "QLD", "VIC", "SA", "TAS", "NT"].includes(entry.region) &&
     entry.configured &&
     entry.capability === "live"
   );
@@ -128,16 +128,23 @@ function regionEvidenceReady(region, evidenceState) {
   const evidence = evidenceState?.payload || {};
   const entry = evidence?.regions?.[region] || {};
   if (region === "QLD") {
+    return fuelPricesEvidenceReady(region, entry, evidenceState);
+  }
+  if (region === "SA") {
+    return fuelPricesEvidenceReady(region, entry, evidenceState);
+  }
+  if (region === "NT") {
     return [
-      entry.signUpAccepted,
-      entry.licenceTermsAccepted,
+      entry.providerPathConfirmed,
+      entry.apiAccessApproved,
+      entry.providerTermsAccepted,
+      entry.cachingDurationConfirmed,
+      entry.rateLimitConfirmed,
       entry.attributionDisclaimerReady,
-      entry.cachePolicyCoversCurrencyObligations,
-      entry.serverSideTokenOnly,
       entry.commercialConsumerAppUseConfirmed,
+      entry.outageAvailabilityUseConfirmed,
       concreteDate(entry.termsAcceptedAt),
-      concretePositiveNumber(entry.priceCacheMaxAgeMinutes, { max: 30 }),
-      concretePositiveNumber(entry.siteDataCacheMaxAgeHours, { max: 24 }),
+      concretePositiveNumber(entry.cachingDurationMinutes),
       providerAttributionReady(region, entry.attributionDisclaimerWording),
       concreteEvidenceReference(region, entry.evidenceReference, entry.termsAcceptedAt),
       evidenceSourceReady(region, entry, evidenceState),
@@ -186,6 +193,23 @@ function regionEvidenceReady(region, evidenceState) {
     ].every(Boolean);
   }
   return false;
+}
+
+function fuelPricesEvidenceReady(region, entry, evidenceState) {
+  return [
+    entry.signUpAccepted,
+    entry.licenceTermsAccepted,
+    entry.attributionDisclaimerReady,
+    entry.cachePolicyCoversCurrencyObligations,
+    entry.serverSideTokenOnly,
+    entry.commercialConsumerAppUseConfirmed,
+    concreteDate(entry.termsAcceptedAt),
+    concretePositiveNumber(entry.priceCacheMaxAgeMinutes, { max: 30 }),
+    concretePositiveNumber(entry.siteDataCacheMaxAgeHours, { max: 24 }),
+    providerAttributionReady(region, entry.attributionDisclaimerWording),
+    concreteEvidenceReference(region, entry.evidenceReference, entry.termsAcceptedAt),
+    evidenceSourceReady(region, entry, evidenceState),
+  ].every(Boolean);
 }
 
 function evidenceSourceReady(region, entry, evidenceState) {
@@ -237,6 +261,8 @@ function concreteEvidenceReference(region, value, termsAcceptedAt = "") {
 function providerEvidenceReferenceMatches(region, value) {
   const text = String(value || "");
   if (region === "QLD") return /qld[-_\s]?fuel[-_\s]?prices|queensland[-_\s]?fuel[-_\s]?prices|fuel[-_\s]?prices/i.test(text);
+  if (region === "SA") return /sa[-_\s]?fuel|south[-_\s]?australia[-_\s]?fuel|fuel[-_\s]?pricing[-_\s]?information/i.test(text);
+  if (region === "NT") return /myfuel[-_\s]?nt|my[-_\s]?fuel[-_\s]?nt|northern[-_\s]?territory/i.test(text);
   if (region === "NSW" || region === "ACT" || region === "TAS") {
     return /fuelcheck|fuel[-_\s]?check|api[-_.\s]?nsw/i.test(text);
   }
@@ -255,6 +281,8 @@ function providerAttributionReady(region, value) {
   if (!concreteText(value)) return false;
   const text = String(value || "");
   if (region === "QLD") return /qld fuel prices|queensland fuel prices|fuel prices/i.test(text);
+  if (region === "SA") return /sa fuel|south australia fuel|fuel pricing information/i.test(text);
+  if (region === "NT") return /myfuel nt|my fuel nt|northern territory/i.test(text);
   if (region === "NSW" || region === "ACT" || region === "TAS") {
     return /fuelcheck|api\.?nsw/i.test(text);
   }
@@ -317,6 +345,23 @@ function confirmationChecklist(termsBlocked) {
         ],
       };
     }
+    if (entry.region === "SA") {
+      return {
+        region: entry.region,
+        provider: entry.provider,
+        flag: "FUEL_PATH_PROVIDER_TERMS_EVIDENCE_CONFIRMED=1 after evidence review",
+        requiredEvidence: [
+          "SA Fuel Pricing Information Scheme access approved for Fuel Path",
+          "Fuel Pricing Information licence or terms accepted for Fuel Path",
+          "terms acceptance date recorded",
+          "price cache max-age recorded at 30 minutes or less",
+          "site-data cache max-age recorded at 24 hours or less",
+          "attribution/disclaimer wording recorded where SA data is displayed",
+          "no direct end-user calls to the SA API token",
+          "commercial consumer-app use confirmed",
+        ],
+      };
+    }
     if (entry.region === "NSW" || entry.region === "ACT") {
       return {
         region: entry.region,
@@ -358,6 +403,23 @@ function confirmationChecklist(termsBlocked) {
           "terms acceptance date recorded",
           "allowed caching duration recorded in minutes",
           "required attribution/disclaimer wording recorded",
+          "commercial consumer-app use confirmed",
+        ],
+      };
+    }
+    if (entry.region === "NT") {
+      return {
+        region: entry.region,
+        provider: entry.provider,
+        flag: "FUEL_PATH_PROVIDER_TERMS_EVIDENCE_CONFIRMED=1 after evidence review",
+        requiredEvidence: [
+          "MyFuel NT third-party API access approved for Fuel Path",
+          "MyFuel NT provider terms accepted for Fuel Path",
+          "terms acceptance date recorded",
+          "allowed caching duration recorded in minutes",
+          "rate limits recorded",
+          "required attribution/disclaimer wording recorded",
+          "outage or availability semantics confirmed if shown",
           "commercial consumer-app use confirmed",
         ],
       };

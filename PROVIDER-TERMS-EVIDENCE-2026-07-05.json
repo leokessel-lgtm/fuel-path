@@ -1,0 +1,103 @@
+{
+  "notes": [
+    "Private provider-terms evidence file created on 2026-07-05 from held local and Gmail evidence.",
+    "This file intentionally marks only proof we genuinely hold as confirmed.",
+    "Do not add API keys, bearer tokens, subscriber tokens, client secrets or raw credential values to this file or its source notes.",
+    "Current state: QLD and VIC access proof exists in email, but explicit terms/caching/attribution/commercial-use acceptance evidence is still missing unless Leo confirms and records that review.",
+    "NSW, ACT and TAS remain blocked for provider terms because current email search found API.NSW verification-code emails only, not approval or accepted FuelCheck terms evidence. TAS technical API access is documented elsewhere, but usage/caching/attribution terms are still not confirmed here."
+  ],
+  "regions": {
+    "NSW": {
+      "apiAccessApproved": false,
+      "authorityTermsAccepted": false,
+      "cachingDurationConfirmed": false,
+      "cachingDurationMinutes": 0,
+      "attributionDisclaimerReady": false,
+      "attributionDisclaimerWording": "",
+      "commercialConsumerAppUseConfirmed": false,
+      "termsAcceptedAt": "",
+      "evidenceReference": "",
+      "evidenceSource": ""
+    },
+    "ACT": {
+      "apiAccessApproved": false,
+      "authorityTermsAccepted": false,
+      "cachingDurationConfirmed": false,
+      "cachingDurationMinutes": 0,
+      "attributionDisclaimerReady": false,
+      "attributionDisclaimerWording": "",
+      "commercialConsumerAppUseConfirmed": false,
+      "termsAcceptedAt": "",
+      "evidenceReference": "",
+      "evidenceSource": ""
+    },
+    "QLD": {
+      "signUpAccepted": true,
+      "licenceTermsAccepted": false,
+      "attributionDisclaimerReady": false,
+      "attributionDisclaimerWording": "",
+      "cachePolicyCoversCurrencyObligations": false,
+      "priceCacheMaxAgeMinutes": 0,
+      "siteDataCacheMaxAgeHours": 0,
+      "serverSideTokenOnly": true,
+      "commercialConsumerAppUseConfirmed": false,
+      "termsAcceptedAt": "",
+      "evidenceReference": "qld-fuel-prices-production-access-email-2026-06-16",
+      "evidenceSource": "provider-terms-evidence-qld-2026-07-05.md"
+    },
+    "TAS": {
+      "apiV2AccessApproved": false,
+      "fuelCheckTasTermsAccepted": false,
+      "cachingDurationConfirmed": false,
+      "cachingDurationMinutes": 0,
+      "attributionDisclaimerReady": false,
+      "attributionDisclaimerWording": "",
+      "commercialConsumerAppUseConfirmed": false,
+      "termsAcceptedAt": "",
+      "evidenceReference": "",
+      "evidenceSource": ""
+    },
+    "VIC": {
+      "servoSaverApiAccessApproved": true,
+      "servoSaverTermsAccepted": true,
+      "cachingDurationConfirmed": true,
+      "cachingDurationMinutes": 5,
+      "attributionDisclaimerReady": true,
+      "attributionDisclaimerWording": "Fuel price data from Service Victoria Servo Saver, licensed under CC BY 4.0. Service Victoria does not endorse Fuel Path. Prices may change; confirm before driving.",
+      "commercialConsumerAppUseConfirmed": true,
+      "termsAcceptedAt": "2026-06-27",
+      "evidenceReference": "service-victoria-servo-saver-terms-commercial-attribution-cache-note-2026-06-27",
+      "evidenceSource": "docs/provider-terms/service-victoria-servo-saver-terms-acceptance-2026-06-27.md"
+    },
+    "SA": {
+      "signUpAccepted": true,
+      "licenceTermsAccepted": false,
+      "attributionDisclaimerReady": false,
+      "attributionDisclaimerWording": "",
+      "cachePolicyCoversCurrencyObligations": true,
+      "priceCacheMaxAgeMinutes": 1,
+      "siteDataCacheMaxAgeHours": 24,
+      "serverSideTokenOnly": true,
+      "commercialConsumerAppUseConfirmed": false,
+      "termsAcceptedAt": "",
+      "evidenceReference": "sa-fuel-pricing-information-production-access-email-2026-06-18",
+      "evidenceSource": "SA-FUEL-API-NOTES.md"
+    },
+    "NT": {
+      "providerPathConfirmed": true,
+      "providerName": "MyFuel NT",
+      "apiAccessApproved": true,
+      "providerTermsAccepted": false,
+      "cachingDurationConfirmed": false,
+      "cachingDurationMinutes": 0,
+      "rateLimitConfirmed": false,
+      "attributionDisclaimerReady": false,
+      "attributionDisclaimerWording": "",
+      "commercialConsumerAppUseConfirmed": false,
+      "outageAvailabilityUseConfirmed": false,
+      "termsAcceptedAt": "",
+      "evidenceReference": "myfuel-nt-third-party-api-access-email-2026-07-03",
+      "evidenceSource": "provider-terms-evidence-nt-2026-07-05.md"
+    }
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "privacyContact": "support@fuelpath.app",
+  "privacyPolicyUrl": "https://fuel-path.vercel.app/web-demo/privacy",
+  "privacyPolicySource": "web-demo/privacy.html",
+  "appStoreUrl": "https://apps.apple.com/au/app/fuel-path/id6740012345",
+  "googlePlayUrl": "https://play.google.com/store/apps/details?id=com.fuelpath.app",
+  "privacyContactConfirmed": true,
+  "storeListingLinksConfirmed": true,
+  "applePrivacyReviewed": true,
+  "applePrivacyReviewReference": "STORE-DATA-SAFETY.md Apple App Privacy review 2026-07-05",
+  "googleDataSafetyReviewed": true,
+  "googleDataSafetyReviewReference": "STORE-DATA-SAFETY.md Google Data Safety review 2026-07-05",
+  "providerLimitationsDisclosed": true,
+  "providerLimitationsDisclosureReference": "STORE-RELEASE-REVIEW-2026-06-20.md Provider limitations disclosure checked 2026-07-05",
+  "supportProcessReady": true,
+  "supportProcessReference": "SUPPORT-RUNBOOK.md Support process reviewed and support contact confirmation 2026-07-05",
+  "reviewedAt": "2026-07-05",
+  "reviewer": "Leo Kesselring"
+}

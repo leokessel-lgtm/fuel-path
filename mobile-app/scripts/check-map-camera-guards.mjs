@@ -147,6 +147,11 @@ const checks = [
       webMap.includes("object-fit: contain;") &&
       webMap.includes(".fuel-path-marker.is-selected .fuel-path-marker-price") &&
       webMap.includes("background: ${colors.black};") &&
+      webMap.includes("const subdued = Boolean(routeEndpoints && selectedStationCode && !selected);") &&
+      webMap.includes('subdued ? "is-subdued" : ""') &&
+      webMap.includes(".fuel-path-marker.is-subdued") &&
+      webMap.includes("opacity: 0.66;") &&
+      webMap.includes("transform: scale(0.92);") &&
       webMap.includes("tooltipAnchor: [0, -58]") &&
       webMap.includes("marker.bindTooltip(item.station.name") &&
       webMap.includes('className: "fuel-path-marker-tooltip"') &&
@@ -237,6 +242,11 @@ const checks = [
       nativeMap.includes("return [...visibleRoutePoints, ...routeStationCameraPoints]") &&
       brandBadge.includes('resizeMode="contain"') &&
       !nativeMap.includes("scale: 1.05") &&
+      nativeMap.includes("const subdued = Boolean(routeEndpoints && selectedStationCode && !selected);") &&
+      nativeMap.includes("subdued && styles.pinSubdued") &&
+      nativeMap.includes("pinSubdued: {") &&
+      nativeMap.includes("opacity: 0.68") &&
+      nativeMap.includes("transform: [{ scale: 0.94 }]") &&
       nativeMap.includes("backgroundColor: colors.greenDark") &&
       nativeMap.includes("pinSelected: {\n    borderColor: colors.black") &&
       nativeMap.includes("pinPriceSelected: {\n    backgroundColor: colors.black") &&

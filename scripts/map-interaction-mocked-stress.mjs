@@ -133,8 +133,10 @@ async function installMocks(page) {
   await page.route("**/api/status", async (route) => route.fulfill(jsonResponse({ defaultSource: "live", credentialsConfigured: true, cacheSeconds: 300, fuelProviders: { selection: "live" }, evCharging: { provider: "api_ninjas", configured: true, capability: "directory", realTimeAvailability: false, liveAvailabilityClaimsAllowed: false }, geocoding: { activeProvider: "fuel_path_gnaf", activeMode: "hosted" } })));
   await page.route("**/api/stations?**", async (route) => route.fulfill(jsonResponse({ stations: fuelStations(96), context: { fuel: "PDL", provider: "map_mock", stationCount: 96, returnedCount: 96 } })));
   await page.route("**/api/ev-chargers?**", async (route) => route.fulfill(jsonResponse({ chargers: evChargers(96), context: { provider: "api_ninjas", source: "map_mock", capability: "directory", chargerCount: 96, returnedCount: 96, provenance: { realTimeAvailability: false } } })));
-  await page.route("**/api/geocode?**", async (route) => {
-    const q = new URL(route.request().url()).searchParams.get("q") || "";
+  await page.route("**/api/geocode**", async (route) => {
+    const request = route.request();
+    const postData = request.postDataJSON?.();
+    const q = new URL(request.url()).searchParams.get("q") || postData?.q || "";
     const location = /sydney/i.test(q) ? { label: "Sydney NSW", lat: -33.8688, lon: 151.2093, state: "NSW", provider: "map_mock" } : { label: "Melbourne VIC", lat: -37.8136, lon: 144.9631, state: "VIC", provider: "map_mock" };
     await route.fulfill(jsonResponse({ provider: "map_mock", lookupStatus: "ok", location, suggestions: [location] }));
   });

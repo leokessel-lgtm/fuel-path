@@ -327,6 +327,7 @@ const brandStyles: BrandStyle[] = [
     label: "Fuel retailer",
     initials: "F",
     color: "#247a4d",
+    icon: require("../../assets/brand-icons/generic-fuel.png"),
     aliases: [
       "prime",
       "prime petroleum",
@@ -374,6 +375,7 @@ export function brandStyleForStation(station: Station): BrandStyle {
       .toUpperCase()
       .slice(0, 2),
     color: colors.blue,
+    icon: require("../../assets/brand-icons/generic-fuel.png"),
     aliases: [],
   };
 }

@@ -342,6 +342,7 @@ export function StationMap({
 
         {markerGroups.priceMarkers.map((item) => {
           const selected = item.station.stationCode === selectedStationCode;
+          const subdued = Boolean(routeEndpoints && selectedStationCode && !selected);
           return (
             <Marker
               {...decorativeStationMarkerAccessibility}
@@ -352,10 +353,10 @@ export function StationMap({
                 markerRefs.current[item.station.stationCode] = marker;
               }}
               tracksViewChanges={false}
-              zIndex={selected ? 700 : 500}
+              zIndex={selected ? 700 : subdued ? 420 : 500}
             >
               <View style={styles.pinAnchor}>
-                <View style={[styles.pin, selected && styles.pinSelected]}>
+                <View style={[styles.pin, subdued && styles.pinSubdued, selected && styles.pinSelected]}>
                   <Text style={[styles.pinPrice, selected && styles.pinPriceSelected]}>
                     {item.adjustedCpl.toFixed(1)}
                   </Text>
@@ -772,6 +773,10 @@ const styles = StyleSheet.create({
   pinSelected: {
     borderColor: colors.black,
     boxShadow: "0 0 0 4px rgba(255, 106, 61, 0.35)",
+  },
+  pinSubdued: {
+    opacity: 0.68,
+    transform: [{ scale: 0.94 }],
   },
   pinPrice: {
     backgroundColor: colors.greenDark,

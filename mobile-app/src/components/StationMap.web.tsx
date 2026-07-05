@@ -271,10 +271,11 @@ export function StationMap({
 
     markerGroups.priceMarkers.forEach((item) => {
       const selected = item.station.stationCode === selectedStationCode;
+      const subdued = Boolean(routeEndpoints && selectedStationCode && !selected);
       const marker = L.marker([item.station.lat, item.station.lon], {
         icon: L.divIcon({
           className: "",
-          html: markerHtml(item, selected),
+          html: markerHtml(item, selected, subdued),
           iconAnchor: [27, 56],
           iconSize: [54, 56],
           tooltipAnchor: [0, -58],
@@ -282,7 +283,7 @@ export function StationMap({
         alt: "",
         keyboard: false,
         riseOnHover: true,
-        zIndexOffset: selected ? 600 : 400,
+        zIndexOffset: selected ? 640 : subdued ? 320 : 400,
       });
       marker.on("click", () => {
         onSelect(item.station.stationCode);
@@ -506,7 +507,7 @@ function addDestinationMarker(
   markerLayer.addLayer(marker);
 }
 
-function markerHtml(item: StationViewModel, selected: boolean) {
+function markerHtml(item: StationViewModel, selected: boolean, subdued: boolean) {
   const style = brandStyleForStation(item.station);
   const iconUri = imageUri(style.icon);
   const logo = iconUri
@@ -514,8 +515,13 @@ function markerHtml(item: StationViewModel, selected: boolean) {
     : `<span class="fuel-path-marker-initials" style="background:${style.color}">${escapeHtml(
         style.initials,
       )}</span>`;
+  const className = [
+    "fuel-path-marker",
+    selected ? "is-selected" : "",
+    subdued ? "is-subdued" : "",
+  ].filter(Boolean).join(" ");
   return `
-    <div class="fuel-path-marker${selected ? " is-selected" : ""}" data-station-code="${escapeHtml(item.station.stationCode)}" aria-hidden="true">
+    <div class="${className}" data-station-code="${escapeHtml(item.station.stationCode)}" aria-hidden="true">
       <span class="fuel-path-marker-price">${item.adjustedCpl.toFixed(1)}</span>
       <span class="fuel-path-marker-brand">${logo}</span>
     </div>
@@ -906,6 +912,13 @@ function ensureLeafletStyles() {
       }
       .fuel-path-marker.is-selected::after {
         border-top-color: ${colors.white};
+      }
+      .fuel-path-marker.is-subdued {
+        opacity: 0.66;
+        transform: scale(0.92);
+      }
+      .fuel-path-marker.is-subdued .fuel-path-marker-price {
+        background: rgba(7, 86, 66, 0.82);
       }
       .fuel-path-marker-brand {
         align-items: center;

@@ -25,6 +25,6 @@ test("map marker state protects selected fuel and EV markers before marker limit
 
   assert.match(nativeMapSource, /pinSelected:[\s\S]*zIndex:\s*70/);
   assert.match(nativeMapSource, /evPinSelected:[\s\S]*zIndex:\s*80/);
-  assert.match(webMapSource, /zIndexOffset:\s*selected \? 600 : 400/);
+  assert.match(webMapSource, /zIndexOffset:\s*selected \? 640 : subdued \? 320 : 400/);
   assert.match(webMapSource, /zIndexOffset:\s*selected \? 760 : 620/);
 });

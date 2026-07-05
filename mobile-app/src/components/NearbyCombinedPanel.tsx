@@ -13,7 +13,7 @@ import { AppPreferences, EvCharger, EvConnector, EvPowerMode, FuelCode, NearbyRe
 import { fuelMismatchContextLine } from "../utils/fuelMismatch";
 
 const nearbySheetBottomOffset = 8;
-const nearbySheetExpandedTop = 80;
+const nearbySheetExpandedTop = 280;
 
 export function NearbyCombinedPanel({
   chargers,

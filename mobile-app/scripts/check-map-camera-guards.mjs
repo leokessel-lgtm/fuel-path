@@ -18,6 +18,8 @@ const planRouteSheet = read("src/components/PlanRouteSheet.tsx");
 const planRouteEditorCard = read("src/components/PlanRouteEditorCard.tsx");
 const nearbyLocationSearch = read("src/components/NearbyLocationSearch.tsx");
 const nearbyStationSheet = read("src/components/NearbyStationSheet.tsx");
+const nearbyCombinedPanel = read("src/components/NearbyCombinedPanel.tsx");
+const nearbyEvControls = read("src/components/NearbyEvControls.tsx");
 const savedPlaceEditor = read("src/components/SavedPlaceEditor.tsx");
 const savedPlacesCard = read("src/components/SavedPlacesCard.tsx");
 const savedRouteAlertsCard = read("src/components/SavedRouteAlertsCard.tsx");
@@ -375,6 +377,10 @@ const checks = [
   {
     label: "nearby expanded station list removes duplicate selected card and grows upward",
     ok:
+      nearbyStationSheet.includes("const nearbySheetExpandedTop = 280;") &&
+      nearbyStationSheet.includes("const nearbySheetExpandedTopCompact = 236;") &&
+      nearbyCombinedPanel.includes("const nearbySheetExpandedTop = 280;") &&
+      nearbyEvControls.includes("top: 280") &&
       nearbyStationSheet.includes("{selected && !sheetExpanded ? (") &&
       nearbyStationSheet.includes("sheetExpanded: {") &&
       nearbyStationSheet.includes("top: nearbySheetExpandedTop") &&

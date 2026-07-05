@@ -22,8 +22,8 @@ export type NearbySortMode = "distance" | "price" | "value";
 
 export const defaultNearbySortMode: NearbySortMode = "value";
 const nearbySheetBottomOffset = 8;
-const nearbySheetExpandedTop = 80;
-const nearbySheetExpandedTopCompact = 62;
+const nearbySheetExpandedTop = 280;
+const nearbySheetExpandedTopCompact = 236;
 const sheetDragActivatePx = 8;
 const sheetExpandDragPx = -60;
 const sheetCollapseDragPx = 70;

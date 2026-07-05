@@ -1,6 +1,7 @@
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
 import {
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -32,6 +33,8 @@ const tabs: Array<{ key: TabKey; label: string; hint: string }> = [
   { key: "account", label: "Settings", hint: "You" },
 ];
 const chromeTextScale = 1.2;
+const releaseBuildId = process.env.EXPO_PUBLIC_FUEL_PATH_BUILD_ID || "";
+const releaseCheckIntervalMs = 5 * 60 * 1000;
 
 function initialTab(): TabKey {
   const configured = process.env.EXPO_PUBLIC_FUEL_PATH_INITIAL_TAB;
@@ -81,6 +84,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<TabKey>(() => initialTab());
   const [evChargingStatus, setEvChargingStatus] = useState<EvChargingStatus>();
   const [fuelProviderStatus, setFuelProviderStatus] = useState<FuelProviderStatus>();
+  const [releaseUpdateAvailable, setReleaseUpdateAvailable] = useState(false);
   const {
     clearNamedPlace,
     preferences,
@@ -140,6 +144,36 @@ export default function App() {
       active = false;
     };
   }, []);
+  useEffect(() => {
+    if (Platform.OS !== "web" || !releaseBuildId) return undefined;
+    let active = true;
+    const checkLatestRelease = async () => {
+      try {
+        const response = await fetch(`/build-version.json?ts=${Date.now()}`, { cache: "no-store" });
+        if (!response.ok) return;
+        const payload = await response.json();
+        const latestBuildId = typeof payload.buildId === "string" ? payload.buildId.trim() : "";
+        if (active && latestBuildId && latestBuildId !== releaseBuildId) {
+          setReleaseUpdateAvailable(true);
+        }
+      } catch {
+        // Release freshness should never block the app.
+      }
+    };
+    const handleVisible = () => {
+      if (document.visibilityState === "visible") void checkLatestRelease();
+    };
+    const intervalId = window.setInterval(checkLatestRelease, releaseCheckIntervalMs);
+    document.addEventListener("visibilitychange", handleVisible);
+    window.addEventListener("focus", checkLatestRelease);
+    void checkLatestRelease();
+    return () => {
+      active = false;
+      window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", handleVisible);
+      window.removeEventListener("focus", checkLatestRelease);
+    };
+  }, []);
 
   const hasNamedVehicle = Boolean(preferences.vehicleName.trim() || preferences.vehicleRego.trim());
   const vehicleInitials = hasNamedVehicle
@@ -181,6 +215,19 @@ export default function App() {
             </View>
           </Pressable>
         </View>
+        {releaseUpdateAvailable ? (
+          <View role="status" style={styles.releaseBanner}>
+            <Text style={styles.releaseBannerText}>New version ready</Text>
+            <Pressable
+              accessibilityLabel="Refresh Fuel Path"
+              accessibilityRole="button"
+              onPress={() => window.location.reload()}
+              style={styles.releaseButton}
+            >
+              <Text style={styles.releaseButtonText}>Refresh</Text>
+            </Pressable>
+          </View>
+        ) : null}
 
         <View role="main" style={styles.content}>
           {activeTab === "plan" ? (
@@ -367,6 +414,33 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: "400",
     marginTop: 1,
+  },
+  releaseBanner: {
+    alignItems: "center",
+    backgroundColor: colors.black,
+    flexDirection: "row",
+    gap: spacing.sm,
+    justifyContent: "center",
+    minHeight: 44,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.xs,
+  },
+  releaseBannerText: {
+    color: colors.white,
+    fontSize: typeScale.caption,
+    fontWeight: "700",
+  },
+  releaseButton: {
+    backgroundColor: colors.green,
+    borderRadius: radii.pill,
+    minHeight: 34,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+  },
+  releaseButtonText: {
+    color: colors.white,
+    fontSize: typeScale.caption,
+    fontWeight: "700",
   },
   content: {
     flex: 1,

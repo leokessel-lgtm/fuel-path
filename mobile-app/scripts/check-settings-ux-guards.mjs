@@ -20,6 +20,7 @@ const files = {
   brandAssets: read("src/data/brandAssets.ts"),
   nearbyStationSheet: read("src/components/NearbyStationSheet.tsx"),
   theme: read("src/theme.ts"),
+  vercelBuildScript: read("../scripts/build-vercel-static.sh"),
 };
 
 const checks = [
@@ -148,6 +149,18 @@ const checks = [
     ok:
       files.theme.includes('muted: "#5f6c65"') &&
       files.theme.includes('amber: "#9a5b00"'),
+  },
+  {
+    label: "web release freshness check gives stale tabs a quiet refresh path",
+    ok:
+      files.vercelBuildScript.includes("EXPO_PUBLIC_FUEL_PATH_BUILD_ID=\"$BUILD_ID\"") &&
+      files.vercelBuildScript.includes("public/build-version.json") &&
+      files.app.includes("const releaseBuildId = process.env.EXPO_PUBLIC_FUEL_PATH_BUILD_ID || \"\";") &&
+      files.app.includes("fetch(`/build-version.json?ts=${Date.now()}`, { cache: \"no-store\" })") &&
+      files.app.includes("document.addEventListener(\"visibilitychange\", handleVisible)") &&
+      files.app.includes("window.addEventListener(\"focus\", checkLatestRelease)") &&
+      files.app.includes("<Text style={styles.releaseBannerText}>New version ready</Text>") &&
+      files.app.includes('accessibilityLabel="Refresh Fuel Path"'),
   },
   {
     label: "Settings UX guards run in the mobile test chain",

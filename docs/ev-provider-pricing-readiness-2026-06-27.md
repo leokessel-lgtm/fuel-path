@@ -1,7 +1,7 @@
 # EV Charging Provider Pricing And Readiness
 
-Reviewed: 2026-06-27
-Status: pricing-first evaluation, no paid provider approved yet
+Reviewed: 2026-06-30
+Status: prototype cascade live, no paid provider approved yet
 
 ## Recommendation
 
@@ -86,7 +86,17 @@ The app should support these provider IDs behind the same EV UI:
 - `tomtom`
 - `network_partner`
 
-`open_charge_map` and `api_ninjas` have prototype adapters today. `api_ninjas` is still a cheap trial candidate, not an approved production data source. `openweb_ninja` failed the first trial smoke and should stay fail-closed unless the provider clarifies a working endpoint/account coverage path. Other provider IDs should fail closed until credentials, contract and schema are approved.
+`open_charge_map`, `api_ninjas` and `openweb_ninja` have prototype adapters today. `api_ninjas` is still the cheap first-choice prototype source where configured. `openweb_ninja` is useful as an optional enrichment/fallback source when it returns Australian rows, but the trial API is rate-limit sensitive and must not be treated as a sole production source. Other provider IDs should fail closed until credentials, contract and schema are approved.
+
+## Prototype Cascade Rules
+
+- Default EV search should use the configured default provider first.
+- Fallback providers may run when the first provider returns no chargers or thin metadata.
+- Thin metadata means low power/operator coverage or an explicit power filter that the first provider cannot confidently satisfy.
+- If a fallback/enrichment provider fails but the cascade already has usable charger rows, keep the result healthy and add an optional enrichment warning.
+- If no provider returns usable charger rows and one or more providers fail, return a degraded no-result response.
+- Do not make live bay availability claims unless the provider gives live availability with clear timestamp semantics.
+- Keep EV provenance cautious: directory data can guide discovery, but users should confirm power, tariff and live availability with the charging network before driving.
 
 ## Cheap Trial Smoke Test
 
@@ -116,3 +126,12 @@ OpenWeb Ninja first smoke, 2026-06-27:
 - p90 latency was 22,043 ms.
 - Control request using the vendor quickstart shape for `San Francisco, CA, USA` also returned 200 OK with an empty `data` array.
 - Decision: do not build an adapter from the current trial endpoint/account state.
+
+Production cascade smoke, 2026-06-30:
+
+- Default EV endpoint covered 6 of 8 locations with charger rows.
+- Covered 3 of 5 NT locations: Darwin, Palmerston and Alice Springs.
+- Missed Katherine and Tennant Creek with the current cheap-provider cascade.
+- Usable rows were returned healthy, not degraded, when OpenWeb enrichment was rate-limited.
+- OpenWeb direct/provider-proxy calls returned useful rows for 4 of 5 NT locations earlier in the run but then hit `429 Too Many Requests`, confirming it is useful but fragile under trial limits.
+- Decision: keep API Ninjas first and OpenWeb as optional enrichment/fallback. Do not promote either to approved production-grade EV data without rate-limit, commercial-use, attribution, availability and coverage terms.

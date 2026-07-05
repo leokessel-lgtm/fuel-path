@@ -147,4 +147,4 @@ This policy should be updated before release whenever Fuel Path adds login, paym
 
 ## Contact
 
-The final published policy must include the correct Fuel Path privacy contact method before store submission or public launch.
+For privacy requests and data questions, contact: **support@fuelpath.app**.

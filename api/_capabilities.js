@@ -48,9 +48,9 @@ const ACT_BOUNDS = {
 };
 const CAPABILITY_LABELS = ["live", "limited", "pending_access", "fallback", "unsupported"];
 const REGION_ORDER = ["NSW", "ACT", "QLD", "WA", "VIC", "SA", "TAS", "NT"];
-const TERMS_GATED_PUBLIC_REGIONS = ["NSW", "ACT", "QLD", "VIC", "TAS"];
+const TERMS_GATED_PUBLIC_REGIONS = ["NSW", "ACT", "QLD", "VIC", "SA", "TAS", "NT"];
 const NT_MYFUEL_ACCESS_PATH =
-  "Historical developer access is available through NTG Open Data monthly/yearly MyFuel NT XLSX datasets. No direct official public REST API contract is confirmed for live feeds. MyFuel NT exposes real-time consumer prices through the NT Government web app. Live app coverage needs NT Consumer Affairs/API reuse permission or a contracted third-party aggregator such as Check Petrol.";
+  "NT Consumer Affairs has approved Fuel Path access to the MyFuel NT third-party API. The backend uses the approved token, postcode, outlet-identifier and reference-data endpoints with server-side credentials.";
 const NSW_VIC_BORDER_POINTS = [
   { lon: 141.0, lat: -34.0 },
   { lon: 142.2, lat: -34.18 },
@@ -81,6 +81,10 @@ function hasWaProvider() {
 
 function hasVicCredentials() {
   return Boolean(process.env.VIC_SERVO_SAVER_API_KEY);
+}
+
+function hasNtCredentials() {
+  return Boolean(process.env.NT_MYFUEL_USERNAME && process.env.NT_MYFUEL_PASSWORD);
 }
 
 function hasTasUsageTermsConfirmed() {
@@ -115,8 +119,12 @@ function hasQldLiveAccess() {
   return hasQldCredentials() && (!publicRuntime() || hasQldUsageTermsConfirmed());
 }
 
+function hasNtLiveAccess() {
+  return hasNtCredentials();
+}
+
 function hasAnyLiveCredentials() {
-  return hasLiveCredentials() || hasQldCredentials() || hasSaCredentials() || hasWaProvider() || hasVicCredentials();
+  return hasLiveCredentials() || hasQldCredentials() || hasSaCredentials() || hasWaProvider() || hasVicCredentials() || hasNtCredentials();
 }
 
 function vicNextAction() {
@@ -236,12 +244,14 @@ function fuelProviderCapabilityMatrix() {
       region: "NT",
       name: "Northern Territory",
       provider: "api_nt_myfuel",
-      capability: "pending_access",
-      configured: false,
-      coverage: "MyFuel NT publishes real-time fuel prices through the NT Government consumer web app; NTG Open Data provides historical daily datasets for developer/data-analysis use, not a live REST feed.",
+      capability: hasNtLiveAccess() ? "live" : "pending_access",
+      configured: hasNtCredentials(),
+      coverage: "MyFuel NT third-party API live fuel prices across the Northern Territory.",
       accessPath: NT_MYFUEL_ACCESS_PATH,
-      blocker: "NT has no confirmed official real-time API contract for Fuel Path.",
-      nextAction: "Choose one path: request NT Consumer Affairs/MyFuel NT reuse terms and schema, or evaluate a contracted commercial aggregator such as Check Petrol for live NT prices.",
+      blocker: hasNtLiveAccess() ? "" : "MyFuel NT username/password credentials are not configured.",
+      nextAction: hasNtLiveAccess()
+        ? "Monitor adapter health, cache behaviour and provider terms evidence."
+        : "Configure approved MyFuel NT API username and password.",
     }),
   ];
 }
@@ -398,6 +408,7 @@ function liveProviderKeysForArea(points = [], radiusKm = 0) {
     if (hasQldLiveAccess()) return ["qld"];
     if (hasWaProvider()) return ["wa"];
     if (hasVicCredentials()) return ["vic"];
+    if (hasNtLiveAccess()) return ["nt"];
     return [];
   }
   const hasQldPoint = points.some(pointInQld);
@@ -405,10 +416,12 @@ function liveProviderKeysForArea(points = [], radiusKm = 0) {
   const hasVicPoint = points.some(pointInVic);
   const hasSaPoint = points.some(pointInSa);
   const hasTasPoint = points.some(pointInTas);
+  const hasNtPoint = points.some(pointInNt);
   const hasNswPoint = points.some(pointInNswOrAct);
   if (hasWaPoint) return ["wa"];
   if (hasSaPoint) return hasSaCredentials() ? ["sa"] : [];
   if (hasTasPoint) return hasTasLiveAccess() ? ["tas"] : [];
+  if (hasNtPoint) return hasNtLiveAccess() ? ["nt"] : [];
   if (hasVicPoint) {
     const providers = ["vic"];
     if (hasNswPoint && hasNswLiveAccess()) providers.push("nsw");
@@ -508,6 +521,8 @@ module.exports = {
   hasAnyLiveCredentials,
   hasFuelCheckUsageTermsConfirmed,
   hasLiveCredentials,
+  hasNtCredentials,
+  hasNtLiveAccess,
   hasNswActUsageTermsConfirmed,
   hasNswLiveAccess,
   hasQldCredentials,

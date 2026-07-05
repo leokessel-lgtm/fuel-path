@@ -19,15 +19,18 @@ function defaultApiBaseUrl() {
   if (__DEV__ && Platform.OS === "android") {
     return "http://10.0.2.2:4174";
   }
+  if (__DEV__) {
+    return "http://127.0.0.1:4174";
+  }
   if (Platform.OS === "web" && typeof globalThis.location?.origin === "string") {
     const hostname = globalThis.location.hostname;
     const localHosts = new Set(["localhost", "127.0.0.1", "::1"]);
+    if (localHosts.has(hostname)) {
+      return globalThis.location.origin;
+    }
     if (!localHosts.has(hostname)) {
       return globalThis.location.origin;
     }
-  }
-  if (__DEV__) {
-    return "http://127.0.0.1:4174";
   }
   return PRODUCTION_API_BASE_URL;
 }

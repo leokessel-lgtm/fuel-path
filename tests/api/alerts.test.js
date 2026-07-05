@@ -3,11 +3,8 @@ const test = require("node:test");
 
 const alertsHandler = require("../../api/alerts");
 const cronEvaluateHandler = require("../../api/cron/evaluate-route-alerts");
-const internalEvaluateHandler = require("../../api/internal/jobs/evaluate-route-alerts");
-const internalReceiptsHandler = require("../../api/internal/jobs/check-push-receipts");
-const internalRetentionHandler = require("../../api/internal/jobs/retention-cleanup");
+const internalJobsHandler = require("../../api/jobs");
 const pushRegisterHandler = require("../../api/push/register");
-const savedRoutesHandler = require("../../api/saved-routes");
 const statusHandler = require("../../api/status");
 const { setAlertRouteScorerForTests, setAlertStorageForTests, setPredictionStorageForTests } = require("../../api/_backend");
 const {
@@ -533,9 +530,9 @@ test("Expo push delivery persists tickets only when delivery gate is enabled", a
       regionCapabilities: [{ region: "NSW", capability: "live" }],
       candidate: freshCandidate(),
     }, { authorization: "Bearer alert-token" });
-    const receipts = await callHandler(internalReceiptsHandler, {
+    const receipts = await callHandler(internalJobsHandler, {
       method: "POST",
-      query: {},
+      query: { job: "check-push-receipts" },
       body: {},
       headers: { authorization: "Bearer alert-token" },
     });
@@ -631,10 +628,15 @@ test("internal evaluator accepts write token without exposing public cron access
 
   try {
     await store.upsertSavedRoute(route);
-    const rejected = await callHandler(internalEvaluateHandler, { method: "POST", query: {}, body: {}, headers: {} });
-    const accepted = await callHandler(internalEvaluateHandler, {
+    const rejected = await callHandler(internalJobsHandler, {
       method: "POST",
-      query: { ignoreWindow: "1" },
+      query: { job: "evaluate-route-alerts" },
+      body: {},
+      headers: {},
+    });
+    const accepted = await callHandler(internalJobsHandler, {
+      method: "POST",
+      query: { job: "evaluate-route-alerts", ignoreWindow: "1" },
       body: {},
       headers: { authorization: "Bearer alert-token" },
     });
@@ -739,10 +741,15 @@ test("retention cleanup job purges expired backend records only", async () => {
       recordedAt: "2026-06-01T00:00:00.000Z",
     });
 
-    const rejected = await callHandler(internalRetentionHandler, { method: "POST", query: {}, body: {}, headers: {} });
-    const dryRun = await callHandler(internalRetentionHandler, {
+    const rejected = await callHandler(internalJobsHandler, {
       method: "POST",
-      query: { dryRun: "1", now },
+      query: { job: "retention-cleanup" },
+      body: {},
+      headers: {},
+    });
+    const dryRun = await callHandler(internalJobsHandler, {
+      method: "POST",
+      query: { job: "retention-cleanup", dryRun: "1", now },
       body: {},
       headers: { authorization: "Bearer alert-token" },
     });
@@ -757,9 +764,9 @@ test("retention cleanup job purges expired backend records only", async () => {
     assert.equal(store.devices.some((item) => item.id === "device-old-invalid"), true);
     assert.equal(predictionStore.records.some((item) => item.id === "prediction-old"), true);
 
-    const cleaned = await callHandler(internalRetentionHandler, {
+    const cleaned = await callHandler(internalJobsHandler, {
       method: "POST",
-      query: { now },
+      query: { job: "retention-cleanup", now },
       body: {},
       headers: { authorization: "Bearer alert-token" },
     });
@@ -963,7 +970,7 @@ function callAlerts(method, query = {}, body, headers = {}) {
 }
 
 function callSavedRoutes(method, query = {}, body, headers = {}) {
-  return callHandler(savedRoutesHandler, { method, query, body, headers });
+  return callHandler(alertsHandler, { method, query: { ...query, __endpoint: "saved-routes" }, body, headers });
 }
 
 function callPushRegister(body, headers = {}) {

@@ -20,10 +20,34 @@
       "environment": "preview",
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_FUEL_PATH_API_BASE_URL": "http://192.168.86.47:4176"
+        "EXPO_PUBLIC_FUEL_PATH_API_BASE_URL": "https://fuel-path.vercel.app"
       },
       "android": {
         "buildType": "apk"
+      }
+    },
+    "iosSimulator": {
+      "environment": "preview",
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_FUEL_PATH_API_BASE_URL": "https://fuel-path.vercel.app"
+      },
+      "ios": {
+        "simulator": true
+      }
+    },
+    "iosSimulatorPlan": {
+      "extends": "iosSimulator",
+      "env": {
+        "EXPO_PUBLIC_FUEL_PATH_API_BASE_URL": "https://fuel-path.vercel.app",
+        "EXPO_PUBLIC_FUEL_PATH_INITIAL_TAB": "plan"
+      }
+    },
+    "iosSimulatorAccount": {
+      "extends": "iosSimulator",
+      "env": {
+        "EXPO_PUBLIC_FUEL_PATH_API_BASE_URL": "https://fuel-path.vercel.app",
+        "EXPO_PUBLIC_FUEL_PATH_INITIAL_TAB": "account"
       }
     },
     "production": {

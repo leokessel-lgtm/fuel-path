@@ -16,21 +16,28 @@ const locationSuggestionDisplay = read("src/utils/locationSuggestionDisplay.ts")
 const savedCommuteShortcuts = read("src/components/SavedCommuteShortcuts.tsx");
 const planRouteSheet = read("src/components/PlanRouteSheet.tsx");
 const planRouteEditorCard = read("src/components/PlanRouteEditorCard.tsx");
-const policyModeCard = read("src/components/PolicyModeCard.tsx");
 const nearbyLocationSearch = read("src/components/NearbyLocationSearch.tsx");
 const nearbyStationSheet = read("src/components/NearbyStationSheet.tsx");
 const savedPlaceEditor = read("src/components/SavedPlaceEditor.tsx");
+const savedPlacesCard = read("src/components/SavedPlacesCard.tsx");
 const savedRouteAlertsCard = read("src/components/SavedRouteAlertsCard.tsx");
+const vehicleFuelCard = read("src/components/VehicleFuelCard.tsx");
+const accountDetailScreen = read("src/components/settings/AccountDetailScreen.tsx");
 const weeklyReportCard = read("src/components/WeeklyReportCard.tsx");
 const routeAddressSuggestionHook = read("src/hooks/useRouteAddressSuggestions.ts");
 const theme = read("src/theme.ts");
 const nearbyScreen = read("src/screens/NearbyScreen.tsx");
+const nearbyResults = read("src/hooks/useNearbyResults.ts");
+const stationBrandFilterPill = read("src/components/StationBrandFilterPill.tsx");
+const stationBrandFilterOverride = read("src/hooks/useStationBrandFilterOverride.ts");
 const planScreen = read("src/screens/PlanScreen.tsx");
 const planScreenUtils = read("src/screens/PlanScreen.utils.ts");
 const accountScreen = read("src/screens/AccountScreen.tsx");
 const stationRow = read("src/components/StationRow.tsx");
 const brandBadge = read("src/components/BrandBadge.tsx");
+const betaPrivacyCard = read("src/components/BetaPrivacyCard.tsx");
 const discountPrograms = read("src/data/discountPrograms.ts");
+const discountRegistry = read("src/data/discountRegistry.generated.json");
 const fuelPathApi = read("src/api/fuelPathApi.ts");
 const types = read("src/types.ts");
 const locationEvidence = read("src/utils/locationEvidence.ts");
@@ -60,7 +67,7 @@ const checks = [
     ok: webMap.includes('map.once("zoomend", finishProgrammaticMove);'),
   },
   {
-    label: "web map-area search ignores programmatic movement",
+    label: "web map-area search requires user movement and ignores programmatic movement",
     ok: webMap.includes("userMovedMapRef.current && !programmaticMoveRef.current"),
   },
   {
@@ -78,6 +85,10 @@ const checks = [
   {
     label: "nearby screen keeps map-area search wired",
     ok: nearbyScreen.includes("onMapSearchAreaChange={handleMapSearchAreaChange}"),
+  },
+  {
+    label: "nearby map keeps cluster pills clear of top controls",
+    ok: nearbyScreen.includes("const nearbyCameraInsets = { top: 240, right: 18, bottom: 330, left: 18 };"),
   },
   {
     label: "nearby screen keeps current location as a separate map pin",
@@ -103,14 +114,21 @@ const checks = [
       !webMap.includes("title: accessibilityLabel"),
   },
   {
-    label: "web station markers stay price-first and density limited",
+    label: "web station markers keep price caps but represent viewport overflow as clusters",
     ok:
       webMap.includes("const maxPriceMarkers = 14;") &&
-      webMap.includes("const maxExtraPriceMarkers = 18;") &&
       webMap.includes("const markerGridSize = 132;") &&
-      webMap.includes("const minClusterStationCount = 3;") &&
       webMap.includes("fuel-path-marker-cluster") &&
       webMap.includes("lowest ${cluster.minPrice.toFixed(1)} c/L") &&
+      webMap.includes("map.fitBounds(") &&
+      webMap.includes("clusterFitsInteractiveMapArea(map, cluster, activeInsets)") &&
+      webMap.includes("if (items.length === 1)") &&
+      webMap.includes("priceMarkers.push(...singletonMarkers)") &&
+      webMap.includes("const visibleStations = stations.filter((item) => bounds.contains([item.station.lat, item.station.lon]));") &&
+      webMap.includes("for (const items of clusterGroups.values())") &&
+      !webMap.includes(".filter((items) => items.length >= minClusterStationCount)") &&
+      !webMap.includes(".slice(0, maxClusterMarkers)") &&
+      webMap.includes("if (!routeEndpoints && userMovedMapRef.current && !programmaticMoveRef.current)") &&
       webMap.includes('<span class="fuel-path-marker-price">') &&
       webMap.includes('<span class="fuel-path-marker-brand">') &&
       webMap.includes(".fuel-path-marker::after") &&
@@ -132,6 +150,11 @@ const checks = [
       webMap.includes("object-fit: contain;") &&
       webMap.includes(".fuel-path-marker.is-selected .fuel-path-marker-price") &&
       webMap.includes("background: ${colors.black};") &&
+      webMap.includes("const subdued = Boolean(routeEndpoints && selectedStationCode && !selected);") &&
+      webMap.includes('subdued ? "is-subdued" : ""') &&
+      webMap.includes(".fuel-path-marker.is-subdued") &&
+      webMap.includes("opacity: 0.66;") &&
+      webMap.includes("transform: scale(0.92);") &&
       webMap.includes("tooltipAnchor: [0, -58]") &&
       webMap.includes("marker.bindTooltip(item.station.name") &&
       webMap.includes('className: "fuel-path-marker-tooltip"') &&
@@ -144,9 +167,10 @@ const checks = [
       webMap.includes("map.panInside([selectedCharger.lat, selectedCharger.lon]") &&
       webMap.includes("map.panInside([charger.lat, charger.lon]") &&
       !webMap.includes('`${item.station.name} - ${item.adjustedCpl.toFixed(1)} c/L`') &&
-      webMap.includes("nearestStationsForCamera(stations, centre, 12)") &&
-      webMap.includes("showCentreMarker ? 15 : 14") &&
-      webMap.includes(".filter((items) => items.length >= minClusterStationCount)") &&
+      webMap.includes("const nearbyInitialCameraZoom = 12.5;") &&
+      webMap.includes("const nearbyInitialMarkerRadiusKm = 4.2;") &&
+      webMap.includes("map.setView([centre.lat, centre.lon], nearbyInitialCameraZoom") &&
+      webMap.includes("nearbyCameraPointsForCentre(centre, nearbyInitialMarkerRadiusKm)") &&
       webMap.includes("transform: translateY(-4px);") &&
       !webMap.includes("transform: scale(1.12)") &&
       !webMap.includes(".fuel-path-marker-cluster::after"),
@@ -183,10 +207,31 @@ const checks = [
       !stationRow.includes("Possible lower price, not guaranteed"),
   },
   {
-    label: "native station markers stay price-first and density limited",
+    label: "native station markers keep price caps but represent viewport overflow",
     ok:
-      nativeMap.includes("const maxPriceMarkers = 18;") &&
-      nativeMap.includes("const markerGridSize = 132;") &&
+      nativeMap.includes("const defaultMarkerDensity = {") &&
+      nativeMap.includes("maxPriceMarkers: 8,") &&
+      nativeMap.includes("maxDotMarkers: 18,") &&
+      nativeMap.includes("markerGridSize: 240,") &&
+      nativeMap.includes("compactMarkerGridSize: 128,") &&
+      nativeMap.includes("const compactMarkerDensity = {") &&
+      nativeMap.includes("maxPriceMarkers: 3,") &&
+      nativeMap.includes("maxDotMarkers: 8,") &&
+      nativeMap.includes("markerGridSize: 390,") &&
+      nativeMap.includes("compactMarkerGridSize: 230,") &&
+      nativeMap.includes("function nativeMarkerDensity(width: number)") &&
+      nativeMap.includes("return width <= 430 ? compactMarkerDensity : defaultMarkerDensity;") &&
+      nativeMap.includes("type ClusterMarker = {") &&
+      nativeMap.includes("items: StationViewModel[];") &&
+      nativeMap.includes("fitToCoordinates(") &&
+      nativeMap.includes("if (items.length === 1)") &&
+      nativeMap.includes("priceMarkers.push(...singletonMarkers)") &&
+      nativeMap.includes("clusterGroups") &&
+      nativeMap.includes("stationInRegion(item, region)") &&
+      nativeMap.includes("clusterMarkerForItems") &&
+      nativeMap.includes("clusterFitsInteractiveRegion(cluster, currentRegion, activeInsets)") &&
+      nativeMap.includes("styles.clusterPin") &&
+      nativeMap.includes("styles.clusterCount") &&
       nativeMap.includes("styles.pinBrand") &&
       nativeMap.includes("styles.pinPointer") &&
       nativeMap.includes("borderTopColor: colors.white") &&
@@ -196,17 +241,38 @@ const checks = [
       nativeMap.includes("height: 46") &&
       nativeMap.includes("minHeight: 24") &&
       nativeMap.includes("<BrandBadge station={item.station} size={22} />") &&
-      nativeMap.includes("const routeStationCameraPoints = stations.slice(0, maxPriceMarkers).map") &&
+      nativeMap.includes("const routeStationCameraPoints = stations.slice(0, markerDensity.maxPriceMarkers).map") &&
       nativeMap.includes("return [...visibleRoutePoints, ...routeStationCameraPoints]") &&
       brandBadge.includes('resizeMode="contain"') &&
       !nativeMap.includes("scale: 1.05") &&
+      nativeMap.includes("const subdued = Boolean(routeEndpoints && selectedStationCode && !selected);") &&
+      nativeMap.includes("subdued && styles.pinSubdued") &&
+      nativeMap.includes("pinSubdued: {") &&
+      nativeMap.includes("opacity: 0.68") &&
+      nativeMap.includes("transform: [{ scale: 0.94 }]") &&
       nativeMap.includes("backgroundColor: colors.greenDark") &&
       nativeMap.includes("pinSelected: {\n    borderColor: colors.black") &&
       nativeMap.includes("pinPriceSelected: {\n    backgroundColor: colors.black") &&
-      nativeMap.includes("nearestStationsForCamera(stations, centre, 12)") &&
+      nativeMap.includes("const nearbyInitialRegionDelta = 0.035;") &&
+      nativeMap.includes("const nearbyInitialMarkerRadiusKm = 4.2;") &&
+      nativeMap.includes("regionForPoint(centre, nearbyInitialRegionDelta)") &&
+      nativeMap.includes("nearbyCameraPointsForCentre(centre, nearbyInitialMarkerRadiusKm)") &&
       nativeMap.indexOf("<Text style={[styles.pinPrice") <
         nativeMap.indexOf("<View style={styles.pinBrand}>") &&
       nativeMap.includes("pinPointerSelected"),
+  },
+  {
+    label: "nearby cluster pill only drills into the map",
+    ok:
+      webMap.includes("map.fitBounds(") &&
+      nativeMap.includes("fitToCoordinates(") &&
+      !webMap.includes("onSelectCluster") &&
+      !nativeMap.includes("onSelectCluster") &&
+      !nearbyScreen.includes("useNearbyClusterSelection") &&
+      !nearbyScreen.includes("onSelectCluster={handleMapClusterSelect}") &&
+      !nearbyScreen.includes("handleMapClusterSelect") &&
+      !nearbyScreen.includes("selectedCluster") &&
+      !nearbyScreen.includes("NearbyClusterContextCard"),
   },
   {
     label: "app shell uses the Fuel Path logo lockup",
@@ -227,6 +293,17 @@ const checks = [
       !appShell.includes("styles.tabHint"),
   },
   {
+    label: "app shell caps fixed chrome text scaling for accessibility",
+    ok:
+      appShell.includes("const chromeTextScale = 1.2;") &&
+      appShell.includes("<Text maxFontSizeMultiplier={chromeTextScale} numberOfLines={1} style={styles.brand}>Fuel Path</Text>") &&
+      appShell.includes("<Text maxFontSizeMultiplier={chromeTextScale} numberOfLines={1} style={styles.subhead}>Live fuel decisions</Text>") &&
+      appShell.includes("<Text maxFontSizeMultiplier={chromeTextScale} style={styles.vehicleIconText}>{vehicleInitials}</Text>") &&
+      appShell.includes("<Text maxFontSizeMultiplier={chromeTextScale} numberOfLines={1} style={styles.vehiclePrimary}>") &&
+      appShell.includes("<Text maxFontSizeMultiplier={chromeTextScale} numberOfLines={1} style={styles.vehicleSecondary}>") &&
+      appShell.includes("<Text maxFontSizeMultiplier={chromeTextScale} numberOfLines={1} style={[styles.tabLabel, selected && styles.tabLabelSelected]}>{tab.label}</Text>"),
+  },
+  {
     label: "typography keeps normal text lighter than standout text",
     ok:
       theme.includes('fontWeight: "400" as const') &&
@@ -240,9 +317,28 @@ const checks = [
     label: "nearby station sheet removes non-actionable notice cards",
     ok:
       nearbyScreen.includes("NearbyStationSheet") &&
-      !nearbyStationSheet.includes("sheetExpanded && stationNotice && stations.length") &&
+      !nearbyStationSheet.includes("Check price freshness") &&
+      !nearbyStationSheet.includes("stationNotice && stations.length") &&
       !nearbyStationSheet.includes("styles.noticeCard") &&
       !nearbyStationSheet.includes("noticeText"),
+  },
+  {
+    label: "nearby station sheet keeps an explicit map escape control before full expansion",
+    ok:
+      nearbyStationSheet.includes("const requestMap = () => {") &&
+      nearbyStationSheet.includes('requestSnap(isFull ? "browse" : "peek");') &&
+      nearbyStationSheet.includes("!isPeek ? (") &&
+      nearbyStationSheet.includes('accessibilityLabel={isFull ? "Show map" : "Dismiss station list and show map"}') &&
+      nearbyStationSheet.includes("styles.headerActions") &&
+      nearbyStationSheet.includes("<Text style={styles.mapButtonText}>Map</Text>"),
+  },
+  {
+    label: "fresh degraded provider warnings do not masquerade as stale cache",
+    ok:
+      nearbyResults.includes('if (context.cacheMode !== "stale") return false;') &&
+      nearbyResults.includes("return Number.isFinite(age) && age >= 30 * 60;") &&
+      !nearbyResults.includes("context.degraded === true") &&
+      !nearbyResults.includes("Price feed is degraded or stale."),
   },
   {
     label: "nearby map selection clears sort highlight and uses row-style selected card",
@@ -259,7 +355,6 @@ const checks = [
       nearbyStationSheet.includes('accessibilityLabel="Close selected station"') &&
       nearbyStationSheet.includes("<Text style={styles.mapButtonText}>Close</Text>") &&
       nearbyStationSheet.includes("styles.selectedCardShell") &&
-      nearbyStationSheet.includes("stationEvidenceLine(selected)") &&
       !nearbyStationSheet.includes("styles.closeButton") &&
       !nearbyStationSheet.includes("closeButtonText") &&
       !nearbyStationSheet.includes("selectedActions") &&
@@ -282,9 +377,8 @@ const checks = [
     ok:
       nearbyStationSheet.includes("{selected && !sheetExpanded ? (") &&
       nearbyStationSheet.includes("sheetExpanded: {") &&
-      nearbyStationSheet.includes("top: 140") &&
+      nearbyStationSheet.includes("top: nearbySheetExpandedTop") &&
       nearbyStationSheet.includes("bottom: 8") &&
-      !nearbyStationSheet.includes("sheetExpanded={sheetExpanded}") &&
       !nearbyStationSheet.includes("selected,\n  sheetExpanded,"),
   },
   {
@@ -359,15 +453,13 @@ const checks = [
   {
     label: "plan evidence shows four compact route decision metrics",
     ok:
-      types.includes("detourFuelLitres?: number") &&
-      types.includes("timeCost?: number") &&
-      types.includes("netAfterDetourAndTimeCost?: number") &&
-      (planScreen.includes("detourFuelLitres") || planScreenUtils.includes("detourFuelLitres")) &&
-      decisionEvidencePanel.includes("decisionSummary?.economics") &&
+      types.includes("decisionSummary?: RouteDecisionSummary;") &&
+      decisionEvidencePanel.includes("const economics = decisionSummary?.economics;") &&
       decisionEvidencePanel.includes('label="Pump"') &&
       decisionEvidencePanel.includes('label="Your price"') &&
       decisionEvidencePanel.includes('label="Best price by"') &&
-      decisionEvidencePanel.includes('label="Detour"') &&
+      decisionEvidencePanel.includes("routeDetourEvidenceMetricLabel(candidate)") &&
+      decisionEvidencePanel.includes('label="Pump price"') &&
       decisionEvidencePanel.includes("routeComparisonCpl") &&
       decisionEvidencePanel.includes("savingCpl.toFixed(1)} c/L") &&
       !decisionEvidencePanel.includes('label="Fuel used"') &&
@@ -425,51 +517,95 @@ const checks = [
       planRouteEditorCard.includes("styles.routeError"),
   },
   {
-    label: "fleet-lite policy mode filters route scoring to approved brands",
+    label: "settings keep vehicle profiles lightweight and account-level places separate",
     ok:
-      types.includes("fuelPolicyEnabled: boolean") &&
-      types.includes("approvedPolicyBrands: string[]") &&
-      preferencesStore.includes('fuelPolicyEnabled: false') &&
-      preferencesStore.includes('approvedPolicyBrands: ["Ampol", "BP", "Shell"]') &&
-      accountScreen.includes("PolicyModeCard") &&
-      policyModeCard.includes("Policy mode") &&
-      policyModeCard.includes("Approved fuel stops") &&
-      policyModeCard.includes("onToggleFuelPolicy") &&
-      policyModeCard.includes("onTogglePolicyBrand") &&
-      fuelPathApi.includes("approvedPolicyBrands") &&
-      fuelPathApi.includes("brandFilter: policyBrands.length > 0") &&
-      fuelPathApi.includes("brands: policyBrands") &&
-      planScreen.includes("Policy mode active") &&
-      !decisionEvidencePanel.includes('label="Policy"') &&
-      appShell.includes("toggleFuelPolicy") &&
-      appShell.includes("togglePolicyBrand"),
+      types.includes("export type VehicleProfile = {") &&
+      types.includes("activeVehicleId: string;") &&
+      types.includes("vehicles: VehicleProfile[];") &&
+      preferencesStore.includes("const vehicles = normaliseVehicleProfiles(preferences.vehicles, legacyVehicle);") &&
+      preferencesStore.includes("fuelPolicyEnabled: false") &&
+      preferencesStore.includes("activeVehicleId: activeVehicle.id") &&
+      vehicleFuelCard.includes("const maxVehicleProfiles = 5;") &&
+      vehicleFuelCard.includes("preferences.vehicles.map") &&
+      vehicleFuelCard.includes("onSelectVehicle(vehicle.id)") &&
+      vehicleFuelCard.includes("Five vehicles keeps switching quick") &&
+      accountDetailScreen.includes("<VehicleFuelCard") &&
+      accountDetailScreen.includes("<SavedPlacesCard") &&
+      savedPlacesCard.includes("Favourite routes") &&
+      savedPlacesCard.includes("onRenameCommute") &&
+      savedPlacesCard.includes("onSaveNamedPlace(\"home\", commute.from)") &&
+      savedPlacesCard.includes("onSaveNamedPlace(\"work\", commute.to)") &&
+      !accountScreen.includes("PolicyModeCard") &&
+      !appShell.includes("toggleFuelPolicy") &&
+      !appShell.includes("togglePolicyBrand"),
   },
   {
-    label: "fleet-lite weekly report stays driver-facing and outcome based",
+    label: "legacy weekly report stays unmounted from streamlined Settings",
     ok:
-      decisionEvidence.includes("weeklyFleetLiteReportSummary") &&
-      decisionEvidence.includes("send alert, watch only, skip alert, quiet today, range first") &&
-      decisionEvidence.includes("activeRouteCount") &&
-      decisionEvidence.includes("backendSyncedRouteCount") &&
-      decisionEvidence.includes("localOnlyRouteCount") &&
-      accountScreen.includes("WeeklyReportCard") &&
       weeklyReportCard.includes("Weekly report") &&
-      weeklyReportCard.includes("Fleet-lite summary") &&
       weeklyReportCard.includes("No payroll, accounting or admin tools") &&
-      weeklyReportCard.includes("WeeklyReportMetric") &&
-      weeklyReportCard.includes("Policy brands:"),
+      !accountScreen.includes("WeeklyReportCard") &&
+      !accountDetailScreen.includes("WeeklyReportCard"),
   },
   {
-    label: "saved route alerts avoid per-route decision rule controls",
+    label: "saved route alerts expose compact route watch controls",
     ok:
-      accountScreen.includes("SavedRouteAlertsCard") &&
+      accountDetailScreen.includes("SavedRouteAlertsCard") &&
+      savedRouteAlertsCard.includes("Route notification settings") &&
+      savedRouteAlertsCard.includes("Commute days") &&
+      savedRouteAlertsCard.includes("Minimum saving") &&
+      savedRouteAlertsCard.includes("Vehicle") &&
       !savedRouteAlertsCard.includes("RouteAlertRuleSelector") &&
-      !savedRouteAlertsCard.includes("ruleKey=\"minSavingDollars\"") &&
-      !savedRouteAlertsCard.includes("ruleKey=\"maxDetourMinutes\"") &&
       !savedRouteAlertsCard.includes("ruleKey=\"tankThresholdPercent\"") &&
-      !appShell.includes("onUpdateCommuteAlertRule") &&
-      decisionEvidence.includes("smart detour rules") &&
-      decisionEvidence.includes("one alert per run"),
+      appShell.includes("onUpdateCommuteAlertSettings") &&
+      decisionEvidence.includes("Only alerts when the saving clears your rule"),
+  },
+  {
+    label: "station brand preferences filter Nearby and Plan without reviving policy controls",
+    ok:
+      preferencesStore.includes("stationBrandMode") &&
+      preferencesStore.includes("preferredStationBrands") &&
+      stationBrandFilterPill.includes("Show all station brands once") &&
+      stationBrandFilterOverride.includes("preferredStationBrandSummary") &&
+      nearbyResults.includes("activePreferredStationBrands") &&
+      nearbyResults.includes("filterStationsByPreferredBrands") &&
+      planScreen.includes("stationBrands: preferredStationBrands") &&
+      planScreenUtils.includes("Filtered to") &&
+      fuelPathApi.includes("brandFilter: selectedBrands.length > 0") &&
+      !appShell.includes("toggleFuelPolicy") &&
+      !appShell.includes("togglePolicyBrand"),
+  },
+  {
+    label: "plan recommendation follow-up keeps save before watch",
+    ok:
+      planRouteSheet.includes("Save this commute") &&
+      planRouteSheet.includes("Watch this route") &&
+      planRouteSheet.includes("Watching this route") &&
+      planRouteSheet.includes("currentRouteSaved") &&
+      planRouteSheet.includes("watchRouteEnabled") &&
+      planScreen.includes("currentSavedCommute") &&
+      planScreen.includes("onToggleCommuteAlert(currentSavedCommute.id)") &&
+      appShell.includes("onToggleCommuteAlert={toggleCommuteAlert}"),
+  },
+  {
+    label: "support settings copy excludes sensitive route data collection claims",
+    ok:
+      accountDetailScreen.includes("Privacy & support") &&
+      accountDetailScreen.includes("Data used for better route decisions") &&
+      accountDetailScreen.includes("aggregate product signals like saved routes, route watches and navigation opens") &&
+      !accountDetailScreen.includes("route geometry") &&
+      !accountDetailScreen.includes("push tokens"),
+  },
+  {
+    label: "EV fallback confidence chips avoid live availability claims",
+    ok:
+      planRouteSheet.includes("Route charger options") &&
+      planRouteSheet.includes("Use Nearby EV charging or your network app before driving.") &&
+      planRouteSheet.includes("Set your EV connectors in Settings for better matching.") &&
+      planRouteSheet.includes('return "Here";') &&
+      !planRouteSheet.includes("Live chargers available now") &&
+      !planRouteSheet.includes("Best charging stop for your route") &&
+      !planRouteSheet.includes("Guaranteed available charger"),
   },
   {
     label: "local route data retention caps match privacy policy",
@@ -483,7 +619,7 @@ const checks = [
       quickPlaceShortcuts.includes('accessibilityLabel="Clear recent route locations"') &&
       quickPlaceShortcuts.includes("onRemoveRecent") &&
       planScreen.includes("onRemoveRecentLocation") &&
-      accountScreen.includes("onRemoveCommute"),
+      accountDetailScreen.includes("onRemoveCommute"),
   },
   {
     label: "backend alert identity stays local generated and non-contact",
@@ -607,7 +743,7 @@ const checks = [
       nearbyScreen.includes("const selectedPlaceActive = locationQuery.trim().length > 0 && locationQuery.trim() === centre.label;") &&
       nearbyScreen.includes("showCentreMarker={selectedPlaceActive}") &&
       nearbyLocationSearch.includes("styles.inputShell") &&
-      nearbyLocationSearch.includes("styles.currentLocationButton") &&
+      nearbyLocationSearch.includes("CurrentLocationFieldButton") &&
       nearbyLocationSearch.includes("locationInputWithIcon") &&
       locationSuggestionDisplay.includes("titleConsumesStreetNumber(parts)") &&
       locationSuggestionDisplay.includes("isStreetNumberFragment") &&
@@ -632,10 +768,10 @@ const checks = [
   {
     label: "account wallet separates discount selection from redemption state",
     ok:
-      accountScreen.includes("DiscountWalletCard") &&
+      accountDetailScreen.includes("DiscountWalletCard") &&
       discountWalletCard.includes("onToggleDiscountRedemption") &&
-      discountWalletCard.includes("discountRedemptionLabel") &&
-      discountWalletCard.includes("Used today"),
+      discountWalletCard.includes("onToggleDiscountRedemption: _onToggleDiscountRedemption") &&
+      discountWalletCard.includes("activeDirectDiscountPrograms"),
   },
   {
     label: "wallet separates pump confirmed and possible lower prices",
@@ -651,22 +787,21 @@ const checks = [
       !stationRow.includes("Possible, not guaranteed:") &&
       !stationRow.includes("possible only") &&
       !planRouteSheet.includes(">Possible only<") &&
-      discountWalletCard.includes("pump price, confirmed wallet price") &&
-      discountPrograms.includes("costco_member") &&
-      discountPrograms.includes("seven_eleven_lock") &&
-      discountPrograms.includes("rac_member"),
+      discountWalletCard.includes("Turn on the offers you can actually use") &&
+      discountRegistry.includes('"id": "linkt_7eleven"') &&
+      discountRegistry.includes('"id": "rac_wa_caltex"'),
   },
   {
-    label: "manual discount wallet stays scoped to starter programs",
+    label: "discount wallet uses active direct programmes from generated registry",
     ok:
-      discountPrograms.includes("everyday_rewards") &&
-      discountPrograms.includes("flybuys") &&
-      discountPrograms.includes("nrma_ampol") &&
-      discountPrograms.includes("rac_member") &&
-      discountPrograms.includes("costco_member") &&
-      discountPrograms.includes("seven_eleven_lock") &&
-      discountPrograms.includes("fleet_card") &&
-      !discountPrograms.includes("linkt_rewards") &&
+      discountPrograms.includes("discountRegistry.generated.json") &&
+      discountPrograms.includes('program.discountType !== "direct_cpl"') &&
+      discountRegistry.includes('"id": "everyday_rewards"') &&
+      discountRegistry.includes('"id": "flybuys"') &&
+      discountRegistry.includes('"id": "nrma_ampol"') &&
+      discountRegistry.includes('"id": "rac_wa_caltex"') &&
+      discountRegistry.includes('"id": "linkt_7eleven"') &&
+      !discountRegistry.includes('"id": "fleet_card"') &&
       !discountPrograms.toLowerCase().includes("oauth") &&
       !discountPrograms.toLowerCase().includes("cashback"),
   },
@@ -679,9 +814,9 @@ const checks = [
       routeNotifications.includes("Android Expo Go cannot schedule route notifications. Use a development or preview build.") &&
       routeNotifications.includes("remotePushUnavailableInExpoGo") &&
       routeNotifications.includes('Constants.appOwnership === "expo"') &&
-      routeNotifications.includes("Backend push alerts need a development or preview build, not Expo Go.") &&
+      routeNotifications.includes("Smart route notifications need a development or preview build, not Expo Go.") &&
       routeNotifications.includes("Route alert permission is enabled on this validation build.") &&
-      routeNotifications.includes("Validation push token ready for backend alert sync.") &&
+      routeNotifications.includes("Smart route notifications are ready for this build.") &&
       savedRouteAlertsCard.includes('? "Permission enabled"') &&
       !savedRouteAlertsCard.includes('? "Alerts enabled"') &&
       !routeNotifications.includes("Push token ready.") &&
@@ -705,8 +840,8 @@ const checks = [
       !planScreen.includes('"Alerts on"') &&
       !savedCommuteShortcuts.includes('"Alerts on"') &&
       savedRouteAlertsCard.includes('? "Watching"') &&
-      decisionEvidence.includes("Route watches are on this device; delivery still needs native push and backend evidence before beta.") &&
-      !decisionEvidence.includes("Alerts can send only when route value"),
+      decisionEvidence.includes("Fuel Path checks watched routes for useful savings") &&
+      !decisionEvidence.includes("delivery still needs native push"),
   },
   {
     label: "Android map smoke captures native render and frame evidence",

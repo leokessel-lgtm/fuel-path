@@ -8,11 +8,29 @@ export type EvConnector = "CCS2" | "CHADEMO" | "TYPE2" | "TESLA" | "NACS";
 
 export type EvPowerMode = "" | "ac" | "dc_fast" | "ultra_fast";
 
-export type VehicleEnergyType = "petrol" | "diesel" | "hybrid" | "electric";
+export type VehicleEnergyType = "petrol" | "diesel" | "electric";
 
 export type HomeChargingAccess = "unknown" | "yes" | "no";
 
 export type EvChargingPreference = "balanced" | "cheap" | "fast" | "reliable" | "nearby";
+
+export type Weekday = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
+
+export type StationBrandMode = "all" | "preferred_only";
+
+export type VehicleProfile = {
+  id: string;
+  name: string;
+  rego: string;
+  vehicleEnergyType: VehicleEnergyType;
+  fuel: FuelCode;
+  evConnectors: EvConnector[];
+  fuelTankLitres: number;
+  evBatteryKwh: number;
+  evRangeKm: number;
+  homeChargingAccess: HomeChargingAccess;
+  evChargingPreference: EvChargingPreference;
+};
 
 export type AppPreferences = {
   vehicleName: string;
@@ -29,6 +47,10 @@ export type AppPreferences = {
   maxDetourMinutes: number;
   fuelPolicyEnabled: boolean;
   approvedPolicyBrands: string[];
+  stationBrandMode: StationBrandMode;
+  preferredStationBrands: string[];
+  activeVehicleId: string;
+  vehicles: VehicleProfile[];
   selectedDiscounts: string[];
   discountRedemptions?: Record<string, DiscountRedemptionState>;
   homeLocation?: MapPoint;
@@ -56,8 +78,11 @@ export type SavedCommute = {
   from: MapPoint;
   to: MapPoint;
   fuel: FuelCode;
+  vehicleId?: string;
   alertEnabled: boolean;
   alertTime: string;
+  alertDays?: Weekday[];
+  localReminderEnabled?: boolean;
   minSavingDollars: number;
   maxDetourMinutes: number;
   tankThresholdPercent: number;
@@ -67,6 +92,7 @@ export type SavedCommute = {
   createdAt: string;
   nextAlertAt?: string;
   scheduledNotificationId?: string;
+  scheduledNotificationIds?: string[];
   updatedAt?: string;
 };
 
@@ -81,13 +107,39 @@ export type DiscountRule = {
   id: string;
   label: string;
   shortLabel: string;
+  discountType: "direct_cpl";
   centsPerLitre: number;
+  fuelTypeCentsPerLitre?: Partial<Record<FuelCode, number>>;
+  maxLitresPerTransaction: number;
+  maxTransactionsPer24h: number;
+  excludedFuelTypes?: string[];
+  excludedStates?: string[];
+  includedStates?: string[];
+  notStackableWith?: string[];
+  requiresBarcode: boolean;
+  participatingStationScope: string;
+  expiryDate: string | null;
+  lastVerifiedAt: string;
+  nextReviewAt: string;
+  sourceUrl: string;
+  stationBrands?: string[];
+  brandIncludes?: string[];
 };
 
 export type StationDiscount = {
   id: string;
   label: string;
   centsPerLitre: number;
+  fuelTypeCentsPerLitre?: Partial<Record<FuelCode, number>>;
+  maxLitresPerTransaction?: number;
+  maxTransactionsPer24h?: number;
+  excludedFuelTypes?: string[];
+  excludedStates?: string[];
+  includedStates?: string[];
+  notStackableWith?: string[];
+  requiresBarcode?: boolean;
+  participatingStationScope?: string;
+  sourceUrl?: string;
   inferred?: boolean;
 };
 
@@ -117,6 +169,9 @@ export type Station = {
   discounts?: StationDiscount[];
   pumpCpl?: number;
   distanceKm?: number;
+  requestedFuel?: string;
+  matchedFuel?: string;
+  exactFuelMatch?: boolean;
 };
 
 export type StationViewModel = {
@@ -131,6 +186,8 @@ export type StationViewModel = {
   possibleDiscountCpl?: number;
   distanceKm: number;
   fuel?: string;
+  requestedFuel?: string;
+  exactFuelMatch?: boolean;
   score?: number;
   netSaving?: number;
   detourMinutes?: number;
@@ -142,6 +199,30 @@ export type StationViewModel = {
   reachable?: boolean;
   warnings?: string[];
   matchesDecisionRule?: boolean;
+  actualDetour?: {
+    source: "route_engine_via_station" | "unavailable";
+    provider?: string;
+    detourKm?: number;
+    detourMinutes?: number;
+    tollCostDollars?: number;
+    tollRankingApplied?: boolean;
+    totalDetourCostDollars?: number;
+    trafficPreference?: "aware" | "unaware";
+    tollPreference?: "avoid" | "allow" | "no_preference";
+    warning?: string;
+  };
+  routePosition?: {
+    segment: "near_origin" | "mid_route" | "near_destination";
+    progressRatio: number;
+    remainingRouteKm: number;
+    endpointAdjacent: boolean;
+    backtrackingRisk: "low" | "origin_side_check" | "destination_side_check";
+    roadSide?: "left" | "right" | "on_route" | "unknown";
+    roadSideConfidence?: "low" | "medium" | "approximate";
+    turnFriction?: "none" | "low" | "medium" | "high";
+    turnFrictionReason?: string;
+    geometrySignal?: "approximate_route_segment" | "unavailable";
+  };
 };
 
 export type MapPoint = {
@@ -149,6 +230,7 @@ export type MapPoint = {
   lon: number;
   label: string;
   provider?: string;
+  providerId?: string;
   matchType?: string;
   confidence?: string;
   type?: string;
@@ -247,6 +329,14 @@ export type RouteDecisionSummary = {
 export type NearbyResponse = {
   context: {
     fuel: FuelCode;
+    requestedFuel?: FuelCode;
+    exactFuelMatch?: boolean;
+    fuelMatchMode?: string;
+    requestedFuelUnavailable?: boolean;
+    alternativeFuelCodes?: FuelCode[];
+    alternativeRadiusKm?: number;
+    expandedAlternativeRadius?: boolean;
+    exactStationCount?: number;
     source: string;
     provider?: string;
     capability?: RegionCapabilityStatus;
@@ -255,6 +345,9 @@ export type NearbyResponse = {
     stationCount: number;
     returnedCount: number;
     generatedAt: string;
+    cacheAgeSeconds?: number;
+    cacheMode?: string;
+    degraded?: boolean;
     warning?: string;
   };
   stations: Station[];
@@ -293,6 +386,8 @@ export type EvCharger = {
   powerBand: "ac" | "dc_fast" | "ultra_fast" | "unknown";
   availability: "unknown" | "unavailable";
   availabilityLabel: string;
+  availableConnectorCount?: number;
+  connectorCount?: number;
   pricing?: string;
   updatedAt?: string;
   source: string;
@@ -304,6 +399,8 @@ export type EvChargerResponse = {
     provider: string;
     source: string;
     capability: "prototype" | "pending_commercial_access";
+    planMode?: "route_charging";
+    fallbackMode?: string;
     radiusKm: number;
     centre: MapPoint;
     filters: {
@@ -313,6 +410,12 @@ export type EvChargerResponse = {
     };
     chargerCount: number;
     returnedCount: number;
+    routeDistanceKm?: number;
+    selectedRangeKm?: number;
+    rangeStatus?: "comfortable" | "tight" | "charging_needed" | "unknown";
+    rangeMarginKm?: number | null;
+    recommendedChargeCount?: number;
+    warnings?: string[];
     generatedAt: string;
     cacheHit?: boolean;
     cacheAgeSeconds?: number;
@@ -347,6 +450,15 @@ export type ScoreResponse = {
     capability?: RegionCapabilityStatus;
     regionCapabilities?: RegionCapability[];
     warning?: string;
+    requestedFuel?: FuelCode;
+    exactFuelMatch?: boolean;
+    fuelMatchMode?: string;
+    requestedFuelUnavailable?: boolean;
+    alternativeFuelCodes?: FuelCode[];
+    generatedAt?: string;
+    cacheAgeSeconds?: number;
+    cacheMode?: string;
+    degraded?: boolean;
     fuel: FuelCode;
     routeDistanceKm: number;
     baselineCpl: number;

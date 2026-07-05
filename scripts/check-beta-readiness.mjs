@@ -12,6 +12,7 @@ const nativeBlockerPacket = readNativeBlockerPacket();
 const iosValidationReport = readIosValidationReport();
 const store = readStoreStatus();
 const support = readSupportStatus();
+const evCharging = await readEvChargingStatus();
 
 const native = buildNativeStatus(nativeSmoke, nativePerformanceSummary, nativeBlockerPacket, iosValidationReport);
 const supportContactComparisonReady =
@@ -31,6 +32,7 @@ const directBlockers = [
 ];
 const blockers = [
   ...(!providerTerms.publicLivePriceClaimsAllowed ? ["provider_terms_not_confirmed"] : []),
+  ...(evCharging.status === "blocked" ? ["ev_charging_budget_controls_not_ready"] : []),
   ...(!nativeSmoke ? ["android_preview_smoke_missing"] : []),
   ...(nativeSmoke && !native.androidMapTilesReady ? ["android_map_tiles_not_ready"] : []),
   ...(nativeSmoke && (!native.physicalDeviceEvidence || native.androidPhysicalDeviceReady === false)
@@ -69,6 +71,7 @@ const payload = {
   },
   native,
   store,
+  evCharging,
   support,
   supportContactComparisonReady,
   supportContactMatchesPrivacyContact,
@@ -160,8 +163,10 @@ function readStoreStatus() {
 function readSupportStatus() {
   const commandArgs = ["scripts/check-support-readiness.mjs", "--allow-blocked"];
   if (args.supportRunbook) commandArgs.push("--runbook", args.supportRunbook);
+  if (args.supportEvidenceJson) commandArgs.push("--evidence-json", args.supportEvidenceJson);
   if (args["support-contact"]) commandArgs.push("--support-contact", args["support-contact"]);
   if (args["support-owner"]) commandArgs.push("--support-owner", args["support-owner"]);
+  if (args["reviewed-at"]) commandArgs.push("--reviewed-at", args["reviewed-at"]);
   if (args["support-reviewed-at"]) commandArgs.push("--reviewed-at", args["support-reviewed-at"]);
   if (args["support-review-max-age-days"]) {
     commandArgs.push("--support-review-max-age-days", args["support-review-max-age-days"]);
@@ -172,6 +177,70 @@ function readSupportStatus() {
     maxBuffer: 2 * 1024 * 1024,
   });
   return JSON.parse(stdout);
+}
+
+function readEvChargingStatus() {
+  if (args.evChargingJson) {
+    return JSON.parse(readFileSync(resolve(args.evChargingJson), "utf8"));
+  }
+  const apiBase = args.apiBase || process.env.FUEL_PATH_API_BASE || process.env.API_BASE_URL || "";
+  if (!apiBase) {
+    return {
+      status: "not_checked",
+      blockers: ["api_base_not_configured_for_ev_charging_readiness"],
+      cap: {},
+    };
+  }
+  return readEvChargingStatusFromApi(apiBase);
+}
+
+async function readEvChargingStatusFromApi(apiBase) {
+  try {
+    const response = await fetch(`${apiBase}/api/status`, {
+      headers: {
+        accept: "application/json",
+      },
+    });
+    if (!response.ok) {
+      return {
+        status: "not_checked",
+        blockers: [`ev_charging_status_http_${response.status}`],
+        cap: {},
+      };
+    }
+    const payload = await response.json();
+    const release = payload?.releaseReadiness?.evCharging || {};
+    const fallbackCostControls = payload?.evCharging?.googlePlacesEvCostControls || {};
+    const releaseCap = release.cap || {};
+    const fallbackCap = fallbackCostControls || {};
+    const normalisedCap = {
+      ...fallbackCap,
+      ...releaseCap,
+      googlePlacesDailyLookupCap:
+        releaseCap.googlePlacesDailyLookupCap ?? releaseCap.hardLimit ?? fallbackCap.googlePlacesDailyLookupCap ?? 0,
+      googlePlacesEvLookupsToday:
+        releaseCap.googlePlacesEvLookupsToday ?? releaseCap.hardLimitUsed ?? fallbackCap.googlePlacesEvLookupsToday ?? 0,
+      googlePlacesEvHardStopAt:
+        releaseCap.googlePlacesEvHardStopAt ?? fallbackCap.googlePlacesEvHardStopAt ?? "",
+      googlePlacesEvHysteresisEnabled:
+        releaseCap.googlePlacesEvHysteresisEnabled ?? Boolean(fallbackCap.googlePlacesEvHysteresisEnabled) ?? false,
+    };
+    return {
+      status: release.status || fallbackCostControls.status || "unknown",
+      blockers: Array.isArray(release.blockers)
+        ? release.blockers
+        : Array.isArray(fallbackCostControls.blockers)
+          ? fallbackCostControls.blockers
+          : ["ev_charging_readiness_unknown"],
+      cap: normalisedCap,
+    };
+  } catch {
+    return {
+      status: "not_checked",
+      blockers: ["ev_charging_status_request_failed"],
+      cap: {},
+    };
+  }
 }
 
 function latestNativeSmokePath() {
@@ -494,6 +563,9 @@ function nextAction(items) {
   ) {
     actions.push("complete Apple privacy, Google Data Safety, provider limitation and support-process review evidence");
   }
+  if (items.includes("ev_charging_budget_controls_not_ready")) {
+    actions.push("pause paid Google EV charging lookups until budget hard-stop/cap state is clear");
+  }
   if (items.includes("support_contact_mismatch")) {
     actions.push("use the same monitored contact for privacy, store and support evidence before setting supportProcessReady");
   }
@@ -606,11 +678,17 @@ function parseArgs(values) {
     } else if (value === "--support-reviewed-at") {
       result["support-reviewed-at"] = values[index + 1] || "";
       index += 1;
+    } else if (value === "--support-evidence-json") {
+      result.supportEvidenceJson = values[index + 1] || "";
+      index += 1;
     } else if (value === "--support-review-max-age-days") {
       result["support-review-max-age-days"] = values[index + 1] || "";
       index += 1;
     } else if (value === "--reviewed-at") {
       result["reviewed-at"] = values[index + 1] || "";
+      index += 1;
+    } else if (value === "--ev-charging-json") {
+      result.evChargingJson = values[index + 1] || "";
       index += 1;
     } else if (value === "--reviewer") {
       result.reviewer = values[index + 1] || "";

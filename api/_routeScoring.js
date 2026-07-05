@@ -5,7 +5,13 @@ const {
   totalRouteKm,
 } = require("./_geoMath");
 
-const SAMPLE_NOW = new Date("2026-06-13T08:00:00+10:00");
+function sampleReferenceNow() {
+  const configured = String(process.env.FUEL_PATH_SAMPLE_NOW || "").trim();
+  if (!configured) return new Date();
+  const parsed = new Date(configured);
+  return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+}
+
 const RECOMMENDATION_MAX_PRICE_AGE_HOURS = 48;
 const ASSUMED_ROUTE_FILL_LITRES = 40;
 const SMART_HARD_REJECT_SAVING_DOLLARS = 1.5;
@@ -18,6 +24,7 @@ const OFFICIAL_LIVE_PRICE_SOURCES = new Set([
   "api_vic_servo_saver",
   "api_sa_fuel_price_reporting",
   "api_tas_fuelcheck",
+  "api_nt_myfuel",
 ]);
 
 function stationPayload(station, { fuel, distanceKm, routeDistance } = {}) {
@@ -96,23 +103,40 @@ function median(values) {
   return ordered.length % 2 ? ordered[middle] : (ordered[middle - 1] + ordered[middle]) / 2;
 }
 
-function bestDiscount(station, eligibleDiscounts) {
-  const eligible = (station.discounts || []).filter((discount) => eligibleDiscounts.has(discount.id));
-  return eligible.sort((a, b) => Number(b.centsPerLitre) - Number(a.centsPerLitre))[0];
+function bestDiscount(station, eligibleDiscounts, { fillLitres = ASSUMED_ROUTE_FILL_LITRES, fuel } = {}) {
+  const eligible = (station.discounts || [])
+    .filter((discount) => eligibleDiscounts.has(discount.id))
+    .filter((discount) => discountAppliesToStation(discount, station))
+    .map((discount) => discountForFill(discount, { fillLitres, fuel }))
+    .filter((discount) => Number(discount.effectiveCentsPerLitre || 0) > 0);
+  return eligible.sort((a, b) => Number(b.effectiveCentsPerLitre) - Number(a.effectiveCentsPerLitre))[0];
 }
 
 function adaptiveCorridorAttempts(routeDistanceKm, requestedCorridorKm) {
-  const attempts = [requestedCorridorKm];
-  if (routeDistanceKm >= 150) attempts.push(5, 8, 12, 20);
-  else if (routeDistanceKm >= 50) attempts.push(4, 6, 10);
-  else attempts.push(3.5, 5);
+  const profile = routeCorridorProfile(routeDistanceKm);
+  const attempts = [requestedCorridorKm, ...profile.attemptsKm];
   return [...new Set(attempts.map((value) => round(Math.max(requestedCorridorKm, value), 1)))];
+}
+
+function routeCorridorProfile(routeDistanceKm) {
+  const km = Number(routeDistanceKm || 0);
+  if (km <= 25) {
+    return { id: "urban_short", label: "Urban short route", attemptsKm: [2.5, 3.5, 5] };
+  }
+  if (km <= 80) {
+    return { id: "metro_regional", label: "Metro/regional route", attemptsKm: [3, 5, 8] };
+  }
+  if (km <= 180) {
+    return { id: "regional", label: "Regional route", attemptsKm: [4, 6, 10, 14] };
+  }
+  return { id: "long_regional_remote", label: "Long regional or remote route", attemptsKm: [5, 8, 12, 20] };
 }
 
 function scoreRoute({ source, route, stations, fuel, tankLitres, tankPercent, economy, reserveKm, corridorKm, eligibleDiscounts, includeMemberPrices, includeClosed, minSavingDollars, maxDetourMinutes }) {
   const decisionRule = normaliseDecisionRule({ minSavingDollars, maxDetourMinutes });
   const points = route.points || [];
   const routeKm = totalRouteKm(points);
+  const corridorProfile = routeCorridorProfile(routeKm);
   const attempts = adaptiveCorridorAttempts(routeKm, corridorKm || route.defaultCorridorKm || 2.5);
   let scored = null;
   for (const attempt of attempts) {
@@ -132,6 +156,8 @@ function scoreRoute({ source, route, stations, fuel, tankLitres, tankPercent, ec
       includeMemberPrices,
       includeClosed,
     });
+    scored.context.corridorProfile = corridorProfile;
+    scored.context.corridorAttemptsKm = attempts;
     if (scored.candidates.length || attempt === attempts[attempts.length - 1]) break;
   }
   return scored;
@@ -140,7 +166,7 @@ function scoreRoute({ source, route, stations, fuel, tankLitres, tankPercent, ec
 function scoreRouteForCorridor({ source, route, stations, fuel, tankLitres, tankPercent, economy, reserveKm, corridorKm, minSavingDollars, maxDetourMinutes, eligibleDiscounts, includeMemberPrices, includeClosed }) {
   const points = route.points || [];
   const sampleClock = ["sample", "sample_fallback", "public_demo_snapshot"].includes(source);
-  const now = sampleClock ? SAMPLE_NOW : new Date();
+  const now = sampleClock ? sampleReferenceNow() : new Date();
   const routePositions = new Map();
   const inCorridor = [];
   const bounds = routeBounds(points, Math.max(8, Number(corridorKm || 0) + 8));
@@ -182,26 +208,39 @@ function scoreRouteForCorridor({ source, route, stations, fuel, tankLitres, tank
     if (!includeMemberPrices && station.membershipRequired) continue;
 
     const pumpCpl = Number(station.prices[fuel]);
-    const discount = bestDiscount(station, eligibleDiscounts);
-    const discountCpl = Number(discount?.centsPerLitre || 0);
+    const discount = bestDiscount(station, eligibleDiscounts, { fillLitres, fuel });
+    const discountCpl = Number(discount?.effectiveCentsPerLitre || 0);
     const adjustedCpl = Math.max(0, pumpCpl - discountCpl);
     const detourKm = routeDistanceInfo.distanceToRouteKm * 2 * 1.35;
     const detourMinutes = (detourKm / Number(route.defaultDetourSpeedKmh || 45)) * 60;
     const detourFuelLitres = (detourKm * economy) / 100;
     const detourCost = detourFuelLitres * (adjustedCpl / 100);
     const netSaving = fillLitres * ((baselineCpl - adjustedCpl) / 100) - detourCost;
+    const routePosition = candidateRoutePosition({
+      distanceAlongRouteKm: routeDistanceInfo.distanceAlongRouteKm,
+      distanceToRouteKm: routeDistanceInfo.distanceToRouteKm,
+      points,
+      routeKm: totalRouteKm(points),
+      stationPoint: { lat: Number(station.lat), lon: Number(station.lon) },
+    });
     const reachable = true;
     const [, freshWarning] = freshnessPenalty(station.updatedAt, now, station.source);
     const smartDetourLimitMinutes = smartDetourLimitMinutesForSaving(netSaving);
-    const matchesSavingRule = netSaving > SMART_HARD_REJECT_SAVING_DOLLARS;
-    const matchesDetourRule = detourMinutes <= smartDetourLimitMinutes;
+    const effectiveDetourLimitMinutes = Math.min(Number(maxDetourMinutes || SMART_MAX_DETOUR_MINUTES), smartDetourLimitMinutes);
+    const matchesSavingRule = netSaving > Number(minSavingDollars);
+    const matchesDetourRule = detourMinutes <= effectiveDetourLimitMinutes;
     const matchesDecisionRule = matchesSavingRule && matchesDetourRule && reachable && station.openNow !== false;
     const warnings = [];
-    if (discount) warnings.push(`discount applied: ${discount.label}`);
+    if (discount) {
+      warnings.push(`discount applied: ${discount.label}`);
+      if (discount.maxLitresPerTransaction && discount.appliedLitres < fillLitres) {
+        warnings.push(`discount capped at ${discount.appliedLitres.toFixed(1)} L`);
+      }
+    }
     if (station.membershipRequired) warnings.push("membership-only price included");
     if (station.openNow === false) warnings.push("station marked closed");
     if (!matchesSavingRule) warnings.push("small saving after detour fuel");
-    if (!matchesDetourRule) warnings.push(`above ${smartDetourLimitMinutes} min smart detour for this saving`);
+    if (!matchesDetourRule) warnings.push(`above ${effectiveDetourLimitMinutes} min detour rule`);
     if (freshWarning) warnings.push(freshWarning);
 
     const preferencePenalty = (matchesSavingRule ? 0 : 15) + (matchesDetourRule ? 0 : 15);
@@ -215,6 +254,8 @@ function scoreRouteForCorridor({ source, route, stations, fuel, tankLitres, tank
       discountCpl: round(discountCpl, 1),
       discountLabel: discount?.label,
       discountLabels: discount ? [discount.label] : [],
+      discountAppliedLitres: discount ? round(discount.appliedLitres, 1) : 0,
+      discountMaxLitres: discount?.maxLitresPerTransaction,
       detourKm: round(detourKm, 2),
       detourMinutes: round(detourMinutes, 1),
       detourFuelLitres: round(detourFuelLitres, 2),
@@ -233,11 +274,16 @@ function scoreRouteForCorridor({ source, route, stations, fuel, tankLitres, tank
       distanceKm: round(routeDistanceInfo.distanceToRouteKm, 2),
       distanceToRouteKm: round(routeDistanceInfo.distanceToRouteKm, 2),
       distanceAlongRouteKm: round(routeDistanceInfo.distanceAlongRouteKm, 1),
+      routePosition,
     });
   }
 
   candidates.sort(routeRecommendationOrder);
-  const timingAdvice = routeTimingAdvice(candidates[0], { minSavingDollars, maxDetourMinutes, fillLitres });
+  const timingAdvice = routeTimingAdvice(candidates[0], {
+    minSavingDollars,
+    maxDetourMinutes,
+    fillLitres,
+  });
   return {
     candidates,
     context: {
@@ -267,6 +313,109 @@ function scoreRouteForCorridor({ source, route, stations, fuel, tankLitres, tank
       }),
     },
   };
+}
+
+function candidateRoutePosition({ distanceAlongRouteKm, distanceToRouteKm, points = [], routeKm, stationPoint }) {
+  const along = Math.max(0, Number(distanceAlongRouteKm || 0));
+  const total = Math.max(0, Number(routeKm || 0));
+  const remainingKm = Math.max(0, total - along);
+  const segmentDetail = nearestRouteSegmentDetail({ distanceAlongRouteKm: along, points, stationPoint });
+  const progressRatio = total > 0 ? Math.max(0, Math.min(1, along / total)) : 0;
+  const endpointAdjacent = total > 0 && (along <= 1 || remainingKm <= 1) && Number(distanceToRouteKm || 0) > 0.5;
+  const segment =
+    progressRatio >= 0.9 ? "near_destination" :
+      progressRatio <= 0.1 ? "near_origin" :
+        "mid_route";
+  const backtrackingRisk =
+    endpointAdjacent && progressRatio >= 0.9 ? "destination_side_check" :
+      endpointAdjacent && progressRatio <= 0.1 ? "origin_side_check" :
+        "low";
+  return {
+    segment,
+    progressRatio: round(progressRatio, 3),
+    remainingRouteKm: round(remainingKm, 1),
+    endpointAdjacent,
+    backtrackingRisk,
+    roadSide: segmentDetail.roadSide,
+    roadSideConfidence: segmentDetail.roadSideConfidence,
+    turnFriction: segmentDetail.turnFriction,
+    turnFrictionReason: segmentDetail.turnFrictionReason,
+    geometrySignal: segmentDetail.geometrySignal,
+  };
+}
+
+function nearestRouteSegmentDetail({ distanceAlongRouteKm, points = [], stationPoint }) {
+  if (!Array.isArray(points) || points.length < 2 || !stationPoint) {
+    return approximateGeometrySignal("unavailable", "unknown", "none", "route geometry unavailable");
+  }
+  let travelled = 0;
+  let selected = null;
+  for (let index = 1; index < points.length; index += 1) {
+    const start = points[index - 1];
+    const end = points[index];
+    const segmentKm = distanceKm(start, end);
+    if (segmentKm <= 0) continue;
+    if (!selected || travelled + segmentKm >= distanceAlongRouteKm) {
+      selected = { end, segmentKm, start };
+      break;
+    }
+    travelled += segmentKm;
+  }
+  if (!selected) return approximateGeometrySignal("unavailable", "unknown", "none", "route segment unavailable");
+
+  const routeVector = toLocalXYKm(selected.end, selected.start);
+  const stationVector = toLocalXYKm(stationPoint, selected.start);
+  const cross = routeVector.x * stationVector.y - routeVector.y * stationVector.x;
+  const lateralKm = Math.abs(cross) / Math.max(0.001, Math.hypot(routeVector.x, routeVector.y));
+  const roadSide = Math.abs(cross) < 0.0001 ? "on_route" : cross > 0 ? "left" : "right";
+  const roadSideConfidence = lateralKm < 0.08 ? "low" : lateralKm < 0.5 ? "medium" : "approximate";
+  const turnFriction = roadSide === "on_route" || lateralKm < 0.08 ? "low" : lateralKm < 0.5 ? "medium" : "high";
+  const turnFrictionReason =
+    turnFriction === "high"
+      ? "station is laterally separated from the route segment; provider detour should confirm access"
+      : turnFriction === "medium"
+        ? "station is off-route; road-side access is approximate"
+        : "station is close to the route segment";
+  return {
+    geometrySignal: "approximate_route_segment",
+    roadSide,
+    roadSideConfidence,
+    turnFriction,
+    turnFrictionReason,
+  };
+}
+
+function approximateGeometrySignal(geometrySignal, roadSide, turnFriction, turnFrictionReason) {
+  return {
+    geometrySignal,
+    roadSide,
+    roadSideConfidence: "low",
+    turnFriction,
+    turnFrictionReason,
+  };
+}
+
+function distanceKm(a, b) {
+  const radiusKm = 6371;
+  const dLat = toRad(Number(b.lat) - Number(a.lat));
+  const dLon = toRad(Number(b.lon) - Number(a.lon));
+  const lat1 = toRad(Number(a.lat));
+  const lat2 = toRad(Number(b.lat));
+  const hav = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
+  return 2 * radiusKm * Math.asin(Math.sqrt(hav));
+}
+
+function toLocalXYKm(point, origin) {
+  const latKm = 110.574;
+  const lonKm = 111.32 * Math.cos(toRad(origin.lat));
+  return {
+    x: (Number(point.lon) - Number(origin.lon)) * lonKm,
+    y: (Number(point.lat) - Number(origin.lat)) * latKm,
+  };
+}
+
+function toRad(value) {
+  return (Number(value) * Math.PI) / 180;
 }
 
 function routeDecisionSummary(candidates, timingAdvice, context = {}) {
@@ -365,6 +514,8 @@ function decisionEconomics(candidate, { baselineCpl, fillLitres, candidates = []
     comparisonKind: Number.isFinite(comparisonCpl) ? "next_best_viable" : "none",
     pumpCpl: candidate.pumpCpl,
     adjustedCpl: candidate.adjustedCpl,
+    discountAppliedLitres: candidate.discountAppliedLitres,
+    discountMaxLitres: candidate.discountMaxLitres,
     fillLitres: candidate.fillLitres,
     grossFuelSaving: round(grossFuelSaving, 2),
     detourKm: candidate.detourKm,
@@ -376,6 +527,51 @@ function decisionEconomics(candidate, { baselineCpl, fillLitres, candidates = []
     netSavingAfterDetourFuel: candidate.netSaving,
     netSavingAfterDetourFuelAndTime: candidate.netAfterDetourAndTimeCost,
   };
+}
+
+function discountForFill(discount, { fillLitres, fuel } = {}) {
+  const rawCpl = discountCentsForFuel(discount, fuel);
+  const litres = Number(fillLitres || ASSUMED_ROUTE_FILL_LITRES);
+  const maxLitres = Number(discount.maxLitresPerTransaction || litres);
+  const appliedLitres = Math.max(0, Math.min(litres, Number.isFinite(maxLitres) ? maxLitres : litres));
+  const effectiveCentsPerLitre = litres > 0 ? rawCpl * (appliedLitres / litres) : rawCpl;
+  return {
+    ...discount,
+    centsPerLitre: rawCpl,
+    effectiveCentsPerLitre,
+    appliedLitres,
+  };
+}
+
+function discountCentsForFuel(discount, fuel) {
+  const fuelSpecific = discount?.fuelTypeCentsPerLitre?.[fuel];
+  if (Number.isFinite(Number(fuelSpecific))) return Number(fuelSpecific);
+  return Number(discount?.centsPerLitre || 0);
+}
+
+function discountAppliesToStation(discount, station) {
+  const state = stationState(station);
+  if (state && Array.isArray(discount.includedStates) && discount.includedStates.length && !discount.includedStates.includes(state)) {
+    return false;
+  }
+  if (state && Array.isArray(discount.excludedStates) && discount.excludedStates.includes(state)) {
+    return false;
+  }
+  return true;
+}
+
+function stationState(station) {
+  const source = String(station?.source || "");
+  if (source.includes("_sa_")) return "SA";
+  if (source.includes("_tas_")) return "TAS";
+  if (source.includes("_wa_")) return "WA";
+  if (source.includes("_nt_")) return "NT";
+  if (source.includes("_qld_")) return "QLD";
+  if (source.includes("_vic_")) return "VIC";
+  if (source.includes("_nsw_")) return "NSW";
+  const text = ` ${station?.address || ""} ${station?.suburb || ""} ${station?.name || ""} `.toUpperCase();
+  const match = text.match(/\b(NSW|ACT|VIC|QLD|SA|WA|TAS|NT)\b/);
+  return match?.[1] || "";
 }
 
 function nextBestViableComparisonCpl(selectedCandidate, candidates = []) {
@@ -455,7 +651,11 @@ function routeTimingAdvice(candidate, { minSavingDollars = SMART_HARD_REJECT_SAV
   const saving = Number(candidate.netSaving || 0);
   const detourMinutes = Number(candidate.detourMinutes || 0);
   const smartDetourLimitMinutes = smartDetourLimitMinutesForSaving(saving);
+  const effectiveDetourLimitMinutes = Math.min(Number(maxDetourMinutes || SMART_MAX_DETOUR_MINUTES), smartDetourLimitMinutes);
   const label = savingsDetourLabel(saving);
+  const normalisedMinSavingDollars = Number.isFinite(Number(minSavingDollars)) && Number(minSavingDollars) >= 0
+    ? Number(minSavingDollars)
+    : SMART_HARD_REJECT_SAVING_DOLLARS;
   if (candidate.reachable === false) {
     return {
       action: "range_first",
@@ -464,7 +664,7 @@ function routeTimingAdvice(candidate, { minSavingDollars = SMART_HARD_REJECT_SAV
       reason: `${candidate.station?.name || "This stop"} has range risk. Choose a closer stop before chasing price.`,
     };
   }
-  if (detourMinutes > smartDetourLimitMinutes) {
+  if (detourMinutes > effectiveDetourLimitMinutes) {
     return {
       action: "skip_detour",
       visible: true,
@@ -474,7 +674,7 @@ function routeTimingAdvice(candidate, { minSavingDollars = SMART_HARD_REJECT_SAV
   }
   const waitCue = lockedTomorrowWaitCue(candidate, { fillLitres, minSavingDollars });
   if (waitCue) return waitCue;
-  if (saving <= SMART_HARD_REJECT_SAVING_DOLLARS) {
+  if (saving <= normalisedMinSavingDollars) {
     return {
       action: "skip_detour",
       visible: true,
@@ -535,9 +735,13 @@ function lockedTomorrowWaitCue(candidate, { fillLitres = 0, minSavingDollars = 5
 }
 
 function normaliseDecisionRule({ minSavingDollars, maxDetourMinutes }) {
+  const normalisedMinSavingDollars = Number(minSavingDollars);
+  const normalisedMaxDetourMinutes = Number(maxDetourMinutes);
   return {
-    minSavingDollars: SMART_HARD_REJECT_SAVING_DOLLARS,
-    maxDetourMinutes: SMART_MAX_DETOUR_MINUTES,
+    minSavingDollars: Number.isFinite(normalisedMinSavingDollars) && normalisedMinSavingDollars >= 0
+      ? Math.max(0, Number(normalisedMinSavingDollars.toFixed(2)))
+      : SMART_HARD_REJECT_SAVING_DOLLARS,
+    maxDetourMinutes: boundedNumber(normalisedMaxDetourMinutes, 1, SMART_MAX_DETOUR_MINUTES, SMART_MAX_DETOUR_MINUTES),
   };
 }
 
@@ -624,4 +828,10 @@ module.exports = {
   routeContextStations,
   scoreRoute,
   stationPayload,
+  _discountTermsForTests: {
+    discountAppliesToStation,
+    discountCentsForFuel,
+    discountForFill,
+    stationState,
+  },
 };

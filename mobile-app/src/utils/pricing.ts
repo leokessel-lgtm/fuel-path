@@ -8,18 +8,24 @@ export function stationPriceView(
   fuel: string,
   preferences: AppPreferences,
 ): StationViewModel | null {
-  const pumpCpl = Number(station.pumpCpl ?? station.prices?.[fuel]);
+  const matchedFuel = station.matchedFuel || fuel;
+  const pumpCpl = Number(station.pumpCpl ?? station.prices?.[matchedFuel]);
   if (!Number.isFinite(pumpCpl)) return null;
 
   let discountCpl = 0;
   let discountLabel = "";
   const eligibleDiscounts = eligibleDiscountIds(preferences);
   for (const discount of station.discounts || []) {
+    const effectiveDiscountCpl = effectiveDiscountCentsPerLitre(discount, {
+      fillLitres: preferences.fuelTankLitres,
+      fuel: matchedFuel,
+      station,
+    });
     if (
       eligibleDiscounts.includes(discount.id) &&
-      Number(discount.centsPerLitre || 0) > discountCpl
+      effectiveDiscountCpl > discountCpl
     ) {
-      discountCpl = Number(discount.centsPerLitre || 0);
+      discountCpl = effectiveDiscountCpl;
       discountLabel = discount.label;
     }
   }
@@ -47,19 +53,87 @@ export function stationPriceView(
         : undefined,
     possibleDiscountCpl: possibleLowerCpl !== undefined ? possibleDiscountCpl : undefined,
     distanceKm: Number(station.distanceKm || 0),
-    fuel,
+    fuel: matchedFuel,
+    requestedFuel: station.requestedFuel || fuel,
+    exactFuelMatch: station.exactFuelMatch !== false && matchedFuel === fuel,
   };
 }
 
 function bestPossibleDiscount(station: Station, preferences: AppPreferences) {
   if (preferences.selectedDiscounts.length === 0) return undefined;
   return [...(station.discounts || [])]
-    .filter((discount) => Number(discount.centsPerLitre || 0) > 0)
-    .sort((left, right) => Number(right.centsPerLitre || 0) - Number(left.centsPerLitre || 0))
+    .filter((discount) => effectiveDiscountCentsPerLitre(discount, {
+      fillLitres: preferences.fuelTankLitres,
+      fuel: station.requestedFuel || "",
+      station,
+    }) > 0)
+    .sort((left, right) =>
+      effectiveDiscountCentsPerLitre(right, {
+        fillLitres: preferences.fuelTankLitres,
+        fuel: station.requestedFuel || "",
+        station,
+      }) - effectiveDiscountCentsPerLitre(left, {
+        fillLitres: preferences.fuelTankLitres,
+        fuel: station.requestedFuel || "",
+        station,
+      }),
+    )
     .find((discount) => {
       const selected = preferences.selectedDiscounts.includes(discount.id);
       return !selected || isDiscountRedeemedToday(preferences, discount.id);
     });
+}
+
+function effectiveDiscountCentsPerLitre(
+  discount: NonNullable<Station["discounts"]>[number],
+  {
+    fillLitres,
+    fuel,
+    station,
+  }: {
+    fillLitres?: number;
+    fuel?: string;
+    station: Station;
+  },
+) {
+  if (!discountAppliesToStation(discount, station)) return 0;
+  const rawCpl = discountCentsForFuel(discount, fuel);
+  const litres = Number(fillLitres || 0);
+  const maxLitres = Number(discount.maxLitresPerTransaction || litres);
+  if (litres <= 0 || !Number.isFinite(maxLitres)) return rawCpl;
+  return rawCpl * (Math.max(0, Math.min(litres, maxLitres)) / litres);
+}
+
+function discountCentsForFuel(
+  discount: NonNullable<Station["discounts"]>[number],
+  fuel?: string,
+) {
+  const fuelSpecific = fuel ? discount.fuelTypeCentsPerLitre?.[fuel as keyof typeof discount.fuelTypeCentsPerLitre] : undefined;
+  if (Number.isFinite(Number(fuelSpecific))) return Number(fuelSpecific);
+  return Number(discount.centsPerLitre || 0);
+}
+
+function discountAppliesToStation(
+  discount: NonNullable<Station["discounts"]>[number],
+  station: Station,
+) {
+  const state = stationState(station);
+  if (state && discount.includedStates?.length && !discount.includedStates.includes(state)) return false;
+  if (state && discount.excludedStates?.includes(state)) return false;
+  return true;
+}
+
+function stationState(station: Station) {
+  const source = String(station.source || "");
+  if (source.includes("_sa_")) return "SA";
+  if (source.includes("_tas_")) return "TAS";
+  if (source.includes("_wa_")) return "WA";
+  if (source.includes("_nt_")) return "NT";
+  if (source.includes("_qld_")) return "QLD";
+  if (source.includes("_vic_")) return "VIC";
+  if (source.includes("_nsw_")) return "NSW";
+  const text = ` ${station.address || ""} ${station.suburb || ""} ${station.name || ""} `.toUpperCase();
+  return text.match(/\b(NSW|ACT|VIC|QLD|SA|WA|TAS|NT)\b/)?.[1] || "";
 }
 
 function possibleDiscountLabel(

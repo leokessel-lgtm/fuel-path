@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
-import { colors, radii, shadow, spacing, surfaces, typeScale, typography } from "../theme";
-import { EvConnector, FuelCode, MapPoint, SavedCommute, VehicleEnergyType } from "../types";
+import { colors, radii, shadow, spacing, surfaces, typeScale } from "../theme";
+import { FuelCode, MapPoint, SavedCommute, VehicleEnergyType } from "../types";
+import { CurrentLocationFieldButton, currentLocationFieldInset } from "./CurrentLocationFieldButton";
 import { NearbyEnergyChoice, NearbyEnergySelector } from "./NearbyEvControls";
 import { QuickPlace, QuickPlaceShortcuts } from "./QuickPlaceShortcuts";
 import { AddressSuggestions } from "./RouteAddressSuggestions";
@@ -11,7 +12,6 @@ import { SavedCommuteShortcuts } from "./SavedCommuteShortcuts";
 export function PlanRouteEditorCard({
   activeAddressField,
   canPlanRoute,
-  evConnectors,
   fuel,
   from,
   fromSuggestions,
@@ -29,6 +29,7 @@ export function PlanRouteEditorCard({
   onToChange,
   onToFocus,
   onUseCurrentFromLocation,
+  onVehicleEnergyTypeChange,
   quickPlaces,
   recentLocationsCount,
   routePrecisionHint,
@@ -42,11 +43,9 @@ export function PlanRouteEditorCard({
   toSuggestions,
   vehicleEnergyType,
   vehicleRouteNotice,
-  vehicleSummary,
 }: {
   activeAddressField: "from" | "to" | null;
   canPlanRoute: boolean;
-  evConnectors: EvConnector[];
   fuel: FuelCode;
   from: string;
   fromSuggestions: MapPoint[];
@@ -64,6 +63,7 @@ export function PlanRouteEditorCard({
   onToChange: (value: string) => void;
   onToFocus: () => void;
   onUseCurrentFromLocation: () => void;
+  onVehicleEnergyTypeChange: (vehicleEnergyType: VehicleEnergyType) => void;
   quickPlaces: QuickPlace[];
   recentLocationsCount: number;
   routePrecisionHint: string;
@@ -77,14 +77,17 @@ export function PlanRouteEditorCard({
   toSuggestions: MapPoint[];
   vehicleEnergyType: VehicleEnergyType;
   vehicleRouteNotice: string;
-  vehicleSummary: string;
 }) {
-  const showFuelSelector = vehicleEnergyType !== "electric";
+  const showFuelSelector = true;
   const [fuelSelectorOpen, setFuelSelectorOpen] = useState(false);
-  const selectedConnectors = evConnectors.length ? evConnectors.join(", ") : "connector not set";
   const handleEnergyChange = (value: NearbyEnergyChoice) => {
     setFuelSelectorOpen(false);
-    if (value !== "EV") onFuelChange(value);
+    if (value === "EV") {
+      onVehicleEnergyTypeChange("electric");
+      return;
+    }
+    onVehicleEnergyTypeChange(value === "DL" || value === "PDL" ? "diesel" : "petrol");
+    onFuelChange(value);
   };
   const primaryLabel =
     vehicleEnergyType === "electric"
@@ -97,7 +100,6 @@ export function PlanRouteEditorCard({
 
   return (
     <View style={styles.searchCard}>
-      <Text style={styles.eyebrow}>Plan trip</Text>
       {vehicleRouteNotice ? (
         <View style={styles.routeNoticeCard}>
           <Text style={styles.routeNoticeText}>{vehicleRouteNotice}</Text>
@@ -110,28 +112,18 @@ export function PlanRouteEditorCard({
             value={from}
             onChangeText={onFromChange}
             onFocus={onFromFocus}
+            onPressIn={onFromFocus}
             onSubmitEditing={onPlanRoute}
             placeholder="Start address, suburb or place"
+            placeholderTextColor={colors.muted}
             returnKeyType="search"
             style={[styles.input, styles.inputWithIcon]}
           />
-          <Pressable
+          <CurrentLocationFieldButton
             accessibilityLabel="Use current location as start"
             disabled={locatingFrom}
-            hitSlop={8}
             onPress={onUseCurrentFromLocation}
-            style={({ pressed }) => [
-              styles.currentLocationButton,
-              pressed && styles.currentLocationButtonPressed,
-              locatingFrom && styles.currentLocationButtonDisabled,
-            ]}
-          >
-            <View style={styles.currentLocationIcon}>
-              <View style={styles.currentLocationLineVertical} />
-              <View style={styles.currentLocationLineHorizontal} />
-              <View style={styles.currentLocationDot} />
-            </View>
-          </Pressable>
+          />
         </View>
         {activeAddressField === "from" ? (
           <AddressSuggestions
@@ -147,8 +139,10 @@ export function PlanRouteEditorCard({
           value={to}
           onChangeText={onToChange}
           onFocus={onToFocus}
+          onPressIn={onToFocus}
           onSubmitEditing={onPlanRoute}
           placeholder="Destination address, suburb or place"
+          placeholderTextColor={colors.muted}
           returnKeyType="search"
           style={styles.input}
         />
@@ -165,11 +159,11 @@ export function PlanRouteEditorCard({
       {showFuelSelector ? (
         <NearbyEnergySelector
           eyebrow="Plan with"
-          includeEv={false}
+          includeEv
           onChange={handleEnergyChange}
           onToggleOpen={() => setFuelSelectorOpen((current) => !current)}
           open={fuelSelectorOpen}
-          value={fuel}
+          value={vehicleEnergyType === "electric" ? "EV" : fuel}
         />
       ) : null}
       {routePrecisionHint ? (
@@ -202,42 +196,7 @@ const styles = StyleSheet.create({
     ...surfaces.floating,
     borderRadius: radii.xxl,
     gap: spacing.sm,
-    padding: spacing.md,
-  },
-  eyebrow: {
-    ...typography.eyebrow,
-    textTransform: "uppercase",
-  },
-  vehicleSummaryCard: {
-    alignItems: "center",
-    backgroundColor: colors.greenSoft,
-    borderColor: colors.green,
-    borderRadius: radii.xl,
-    borderWidth: 1,
-    flexDirection: "row",
-    gap: spacing.sm,
-    justifyContent: "space-between",
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-  },
-  vehicleSummaryLabel: {
-    color: colors.muted,
-    fontSize: typeScale.micro,
-    fontWeight: "700",
-    textTransform: "uppercase",
-  },
-  vehicleSummaryValue: {
-    color: colors.ink,
-    fontSize: typeScale.caption,
-    fontWeight: "800",
-  },
-  connectorSummary: {
-    color: colors.greenDark,
-    flexShrink: 1,
-    fontSize: typeScale.micro,
-    fontWeight: "800",
-    textAlign: "right",
-    textTransform: "uppercase",
+    padding: spacing.sm,
   },
   routeNoticeCard: {
     backgroundColor: colors.panel,
@@ -268,11 +227,12 @@ const styles = StyleSheet.create({
     color: colors.ink,
     fontSize: typeScale.body,
     fontWeight: "500",
-    minHeight: 48,
-    padding: spacing.md,
+    minHeight: 44,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
   },
   inputWithIcon: {
-    paddingRight: 52,
+    paddingRight: currentLocationFieldInset,
   },
   routePrecisionHint: {
     color: colors.muted,
@@ -285,56 +245,6 @@ const styles = StyleSheet.create({
     fontSize: typeScale.caption,
     fontWeight: "600",
     paddingHorizontal: spacing.sm,
-  },
-  currentLocationButton: {
-    alignItems: "center",
-    backgroundColor: colors.white,
-    borderColor: colors.line,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    bottom: 7,
-    height: 34,
-    justifyContent: "center",
-    position: "absolute",
-    right: spacing.sm,
-    top: 7,
-    width: 34,
-  },
-  currentLocationButtonPressed: {
-    backgroundColor: colors.greenSoft,
-    borderColor: colors.green,
-  },
-  currentLocationButtonDisabled: {
-    opacity: 0.55,
-  },
-  currentLocationIcon: {
-    alignItems: "center",
-    borderColor: colors.green,
-    borderRadius: 9,
-    borderWidth: 2,
-    height: 18,
-    justifyContent: "center",
-    width: 18,
-  },
-  currentLocationLineVertical: {
-    backgroundColor: colors.green,
-    height: 24,
-    position: "absolute",
-    width: 2,
-  },
-  currentLocationLineHorizontal: {
-    backgroundColor: colors.green,
-    height: 2,
-    position: "absolute",
-    width: 24,
-  },
-  currentLocationDot: {
-    backgroundColor: colors.green,
-    borderColor: colors.white,
-    borderRadius: 4,
-    borderWidth: 1,
-    height: 8,
-    width: 8,
   },
   primaryButton: {
     ...surfaces.darkAction,

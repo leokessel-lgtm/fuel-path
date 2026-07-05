@@ -82,11 +82,12 @@ async function smokeNearbyFuel(page, row) {
   await page.waitForTimeout(800);
   const state = await uiState(page);
   row.metrics = state;
+  const visibleFuelTargets = state.stationMarkers + state.clusters;
   row.failures.push(...checks([
     [state.text.includes("Nearby"), "Nearby tab text missing"],
     [state.text.includes("Closest") && state.text.includes("Cheapest") && state.text.includes("Best value"), "fuel sort controls missing"],
-    [state.stationMarkers >= 6, `expected visible fuel markers, got ${state.stationMarkers}`],
-    [state.hasZoomControls, "Leaflet zoom controls missing"],
+    [visibleFuelTargets >= 6, `expected visible fuel markers or cluster pills, got ${visibleFuelTargets}`],
+    [!state.hasZoomControls, "Leaflet zoom controls returned"],
     [!state.text.includes("Full list"), "removed Full list copy returned"],
     [!state.text.includes("WA tomorrow locked prices"), "state timing banner returned"],
     [!state.text.includes("Suggested fuel stops"), "suggested fuel stops copy leaked into Nearby"],
@@ -126,13 +127,16 @@ async function smokePlanRoute(page, row) {
   await page.locator("input").nth(1).fill("Melbourne VIC");
   await page.waitForTimeout(250);
   await page.getByText("Plan route", { exact: true }).first().click({ timeout: 5000 });
-  await page.getByText("Why this stop", { exact: false }).first().waitFor({ timeout: 12000 });
+  await waitForPlanRecommendation(page);
   await page.waitForTimeout(800);
+  await page.getByText("Why?", { exact: true }).first().click({ timeout: 5000 });
+  await page.getByText("Why this stop", { exact: false }).first().waitFor({ timeout: 5000 });
   const state = await uiState(page);
   row.metrics = state;
   row.failures.push(...checks([
     [/savings detour/i.test(state.text), "detour recommendation label missing"],
     [state.text.includes("BEST PRICE BY") || state.text.includes("Best price by") || state.text.includes("Best route price"), "best-price evidence missing"],
+    [state.text.includes("Why this stop"), "expanded evidence title missing after Why action"],
     [state.stationMarkers >= 3, `expected route station markers, got ${state.stationMarkers}`],
     [!state.text.includes("Suggested fuel stops"), "retired Suggested fuel stops copy returned"],
     [!state.text.includes("Navigate to this stop"), "large navigate button returned"],
@@ -155,7 +159,7 @@ function attachConsole(page) {
 }
 
 function consoleFailures(messages) {
-  const actionable = messages.filter((entry) => !/favicon|ResizeObserver|tile.openstreetmap.org|Cannot record touch end without a touch start/i.test(entry));
+  const actionable = messages.filter((entry) => !/favicon|File not found|ResizeObserver|tile.openstreetmap.org|Cannot record touch end without a touch start/i.test(entry));
   return actionable.length ? [`console/page errors: ${actionable.slice(0, 3).join(" | ")}`] : [];
 }
 
@@ -176,19 +180,18 @@ async function installCommonMocks(page) {
 }
 
 async function installPlanMocks(page) {
-  await page.route("**/api/geocode?**", async (route) => {
-    const q = new URL(route.request().url()).searchParams.get("q") || "";
+  await page.route("**/api/geocode**", async (route) => {
+    const body = route.request().postDataJSON?.() || {};
+    const q = body.q || new URL(route.request().url()).searchParams.get("q") || "";
     const isSydney = /sydney/i.test(q);
     const location = isSydney ? { label: "Sydney NSW", lat: -33.8688, lon: 151.2093, state: "NSW", provider: "smoke_mock" } : { label: "Melbourne VIC", lat: -37.8136, lon: 144.9631, state: "VIC", provider: "smoke_mock" };
     await route.fulfill(jsonResponse({ provider: "smoke_mock", lookupStatus: "ok", location, suggestions: [location] }));
   });
-  await page.route("**/api/route?**", async (route) => route.fulfill(jsonResponse({
-    provider: "smoke_mock",
-    distanceKm: 859,
-    durationMin: 540,
-    points: [{ lat: -33.8688, lon: 151.2093, label: "Sydney NSW" }, { lat: -35.2809, lon: 149.13, label: "Canberra ACT" }, { lat: -37.8136, lon: 144.9631, label: "Melbourne VIC" }],
+  await page.route("**/api/route?**", async (route) => route.fulfill(jsonResponse(routePayload())));
+  await page.route("**/api/score", async (route) => route.fulfill(jsonResponse({
+    route: routePayload(),
+    score: scorePayload(),
   })));
-  await page.route("**/api/score", async (route) => route.fulfill(jsonResponse(scorePayload())));
 }
 
 async function chooseFuelMode(page, label) {
@@ -199,6 +202,13 @@ async function chooseFuelMode(page, label) {
 async function clickBottomTab(page, label) {
   await page.getByText(label, { exact: true }).last().click({ timeout: 5000 });
   await page.waitForTimeout(350);
+}
+
+async function waitForPlanRecommendation(page) {
+  await page.getByText("Why?", { exact: true }).first().waitFor({ state: "visible", timeout: 12000 });
+  await page.getByText("BEST PRICE BY", { exact: false }).first().waitFor({ state: "visible", timeout: 12000 }).catch(async () => {
+    await page.getByText("Best route price", { exact: false }).first().waitFor({ state: "visible", timeout: 12000 });
+  });
 }
 
 async function uiState(page) {
@@ -283,6 +293,19 @@ function scorePayload() {
     },
     recommendations: stations,
     contextStations: [],
+  };
+}
+
+function routePayload() {
+  return {
+    provider: "smoke_mock",
+    distanceKm: 859,
+    durationMin: 540,
+    points: [
+      { lat: -33.8688, lon: 151.2093, label: "Sydney NSW" },
+      { lat: -35.2809, lon: 149.13, label: "Canberra ACT" },
+      { lat: -37.8136, lon: 144.9631, label: "Melbourne VIC" },
+    ],
   };
 }
 

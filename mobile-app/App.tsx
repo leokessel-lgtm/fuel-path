@@ -1,7 +1,6 @@
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
 import {
-  StatusBar as NativeStatusBar,
   Pressable,
   StyleSheet,
   Text,
@@ -22,11 +21,25 @@ import { colors, radii, shadow, spacing, surfaces, typeScale, typography } from 
 
 type TabKey = "plan" | "nearby" | "account";
 
+declare const process:
+  {
+    env: Record<string, string | undefined>;
+  };
+
 const tabs: Array<{ key: TabKey; label: string; hint: string }> = [
   { key: "plan", label: "Plan", hint: "Trip" },
   { key: "nearby", label: "Nearby", hint: "Map" },
-  { key: "account", label: "Account", hint: "You" },
+  { key: "account", label: "Settings", hint: "You" },
 ];
+const chromeTextScale = 1.2;
+
+function initialTab(): TabKey {
+  const configured = process.env.EXPO_PUBLIC_FUEL_PATH_INITIAL_TAB;
+  if (configured === "plan" || configured === "nearby" || configured === "account") {
+    return configured;
+  }
+  return "nearby";
+}
 
 function TabIcon({ tab, selected }: { tab: TabKey; selected: boolean }) {
   const iconTint = selected ? colors.white : "#9eaaa4";
@@ -65,18 +78,22 @@ function TabIcon({ tab, selected }: { tab: TabKey; selected: boolean }) {
 }
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<TabKey>("nearby");
+  const [activeTab, setActiveTab] = useState<TabKey>(() => initialTab());
   const [evChargingStatus, setEvChargingStatus] = useState<EvChargingStatus>();
   const [fuelProviderStatus, setFuelProviderStatus] = useState<FuelProviderStatus>();
   const {
     clearNamedPlace,
     preferences,
+    addVehicle,
+    removeVehicle,
     saveNamedPlace,
+    selectVehicle,
+    setPreferredStationBrands,
+    setStationBrandMode,
     toggleDiscount,
     toggleDiscountRedemption,
     toggleEvConnector,
-    toggleFuelPolicy,
-    togglePolicyBrand,
+    togglePreferredStationBrand,
     updateDecisionRule,
     updateFuel,
     updateHomeChargingAccess,
@@ -90,6 +107,7 @@ export default function App() {
     removeRecentLocation,
   } = useRecentLocations();
   const {
+    renameCommute,
     saveCommute,
     savedCommutes,
     setSavedCommutes,
@@ -101,6 +119,7 @@ export default function App() {
     removeCommute,
     requestNotifications,
     toggleCommuteAlert,
+    updateCommuteAlertSettings,
     updateCommuteAlertRule,
   } = useRouteAlerts({
     preferences,
@@ -122,56 +141,60 @@ export default function App() {
     };
   }, []);
 
-  const hasVehicle = Boolean(preferences.vehicleName.trim() || preferences.vehicleRego.trim());
-  const vehicleInitials = hasVehicle
+  const hasNamedVehicle = Boolean(preferences.vehicleName.trim() || preferences.vehicleRego.trim());
+  const vehicleInitials = hasNamedVehicle
     ? (preferences.vehicleRego || preferences.vehicleName).trim().slice(0, 2).toUpperCase()
-    : "+";
+    : vehicleEnergyLabel(preferences.vehicleEnergyType).slice(0, 2).toUpperCase();
   const vehicleDetail = preferences.vehicleName
     ? `${vehicleEnergyLabel(preferences.vehicleEnergyType)} | ${vehicleProfileShortLabel(preferences)}`
     : vehicleProfileShortLabel(preferences);
 
   return (
     <SafeAreaProvider>
-      <SafeAreaView edges={["left", "right", "bottom"]} style={styles.safeArea}>
+      <SafeAreaView edges={["top", "left", "right", "bottom"]} style={styles.safeArea}>
         <StatusBar style="dark" />
         <View style={styles.appShell}>
-        <View style={styles.header}>
+        <View role="banner" style={styles.header}>
           <View style={styles.brandLockup}>
             <FuelPathLogo />
             <View style={styles.brandText}>
-              <Text style={styles.brand}>Fuel Path</Text>
-              <Text style={styles.subhead}>Live fuel decisions</Text>
+              <Text maxFontSizeMultiplier={chromeTextScale} numberOfLines={1} style={styles.brand}>Fuel Path</Text>
+              <Text maxFontSizeMultiplier={chromeTextScale} numberOfLines={1} style={styles.subhead}>Live fuel decisions</Text>
             </View>
           </View>
           <Pressable
-            accessibilityLabel={hasVehicle ? "View vehicle profile" : "Add vehicle profile"}
+            accessibilityLabel={hasNamedVehicle ? "View vehicle profile" : "View fuel profile"}
+            accessibilityRole="button"
             onPress={() => setActiveTab("account")}
             style={({ pressed }) => [styles.vehiclePill, pressed && styles.vehiclePillPressed]}
           >
             <View style={styles.vehicleIcon}>
-              <Text style={styles.vehicleIconText}>{vehicleInitials}</Text>
+              <Text maxFontSizeMultiplier={chromeTextScale} style={styles.vehicleIconText}>{vehicleInitials}</Text>
             </View>
             <View style={styles.vehicleTextGroup}>
-              <Text numberOfLines={1} style={styles.vehiclePrimary}>
-                {hasVehicle ? preferences.vehicleRego || preferences.vehicleName : "Add vehicle"}
+              <Text maxFontSizeMultiplier={chromeTextScale} numberOfLines={1} style={styles.vehiclePrimary}>
+                {hasNamedVehicle ? preferences.vehicleRego || preferences.vehicleName : "Fuel profile"}
               </Text>
-              <Text numberOfLines={1} style={styles.vehicleSecondary}>
-                {hasVehicle ? vehicleDetail : "Set fuel"}
+              <Text maxFontSizeMultiplier={chromeTextScale} numberOfLines={1} style={styles.vehicleSecondary}>
+                {vehicleDetail}
               </Text>
             </View>
           </Pressable>
         </View>
 
-        <View style={styles.content}>
+        <View role="main" style={styles.content}>
           {activeTab === "plan" ? (
             <PlanScreen
               preferences={preferences}
               onFuelChange={updateFuel}
+              onVehicleEnergyTypeChange={updateVehicleEnergyType}
               onAddRecentLocation={addRecentLocation}
               onClearRecentLocations={clearRecentLocations}
               onRemoveRecentLocation={removeRecentLocation}
               onSaveNamedPlace={saveNamedPlace}
               onSaveCommute={saveCommute}
+              onToggleCommuteAlert={toggleCommuteAlert}
+              alertSyncingCommuteId={alertSyncingCommuteId}
               recentLocations={recentLocations}
               savedCommutes={savedCommutes}
             />
@@ -190,39 +213,47 @@ export default function App() {
               onToggleEvConnector={toggleEvConnector}
               onVehicleProfileChange={updateVehicleProfile}
               onVehicleEnergyTypeChange={updateVehicleEnergyType}
+              onAddVehicle={addVehicle}
+              onRemoveVehicle={removeVehicle}
+              onSelectVehicle={selectVehicle}
               onRequestNotifications={requestNotifications}
               onClearNamedPlace={clearNamedPlace}
               onSaveNamedPlace={saveNamedPlace}
+              onRenameCommute={renameCommute}
               onToggleDiscount={toggleDiscount}
               onToggleDiscountRedemption={toggleDiscountRedemption}
-              onToggleFuelPolicy={toggleFuelPolicy}
-              onTogglePolicyBrand={togglePolicyBrand}
+              onSetStationBrandMode={setStationBrandMode}
+              onSetPreferredStationBrands={setPreferredStationBrands}
+              onTogglePreferredStationBrand={togglePreferredStationBrand}
               onToggleCommuteAlert={toggleCommuteAlert}
+              onUpdateCommuteAlertSettings={updateCommuteAlertSettings}
               onRemoveCommute={removeCommute}
               savedCommutes={savedCommutes}
             />
           ) : null}
         </View>
 
-        <View style={styles.tabBar}>
-          {tabs.map((tab) => {
-            const selected = activeTab === tab.key;
-            return (
-              <Pressable
-                accessibilityRole="tab"
-                accessibilityState={{ selected }}
-                hitSlop={8}
-                key={tab.key}
-                onPress={() => setActiveTab(tab.key)}
-                style={[styles.tabButton, selected && styles.tabButtonSelected]}
-              >
-                <View style={[styles.tabIconShell, selected && styles.tabIconShellSelected]}>
-                  <TabIcon tab={tab.key} selected={selected} />
-                </View>
-                <Text style={[styles.tabLabel, selected && styles.tabLabelSelected]}>{tab.label}</Text>
-              </Pressable>
-            );
-          })}
+        <View role="navigation">
+          <View accessibilityRole="tablist" style={styles.tabBar}>
+            {tabs.map((tab) => {
+              const selected = activeTab === tab.key;
+              return (
+                <Pressable
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected }}
+                  hitSlop={8}
+                  key={tab.key}
+                  onPress={() => setActiveTab(tab.key)}
+                  style={[styles.tabButton, selected && styles.tabButtonSelected]}
+                >
+                  <View style={[styles.tabIconShell, selected && styles.tabIconShellSelected]}>
+                    <TabIcon tab={tab.key} selected={selected} />
+                  </View>
+                  <Text maxFontSizeMultiplier={chromeTextScale} numberOfLines={1} style={[styles.tabLabel, selected && styles.tabLabelSelected]}>{tab.label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
         </View>
         </View>
       </SafeAreaView>
@@ -232,7 +263,6 @@ export default function App() {
 
 function vehicleEnergyLabel(value: string) {
   if (value === "electric") return "EV";
-  if (value === "hybrid") return "Hybrid";
   if (value === "diesel") return "Diesel";
   return "Fuel";
 }
@@ -248,11 +278,6 @@ function vehicleProfileShortLabel(preferences: {
     const connectors = preferences.evConnectors?.length ? preferences.evConnectors.join("/") : "Connectors not set";
     return preferences.evRangeKm ? `${preferences.evRangeKm} km | ${connectors}` : connectors;
   }
-  if (preferences.vehicleEnergyType === "hybrid") {
-    const ev = preferences.evConnectors?.length ? ` + ${preferences.evConnectors.join("/")}` : "";
-    const range = preferences.evRangeKm ? ` | ${preferences.evRangeKm} km EV` : "";
-    return `${preferences.fuel}${range}${ev}`;
-  }
   return preferences.fuel;
 }
 
@@ -260,11 +285,17 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: colors.canvas,
-    paddingTop: NativeStatusBar.currentHeight ?? 0,
   },
   appShell: {
     flex: 1,
+    alignSelf: "center",
     backgroundColor: colors.canvas,
+    borderColor: "rgba(20, 35, 29, 0.08)",
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    maxWidth: 1180,
+    overflow: "hidden",
+    width: "100%",
   },
   header: {
     alignItems: "center",

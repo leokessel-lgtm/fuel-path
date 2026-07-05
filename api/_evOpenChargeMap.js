@@ -150,6 +150,13 @@ function unsupportedEvProviderResult({ provider, centre, radiusKm = 8, filters =
 function supportedEvProviders() {
   return [
     {
+      id: "google_places_ev",
+      label: "Google Places EV charging",
+      status: "trial_candidate_flagged",
+      pricing: "billable Google Places path; requires explicit EV enablement, key restrictions and terms review",
+      nextAction: "Enable only with FUEL_PATH_GOOGLE_PLACES_EV_ENABLED=1 after confirming Places EV fields, budget controls and public display/route guidance terms.",
+    },
+    {
       id: "open_charge_map",
       label: "Open Charge Map",
       status: "prototype_not_configured",
@@ -249,6 +256,7 @@ function evProviderResult({
 }
 
 function evProviderLabel(provider) {
+  if (provider === "google_places_ev") return "Google Places EV charging";
   if (provider === "openweb_ninja") return "OpenWeb Ninja EV Charge Finder";
   if (provider === "api_ninjas") return "API Ninjas EV Charger API";
   if (provider === "plugshare") return "PlugShare";

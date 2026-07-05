@@ -290,6 +290,7 @@ const REGIONAL_POIS = [
   poi("Kingaroy Peanut Van", "QLD", "Kingaroy"),
   poi("Charters Towers Venus Gold Battery", "QLD", "Charters Towers"),
   poi("Bowen Big Mango", "QLD", "Bowen"),
+  poi("Aussie World Sunshine Coast", "QLD", "Sunshine Coast", -26.754, 153.047),
   poi("Sunshine Coast University Hospital", "QLD", "Sunshine Coast"),
   poi("Gold Coast University Hospital", "QLD", "Gold Coast"),
   poi("Townsville Airport", "QLD", "Townsville"),
@@ -406,8 +407,95 @@ const REGIONAL_POIS = [
   poi("Batchelor Butterfly Farm", "NT", "Batchelor"),
 ];
 
+const NATIONAL_EXTRA_PLACES = [
+  // NSW localities and high-value POIs.
+  town("Katoomba", "NSW", -33.7129, 150.311, "2780"),
+  town("Leura", "NSW", -33.714, 150.331, "2780"),
+  town("Wentworth Falls", "NSW", -33.709, 150.376, "2782"),
+  town("Blackheath", "NSW", -33.635, 150.284, "2785"),
+  town("Springwood", "NSW", -33.699, 150.563, "2777"),
+  town("Faulconbridge", "NSW", -33.694, 150.536, "2776"),
+  town("Blaxland", "NSW", -33.744, 150.61, "2774"),
+  town("Emu Plains", "NSW", -33.751, 150.659, "2750"),
+  town("Penrith", "NSW", -33.751, 150.694, "2750"),
+  town("Lithgow", "NSW", -33.482, 150.158, "2790"),
+  town("Bowral", "NSW", -34.479, 150.418, "2576"),
+  town("Nowra", "NSW", -34.874, 150.601, "2541"),
+  nationalPoi("Hyde Park, Sydney NSW 2000", "NSW", -33.873, 151.211, ["hide park", "hyde park sydney"]),
+  nationalPoi("Centennial Park, Sydney NSW 2021", "NSW", -33.897, 151.233, ["centennial park sydney"]),
+  nationalPoi("Royal Botanic Garden Sydney, Sydney NSW 2000", "NSW", -33.864, 151.217, ["botanic gardens sydney", "royal botanic gardens"]),
+  nationalPoi("Barangaroo, Sydney NSW 2000", "NSW", -33.858, 151.202, ["barangaroo sydney"]),
+  nationalPoi("Mrs Macquaries Chair, Sydney NSW 2000", "NSW", -33.86, 151.222, ["mrs macquarie chair", "mrs macquaries point"]),
+  nationalPoi("The Rocks, Sydney NSW 2000", "NSW", -33.859, 151.209, ["rocks sydney"]),
+  nationalPoi("Circular Quay, Sydney NSW 2000", "NSW", -33.861, 151.211, ["circular quay sydney"]),
+  nationalPoi("Service NSW Parramatta, Parramatta NSW 2150", "NSW", -33.814, 151.005, ["service nsw", "service nsw parramatta"]),
+  nationalPoi("Service NSW Wynyard, Sydney NSW 2000", "NSW", -33.865, 151.206, ["service nsw wynyard", "service nsw sydney"]),
+  nationalPoi("Service NSW Blacktown, Blacktown NSW 2148", "NSW", -33.771, 150.906, ["service nsw blacktown"]),
+  nationalPoi("Centrelink Blacktown, Blacktown NSW 2148", "NSW", -33.771, 150.906, ["centrelink blacktown"]),
+  nationalPoi("Medicare Parramatta, Parramatta NSW 2150", "NSW", -33.813, 151.003, ["medicare parramatta"]),
+  nationalPoi("NSW Registry of Births Deaths and Marriages, Sydney NSW 2000", "NSW", -33.868, 151.209, ["births deaths marriages nsw", "bdm nsw"]),
+
+  // VIC.
+  town("Footscray", "VIC", -37.8, 144.9, "3011"),
+  town("Dandenong", "VIC", -37.987, 145.214, "3175"),
+  town("Frankston", "VIC", -38.145, 145.123, "3199"),
+  town("Ringwood", "VIC", -37.814, 145.227, "3134"),
+  town("Sunbury", "VIC", -37.579, 144.729, "3429"),
+  town("Melton", "VIC", -37.683, 144.583, "3337"),
+  nationalPoi("Federation Square, Melbourne VIC 3000", "VIC", -37.817, 144.969, ["fed square"]),
+  nationalPoi("Royal Botanic Gardens Victoria, Melbourne VIC 3004", "VIC", -37.83, 144.98, ["melbourne botanic gardens"]),
+  nationalPoi("The Prince Hotel, St Kilda VIC 3182", "VIC", -37.8646, 144.9748, ["prince hotel st kilda", "the prince st kilda", "the prince hotel st kilda", "prince of wales hotel st kilda"]),
+  nationalPoi("Service Victoria Bendigo, Bendigo VIC 3550", "VIC", -36.757, 144.279, ["service victoria bendigo"]),
+
+  // QLD.
+  town("Chermside", "QLD", -27.384, 153.032, "4032"),
+  town("Maroochydore", "QLD", -26.653, 153.09, "4558"),
+  town("Noosa Heads", "QLD", -26.397, 153.09, "4567"),
+  town("Robina", "QLD", -28.077, 153.385, "4226"),
+  town("Loganholme", "QLD", -27.684, 153.19, "4129"),
+  nationalPoi("Service Queensland Brisbane, Brisbane QLD 4000", "QLD", -27.47, 153.025, ["qld government service centre", "service qld brisbane"]),
+  nationalPoi("South Bank Parklands, Brisbane QLD 4101", "QLD", -27.479, 153.023, ["south bank brisbane"]),
+
+  // WA.
+  town("Joondalup", "WA", -31.744, 115.766, "6027"),
+  town("Busselton", "WA", -33.652, 115.345, "6280"),
+  town("Ellenbrook", "WA", -31.778, 115.969, "6069"),
+  town("Morley", "WA", -31.887, 115.899, "6062"),
+  nationalPoi("Kings Park, Perth WA 6005", "WA", -31.96, 115.832, ["kings park perth"]),
+  nationalPoi("ServiceWA Perth CBD, Perth WA 6000", "WA", -31.952, 115.861, ["service wa perth", "servicewa"]),
+
+  // SA.
+  town("Glenelg", "SA", -34.98, 138.515, "5045"),
+  town("Elizabeth", "SA", -34.72, 138.669, "5112"),
+  town("Salisbury", "SA", -34.763, 138.648, "5108"),
+  nationalPoi("Rundle Mall, Adelaide SA 5000", "SA", -34.923, 138.603, ["rundle mall adelaide"]),
+  nationalPoi("Service SA Adelaide, Adelaide SA 5000", "SA", -34.928, 138.601, ["service sa adelaide"]),
+
+  // TAS.
+  town("Salamanca", "TAS", -42.886, 147.331, "7000"),
+  town("Glenorchy", "TAS", -42.833, 147.276, "7010"),
+  town("Moonah", "TAS", -42.847, 147.303, "7009"),
+  nationalPoi("Salamanca Market, Hobart TAS 7000", "TAS", -42.886, 147.331, ["salamanca market"]),
+  nationalPoi("Service Tasmania Hobart, Hobart TAS 7000", "TAS", -42.882, 147.327, ["service tasmania hobart"]),
+
+  // NT.
+  town("Darwin", "NT", -12.463, 130.846, "0800"),
+  town("Casuarina", "NT", -12.376, 130.881, "0810"),
+  town("Nightcliff", "NT", -12.381, 130.851, "0810"),
+  nationalPoi("Litchfield National Park, NT", "NT", -13.18, 130.789, ["litchfield"]),
+  nationalPoi("Territory Families Housing and Communities Darwin, Darwin NT 0800", "NT", -12.463, 130.846, ["nt government service centre", "territory families darwin"]),
+
+  // ACT.
+  town("Canberra City", "ACT", -35.281, 149.13, "2601", ["civic", "canberra cbd"]),
+  town("Yarralumla", "ACT", -35.307, 149.097, "2600"),
+  town("Griffith", "ACT", -35.325, 149.139, "2603"),
+  nationalPoi("Parliament House, Canberra ACT 2600", "ACT", -35.308, 149.125, ["parliament house canberra"]),
+  nationalPoi("Access Canberra Dickson, Dickson ACT 2602", "ACT", -35.25, 149.139, ["access canberra", "access canberra dickson"]),
+];
+
 const STATE_CODES = ["NSW", "ACT", "QLD", "WA", "VIC", "SA", "TAS", "NT"];
 const STATE_CODE_PATTERN = STATE_CODES.join("|");
+const GENERIC_STATE_STRIPPED_NEEDLES = new Set(["service", "health service"]);
 
 function regionalLocalGeocode(query, limit = 5) {
   const needles = regionalSearchNeedles(query);
@@ -419,7 +507,7 @@ function regionalLocalGeocode(query, limit = 5) {
   const street = streetFallback(query, state);
   if (street) rows.push(street);
 
-  for (const place of [...REGIONAL_POIS, ...REGIONAL_TOWNS]) {
+  for (const place of [...NATIONAL_EXTRA_PLACES, ...REGIONAL_POIS, ...REGIONAL_TOWNS]) {
     if (!Number.isFinite(place.lat) || !Number.isFinite(place.lon)) continue;
     if (state && place.state !== state) continue;
     const match = matchPlace(needles, place);
@@ -445,6 +533,7 @@ function regionalGeocodeHintStatus() {
   return {
     regionalTownRecords: REGIONAL_TOWNS.length,
     regionalPoiRecords: REGIONAL_POIS.length,
+    nationalExtraPlaceRecords: NATIONAL_EXTRA_PLACES.length,
     regionalProvider: "fuel_path_regional_gazetteer",
   };
 }
@@ -578,7 +667,9 @@ function regionalSearchNeedles(query) {
   const withoutCountry = stripTerminalCountry(needle);
   const withoutState = stripTerminalStateCode(withoutCountry);
   const withoutGenericSuffix = stripGenericQuerySuffix(withoutState);
-  return [...new Set([needle, withoutCountry, withoutState, withoutGenericSuffix].filter((value) => value.length >= 3))];
+  return [...new Set([needle, withoutCountry, withoutState, withoutGenericSuffix].filter((value) =>
+    value.length >= 3 && !GENERIC_STATE_STRIPPED_NEEDLES.has(value)
+  ))];
 }
 
 function stripTerminalStateCode(value) {
@@ -593,6 +684,7 @@ function stripGenericQuerySuffix(value) {
   return String(value || "")
     .replace(/\btown centre\b$/i, "")
     .replace(/\bcity centre\b$/i, "")
+    .replace(/\bsuburbs?\b$/i, "")
     .trim();
 }
 
@@ -627,6 +719,23 @@ function titleCase(value) {
 
 function normalise(value) {
   return String(value || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function nationalPoi(label, state, lat, lon, aliases = []) {
+  return placeRecord({
+    label,
+    name: label.split(",")[0],
+    state,
+    lat,
+    lon,
+    postcode: postcodeFromLabel(label),
+    kind: "regional_poi",
+    aliases,
+  });
+}
+
+function postcodeFromLabel(label) {
+  return String(label || "").match(/\b\d{4}\b/)?.[0] || "";
 }
 
 module.exports = {

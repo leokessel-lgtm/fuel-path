@@ -8,18 +8,18 @@ import { EvCharger, MapPoint, StationViewModel } from "../types";
 
 const LEAFLET_CSS_ID = "fuel-path-leaflet-css";
 const LEAFLET_CUSTOM_CSS_ID = "fuel-path-leaflet-custom-css";
-const maxStationMarkers = 240;
+const maxStationMarkers = 420;
 const maxPriceMarkers = 14;
-const maxExtraPriceMarkers = 18;
-const maxClusterMarkers = 24;
+const maxEvMarkers = 96;
 const markerGridSize = 132;
-const minClusterStationCount = 3;
 const mixedEnergyMaxPriceMarkers = 8;
-const mixedEnergyMaxExtraPriceMarkers = 12;
 const mixedEnergyMarkerGridSize = 190;
+const nearbyInitialCameraZoom = 12.5;
+const nearbyInitialMarkerRadiusKm = 4.2;
 
 type ClusterMarker = {
   count: number;
+  items: StationViewModel[];
   lat: number;
   lon: number;
   minPrice: number;
@@ -74,7 +74,9 @@ export function StationMap({
   const lastReportedUserCentreKeyRef = useRef("");
   const programmaticMoveRef = useRef(false);
   const userMovedMapRef = useRef(false);
+  const zoomingRef = useRef(false);
   const [mapReady, setMapReady] = useState(false);
+  const [mapRenderVersion, setMapRenderVersion] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -87,10 +89,18 @@ export function StationMap({
 
       const map = L.map(mapElementRef.current, {
         attributionControl: true,
+        fadeAnimation: true,
+        markerZoomAnimation: true,
+        preferCanvas: true,
+        wheelDebounceTime: 36,
+        wheelPxPerZoomLevel: 88,
+        zoomAnimation: true,
+        zoomAnimationThreshold: 4,
         zoomControl: false,
+        zoomDelta: 0.5,
+        zoomSnap: 0.5,
       }).setView([centre.lat, centre.lon], 13);
 
-      L.control.zoom({ position: "bottomright" }).addTo(map);
       L.tileLayer(mapSkin.baseTileUrl, {
         attribution: mapSkin.baseAttribution,
         maxZoom: 19,
@@ -99,6 +109,16 @@ export function StationMap({
         if (!programmaticMoveRef.current) {
           userMovedMapRef.current = true;
         }
+      });
+      map.on("zoomstart", () => {
+        zoomingRef.current = true;
+      });
+      map.on("moveend", () => {
+        setMapRenderVersion((current) => current + 1);
+      });
+      map.on("zoomend", () => {
+        zoomingRef.current = false;
+        setMapRenderVersion((current) => current + 1);
       });
 
       mapRef.current = map;
@@ -119,6 +139,7 @@ export function StationMap({
       lastReportedUserCentreKeyRef.current = "";
       programmaticMoveRef.current = false;
       userMovedMapRef.current = false;
+      zoomingRef.current = false;
     };
   }, []);
 
@@ -127,6 +148,7 @@ export function StationMap({
     const map = mapRef.current;
     const markerLayer = markerLayerRef.current;
     if (!mapReady || !L || !map || !markerLayer) return;
+    if (zoomingRef.current) return;
 
     markerLayer.clearLayers();
 
@@ -135,9 +157,6 @@ export function StationMap({
       .filter((point) => Number.isFinite(point.lat) && Number.isFinite(point.lon))
       .map((point) => [point.lat, point.lon] as [number, number]);
     const activeInsets = resolveCameraInsets(routeEndpoints ? "route" : "nearby", cameraInsets);
-    const cameraStations = showCentreMarker
-      ? nearestStationsForCamera(stations, centre, 12)
-      : stations.slice(0, maxStationMarkers);
     const cameraChargers = chargers.slice(0, 16);
     const routeStationCameraPoints = routeEndpoints
       ? stations
@@ -153,9 +172,7 @@ export function StationMap({
             ...routeStationCameraPoints,
           ]
       : [
-          [centre.lat, centre.lon] as [number, number],
-          ...cameraStations.map((item) => [item.station.lat, item.station.lon] as [number, number]),
-          ...cameraChargers.map((charger) => [charger.lat, charger.lon] as [number, number]),
+          ...nearbyCameraPointsForCentre(centre, nearbyInitialMarkerRadiusKm),
         ];
     const cameraContextKey = routeEndpoints
       ? [
@@ -198,14 +215,28 @@ export function StationMap({
       addUserLocationMarker(L, markerLayer, userLocation);
     }
 
-    const markerGroups = visibleMarkerGroups(
-      stations.slice(0, maxStationMarkers),
-      map.getBounds(),
-      selectedStationCode,
-      chargers.length > 0,
-    );
+    const currentMapBounds = map.getBounds();
+    const groupingBounds =
+      !routeEndpoints && !userMovedMapRef.current && cameraPoints.length >= 2
+        ? L.latLngBounds(cameraPoints).pad(0.12)
+        : currentMapBounds;
+    const groupingUsesCameraBounds = groupingBounds !== currentMapBounds;
+    const markerStations = prioritiseSelectedStations(stations, selectedStationCode);
+    const markerGroups = routeEndpoints
+      ? {
+          priceMarkers: markerStations.slice(0, maxPriceMarkers),
+          clusterMarkers: [],
+        }
+      : visibleMarkerGroups(
+          markerStations.slice(0, maxStationMarkers),
+          groupingBounds,
+          selectedStationCode,
+          chargers.length > 0,
+        );
 
-    markerGroups.clusterMarkers.forEach((cluster) => {
+    markerGroups.clusterMarkers
+      .filter((cluster) => groupingUsesCameraBounds || clusterFitsInteractiveMapArea(map, cluster, activeInsets))
+      .forEach((cluster) => {
       const marker = L.marker([cluster.lat, cluster.lon], {
         icon: L.divIcon({
           className: "",
@@ -216,13 +247,19 @@ export function StationMap({
         alt: "",
         keyboard: false,
         riseOnHover: true,
-        zIndexOffset: 100,
+        zIndexOffset: 680,
       });
       marker.on("click", () => {
         runProgrammaticMapMove(programmaticMoveRef, map, () => {
-          map.flyTo([cluster.lat, cluster.lon], Math.min(map.getZoom() + 2, 17), {
-            animate: true,
-          });
+          map.fitBounds(
+            L.latLngBounds(cluster.items.map((item) => [item.station.lat, item.station.lon] as [number, number])),
+            {
+              ...leafletPadding(activeInsets),
+              animate: true,
+              maxZoom: 17,
+            },
+          );
+          map.once("moveend", () => setMapRenderVersion((current) => current + 1));
         });
       });
       marker.bindTooltip(
@@ -230,14 +267,15 @@ export function StationMap({
         { direction: "top", offset: [0, -22] },
       );
       markerLayer.addLayer(marker);
-    });
+      });
 
     markerGroups.priceMarkers.forEach((item) => {
       const selected = item.station.stationCode === selectedStationCode;
+      const subdued = Boolean(routeEndpoints && selectedStationCode && !selected);
       const marker = L.marker([item.station.lat, item.station.lon], {
         icon: L.divIcon({
           className: "",
-          html: markerHtml(item, selected),
+          html: markerHtml(item, selected, subdued),
           iconAnchor: [27, 56],
           iconSize: [54, 56],
           tooltipAnchor: [0, -58],
@@ -245,7 +283,7 @@ export function StationMap({
         alt: "",
         keyboard: false,
         riseOnHover: true,
-        zIndexOffset: selected ? 600 : 400,
+        zIndexOffset: selected ? 640 : subdued ? 320 : 400,
       });
       marker.on("click", () => {
         onSelect(item.station.stationCode);
@@ -272,7 +310,7 @@ export function StationMap({
       fitPoints.push([item.station.lat, item.station.lon]);
     });
 
-    chargers.slice(0, maxStationMarkers).forEach((charger) => {
+    prioritiseSelectedChargers(chargers, selectedChargerId).slice(0, maxEvMarkers).forEach((charger) => {
       const selected = charger.id === selectedChargerId;
       const marker = L.marker([charger.lat, charger.lon], {
         icon: L.divIcon({
@@ -310,9 +348,13 @@ export function StationMap({
     if (fitKey !== lastFitKeyRef.current && (!userMovedMapRef.current || cameraContextChanged)) {
       runProgrammaticMapMove(programmaticMoveRef, map, () => {
         map.invalidateSize();
+        if (!routeEndpoints) {
+          map.setView([centre.lat, centre.lon], nearbyInitialCameraZoom, { animate: true });
+          return;
+        }
         map.fitBounds(L.latLngBounds(fitCameraPoints), {
           ...leafletPadding(activeInsets),
-          maxZoom: routeEndpoints ? 15 : showCentreMarker ? 15 : 14,
+          maxZoom: routeEndpoints ? 15 : 14,
         });
       });
       lastFitKeyRef.current = fitKey;
@@ -392,6 +434,7 @@ export function StationMap({
     stations,
     onSelectCharger,
     userLocation,
+    mapRenderVersion,
   ]);
 
   return (
@@ -464,7 +507,7 @@ function addDestinationMarker(
   markerLayer.addLayer(marker);
 }
 
-function markerHtml(item: StationViewModel, selected: boolean) {
+function markerHtml(item: StationViewModel, selected: boolean, subdued: boolean) {
   const style = brandStyleForStation(item.station);
   const iconUri = imageUri(style.icon);
   const logo = iconUri
@@ -472,8 +515,13 @@ function markerHtml(item: StationViewModel, selected: boolean) {
     : `<span class="fuel-path-marker-initials" style="background:${style.color}">${escapeHtml(
         style.initials,
       )}</span>`;
+  const className = [
+    "fuel-path-marker",
+    selected ? "is-selected" : "",
+    subdued ? "is-subdued" : "",
+  ].filter(Boolean).join(" ");
   return `
-    <div class="fuel-path-marker${selected ? " is-selected" : ""}" data-station-code="${escapeHtml(item.station.stationCode)}" aria-hidden="true">
+    <div class="${className}" data-station-code="${escapeHtml(item.station.stationCode)}" aria-hidden="true">
       <span class="fuel-path-marker-price">${item.adjustedCpl.toFixed(1)}</span>
       <span class="fuel-path-marker-brand">${logo}</span>
     </div>
@@ -489,6 +537,23 @@ function clusterMarkerHtml(cluster: ClusterMarker) {
   `;
 }
 
+function clusterFitsInteractiveMapArea(
+  map: Leaflet.Map,
+  cluster: ClusterMarker,
+  insets: Required<CameraInsets>,
+) {
+  const point = map.latLngToContainerPoint([cluster.lat, cluster.lon]);
+  const size = map.getSize();
+  const horizontalPadding = 58;
+  const verticalPadding = 24;
+  return (
+    point.x >= Math.max(insets.left, horizontalPadding) &&
+    point.x <= size.x - Math.max(insets.right, horizontalPadding) &&
+    point.y >= insets.top + verticalPadding &&
+    point.y <= size.y - insets.bottom - verticalPadding
+  );
+}
+
 function evChargerMarkerHtml(charger: EvCharger, selected: boolean) {
   const label = charger.maxPowerKw ? `${Math.round(charger.maxPowerKw)}kW` : "";
   return `
@@ -499,6 +564,20 @@ function evChargerMarkerHtml(charger: EvCharger, selected: boolean) {
       ${label ? `<span class="fuel-path-ev-marker-label">${escapeHtml(label)}</span>` : ""}
     </div>
   `;
+}
+
+function prioritiseSelectedStations(stations: StationViewModel[], selectedStationCode?: string) {
+  if (!selectedStationCode) return stations;
+  const selected = stations.find((item) => item.station.stationCode === selectedStationCode);
+  if (!selected) return stations;
+  return [selected, ...stations.filter((item) => item.station.stationCode !== selectedStationCode)];
+}
+
+function prioritiseSelectedChargers(chargers: EvCharger[], selectedChargerId?: string) {
+  if (!selectedChargerId) return chargers;
+  const selected = chargers.find((charger) => charger.id === selectedChargerId);
+  if (!selected) return chargers;
+  return [selected, ...chargers.filter((charger) => charger.id !== selectedChargerId)];
 }
 
 function visibleMarkerGroups(
@@ -512,10 +591,10 @@ function visibleMarkerGroups(
   const clusterGroups = new Map<string, StationViewModel[]>();
   const priceMarkers: StationViewModel[] = [];
   const priceLimit = hasEvMarkers ? mixedEnergyMaxPriceMarkers : maxPriceMarkers;
-  const extraPriceLimit = hasEvMarkers ? mixedEnergyMaxExtraPriceMarkers : maxExtraPriceMarkers;
   const gridSize = hasEvMarkers ? mixedEnergyMarkerGridSize : markerGridSize;
+  const visibleStations = stations.filter((item) => bounds.contains([item.station.lat, item.station.lon]));
 
-  const ranked = [...stations].sort((left, right) => {
+  const ranked = [...visibleStations].sort((left, right) => {
     const leftProtected = protectedCodes.has(left.station.stationCode) ? 0 : 1;
     const rightProtected = protectedCodes.has(right.station.stationCode) ? 0 : 1;
     return (
@@ -542,19 +621,20 @@ function visibleMarkerGroups(
     clusterGroups.set(cell, grouped);
   }
 
-  const overflowGroups = Array.from(clusterGroups.values());
-  const extraPriceMarkers = overflowGroups
-    .filter((items) => items.length < minClusterStationCount)
-    .flat()
-    .sort((left, right) => markerPriorityScore(left) - markerPriorityScore(right))
-    .slice(0, Math.max(0, extraPriceLimit - priceMarkers.length));
-  priceMarkers.push(...extraPriceMarkers);
+  const singletonMarkers: StationViewModel[] = [];
+  const clusterItems: StationViewModel[][] = [];
+  for (const items of clusterGroups.values()) {
+    if (items.length === 1) {
+      singletonMarkers.push(items[0]);
+    } else {
+      clusterItems.push(items);
+    }
+  }
+  priceMarkers.push(...singletonMarkers);
 
-  const clusterMarkers = overflowGroups
-    .filter((items) => items.length >= minClusterStationCount)
+  const clusterMarkers = clusterItems
     .map(clusterMarkerForItems)
     .sort((left, right) => right.count - left.count || left.minPrice - right.minPrice)
-    .slice(0, maxClusterMarkers);
 
   return { priceMarkers, clusterMarkers };
 }
@@ -571,6 +651,7 @@ function clusterMarkerForItems(items: StationViewModel[]): ClusterMarker {
   );
   return {
     count: totals.count,
+    items,
     lat: totals.lat / totals.count,
     lon: totals.lon / totals.count,
     minPrice: totals.minPrice,
@@ -607,6 +688,18 @@ function minBy<T>(items: T[], score: (item: T) => number) {
 
 function markerPriorityScore(item: StationViewModel) {
   return item.adjustedCpl + item.distanceKm * 0.85;
+}
+
+function nearbyCameraPointsForCentre(centre: MapPoint, radiusKm: number) {
+  const latDelta = radiusKm / 111;
+  const lonDelta = radiusKm / Math.max(35, 111 * Math.cos(toRad(centre.lat)));
+  return [
+    [centre.lat, centre.lon] as [number, number],
+    [centre.lat + latDelta, centre.lon] as [number, number],
+    [centre.lat - latDelta, centre.lon] as [number, number],
+    [centre.lat, centre.lon + lonDelta] as [number, number],
+    [centre.lat, centre.lon - lonDelta] as [number, number],
+  ];
 }
 
 function nearestStationsForCamera(
@@ -777,15 +870,6 @@ function ensureLeafletStyles() {
       .leaflet-control-attribution {
         font-size: 10px;
       }
-      .leaflet-bottom.leaflet-right .leaflet-control-zoom {
-        margin-bottom: 132px;
-      }
-      .leaflet-touch .leaflet-bar a,
-      .leaflet-control-zoom a {
-        height: 44px;
-        line-height: 44px;
-        width: 44px;
-      }
       .fuel-path-marker {
         align-items: center;
         background: ${colors.white};
@@ -828,6 +912,13 @@ function ensureLeafletStyles() {
       }
       .fuel-path-marker.is-selected::after {
         border-top-color: ${colors.white};
+      }
+      .fuel-path-marker.is-subdued {
+        opacity: 0.66;
+        transform: scale(0.92);
+      }
+      .fuel-path-marker.is-subdued .fuel-path-marker-price {
+        background: rgba(7, 86, 66, 0.82);
       }
       .fuel-path-marker-brand {
         align-items: center;

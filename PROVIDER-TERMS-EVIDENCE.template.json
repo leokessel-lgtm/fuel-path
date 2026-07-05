@@ -69,6 +69,20 @@
       "evidenceReference": "",
       "evidenceSource": ""
     },
+    "SA": {
+      "signUpAccepted": false,
+      "licenceTermsAccepted": false,
+      "attributionDisclaimerReady": false,
+      "attributionDisclaimerWording": "",
+      "cachePolicyCoversCurrencyObligations": false,
+      "priceCacheMaxAgeMinutes": 0,
+      "siteDataCacheMaxAgeHours": 0,
+      "serverSideTokenOnly": false,
+      "commercialConsumerAppUseConfirmed": false,
+      "termsAcceptedAt": "",
+      "evidenceReference": "",
+      "evidenceSource": ""
+    },
     "NT": {
       "providerPathConfirmed": false,
       "providerName": "",

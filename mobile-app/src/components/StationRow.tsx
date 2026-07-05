@@ -7,6 +7,7 @@ import {
   stationEvidenceLine,
   stationOpenLabel,
 } from "../utils/decisionEvidence";
+import { fuelMismatchLine } from "../utils/fuelMismatch";
 import { tomorrowPriceView } from "../utils/pricing";
 import { BrandBadge } from "./BrandBadge";
 
@@ -25,7 +26,6 @@ export function StationRow({
 }) {
   const tomorrow = tomorrowPriceView(item);
   const attentionCue = stationAttentionCue(item);
-  const showAttentionCue = attentionCue && attentionCue.label !== stationOpenLabel(item.station.openNow);
   const fuelLabel = item.fuel || "fuel";
   return (
     <Pressable
@@ -80,30 +80,6 @@ export function StationRow({
         <View style={styles.actionDistancePill}>
           <Text style={styles.actionDistanceText}>{item.distanceKm.toFixed(1)} km</Text>
         </View>
-        {showAttentionCue ? (
-          <Text
-            numberOfLines={1}
-            style={[
-              styles.confidence,
-              attentionCue.level === "low" && styles.confidenceLow,
-              attentionCue.level === "medium" && styles.confidenceMedium,
-            ]}
-          >
-            {attentionCue.label}
-          </Text>
-        ) : null}
-        {tomorrow ? (
-          <Text
-            numberOfLines={1}
-            style={[
-              styles.tomorrowPrice,
-              tomorrow.direction === "down" && styles.tomorrowPriceDown,
-              tomorrow.direction === "up" && styles.tomorrowPriceUp,
-            ]}
-          >
-            {tomorrow.shortLabel}
-          </Text>
-        ) : null}
       </View>
     </Pressable>
   );
@@ -112,6 +88,8 @@ export function StationRow({
 function stationWhyLine(item: StationViewModel) {
   const priceKind = item.discountCpl ? "your adjusted price" : "pump price";
   const fuel = item.fuel || "fuel";
+  const mismatch = fuelMismatchLine(item);
+  if (mismatch) return `${mismatch} ${priceKind}, ${item.distanceKm.toFixed(1)} km away`;
   return `${fuel} ${priceKind}, ${item.distanceKm.toFixed(1)} km away`;
 }
 
@@ -125,6 +103,9 @@ function stationRowAccessibilityLabel(item: StationViewModel) {
     `${item.adjustedCpl.toFixed(1)} cents per litre ${priceKind}`,
     stationEvidenceLine(item),
   ];
+  if (item.exactFuelMatch === false && item.requestedFuel && item.fuel) {
+    parts.push(`${item.requestedFuel} unavailable nearby, showing ${item.fuel}`);
+  }
   if (item.discountCpl) parts.push(`Confirmed discount: ${item.discountLabel}`);
   const attentionCue = stationAttentionCue(item);
   if (attentionCue) parts.push(attentionCue.label);

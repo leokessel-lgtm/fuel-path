@@ -3,6 +3,12 @@ import Constants from "expo-constants";
 
 import { configuredEasProjectId } from "./backendAlerts";
 import { CommuteAlertStatus, NotificationPermissionState, SavedCommute } from "../types";
+import {
+  ROUTE_ALERT_CHANNEL_ID,
+  nextRouteAlertAt,
+  routeAlertScheduleInputs,
+  scheduledRouteNotificationIds,
+} from "./routeNotificationSchedule";
 
 type PermissionResult = {
   message: string;
@@ -13,6 +19,7 @@ type ScheduleResult = {
   message: string;
   nextAlertAt?: string;
   notificationId?: string;
+  notificationIds?: string[];
   status: CommuteAlertStatus;
 };
 
@@ -21,8 +28,6 @@ type PushTokenResult = {
   token?: string;
   status: "ready" | "unavailable" | "failed";
 };
-
-const ROUTE_ALERT_CHANNEL_ID = "route-alerts";
 
 export async function configureRouteNotificationHandler() {
   if (Platform.OS === "web") return;
@@ -113,34 +118,48 @@ export async function scheduleSavedCommuteAlert(commute: SavedCommute): Promise<
       };
     }
 
-    if (commute.scheduledNotificationId) {
-      await Notifications.cancelScheduledNotificationAsync(commute.scheduledNotificationId);
+    const existingNotificationIds = scheduledRouteNotificationIds(commute);
+    for (const notificationId of existingNotificationIds) {
+      await Notifications.cancelScheduledNotificationAsync(notificationId);
     }
 
-    const { hour, minute } = parseAlertTime(commute.alertTime);
-    const notificationId = await Notifications.scheduleNotificationAsync({
-      content: {
-        title: "Check fuel before your saved drive",
-        body: `${commute.name}: refresh route prices before you head out.`,
-        data: {
-          commuteId: commute.id,
-          routeName: commute.name,
-          type: "saved-route-alert",
+    if (commute.localReminderEnabled === false) {
+      return {
+        status: "scheduled",
+        message: "Route watch is on. Local reminders are off.",
+      };
+    }
+
+    const notificationIds: string[] = [];
+    const scheduleInputs = routeAlertScheduleInputs(commute);
+    for (const scheduleInput of scheduleInputs) {
+      const notificationId = await Notifications.scheduleNotificationAsync({
+        content: {
+          title: "Fuel worth checking before your drive",
+          body: `${commute.name}: watching ${commute.fuel} savings before you leave.`,
+          data: {
+            commuteId: commute.id,
+            routeName: commute.name,
+            type: "saved-route-alert",
+          },
         },
-      },
-      trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.DAILY,
-        channelId: ROUTE_ALERT_CHANNEL_ID,
-        hour,
-        minute,
-      },
-    });
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
+          channelId: ROUTE_ALERT_CHANNEL_ID,
+          weekday: scheduleInput.weekday,
+          hour: scheduleInput.hour,
+          minute: scheduleInput.minute,
+        },
+      });
+      notificationIds.push(notificationId);
+    }
 
     return {
       status: "scheduled",
-      message: "Daily route reminder scheduled.",
-      nextAlertAt: nextDailyAlertAt(commute.alertTime).toISOString(),
-      notificationId,
+      message: "Route watch is on. Reminder scheduled for selected days.",
+      nextAlertAt: nextRouteAlertAt(commute.alertTime, commute.alertDays).toISOString(),
+      notificationId: notificationIds[0],
+      notificationIds,
     };
   } catch {
     return {
@@ -161,7 +180,7 @@ export async function getExpoRoutePushToken(): Promise<PushTokenResult> {
   if (androidNotificationsUnavailableInExpoGo() || remotePushUnavailableInExpoGo()) {
     return {
       status: "unavailable",
-      message: "Backend push alerts need a development or preview build, not Expo Go.",
+      message: "Smart route notifications need a development or preview build, not Expo Go.",
     };
   }
 
@@ -173,7 +192,7 @@ export async function getExpoRoutePushToken(): Promise<PushTokenResult> {
     if (permission.status !== "granted") {
       return {
         status: "unavailable",
-        message: "Enable notifications before backend alerts can run.",
+        message: "Enable notifications before smart route alerts can run.",
       };
     }
 
@@ -181,7 +200,7 @@ export async function getExpoRoutePushToken(): Promise<PushTokenResult> {
     if (!projectId) {
       return {
         status: "unavailable",
-        message: "Backend push alerts need an EAS project id in the native build.",
+        message: "Smart route notifications need an EAS project id in the native build.",
       };
     }
 
@@ -189,7 +208,7 @@ export async function getExpoRoutePushToken(): Promise<PushTokenResult> {
     return {
       status: "ready",
       token: token.data,
-      message: "Validation push token ready for backend alert sync.",
+      message: "Smart route notifications are ready for this build.",
     };
   } catch {
     return {
@@ -200,10 +219,13 @@ export async function getExpoRoutePushToken(): Promise<PushTokenResult> {
 }
 
 export async function cancelSavedCommuteAlert(commute: SavedCommute): Promise<ScheduleResult> {
-  if (Platform.OS !== "web" && !androidNotificationsUnavailableInExpoGo() && commute.scheduledNotificationId) {
+  if (Platform.OS !== "web" && !androidNotificationsUnavailableInExpoGo()) {
     try {
       const Notifications = await import("expo-notifications");
-      await Notifications.cancelScheduledNotificationAsync(commute.scheduledNotificationId);
+      const notificationIds = scheduledRouteNotificationIds(commute);
+      for (const notificationId of notificationIds) {
+        await Notifications.cancelScheduledNotificationAsync(notificationId);
+      }
     } catch {
       return {
         status: "failed",
@@ -247,7 +269,7 @@ function permissionResultForStatus(status: string): PermissionResult {
 
   return {
     state: "undetermined",
-    message: "Enable alerts when you want Fuel Path to check saved routes for you.",
+    message: "Enable notifications when you want Fuel Path to watch saved routes for useful fuel decisions.",
   };
 }
 
@@ -266,33 +288,4 @@ function remotePushUnavailableInExpoGo() {
 
 function androidNotificationsUnavailableInExpoGo() {
   return Platform.OS === "android" && Constants.appOwnership === "expo";
-}
-
-function parseAlertTime(value: string) {
-  const [hourValue, minuteValue] = value.split(":");
-  const hour = Number(hourValue);
-  const minute = Number(minuteValue);
-
-  if (
-    Number.isInteger(hour) &&
-    Number.isInteger(minute) &&
-    hour >= 0 &&
-    hour <= 23 &&
-    minute >= 0 &&
-    minute <= 59
-  ) {
-    return { hour, minute };
-  }
-
-  return { hour: 7, minute: 30 };
-}
-
-function nextDailyAlertAt(alertTime: string) {
-  const { hour, minute } = parseAlertTime(alertTime);
-  const next = new Date();
-  next.setHours(hour, minute, 0, 0);
-  if (next.getTime() <= Date.now()) {
-    next.setDate(next.getDate() + 1);
-  }
-  return next;
 }

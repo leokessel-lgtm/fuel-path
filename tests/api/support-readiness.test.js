@@ -25,6 +25,37 @@ test("support readiness blocks without contact owner and review date", async () 
   assert.deepEqual(payload.missingSections, []);
 });
 
+test("support readiness can load contact owner and review date from evidence", async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-support-readiness-"));
+  const evidence = path.join(tmp, "support-evidence.json");
+  fs.writeFileSync(
+    evidence,
+    JSON.stringify(
+      {
+        runbook: READY_SUPPORT_RUNBOOK_SOURCE,
+        supportContact: "support@fuelpath.app",
+        supportOwner: "Leo Kesselring",
+        reviewedAt: "2026-06-20",
+      },
+      null,
+      2,
+    ),
+  );
+
+  const { stdout } = await execFileAsync(
+    process.execPath,
+    ["scripts/check-support-readiness.mjs", "--evidence-json", evidence],
+    { cwd: ROOT, timeout: 10_000 },
+  );
+  const payload = JSON.parse(stdout);
+
+  assert.equal(payload.status, "ready");
+  assert.equal(payload.evidence.provided, true);
+  assert.equal(payload.supportContact, "support@fuelpath.app");
+  assert.equal(payload.supportOwner, "Leo Kesselring");
+  assert.equal(payload.reviewedAt, "2026-06-20");
+});
+
 test("support readiness rejects incomplete runbooks", async () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-support-readiness-"));
   const runbook = path.join(tmp, "SUPPORT-RUNBOOK.md");
@@ -265,10 +296,21 @@ test("support readiness accepts Fuel Path-owned support contact URLs", async () 
 });
 
 test("support readiness requires claimed contact and owner in the runbook", async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-support-readiness-"));
+  const runbook = path.join(tmp, "SUPPORT-RUNBOOK.md");
+  fs.copyFileSync(READY_SUPPORT_RUNBOOK_SOURCE, runbook);
+  const withoutPublishedLines = fs
+    .readFileSync(runbook, "utf8")
+    .replace(/^Support contact:.*\n/gm, "")
+    .replace(/^Support owner:.*\n/gm, "");
+  fs.writeFileSync(runbook, withoutPublishedLines);
+
   const { stdout } = await execFileAsync(
     process.execPath,
     [
       "scripts/check-support-readiness.mjs",
+      "--runbook",
+      runbook,
       "--support-contact",
       "support@fuelpath.app",
       "--support-owner",

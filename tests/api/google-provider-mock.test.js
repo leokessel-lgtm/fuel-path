@@ -25,6 +25,8 @@ const GOOGLE_ENV_KEYS = [
   "FUEL_PATH_GOOGLE_PLACES_BUDGET_ALERT_CONFIRMED",
   "FUEL_PATH_GEOCODE_QUOTA_DATABASE_URL",
   "FUEL_PATH_GOOGLE_PLACES_MIN_QUERY_LENGTH",
+  "FUEL_PATH_HERE_API_KEY",
+  "FUEL_PATH_PLAN_AUTOCOMPLETE_PROVIDER_CASCADE_ENABLED",
   "FUEL_PATH_GEOCODE_PROVIDER",
   "FUEL_PATH_ROUTE_PROVIDER",
   "FUEL_PATH_PRODUCTION_HARDENING",
@@ -222,6 +224,129 @@ test("Google Places geocoding is exercised through mocked API calls only", async
       assert.equal(mockFetch.calls[0].body.includedRegionCodes[0], "au");
       assert.equal(mockFetch.calls.every((call) => call.host === "places.googleapis.com"), true);
       assert.equal(mockFetch.unexpectedCalls.length, 0);
+
+      mockFetch.restore();
+    },
+  );
+});
+
+test("Plan autocomplete uses Google predictions without Place Details", async () => {
+  await withGoogleEnv(
+    {
+      FUEL_PATH_GOOGLE_PLACES_API_KEY: "test-google-places-key",
+      FUEL_PATH_GEOCODE_PROVIDER: "google",
+      FUEL_PATH_PAID_GEOCODE_FALLBACK_ENABLED: "1",
+      FUEL_PATH_PLAN_AUTOCOMPLETE_PROVIDER_CASCADE_ENABLED: "1",
+    },
+    async () => {
+      const mockFetch = installGoogleMockFetch();
+
+      const payload = await geocode({
+        query: "Sydney Town Hall",
+        limit: 2,
+        purpose: "plan_autocomplete",
+        sessionToken: "session-plan-autocomplete",
+        searchContext: {
+          nearLat: -33.873,
+          nearLon: 151.207,
+          nearRadiusKm: 25,
+        },
+      });
+
+      assert.equal(payload.provider, "google");
+      assert.equal(payload.lookupStatus, "ok");
+      assert.deepEqual(
+        payload.suggestions.map((item) => item.label),
+        ["Sydney Town Hall", "Town Hall Station"],
+      );
+      assert.deepEqual(
+        payload.suggestions.map((item) => item.refineRequired),
+        [true, true],
+      );
+      assert.deepEqual(
+        payload.suggestions.map((item) => item.providerId),
+        ["places/sydney-town-hall", "places/town-hall-station"],
+      );
+      assert.equal(mockFetch.calls.length, 1);
+      assert.equal(mockFetch.calls[0].host, "places.googleapis.com");
+      assert.equal(mockFetch.calls[0].path, "/v1/places:autocomplete");
+      assert.equal(mockFetch.calls[0].body.input, "Sydney Town Hall");
+      assert.equal(mockFetch.calls[0].body.sessionToken, "session-plan-autocomplete");
+      assert.deepEqual(mockFetch.calls[0].body.includedRegionCodes, ["au"]);
+      assert.equal(mockFetch.calls[0].body.languageCode, "en-AU");
+      assert.deepEqual(mockFetch.calls[0].body.locationBias, {
+        circle: {
+          center: { latitude: -33.873, longitude: 151.207 },
+          radius: 25000,
+        },
+      });
+      assert.equal(
+        mockFetch.calls[0].fieldMask,
+        "suggestions.placePrediction.placeId,suggestions.placePrediction.text,suggestions.placePrediction.types",
+      );
+
+      mockFetch.restore();
+    },
+  );
+});
+
+test("selected Google autocomplete suggestion resolves with Place Details", async () => {
+  await withGoogleEnv(
+    {
+      FUEL_PATH_GOOGLE_PLACES_API_KEY: "test-google-places-key",
+      FUEL_PATH_GEOCODE_PROVIDER: "google",
+      FUEL_PATH_PAID_GEOCODE_FALLBACK_ENABLED: "1",
+      FUEL_PATH_PLAN_AUTOCOMPLETE_PROVIDER_CASCADE_ENABLED: "1",
+    },
+    async () => {
+      const mockFetch = installGoogleMockFetch();
+
+      const payload = await geocode({
+        query: "Sydney Town Hall",
+        limit: 1,
+        provider: "google",
+        providerPlaceId: "places/sydney-town-hall",
+        sessionToken: "session-plan-select",
+      });
+
+      assert.equal(payload.lookupStatus, "ok");
+      assert.equal(payload.location.label, "Sydney Town Hall, 483 George St, Sydney NSW 2000, Australia");
+      assert.equal(payload.location.lat, -33.8732);
+      assert.equal(payload.location.lon, 151.2067);
+      assert.equal(mockFetch.calls.length, 1);
+      assert.equal(mockFetch.calls[0].path, "/v1/places/places%2Fsydney-town-hall");
+
+      mockFetch.restore();
+    },
+  );
+});
+
+test("Plan autocomplete falls back to HERE when Google predictions are empty", async () => {
+  await withGoogleEnv(
+    {
+      FUEL_PATH_GOOGLE_PLACES_API_KEY: "test-google-places-key",
+      FUEL_PATH_HERE_API_KEY: "test-here-key",
+      FUEL_PATH_GEOCODE_PROVIDER: "google",
+      FUEL_PATH_PAID_GEOCODE_FALLBACK_ENABLED: "1",
+      FUEL_PATH_PLAN_AUTOCOMPLETE_PROVIDER_CASCADE_ENABLED: "1",
+    },
+    async () => {
+      const mockFetch = installGoogleEmptyHereMockFetch();
+
+      const payload = await geocode({
+        query: "Sylvania Heights Public School",
+        limit: 2,
+        purpose: "plan_autocomplete",
+        sessionToken: "session-plan-here",
+      });
+
+      assert.equal(payload.provider, "google");
+      assert.equal(payload.lookupStatus, "local_fallback");
+      assert.match(payload.warning, /HERE fallback/i);
+      assert.equal(payload.location.label, "Sylvania Heights Public School");
+      assert.equal(payload.location.provider, "here");
+      assert.equal(mockFetch.calls.length, 2);
+      assert.deepEqual(mockFetch.calls.map((call) => call.host), ["places.googleapis.com", "autosuggest.search.hereapi.com"]);
 
       mockFetch.restore();
     },
@@ -505,6 +630,7 @@ function installGoogleMockFetch() {
       search: url.search,
       rapidApiKey: options.headers?.["x-rapidapi-key"] || "",
       body: options.body ? JSON.parse(options.body) : null,
+      fieldMask: options.headers?.["X-Goog-FieldMask"] || "",
       mocked: true,
     };
     calls.push(call);
@@ -512,8 +638,8 @@ function installGoogleMockFetch() {
     if (url.hostname === "places.googleapis.com" && url.pathname === "/v1/places:autocomplete") {
       return jsonResponse({
         suggestions: [
-          { placePrediction: { placeId: "places/sydney-town-hall" } },
-          { placePrediction: { placeId: "places/town-hall-station" } },
+          { placePrediction: { placeId: "places/sydney-town-hall", text: { text: "Sydney Town Hall" }, types: ["point_of_interest"] } },
+          { placePrediction: { placeId: "places/town-hall-station", text: { text: "Town Hall Station" }, types: ["transit_station"] } },
         ],
       });
     }
@@ -612,6 +738,44 @@ function installGoogleMockFetch() {
   return {
     calls,
     unexpectedCalls,
+    restore() {
+      global.fetch = originalFetch;
+    },
+  };
+}
+
+function installGoogleEmptyHereMockFetch() {
+  const originalFetch = global.fetch;
+  const calls = [];
+  global.fetch = async (input, options = {}) => {
+    const url = new URL(String(input));
+    const call = {
+      host: url.hostname,
+      path: url.pathname,
+      search: url.search,
+      body: options.body ? JSON.parse(options.body) : null,
+      mocked: true,
+    };
+    calls.push(call);
+    if (url.hostname === "places.googleapis.com" && url.pathname === "/v1/places:autocomplete") {
+      return jsonResponse({ suggestions: [] });
+    }
+    if (url.hostname === "autosuggest.search.hereapi.com" && url.pathname === "/v1/autosuggest") {
+      return jsonResponse({
+        items: [
+          {
+            title: "Sylvania Heights Public School",
+            id: "here:school:sylvania-heights",
+            resultType: "place",
+            position: { lat: -34.014, lng: 151.104 },
+          },
+        ],
+      });
+    }
+    return jsonResponse({ error: { message: `Unexpected mocked URL ${url.href}` } }, 500);
+  };
+  return {
+    calls,
     restore() {
       global.fetch = originalFetch;
     },

@@ -16,6 +16,7 @@ node_modules/
 dist/
 web-build/
 public/
+mobile-app/dist-local-prod-api/
 expo-env.d.ts
 ios/
 android/
@@ -27,6 +28,7 @@ android/
 *.sqlite-shm
 *.sqlite-wal
 tmp/
+output/
 data/gnaf/
 provider-samples/
 var/

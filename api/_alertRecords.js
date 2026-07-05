@@ -28,8 +28,11 @@ function normaliseBackendSavedRoute(input) {
     from: normaliseRoutePoint(input.from, "from"),
     to: normaliseRoutePoint(input.to, "to"),
     fuel: String(input.fuel || "").trim().toUpperCase(),
+    vehicleId: cleanString(input.vehicleId).slice(0, 80),
+    vehicleEnergyType: cleanString(input.vehicleEnergyType || "petrol").slice(0, 30),
     alertEnabled: Boolean(input.alertEnabled),
     alertTimeLocal: normaliseAlertTime(input.alertTimeLocal || input.alertTime),
+    alertDays: normaliseAlertDays(input.alertDays),
     timezone: cleanString(input.timezone || "Australia/Sydney").slice(0, 80),
     minSavingDollars: boundedNumber(input.minSavingDollars, 1, 100, 5),
     maxDetourMinutes: boundedNumber(input.maxDetourMinutes, 0, 60, 8),
@@ -40,6 +43,11 @@ function normaliseBackendSavedRoute(input) {
     tankPercent: boundedNumber(input.tankPercent, 1, 100, 45),
     economy: boundedNumber(input.economy, 2, 30, 8.2),
     reserveKm: boundedNumber(input.reserveKm, 0, 250, 35),
+    evBatteryKwh: boundedNumber(input.evBatteryKwh, 0, 200, 0),
+    evRangeKm: boundedNumber(input.evRangeKm, 0, 1000, 0),
+    evConnectors: Array.isArray(input.evConnectors)
+      ? input.evConnectors.map(cleanString).filter(Boolean).slice(0, 8)
+      : [],
     pausedUntil: validIsoDate(input.pausedUntil) || undefined,
     lastAlertSentAt: validIsoDate(input.lastAlertSentAt) || undefined,
     createdAt: validIsoDate(input.createdAt) || now,
@@ -67,6 +75,14 @@ function normaliseRoutePoint(value, field) {
 function normaliseAlertTime(value) {
   const text = cleanString(value);
   return /^([01]\d|2[0-3]):[0-5]\d$/.test(text) ? text : "07:30";
+}
+
+function normaliseAlertDays(value) {
+  const weekdays = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
+  if (!Array.isArray(value)) return weekdays;
+  const selected = new Set(value.map(cleanString).filter((day) => weekdays.includes(day)));
+  const days = weekdays.filter((day) => selected.has(day));
+  return days.length ? days : weekdays;
 }
 
 function requiredText(value, field) {

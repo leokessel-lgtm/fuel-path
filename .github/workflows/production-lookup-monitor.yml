@@ -38,6 +38,10 @@ jobs:
         if: github.event_name != 'pull_request'
         run: npm run check:production-lookup-monitor -- --api-base https://fuel-path.vercel.app
 
+      - name: Run production fuel readiness canary
+        if: github.event_name != 'pull_request'
+        run: npm run check:production-fuel-readiness-canary -- --api-base https://fuel-path.vercel.app
+
       - name: Run Plan route latency budget
         if: github.event_name != 'pull_request'
         run: npm run check:plan-route-latency-budget

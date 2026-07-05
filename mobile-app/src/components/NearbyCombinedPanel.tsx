@@ -9,9 +9,11 @@ import {
 } from "./NearbyEvControls";
 import { StationRow } from "./StationRow";
 import { colors, radii, shadow, spacing, surfaces, typeScale } from "../theme";
-import { AppPreferences, EvCharger, EvConnector, EvPowerMode, FuelCode, NearbySheetSnap, StationViewModel } from "../types";
+import { AppPreferences, EvCharger, EvConnector, EvPowerMode, FuelCode, NearbyResponse, NearbySheetSnap, StationViewModel } from "../types";
+import { fuelMismatchContextLine } from "../utils/fuelMismatch";
 
 const nearbySheetBottomOffset = 8;
+const nearbySheetExpandedTop = 80;
 
 export function NearbyCombinedPanel({
   chargers,
@@ -39,6 +41,7 @@ export function NearbyCombinedPanel({
   sheetSnap,
   sheetExpanded,
   sortedStations,
+  stationContext,
   stationNotice,
 }: {
   chargers: EvCharger[];
@@ -66,7 +69,8 @@ export function NearbyCombinedPanel({
   sheetSnap: NearbySheetSnap;
   sheetExpanded: boolean;
   sortedStations: StationViewModel[];
-  stationNotice: string;
+  stationContext?: NearbyResponse["context"];
+  stationNotice?: string;
 }) {
   const combinedRows = combinedNearbyRows(sortedStations, chargers, connectors, preferences.evChargingPreference);
   const selectedRows = combinedRows.filter((row) => row.id === selectedCode);
@@ -77,9 +81,10 @@ export function NearbyCombinedPanel({
     preferences.evChargingPreference,
     preferences.vehicleEnergyType,
   );
-  const showEvControls = mode === "ev" || preferences.vehicleEnergyType === "electric" || preferences.vehicleEnergyType === "hybrid";
+  const showEvControls = mode === "ev" || preferences.vehicleEnergyType === "electric";
   const isPeek = sheetSnap === "peek";
   const isFull = sheetSnap === "full";
+  const fuelNotice = fuelMismatchContextLine(stationContext) || stationNotice || "";
   const requestSnap = (snap: NearbySheetSnap) => {
     if (onSnapChange) {
       onSnapChange(snap);
@@ -141,6 +146,8 @@ export function NearbyCombinedPanel({
       </View>
 
       {error && isFull ? <Text style={styles.notice}>{error}</Text> : null}
+      {!error && fuelNotice && !isPeek ? <Text style={styles.notice}>{fuelNotice}</Text> : null}
+      {!error && evNotice && !isPeek ? <Text style={styles.notice}>{evNotice}</Text> : null}
 
       {!isPeek ? (
         <NearbyControlDeck
@@ -162,7 +169,6 @@ export function NearbyCombinedPanel({
           showAdvanced={isFull}
         />
       ) : null}
-
       {!loading && !error && !isFull
         ? (
           <>
@@ -359,7 +365,7 @@ const styles = StyleSheet.create({
   },
   sheetExpanded: {
     bottom: 8,
-    top: 140,
+    top: nearbySheetExpandedTop,
   },
   sheetHeader: {
     alignItems: "center",

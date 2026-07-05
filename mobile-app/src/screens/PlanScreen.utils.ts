@@ -34,6 +34,8 @@ export function routeCandidateToStation(candidate: ScoreCandidate, index: number
     reachable: candidate.reachable,
     warnings: candidate.warnings || [],
     matchesDecisionRule: candidate.matchesDecisionRule,
+    actualDetour: candidate.actualDetour,
+    routePosition: candidate.routePosition,
   };
 }
 
@@ -56,17 +58,13 @@ export function routeContextStationToView(
 export function vehiclePlanSummary(preferences: AppPreferences) {
   const vehicle = preferences.vehicleName || preferences.vehicleRego || "Vehicle";
   if (preferences.vehicleEnergyType === "electric") return `${vehicle} | EV | ${preferences.evRangeKm} km`;
-  if (preferences.vehicleEnergyType === "hybrid") return `${vehicle} | Hybrid | ${preferences.fuel} | ${preferences.evRangeKm} km EV`;
   if (preferences.vehicleEnergyType === "diesel") return `${vehicle} | Diesel | ${preferences.fuel}`;
   return `${vehicle} | Petrol | ${preferences.fuel}`;
 }
 
 export function vehiclePlanNotice(vehicleEnergyType: VehicleEnergyType) {
   if (vehicleEnergyType === "electric") {
-    return "Plan can check route distance against your EV range. Charger-stop optimisation is not available yet; use Nearby or your charging network app for stops.";
-  }
-  if (vehicleEnergyType === "hybrid") {
-    return "Hybrid trip planning currently scores fuel stops only. Charger stops stay in Nearby until EV route planning is ready.";
+    return "";
   }
   return "";
 }
@@ -76,21 +74,18 @@ export function vehicleRouteRangeNotice(preferences: AppPreferences, routeDistan
   const routeKm = Math.round(routeDistanceKm);
   const rangeKm = preferences.evRangeKm;
   const marginKm = rangeKm - routeKm;
-  if (marginKm >= 80) {
-    return `Route is about ${routeKm} km. Your selected EV range is ${rangeKm} km, so the trip looks comfortable before weather, speed, load and detours. Charger-stop optimisation is not live yet.`;
+  if (marginKm < 0) {
+    return `Route is about ${routeKm} km. Selected EV range is ${rangeKm} km, so include a charging stop while reviewing route charger options.`;
   }
-  if (marginKm >= 0) {
-    return `Route is about ${routeKm} km against your selected ${rangeKm} km EV range. This is tight; plan a charging fallback before driving. Charger availability is not guaranteed here.`;
+  if (marginKm < 80) {
+    return `Route is about ${routeKm} km. Selected EV range is ${rangeKm} km, so keep a charging option in view before driving.`;
   }
-  return `Route is about ${routeKm} km, which is above your selected ${rangeKm} km EV range. Plan at least one charging stop in Nearby or your charging network app before driving.`;
+  return `Route is about ${routeKm} km. Showing route charger options along the trip.`;
 }
 
 export function vehicleRouteCapacityNotice(preferences: AppPreferences, routeDistanceKm: number | null) {
   if (!routeDistanceKm || preferences.vehicleEnergyType === "electric") return "";
   const routeKm = Math.round(routeDistanceKm);
-  if (preferences.vehicleEnergyType === "hybrid") {
-    return `Route is about ${routeKm} km. Fuel stop suggestions use smart detour rules; EV charger stops are not scored yet.`;
-  }
   return `Route is about ${routeKm} km.`;
 }
 
@@ -150,10 +145,13 @@ function timingAdviceLabel(action: RouteTimingAdvice["action"]) {
 function routeValueReason(best: StationViewModel) {
   const saving = Number(best.netSaving || 0);
   const detourMinutes = Number(best.detourMinutes || 0);
+  const detourKind = best.actualDetour?.source === "route_engine_via_station" ? "Route-checked stop" : "Estimated stop";
   if (detourMinutes > 0.05) {
-    return `Suggested detour adds ${detourMinutes.toFixed(1)} min for a better route price.`;
+    return `${detourKind} adds about ${detourMinutes.toFixed(1)} min for a better route price.`;
   }
-  return "Suggested stop is on the route with the best route price found.";
+  return best.actualDetour?.source === "route_engine_via_station"
+    ? "Route-checked stop is on the route with the best route price found."
+    : "Suggested stop is estimated on the route with the best route price found.";
 }
 
 function savingsDetourLabel(saving: number) {
@@ -166,6 +164,15 @@ function savingsDetourLabel(saving: number) {
 
 export function routeContextNotice(context: ScoreResponse["context"]) {
   if (context.warning) return context.warning;
+  if (context.brandFilter && context.brands?.length) {
+    const brandText = context.brands.length <= 3
+      ? context.brands.join(", ")
+      : `${context.brands.length} preferred brands`;
+    if (context.eligibleCandidates === 0) {
+      return `No preferred station brands found on this route. Show all brands in Settings to compare every station.`;
+    }
+    return `Filtered to ${brandText}.`;
+  }
   const limited = context.regionCapabilities?.find((item) =>
     ["limited", "pending_access", "fallback", "unsupported"].includes(item.capability),
   );

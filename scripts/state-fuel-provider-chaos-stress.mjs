@@ -8,6 +8,7 @@ const { createNswFuelCheckAdapter } = require("../api/_nswFuelCheck");
 const { createWaFuelWatchAdapter } = require("../api/_waFuelWatch");
 const { normaliseVicPayload } = require("../api/_vicServoSaverProvider");
 const { createFppDirectProvider } = require("../api/_fppDirectProvider");
+const { normaliseNtPayload } = require("../api/_ntMyFuelProvider");
 
 const runId = new Date().toISOString().replace(/[:.]/g, "-");
 const outputDir = path.resolve("tmp");
@@ -16,12 +17,14 @@ const { normaliseWaFuelWatchPayloads } = createWaFuelWatchAdapter();
 const { normaliseQldPayload, normaliseSaPayload } = createFppDirectProvider();
 
 const cases = [
+  localCase("act-using-nsw-feed-drops-zero-coords-price-only-and-invalid-prices", assertActMalformedPayload),
   localCase("nsw-drops-zero-coords-price-only-and-invalid-prices", assertNswMalformedPayload),
   localCase("tas-state-filter-prefixes-and-drops-malformed-rows", assertTasMalformedPayload),
   localCase("wa-rss-drops-bad-items-and-preserves-tomorrow-prices", assertWaMalformedPayload),
   localCase("vic-reference-merge-aliases-and-drops-unusable-rows", assertVicMalformedPayload),
   localCase("qld-fpp-direct-drops-price-only-zero-coord-and-unavailable-prices", assertQldMalformedPayload),
   localCase("sa-fpp-direct-drops-price-only-zero-coord-and-unavailable-prices", assertSaMalformedPayload),
+  localCase("nt-myfuel-drops-zero-coords-and-malformed-prices", assertNtMalformedPayload),
   localCase("all-state-normalisers-never-return-non-finite-prices-or-null-island", assertGlobalInvariants),
 ];
 
@@ -94,6 +97,31 @@ function assertNswMalformedPayload() {
     expectedCodes: ["NSW-GOOD"],
     expectedPrice: ["NSW-GOOD", "U91", 181.9],
     absentCodes: ["NSW-ZERO", "NSW-NOPRICE", "NSW-PRICE-ONLY"],
+    observations: { count: stations.length, stationCodes: stations.map((station) => station.stationCode) },
+  });
+}
+
+function assertActMalformedPayload() {
+  const stations = normaliseNswPayload({
+    stations: [
+      stationRow("ACT-GOOD", "Metro Valid ACT", "Metro", -35.2809, 149.13, "1 Constitution Ave, Canberra ACT 2600"),
+      stationRow("ACT-ZERO", "Zero Coord ACT", "Ghost", 0, 0, "Null Island"),
+      stationRow("ACT-NOPRICE", "No Price ACT", "Ghost", -35.28, 149.13, "No Price"),
+      null,
+      "not an object",
+    ],
+    prices: [
+      priceRow("ACT-GOOD", "U91", 175.4, "29/06/2026 08:00:00"),
+      priceRow("ACT-GOOD", "P95", "not-a-price", "29/06/2026 08:05:00"),
+      priceRow("ACT-ZERO", "U91", 149.9),
+      priceRow("ACT-PRICE-ONLY", "DL", 177.7),
+      { stationcode: "ACT-GOOD", fueltype: "", price: 99.9 },
+    ],
+  });
+  return providerChecks("act", stations, {
+    expectedCodes: ["ACT-GOOD"],
+    expectedPrice: ["ACT-GOOD", "U91", 175.4],
+    absentCodes: ["ACT-ZERO", "ACT-NOPRICE", "ACT-PRICE-ONLY"],
     observations: { count: stations.length, stationCodes: stations.map((station) => station.stationCode) },
   });
 }
@@ -225,22 +253,69 @@ function assertSaMalformedPayload() {
   });
 }
 
+function assertNtMalformedPayload() {
+  const stations = normaliseNtPayload({
+    Data: [
+      {
+        fuelOutletIdentifier: "DAR-001",
+        fuelOutletName: "Metro Valid NT",
+        brandName: "Metro",
+        suburb: "Darwin",
+        address: "1 Smith St, Darwin NT 0800",
+        postCode: "0800",
+        latitude: -12.4634,
+        longitude: 130.8456,
+        fuelPrices: [
+          { fuelType: "Unleaded 91", price: 195.7, lastUpdated: "2026-07-03T00:00:00Z" },
+          { fuelType: "Diesel", price: "bad" },
+        ],
+      },
+      {
+        fuelOutletIdentifier: "NT-ZERO",
+        fuelOutletName: "NT Zero",
+        latitude: 0,
+        longitude: 0,
+        fuelPrices: [{ fuelType: "Unleaded 91", price: 111.1 }],
+      },
+      {
+        fuelOutletIdentifier: "NT-NOPRICE",
+        fuelOutletName: "NT No Price",
+        latitude: -12.4,
+        longitude: 130.8,
+        fuelPrices: [],
+      },
+      null,
+      "not an object",
+    ],
+  });
+  return providerChecks("nt", stations, {
+    expectedCodes: ["NT-DAR-001"],
+    expectedPrice: ["NT-DAR-001", "U91", 195.7],
+    absentCodes: ["NT-NT-ZERO", "NT-NT-NOPRICE"],
+    observations: { count: stations.length, stationCodes: stations.map((station) => station.stationCode), prices: stations[0]?.prices || {} },
+  });
+}
+
 function assertGlobalInvariants() {
   const providers = [
+    ["act", assertActMalformedPayload().observations],
     ["nsw", assertNswMalformedPayload().observations],
     ["tas", assertTasMalformedPayload().observations],
     ["wa", assertWaMalformedPayload().observations],
     ["vic", assertVicMalformedPayload().observations],
     ["qld", assertQldMalformedPayload().observations],
     ["sa", assertSaMalformedPayload().observations],
+    ["nt", assertNtMalformedPayload().observations],
   ];
   const snapshots = {
+    act: normaliseNswPayload({ stations: [stationRow("A", "A", "A", -35.2809, 149.13)], prices: [priceRow("A", "U91", 1)] }),
     nsw: normaliseNswPayload({ stations: [stationRow("A", "A", "A", 0, 0)], prices: [priceRow("A", "U91", 1)] }),
     tas: normaliseTasPayload({ stations: [{ ...stationRow("A", "A", "A", 0, 0), state: "TAS" }], prices: [{ ...priceRow("A", "U91", 1), state: "TAS" }] }),
     wa: normaliseWaFuelWatchPayloads([{ fuelCode: "U91", xml: waXml([waItem({ lat: "0", lon: "0", price: "1" })]) }]),
     vic: normaliseVicPayload({ fuelPriceDetails: [{ fuelStation: { id: "A", latitude: 0, longitude: 0 }, fuelPrices: [{ fuelTypeCode: "U91", price: 1 }] }] }),
     qld: normaliseQldPayload(fppSites("QLD", [fppSite("A", "A", "1", 0, 0)]), fppPrices([fppPrice("A", 2, 1)]), fppBrands(), fppRegions("Queensland", "Brisbane", "10")),
     sa: normaliseSaPayload(fppSites("SA", [fppSite("A", "A", "1", 0, 0)]), fppPrices([fppPrice("A", 2, 1)]), fppBrands(), fppRegions("South Australia", "Adelaide", "20")),
+    nt: normaliseNtPayload({ Data: [{ fuelOutletIdentifier: "A", latitude: 0, longitude: 0, fuelPrices: [{ fuelType: "Unleaded 91", price: 1 }] }] }),
   };
   const failures = [];
   for (const [provider, stations] of Object.entries(snapshots)) {
@@ -338,6 +413,6 @@ ${results.map((result) => `- ${result.id}: ${JSON.stringify(result.observations)
 
 ## Brutal read
 
-${summary.failed ? "Malformed provider payloads still leak unsafe data. Do not treat state-provider resilience as release-safe until fixed and rerun." : "State fuel provider normalisers held against malformed payloads for NSW, TAS, WA, VIC, QLD and SA. The strongest remaining risk is live provider schema drift beyond these known contract families."}
+${summary.failed ? "Malformed provider payloads still leak unsafe data. Do not treat state-provider resilience as release-safe until fixed and rerun." : "State fuel provider normalisers held against malformed payloads for ACT, NSW, TAS, WA, VIC, QLD and SA. The strongest remaining risk is live provider schema drift beyond these known contract families."}
 `;
 }

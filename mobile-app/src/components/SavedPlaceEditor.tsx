@@ -12,6 +12,7 @@ import { searchLocations } from "../api/fuelPathApi";
 import { getCurrentMapPoint } from "../services/currentLocation";
 import { colors, radii, spacing, surfaces, typeScale } from "../theme";
 import { MapPoint } from "../types";
+import { CurrentLocationFieldButton, currentLocationFieldInset } from "./CurrentLocationFieldButton";
 import { LocationEvidenceChip } from "./LocationEvidenceChip";
 import { StationMap } from "./StationMap";
 
@@ -140,10 +141,16 @@ export function SavedPlaceEditor({
           }}
           placeholder={`${label} address or place`}
           returnKeyType="search"
-          style={styles.input}
+          style={[styles.input, loading && styles.inputWithLoading]}
           value={query}
         />
-        {loading ? <ActivityIndicator color={colors.green} /> : null}
+        {loading ? <ActivityIndicator color={colors.green} style={styles.lookupSpinner} /> : null}
+        <CurrentLocationFieldButton
+          accessibilityHint={`Requests location permission and saves the current position as ${label.toLowerCase()}.`}
+          accessibilityLabel={`Use current location for ${label.toLowerCase()}`}
+          disabled={locating}
+          onPress={useCurrentLocation}
+        />
       </View>
 
       {suggestions.length ? (
@@ -204,21 +211,6 @@ export function SavedPlaceEditor({
         </View>
       ) : null}
 
-      <View style={styles.buttonRow}>
-        <Pressable
-          accessibilityLabel={`Use current location for ${label.toLowerCase()}`}
-          accessibilityHint={`Requests location permission and saves the current position as ${label.toLowerCase()}.`}
-          accessibilityRole="button"
-          accessibilityState={{ disabled: locating }}
-          disabled={locating}
-          onPress={useCurrentLocation}
-          style={[styles.miniButton, locating && styles.miniButtonDisabled]}
-        >
-          <Text style={styles.miniButtonText}>
-            {locating ? "Locating" : "Current location"}
-          </Text>
-        </Pressable>
-      </View>
       {message ? (
         <Text accessibilityLiveRegion="polite" numberOfLines={2} style={styles.message}>
           {message}
@@ -305,23 +297,29 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   inputRow: {
-    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+  },
+  input: {
     backgroundColor: colors.white,
     borderColor: colors.line,
     borderRadius: radii.lg,
     borderWidth: 1,
-    flexDirection: "row",
-    gap: spacing.sm,
-    minHeight: 48,
-    paddingHorizontal: spacing.md,
-  },
-  input: {
     color: colors.ink,
-    flex: 1,
     fontSize: typeScale.body,
     fontWeight: "500",
     minHeight: 44,
     minWidth: 0,
+    paddingHorizontal: spacing.md,
+    paddingRight: currentLocationFieldInset,
+    paddingVertical: spacing.sm,
+  },
+  inputWithLoading: {
+    paddingRight: currentLocationFieldInset + 28,
+  },
+  lookupSpinner: {
+    position: "absolute",
+    right: currentLocationFieldInset,
   },
   suggestionList: {
     backgroundColor: colors.white,
@@ -378,30 +376,6 @@ const styles = StyleSheet.create({
     fontSize: typeScale.caption,
     fontWeight: "600",
     lineHeight: 38,
-  },
-  buttonRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing.sm,
-  },
-  miniButton: {
-    alignItems: "center",
-    backgroundColor: colors.greenSoft,
-    borderColor: colors.green,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    justifyContent: "center",
-    minHeight: 38,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-  },
-  miniButtonDisabled: {
-    opacity: 0.65,
-  },
-  miniButtonText: {
-    color: colors.greenDark,
-    fontSize: typeScale.caption,
-    fontWeight: "600",
   },
   message: {
     color: colors.greenDark,

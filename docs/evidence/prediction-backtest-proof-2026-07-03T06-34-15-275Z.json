@@ -1,0 +1,700 @@
+{
+  "summary": {
+    "runId": "2026-07-03T06-34-15-275Z",
+    "appUrl": "https://fuel-path.vercel.app",
+    "regions": [
+      "NSW",
+      "ACT",
+      "VIC",
+      "QLD",
+      "WA",
+      "SA",
+      "TAS",
+      "NT"
+    ],
+    "fuels": [
+      "U91",
+      "PDL"
+    ],
+    "readinessStatus": "measurement_only",
+    "userFacingPredictionEnabled": false,
+    "accuracyClaimsAllowed": false,
+    "storageDurable": true,
+    "completedSampleSize": 1,
+    "directionSampleSize": 1,
+    "meanAbsoluteErrorCpl": 1.5,
+    "directionAccuracy": 1,
+    "blockers": [
+      "prediction_completed_sample_below_threshold",
+      "prediction_direction_sample_below_threshold"
+    ],
+    "apiBlindSpots": [],
+    "requiredBlindSpots": [
+      "Predictions are blocked unless durable back-test storage is configured.",
+      "Directional accuracy proves only up/down/flat direction, not the exact pump price a driver will see.",
+      "Station-level prices can move differently from region averages and must not be presented as guaranteed.",
+      "Provider outages, stale cache, delayed official feeds or station corrections can invalidate a cycle signal.",
+      "WA tomorrow locked prices are official source data, not model prediction, and should be labelled separately.",
+      "Uncovered or sparse regions and fuel grades must remain outside any prediction claim."
+    ],
+    "blindSpotExposure": "api_blind_spots_missing",
+    "signalChecks": 16,
+    "backtestRequiredSignals": 16,
+    "noCycleSignals": 0,
+    "failedSignalChecks": 0
+  },
+  "status": {
+    "mode": "measurement_foundation",
+    "storage": {
+      "mode": "postgres_neon",
+      "configured": true,
+      "durable": true,
+      "maxRecords": 500,
+      "recordCount": 1,
+      "table": "fuel_path_prediction_backtests",
+      "nextBuildStep": "Keep prediction claims disabled until back-test sample size and error thresholds are proven.",
+      "health": "ok",
+      "lastError": ""
+    },
+    "writeSecurity": {
+      "tokenConfigured": true,
+      "tokenRequired": true,
+      "writeEnabled": true,
+      "acceptedHeaders": [
+        "Authorization: Bearer <token>",
+        "X-Fuel-Path-Prediction-Token"
+      ]
+    },
+    "userFacingPredictionEnabled": false,
+    "accuracyClaimsAllowed": false,
+    "supportedSignalLabels": [
+      "no_cycle_signal",
+      "backtest_required",
+      "measured_cycle_signal_ready"
+    ],
+    "readiness": {
+      "status": "measurement_only",
+      "thresholds": {
+        "completedSampleSize": 60,
+        "directionSampleSize": 60,
+        "maxMeanAbsoluteErrorCpl": 4,
+        "minDirectionAccuracy": 0.68
+      },
+      "completedSampleSize": 1,
+      "directionSampleSize": 1,
+      "meanAbsoluteErrorCpl": 1.5,
+      "directionAccuracy": 1,
+      "blockers": [
+        "prediction_completed_sample_below_threshold",
+        "prediction_direction_sample_below_threshold"
+      ],
+      "userFacingPredictionEnabled": false,
+      "accuracyClaimsAllowed": false
+    },
+    "summary": {
+      "sampleSize": 1,
+      "completedSampleSize": 1,
+      "meanAbsoluteErrorCpl": 1.5,
+      "directionSampleSize": 1,
+      "directionAccuracy": 1,
+      "byRegion": {
+        "WA": 1
+      },
+      "accuracyClaimsAllowed": false
+    }
+  },
+  "signalChecks": [
+    {
+      "region": "NSW",
+      "fuel": "U91",
+      "status": "ok",
+      "payload": {
+        "region": "NSW",
+        "fuel": "U91",
+        "signal": "backtest_required",
+        "confidence": "low",
+        "reasons": [
+          "history threshold met, but measured back-test evidence is still required before guidance is enabled"
+        ],
+        "userFacingCopy": "No cycle guidance yet.",
+        "userFacingPredictionEnabled": false,
+        "accuracyClaimsAllowed": false,
+        "readiness": {
+          "status": "measurement_only",
+          "thresholds": {
+            "completedSampleSize": 60,
+            "directionSampleSize": 60,
+            "maxMeanAbsoluteErrorCpl": 4,
+            "minDirectionAccuracy": 0.68
+          },
+          "completedSampleSize": 0,
+          "directionSampleSize": 0,
+          "blockers": [
+            "durable_prediction_storage_missing",
+            "prediction_completed_sample_below_threshold",
+            "prediction_direction_sample_below_threshold",
+            "prediction_mae_above_threshold_or_missing",
+            "prediction_direction_accuracy_below_threshold_or_missing"
+          ],
+          "userFacingPredictionEnabled": false,
+          "accuracyClaimsAllowed": false
+        }
+      }
+    },
+    {
+      "region": "NSW",
+      "fuel": "PDL",
+      "status": "ok",
+      "payload": {
+        "region": "NSW",
+        "fuel": "PDL",
+        "signal": "backtest_required",
+        "confidence": "low",
+        "reasons": [
+          "history threshold met, but measured back-test evidence is still required before guidance is enabled"
+        ],
+        "userFacingCopy": "No cycle guidance yet.",
+        "userFacingPredictionEnabled": false,
+        "accuracyClaimsAllowed": false,
+        "readiness": {
+          "status": "measurement_only",
+          "thresholds": {
+            "completedSampleSize": 60,
+            "directionSampleSize": 60,
+            "maxMeanAbsoluteErrorCpl": 4,
+            "minDirectionAccuracy": 0.68
+          },
+          "completedSampleSize": 0,
+          "directionSampleSize": 0,
+          "blockers": [
+            "durable_prediction_storage_missing",
+            "prediction_completed_sample_below_threshold",
+            "prediction_direction_sample_below_threshold",
+            "prediction_mae_above_threshold_or_missing",
+            "prediction_direction_accuracy_below_threshold_or_missing"
+          ],
+          "userFacingPredictionEnabled": false,
+          "accuracyClaimsAllowed": false
+        }
+      }
+    },
+    {
+      "region": "ACT",
+      "fuel": "U91",
+      "status": "ok",
+      "payload": {
+        "region": "ACT",
+        "fuel": "U91",
+        "signal": "backtest_required",
+        "confidence": "low",
+        "reasons": [
+          "history threshold met, but measured back-test evidence is still required before guidance is enabled"
+        ],
+        "userFacingCopy": "No cycle guidance yet.",
+        "userFacingPredictionEnabled": false,
+        "accuracyClaimsAllowed": false,
+        "readiness": {
+          "status": "measurement_only",
+          "thresholds": {
+            "completedSampleSize": 60,
+            "directionSampleSize": 60,
+            "maxMeanAbsoluteErrorCpl": 4,
+            "minDirectionAccuracy": 0.68
+          },
+          "completedSampleSize": 0,
+          "directionSampleSize": 0,
+          "blockers": [
+            "durable_prediction_storage_missing",
+            "prediction_completed_sample_below_threshold",
+            "prediction_direction_sample_below_threshold",
+            "prediction_mae_above_threshold_or_missing",
+            "prediction_direction_accuracy_below_threshold_or_missing"
+          ],
+          "userFacingPredictionEnabled": false,
+          "accuracyClaimsAllowed": false
+        }
+      }
+    },
+    {
+      "region": "ACT",
+      "fuel": "PDL",
+      "status": "ok",
+      "payload": {
+        "region": "ACT",
+        "fuel": "PDL",
+        "signal": "backtest_required",
+        "confidence": "low",
+        "reasons": [
+          "history threshold met, but measured back-test evidence is still required before guidance is enabled"
+        ],
+        "userFacingCopy": "No cycle guidance yet.",
+        "userFacingPredictionEnabled": false,
+        "accuracyClaimsAllowed": false,
+        "readiness": {
+          "status": "measurement_only",
+          "thresholds": {
+            "completedSampleSize": 60,
+            "directionSampleSize": 60,
+            "maxMeanAbsoluteErrorCpl": 4,
+            "minDirectionAccuracy": 0.68
+          },
+          "completedSampleSize": 0,
+          "directionSampleSize": 0,
+          "blockers": [
+            "durable_prediction_storage_missing",
+            "prediction_completed_sample_below_threshold",
+            "prediction_direction_sample_below_threshold",
+            "prediction_mae_above_threshold_or_missing",
+            "prediction_direction_accuracy_below_threshold_or_missing"
+          ],
+          "userFacingPredictionEnabled": false,
+          "accuracyClaimsAllowed": false
+        }
+      }
+    },
+    {
+      "region": "VIC",
+      "fuel": "U91",
+      "status": "ok",
+      "payload": {
+        "region": "VIC",
+        "fuel": "U91",
+        "signal": "backtest_required",
+        "confidence": "low",
+        "reasons": [
+          "history threshold met, but measured back-test evidence is still required before guidance is enabled"
+        ],
+        "userFacingCopy": "No cycle guidance yet.",
+        "userFacingPredictionEnabled": false,
+        "accuracyClaimsAllowed": false,
+        "readiness": {
+          "status": "measurement_only",
+          "thresholds": {
+            "completedSampleSize": 60,
+            "directionSampleSize": 60,
+            "maxMeanAbsoluteErrorCpl": 4,
+            "minDirectionAccuracy": 0.68
+          },
+          "completedSampleSize": 0,
+          "directionSampleSize": 0,
+          "blockers": [
+            "durable_prediction_storage_missing",
+            "prediction_completed_sample_below_threshold",
+            "prediction_direction_sample_below_threshold",
+            "prediction_mae_above_threshold_or_missing",
+            "prediction_direction_accuracy_below_threshold_or_missing"
+          ],
+          "userFacingPredictionEnabled": false,
+          "accuracyClaimsAllowed": false
+        }
+      }
+    },
+    {
+      "region": "VIC",
+      "fuel": "PDL",
+      "status": "ok",
+      "payload": {
+        "region": "VIC",
+        "fuel": "PDL",
+        "signal": "backtest_required",
+        "confidence": "low",
+        "reasons": [
+          "history threshold met, but measured back-test evidence is still required before guidance is enabled"
+        ],
+        "userFacingCopy": "No cycle guidance yet.",
+        "userFacingPredictionEnabled": false,
+        "accuracyClaimsAllowed": false,
+        "readiness": {
+          "status": "measurement_only",
+          "thresholds": {
+            "completedSampleSize": 60,
+            "directionSampleSize": 60,
+            "maxMeanAbsoluteErrorCpl": 4,
+            "minDirectionAccuracy": 0.68
+          },
+          "completedSampleSize": 0,
+          "directionSampleSize": 0,
+          "blockers": [
+            "durable_prediction_storage_missing",
+            "prediction_completed_sample_below_threshold",
+            "prediction_direction_sample_below_threshold",
+            "prediction_mae_above_threshold_or_missing",
+            "prediction_direction_accuracy_below_threshold_or_missing"
+          ],
+          "userFacingPredictionEnabled": false,
+          "accuracyClaimsAllowed": false
+        }
+      }
+    },
+    {
+      "region": "QLD",
+      "fuel": "U91",
+      "status": "ok",
+      "payload": {
+        "region": "QLD",
+        "fuel": "U91",
+        "signal": "backtest_required",
+        "confidence": "low",
+        "reasons": [
+          "history threshold met, but measured back-test evidence is still required before guidance is enabled"
+        ],
+        "userFacingCopy": "No cycle guidance yet.",
+        "userFacingPredictionEnabled": false,
+        "accuracyClaimsAllowed": false,
+        "readiness": {
+          "status": "measurement_only",
+          "thresholds": {
+            "completedSampleSize": 60,
+            "directionSampleSize": 60,
+            "maxMeanAbsoluteErrorCpl": 4,
+            "minDirectionAccuracy": 0.68
+          },
+          "completedSampleSize": 0,
+          "directionSampleSize": 0,
+          "blockers": [
+            "durable_prediction_storage_missing",
+            "prediction_completed_sample_below_threshold",
+            "prediction_direction_sample_below_threshold",
+            "prediction_mae_above_threshold_or_missing",
+            "prediction_direction_accuracy_below_threshold_or_missing"
+          ],
+          "userFacingPredictionEnabled": false,
+          "accuracyClaimsAllowed": false
+        }
+      }
+    },
+    {
+      "region": "QLD",
+      "fuel": "PDL",
+      "status": "ok",
+      "payload": {
+        "region": "QLD",
+        "fuel": "PDL",
+        "signal": "backtest_required",
+        "confidence": "low",
+        "reasons": [
+          "history threshold met, but measured back-test evidence is still required before guidance is enabled"
+        ],
+        "userFacingCopy": "No cycle guidance yet.",
+        "userFacingPredictionEnabled": false,
+        "accuracyClaimsAllowed": false,
+        "readiness": {
+          "status": "measurement_only",
+          "thresholds": {
+            "completedSampleSize": 60,
+            "directionSampleSize": 60,
+            "maxMeanAbsoluteErrorCpl": 4,
+            "minDirectionAccuracy": 0.68
+          },
+          "completedSampleSize": 0,
+          "directionSampleSize": 0,
+          "blockers": [
+            "durable_prediction_storage_missing",
+            "prediction_completed_sample_below_threshold",
+            "prediction_direction_sample_below_threshold",
+            "prediction_mae_above_threshold_or_missing",
+            "prediction_direction_accuracy_below_threshold_or_missing"
+          ],
+          "userFacingPredictionEnabled": false,
+          "accuracyClaimsAllowed": false
+        }
+      }
+    },
+    {
+      "region": "WA",
+      "fuel": "U91",
+      "status": "ok",
+      "payload": {
+        "region": "WA",
+        "fuel": "U91",
+        "signal": "backtest_required",
+        "confidence": "low",
+        "reasons": [
+          "history threshold met, but measured back-test evidence is still required before guidance is enabled"
+        ],
+        "userFacingCopy": "No cycle guidance yet.",
+        "userFacingPredictionEnabled": false,
+        "accuracyClaimsAllowed": false,
+        "readiness": {
+          "status": "measurement_only",
+          "thresholds": {
+            "completedSampleSize": 60,
+            "directionSampleSize": 60,
+            "maxMeanAbsoluteErrorCpl": 4,
+            "minDirectionAccuracy": 0.68
+          },
+          "completedSampleSize": 0,
+          "directionSampleSize": 0,
+          "blockers": [
+            "durable_prediction_storage_missing",
+            "prediction_completed_sample_below_threshold",
+            "prediction_direction_sample_below_threshold",
+            "prediction_mae_above_threshold_or_missing",
+            "prediction_direction_accuracy_below_threshold_or_missing"
+          ],
+          "userFacingPredictionEnabled": false,
+          "accuracyClaimsAllowed": false
+        }
+      }
+    },
+    {
+      "region": "WA",
+      "fuel": "PDL",
+      "status": "ok",
+      "payload": {
+        "region": "WA",
+        "fuel": "PDL",
+        "signal": "backtest_required",
+        "confidence": "low",
+        "reasons": [
+          "history threshold met, but measured back-test evidence is still required before guidance is enabled"
+        ],
+        "userFacingCopy": "No cycle guidance yet.",
+        "userFacingPredictionEnabled": false,
+        "accuracyClaimsAllowed": false,
+        "readiness": {
+          "status": "measurement_only",
+          "thresholds": {
+            "completedSampleSize": 60,
+            "directionSampleSize": 60,
+            "maxMeanAbsoluteErrorCpl": 4,
+            "minDirectionAccuracy": 0.68
+          },
+          "completedSampleSize": 0,
+          "directionSampleSize": 0,
+          "blockers": [
+            "durable_prediction_storage_missing",
+            "prediction_completed_sample_below_threshold",
+            "prediction_direction_sample_below_threshold",
+            "prediction_mae_above_threshold_or_missing",
+            "prediction_direction_accuracy_below_threshold_or_missing"
+          ],
+          "userFacingPredictionEnabled": false,
+          "accuracyClaimsAllowed": false
+        }
+      }
+    },
+    {
+      "region": "SA",
+      "fuel": "U91",
+      "status": "ok",
+      "payload": {
+        "region": "SA",
+        "fuel": "U91",
+        "signal": "backtest_required",
+        "confidence": "low",
+        "reasons": [
+          "history threshold met, but measured back-test evidence is still required before guidance is enabled"
+        ],
+        "userFacingCopy": "No cycle guidance yet.",
+        "userFacingPredictionEnabled": false,
+        "accuracyClaimsAllowed": false,
+        "readiness": {
+          "status": "measurement_only",
+          "thresholds": {
+            "completedSampleSize": 60,
+            "directionSampleSize": 60,
+            "maxMeanAbsoluteErrorCpl": 4,
+            "minDirectionAccuracy": 0.68
+          },
+          "completedSampleSize": 0,
+          "directionSampleSize": 0,
+          "blockers": [
+            "durable_prediction_storage_missing",
+            "prediction_completed_sample_below_threshold",
+            "prediction_direction_sample_below_threshold",
+            "prediction_mae_above_threshold_or_missing",
+            "prediction_direction_accuracy_below_threshold_or_missing"
+          ],
+          "userFacingPredictionEnabled": false,
+          "accuracyClaimsAllowed": false
+        }
+      }
+    },
+    {
+      "region": "SA",
+      "fuel": "PDL",
+      "status": "ok",
+      "payload": {
+        "region": "SA",
+        "fuel": "PDL",
+        "signal": "backtest_required",
+        "confidence": "low",
+        "reasons": [
+          "history threshold met, but measured back-test evidence is still required before guidance is enabled"
+        ],
+        "userFacingCopy": "No cycle guidance yet.",
+        "userFacingPredictionEnabled": false,
+        "accuracyClaimsAllowed": false,
+        "readiness": {
+          "status": "measurement_only",
+          "thresholds": {
+            "completedSampleSize": 60,
+            "directionSampleSize": 60,
+            "maxMeanAbsoluteErrorCpl": 4,
+            "minDirectionAccuracy": 0.68
+          },
+          "completedSampleSize": 0,
+          "directionSampleSize": 0,
+          "blockers": [
+            "durable_prediction_storage_missing",
+            "prediction_completed_sample_below_threshold",
+            "prediction_direction_sample_below_threshold",
+            "prediction_mae_above_threshold_or_missing",
+            "prediction_direction_accuracy_below_threshold_or_missing"
+          ],
+          "userFacingPredictionEnabled": false,
+          "accuracyClaimsAllowed": false
+        }
+      }
+    },
+    {
+      "region": "TAS",
+      "fuel": "U91",
+      "status": "ok",
+      "payload": {
+        "region": "TAS",
+        "fuel": "U91",
+        "signal": "backtest_required",
+        "confidence": "low",
+        "reasons": [
+          "history threshold met, but measured back-test evidence is still required before guidance is enabled"
+        ],
+        "userFacingCopy": "No cycle guidance yet.",
+        "userFacingPredictionEnabled": false,
+        "accuracyClaimsAllowed": false,
+        "readiness": {
+          "status": "measurement_only",
+          "thresholds": {
+            "completedSampleSize": 60,
+            "directionSampleSize": 60,
+            "maxMeanAbsoluteErrorCpl": 4,
+            "minDirectionAccuracy": 0.68
+          },
+          "completedSampleSize": 0,
+          "directionSampleSize": 0,
+          "blockers": [
+            "durable_prediction_storage_missing",
+            "prediction_completed_sample_below_threshold",
+            "prediction_direction_sample_below_threshold",
+            "prediction_mae_above_threshold_or_missing",
+            "prediction_direction_accuracy_below_threshold_or_missing"
+          ],
+          "userFacingPredictionEnabled": false,
+          "accuracyClaimsAllowed": false
+        }
+      }
+    },
+    {
+      "region": "TAS",
+      "fuel": "PDL",
+      "status": "ok",
+      "payload": {
+        "region": "TAS",
+        "fuel": "PDL",
+        "signal": "backtest_required",
+        "confidence": "low",
+        "reasons": [
+          "history threshold met, but measured back-test evidence is still required before guidance is enabled"
+        ],
+        "userFacingCopy": "No cycle guidance yet.",
+        "userFacingPredictionEnabled": false,
+        "accuracyClaimsAllowed": false,
+        "readiness": {
+          "status": "measurement_only",
+          "thresholds": {
+            "completedSampleSize": 60,
+            "directionSampleSize": 60,
+            "maxMeanAbsoluteErrorCpl": 4,
+            "minDirectionAccuracy": 0.68
+          },
+          "completedSampleSize": 0,
+          "directionSampleSize": 0,
+          "blockers": [
+            "durable_prediction_storage_missing",
+            "prediction_completed_sample_below_threshold",
+            "prediction_direction_sample_below_threshold",
+            "prediction_mae_above_threshold_or_missing",
+            "prediction_direction_accuracy_below_threshold_or_missing"
+          ],
+          "userFacingPredictionEnabled": false,
+          "accuracyClaimsAllowed": false
+        }
+      }
+    },
+    {
+      "region": "NT",
+      "fuel": "U91",
+      "status": "ok",
+      "payload": {
+        "region": "NT",
+        "fuel": "U91",
+        "signal": "backtest_required",
+        "confidence": "low",
+        "reasons": [
+          "history threshold met, but measured back-test evidence is still required before guidance is enabled"
+        ],
+        "userFacingCopy": "No cycle guidance yet.",
+        "userFacingPredictionEnabled": false,
+        "accuracyClaimsAllowed": false,
+        "readiness": {
+          "status": "measurement_only",
+          "thresholds": {
+            "completedSampleSize": 60,
+            "directionSampleSize": 60,
+            "maxMeanAbsoluteErrorCpl": 4,
+            "minDirectionAccuracy": 0.68
+          },
+          "completedSampleSize": 0,
+          "directionSampleSize": 0,
+          "blockers": [
+            "durable_prediction_storage_missing",
+            "prediction_completed_sample_below_threshold",
+            "prediction_direction_sample_below_threshold",
+            "prediction_mae_above_threshold_or_missing",
+            "prediction_direction_accuracy_below_threshold_or_missing"
+          ],
+          "userFacingPredictionEnabled": false,
+          "accuracyClaimsAllowed": false
+        }
+      }
+    },
+    {
+      "region": "NT",
+      "fuel": "PDL",
+      "status": "ok",
+      "payload": {
+        "region": "NT",
+        "fuel": "PDL",
+        "signal": "backtest_required",
+        "confidence": "low",
+        "reasons": [
+          "history threshold met, but measured back-test evidence is still required before guidance is enabled"
+        ],
+        "userFacingCopy": "No cycle guidance yet.",
+        "userFacingPredictionEnabled": false,
+        "accuracyClaimsAllowed": false,
+        "readiness": {
+          "status": "measurement_only",
+          "thresholds": {
+            "completedSampleSize": 60,
+            "directionSampleSize": 60,
+            "maxMeanAbsoluteErrorCpl": 4,
+            "minDirectionAccuracy": 0.68
+          },
+          "completedSampleSize": 0,
+          "directionSampleSize": 0,
+          "blockers": [
+            "durable_prediction_storage_missing",
+            "prediction_completed_sample_below_threshold",
+            "prediction_direction_sample_below_threshold",
+            "prediction_mae_above_threshold_or_missing",
+            "prediction_direction_accuracy_below_threshold_or_missing"
+          ],
+          "userFacingPredictionEnabled": false,
+          "accuracyClaimsAllowed": false
+        }
+      }
+    }
+  ]
+}

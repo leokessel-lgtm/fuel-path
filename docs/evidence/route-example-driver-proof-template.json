@@ -1,0 +1,17 @@
+{
+  "study": "route-example-driver-proof",
+  "date": "2026-07-03",
+  "sessions": [
+    {
+      "sessionId": "driver-001",
+      "routeId": "nsw-sydney-newcastle",
+      "fuel": "U91",
+      "trustOrNavigate": true,
+      "detourClear": true,
+      "bestPriceByClear": true,
+      "providerCaveatClear": true,
+      "unresolvedSafetyObjection": false,
+      "notes": "Replace this sample with real recruited-driver evidence before using the gate without --allow-blocked."
+    }
+  ]
+}

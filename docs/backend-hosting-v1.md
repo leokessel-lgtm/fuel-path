@@ -62,6 +62,18 @@ SA_FUEL_API_BASE_URL
 SA_FUEL_API_TOKEN
 ```
 
+Northern Territory production access:
+
+```text
+NT_MYFUEL_API_BASE_URL
+NT_MYFUEL_TOKEN_URL
+NT_MYFUEL_REFERENCE_URL
+NT_MYFUEL_POSTCODE_URL
+NT_MYFUEL_OUTLET_URL
+NT_MYFUEL_USERNAME
+NT_MYFUEL_PASSWORD
+```
+
 Geocoding:
 
 ```text
@@ -70,6 +82,22 @@ FUEL_PATH_GOOGLE_PLACES_API_KEY
 FUEL_PATH_MAPBOX_ACCESS_TOKEN
 FUEL_PATH_HERE_API_KEY
 FUEL_PATH_GEOAPIFY_API_KEY
+FUEL_PATH_TOMTOM_API_KEY
+```
+
+Named POI provider evaluation:
+
+```text
+npm run test:named-poi-provider-bakeoff
+```
+
+The bake-off compares Google Places, HERE and TomTom for named Plan destinations such as schools, hotels, parks, hospitals, shopping centres, airports and civic locations. It skips providers without keys, keeps Google Place Details disabled unless explicitly enabled, and only fills cost estimates when current per-1,000 pricing is provided through:
+
+```text
+FUEL_PATH_GOOGLE_PLACES_AUTOCOMPLETE_PER_1000_USD
+FUEL_PATH_GOOGLE_PLACE_DETAILS_PER_1000_USD
+FUEL_PATH_HERE_SEARCH_PER_1000_USD
+FUEL_PATH_TOMTOM_SEARCH_PER_1000_USD
 ```
 
 Routing:

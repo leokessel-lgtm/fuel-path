@@ -1,0 +1,2296 @@
+{
+  "summary": {
+    "runId": "2026-07-03T06-33-31-440Z",
+    "appUrl": "https://fuel-path.vercel.app",
+    "fuels": [
+      "U91",
+      "PDL"
+    ],
+    "cases": 16,
+    "passed": 15,
+    "warnings": 1,
+    "failed": 0,
+    "recommendations": 15,
+    "noRecommendation": 1
+  },
+  "routes": [
+    {
+      "id": "nsw-sydney-newcastle",
+      "region": "NSW",
+      "from": {
+        "label": "Sydney CBD NSW",
+        "lat": -33.8688,
+        "lon": 151.2093
+      },
+      "to": {
+        "label": "Newcastle NSW",
+        "lat": -32.9283,
+        "lon": 151.7817
+      }
+    },
+    {
+      "id": "act-nsw-canberra-sydney",
+      "region": "ACT/NSW",
+      "from": {
+        "label": "Canberra ACT",
+        "lat": -35.2809,
+        "lon": 149.13
+      },
+      "to": {
+        "label": "Sydney CBD NSW",
+        "lat": -33.8688,
+        "lon": 151.2093
+      }
+    },
+    {
+      "id": "vic-melbourne-ballarat",
+      "region": "VIC",
+      "from": {
+        "label": "Melbourne CBD VIC",
+        "lat": -37.8136,
+        "lon": 144.9631
+      },
+      "to": {
+        "label": "Ballarat VIC",
+        "lat": -37.5622,
+        "lon": 143.8503
+      }
+    },
+    {
+      "id": "qld-brisbane-longreach",
+      "region": "QLD",
+      "from": {
+        "label": "Brisbane CBD QLD",
+        "lat": -27.4698,
+        "lon": 153.0251
+      },
+      "to": {
+        "label": "Longreach QLD",
+        "lat": -23.44,
+        "lon": 144.25
+      }
+    },
+    {
+      "id": "wa-perth-broome",
+      "region": "WA",
+      "from": {
+        "label": "Perth CBD WA",
+        "lat": -31.9523,
+        "lon": 115.8613
+      },
+      "to": {
+        "label": "Broome WA",
+        "lat": -17.9644,
+        "lon": 122.2304
+      }
+    },
+    {
+      "id": "sa-adelaide-coober-pedy",
+      "region": "SA",
+      "from": {
+        "label": "Adelaide CBD SA",
+        "lat": -34.9285,
+        "lon": 138.6007
+      },
+      "to": {
+        "label": "Coober Pedy SA",
+        "lat": -29.0139,
+        "lon": 134.7544
+      }
+    },
+    {
+      "id": "tas-hobart-strahan",
+      "region": "TAS",
+      "from": {
+        "label": "Hobart TAS",
+        "lat": -42.8821,
+        "lon": 147.3272
+      },
+      "to": {
+        "label": "Strahan TAS",
+        "lat": -42.1584,
+        "lon": 145.355
+      }
+    },
+    {
+      "id": "nt-darwin-alice-springs",
+      "region": "NT",
+      "from": {
+        "label": "Darwin NT",
+        "lat": -12.4634,
+        "lon": 130.8456
+      },
+      "to": {
+        "label": "Alice Springs NT",
+        "lat": -23.698,
+        "lon": 133.8807
+      }
+    }
+  ],
+  "cases": [
+    {
+      "id": "nsw-sydney-newcastle-u91",
+      "route": {
+        "id": "nsw-sydney-newcastle",
+        "region": "NSW",
+        "from": {
+          "label": "Sydney CBD NSW",
+          "lat": -33.8688,
+          "lon": 151.2093
+        },
+        "to": {
+          "label": "Newcastle NSW",
+          "lat": -32.9283,
+          "lon": 151.7817
+        }
+      },
+      "fuel": "U91",
+      "status": "passed",
+      "elapsedMs": 2192,
+      "routeKm": 162.31,
+      "provider": "api_nsw",
+      "source": "api_nsw",
+      "capability": "live",
+      "cacheAgeSeconds": 272,
+      "cacheMode": "fresh",
+      "degraded": false,
+      "warning": "",
+      "providerCaveat": "NSW FuelCheck; fresh 5m ago; exact U91 price",
+      "recommendation": {
+        "stationCode": "18171",
+        "stationName": "North Ryde Petroleum",
+        "suburb": "North Ryde",
+        "brand": "Independent",
+        "fuel": "U91",
+        "adjustedCpl": 153.7,
+        "pumpCpl": 153.7,
+        "detourMinutes": 3.1,
+        "bestPriceByCpl": 1.200000000000017,
+        "comparisonCpl": 154.9,
+        "priceMatch": "exact U91 price"
+      },
+      "rawContext": {
+        "eligibleCandidates": 119,
+        "baselineCpl": 163.9,
+        "generatedAt": "2026-07-03T06:33:33.356Z",
+        "decisionSummary": {
+          "action": "fill_now",
+          "label": "Medium savings detour",
+          "reason": "Suggested detour adds 1.6 min and saves $3.80.",
+          "stationCode": "18171",
+          "stationName": "North Ryde Petroleum",
+          "economics": {
+            "baselineCpl": 163.9,
+            "comparisonCpl": 154.9,
+            "comparisonKind": "next_best_viable",
+            "pumpCpl": 153.7,
+            "adjustedCpl": 153.7,
+            "fillLitres": 40,
+            "grossFuelSaving": 4.08,
+            "detourKm": 2.2,
+            "detourMinutes": 1.6,
+            "detourFuelLitres": 0.18,
+            "detourCost": 0.28,
+            "timeCost": 0.25,
+            "timeCostDollarsPerMinute": 0.15,
+            "netSavingAfterDetourFuel": 3.8,
+            "netSavingAfterDetourFuelAndTime": 3.56
+          },
+          "decisionRule": {
+            "minSavingDollars": 1.5,
+            "maxDetourMinutes": 30
+          },
+          "alternatives": [
+            {
+              "kind": "best_value",
+              "label": "Best value",
+              "stationCode": "18171",
+              "stationName": "North Ryde Petroleum",
+              "note": "153.7 c/L, 1.6 min detour",
+              "adjustedCpl": 153.7,
+              "netSaving": 3.8,
+              "detourMinutes": 1.6,
+              "detourFuelLitres": 0.18,
+              "timeCost": 0.25,
+              "netAfterDetourAndTimeCost": 3.56,
+              "selected": true
+            },
+            {
+              "kind": "cheapest",
+              "label": "Cheapest",
+              "stationCode": "18171",
+              "stationName": "North Ryde Petroleum",
+              "note": "153.7 c/L after wallet",
+              "adjustedCpl": 153.7,
+              "netSaving": 3.8,
+              "detourMinutes": 1.6,
+              "detourFuelLitres": 0.18,
+              "timeCost": 0.25,
+              "netAfterDetourAndTimeCost": 3.56,
+              "selected": true
+            },
+            {
+              "kind": "closest",
+              "label": "Closest",
+              "stationCode": "260",
+              "stationName": "7-Eleven North Ryde",
+              "note": "0.0 min detour",
+              "adjustedCpl": 161.9,
+              "netSaving": 0.8,
+              "detourMinutes": 0,
+              "detourFuelLitres": 0,
+              "timeCost": 0,
+              "netAfterDetourAndTimeCost": 0.8,
+              "selected": false
+            },
+            {
+              "kind": "safest",
+              "label": "Safest",
+              "stationCode": "18171",
+              "stationName": "North Ryde Petroleum",
+              "note": "Open, reachable and clean",
+              "adjustedCpl": 153.7,
+              "netSaving": 3.8,
+              "detourMinutes": 1.6,
+              "detourFuelLitres": 0.18,
+              "timeCost": 0.25,
+              "netAfterDetourAndTimeCost": 3.56,
+              "selected": true
+            }
+          ],
+          "whyNotCheapest": "Cheapest also wins because the route saving stays ahead after detour time and fuel used.",
+          "trust": {
+            "source": "api_nsw_fuelcheck",
+            "sourceType": "official_live",
+            "officialLive": true,
+            "updatedAt": "2026-07-01T18:22:08.000Z",
+            "freshnessMinutes": 2171
+          }
+        }
+      }
+    },
+    {
+      "id": "nsw-sydney-newcastle-pdl",
+      "route": {
+        "id": "nsw-sydney-newcastle",
+        "region": "NSW",
+        "from": {
+          "label": "Sydney CBD NSW",
+          "lat": -33.8688,
+          "lon": 151.2093
+        },
+        "to": {
+          "label": "Newcastle NSW",
+          "lat": -32.9283,
+          "lon": 151.7817
+        }
+      },
+      "fuel": "PDL",
+      "status": "passed",
+      "elapsedMs": 907,
+      "routeKm": 162.31,
+      "provider": "api_nsw",
+      "source": "api_nsw",
+      "capability": "live",
+      "cacheAgeSeconds": 274,
+      "cacheMode": "fresh",
+      "degraded": false,
+      "warning": "",
+      "providerCaveat": "NSW FuelCheck; fresh 5m ago; exact PDL price",
+      "recommendation": {
+        "stationCode": "18570",
+        "stationName": "Metro Petroleum West Wallsend",
+        "suburb": "West Wallsend",
+        "brand": "Metro Fuel",
+        "fuel": "PDL",
+        "adjustedCpl": 177.9,
+        "pumpCpl": 177.9,
+        "detourMinutes": 4.1,
+        "bestPriceByCpl": 0,
+        "comparisonCpl": 177.9,
+        "priceMatch": "exact PDL price"
+      },
+      "rawContext": {
+        "eligibleCandidates": 111,
+        "baselineCpl": 189.9,
+        "generatedAt": "2026-07-03T06:33:34.464Z",
+        "decisionSummary": {
+          "action": "fill_now",
+          "label": "Medium savings detour",
+          "reason": "Suggested detour adds 1.8 min and saves $4.44.",
+          "stationCode": "18570",
+          "stationName": "Metro Petroleum West Wallsend",
+          "economics": {
+            "baselineCpl": 189.9,
+            "comparisonCpl": 177.9,
+            "comparisonKind": "next_best_viable",
+            "pumpCpl": 177.9,
+            "adjustedCpl": 177.9,
+            "fillLitres": 40,
+            "grossFuelSaving": 4.8,
+            "detourKm": 2.45,
+            "detourMinutes": 1.8,
+            "detourFuelLitres": 0.2,
+            "detourCost": 0.36,
+            "timeCost": 0.28,
+            "timeCostDollarsPerMinute": 0.15,
+            "netSavingAfterDetourFuel": 4.44,
+            "netSavingAfterDetourFuelAndTime": 4.17
+          },
+          "decisionRule": {
+            "minSavingDollars": 1.5,
+            "maxDetourMinutes": 30
+          },
+          "alternatives": [
+            {
+              "kind": "best_value",
+              "label": "Best value",
+              "stationCode": "18570",
+              "stationName": "Metro Petroleum West Wallsend",
+              "note": "177.9 c/L, 1.8 min detour",
+              "adjustedCpl": 177.9,
+              "netSaving": 4.44,
+              "detourMinutes": 1.8,
+              "detourFuelLitres": 0.2,
+              "timeCost": 0.28,
+              "netAfterDetourAndTimeCost": 4.17,
+              "selected": true
+            },
+            {
+              "kind": "cheapest",
+              "label": "Cheapest",
+              "stationCode": "18570",
+              "stationName": "Metro Petroleum West Wallsend",
+              "note": "177.9 c/L after wallet",
+              "adjustedCpl": 177.9,
+              "netSaving": 4.44,
+              "detourMinutes": 1.8,
+              "detourFuelLitres": 0.2,
+              "timeCost": 0.28,
+              "netAfterDetourAndTimeCost": 4.17,
+              "selected": true
+            },
+            {
+              "kind": "closest",
+              "label": "Closest",
+              "stationCode": "260",
+              "stationName": "7-Eleven North Ryde",
+              "note": "0.0 min detour",
+              "adjustedCpl": 189.9,
+              "netSaving": 0,
+              "detourMinutes": 0,
+              "detourFuelLitres": 0,
+              "timeCost": 0,
+              "netAfterDetourAndTimeCost": 0,
+              "selected": false
+            },
+            {
+              "kind": "safest",
+              "label": "Safest",
+              "stationCode": "18570",
+              "stationName": "Metro Petroleum West Wallsend",
+              "note": "Open, reachable and clean",
+              "adjustedCpl": 177.9,
+              "netSaving": 4.44,
+              "detourMinutes": 1.8,
+              "detourFuelLitres": 0.2,
+              "timeCost": 0.28,
+              "netAfterDetourAndTimeCost": 4.17,
+              "selected": true
+            }
+          ],
+          "whyNotCheapest": "Cheapest also wins because the route saving stays ahead after detour time and fuel used.",
+          "trust": {
+            "source": "api_nsw_fuelcheck",
+            "sourceType": "official_live",
+            "officialLive": true,
+            "updatedAt": "2026-06-30T17:43:42.000Z",
+            "freshnessMinutes": 3650
+          }
+        }
+      }
+    },
+    {
+      "id": "act-nsw-canberra-sydney-u91",
+      "route": {
+        "id": "act-nsw-canberra-sydney",
+        "region": "ACT/NSW",
+        "from": {
+          "label": "Canberra ACT",
+          "lat": -35.2809,
+          "lon": 149.13
+        },
+        "to": {
+          "label": "Sydney CBD NSW",
+          "lat": -33.8688,
+          "lon": 151.2093
+        }
+      },
+      "fuel": "U91",
+      "status": "passed",
+      "elapsedMs": 960,
+      "routeKm": 285.09,
+      "provider": "api_nsw",
+      "source": "api_nsw",
+      "capability": "live",
+      "cacheAgeSeconds": 275,
+      "cacheMode": "fresh",
+      "degraded": false,
+      "warning": "",
+      "providerCaveat": "NSW FuelCheck; fresh 5m ago; exact U91 price",
+      "recommendation": {
+        "stationCode": "18216",
+        "stationName": "Metro Bexley",
+        "suburb": "Bexley",
+        "brand": "Metro Fuel",
+        "fuel": "U91",
+        "adjustedCpl": 147.9,
+        "pumpCpl": 147.9,
+        "detourMinutes": 8.3,
+        "bestPriceByCpl": 0.9000000000000057,
+        "comparisonCpl": 148.8,
+        "priceMatch": "exact U91 price"
+      },
+      "rawContext": {
+        "eligibleCandidates": 178,
+        "baselineCpl": 161.9,
+        "generatedAt": "2026-07-03T06:33:35.592Z",
+        "decisionSummary": {
+          "action": "fill_now",
+          "label": "Medium savings detour",
+          "reason": "Suggested detour adds 4.8 min and saves $4.82.",
+          "stationCode": "18216",
+          "stationName": "Metro Bexley",
+          "economics": {
+            "baselineCpl": 161.9,
+            "comparisonCpl": 148.8,
+            "comparisonKind": "next_best_viable",
+            "pumpCpl": 147.9,
+            "adjustedCpl": 147.9,
+            "fillLitres": 40,
+            "grossFuelSaving": 5.6,
+            "detourKm": 6.39,
+            "detourMinutes": 4.8,
+            "detourFuelLitres": 0.52,
+            "detourCost": 0.78,
+            "timeCost": 0.72,
+            "timeCostDollarsPerMinute": 0.15,
+            "netSavingAfterDetourFuel": 4.82,
+            "netSavingAfterDetourFuelAndTime": 4.11
+          },
+          "decisionRule": {
+            "minSavingDollars": 1.5,
+            "maxDetourMinutes": 30
+          },
+          "alternatives": [
+            {
+              "kind": "best_value",
+              "label": "Best value",
+              "stationCode": "18216",
+              "stationName": "Metro Bexley",
+              "note": "147.9 c/L, 4.8 min detour",
+              "adjustedCpl": 147.9,
+              "netSaving": 4.82,
+              "detourMinutes": 4.8,
+              "detourFuelLitres": 0.52,
+              "timeCost": 0.72,
+              "netAfterDetourAndTimeCost": 4.11,
+              "selected": true
+            },
+            {
+              "kind": "cheapest",
+              "label": "Cheapest",
+              "stationCode": "18216",
+              "stationName": "Metro Bexley",
+              "note": "147.9 c/L after wallet",
+              "adjustedCpl": 147.9,
+              "netSaving": 4.82,
+              "detourMinutes": 4.8,
+              "detourFuelLitres": 0.52,
+              "timeCost": 0.72,
+              "netAfterDetourAndTimeCost": 4.11,
+              "selected": true
+            },
+            {
+              "kind": "closest",
+              "label": "Closest",
+              "stationCode": "20196",
+              "stationName": "Metro Petroleum Tempe",
+              "note": "0.0 min detour",
+              "adjustedCpl": 151.7,
+              "netSaving": 4.07,
+              "detourMinutes": 0,
+              "detourFuelLitres": 0,
+              "timeCost": 0.01,
+              "netAfterDetourAndTimeCost": 4.07,
+              "selected": false
+            },
+            {
+              "kind": "safest",
+              "label": "Safest",
+              "stationCode": "18216",
+              "stationName": "Metro Bexley",
+              "note": "Open, reachable and clean",
+              "adjustedCpl": 147.9,
+              "netSaving": 4.82,
+              "detourMinutes": 4.8,
+              "detourFuelLitres": 0.52,
+              "timeCost": 0.72,
+              "netAfterDetourAndTimeCost": 4.11,
+              "selected": true
+            }
+          ],
+          "whyNotCheapest": "Cheapest also wins because the route saving stays ahead after detour time and fuel used.",
+          "trust": {
+            "source": "api_nsw_fuelcheck",
+            "sourceType": "official_live",
+            "officialLive": true,
+            "updatedAt": "2026-07-02T11:19:52.000Z",
+            "freshnessMinutes": 1154
+          }
+        }
+      }
+    },
+    {
+      "id": "act-nsw-canberra-sydney-pdl",
+      "route": {
+        "id": "act-nsw-canberra-sydney",
+        "region": "ACT/NSW",
+        "from": {
+          "label": "Canberra ACT",
+          "lat": -35.2809,
+          "lon": 149.13
+        },
+        "to": {
+          "label": "Sydney CBD NSW",
+          "lat": -33.8688,
+          "lon": 151.2093
+        }
+      },
+      "fuel": "PDL",
+      "status": "passed",
+      "elapsedMs": 784,
+      "routeKm": 285.09,
+      "provider": "api_nsw",
+      "source": "api_nsw",
+      "capability": "live",
+      "cacheAgeSeconds": 276,
+      "cacheMode": "fresh",
+      "degraded": false,
+      "warning": "",
+      "providerCaveat": "NSW FuelCheck; fresh 5m ago; exact PDL price",
+      "recommendation": {
+        "stationCode": "20632",
+        "stationName": "Budget Bexley South",
+        "suburb": "Bexley",
+        "brand": "Budget",
+        "fuel": "PDL",
+        "adjustedCpl": 169.8,
+        "pumpCpl": 169.8,
+        "detourMinutes": 6.7,
+        "bestPriceByCpl": 0.09999999999999432,
+        "comparisonCpl": 169.9,
+        "priceMatch": "exact PDL price"
+      },
+      "rawContext": {
+        "eligibleCandidates": 175,
+        "baselineCpl": 185.9,
+        "generatedAt": "2026-07-03T06:33:36.839Z",
+        "decisionSummary": {
+          "action": "fill_now",
+          "label": "Good savings detour",
+          "reason": "Suggested detour adds 3.1 min and saves $5.86.",
+          "stationCode": "20632",
+          "stationName": "Budget Bexley South",
+          "economics": {
+            "baselineCpl": 185.9,
+            "comparisonCpl": 169.9,
+            "comparisonKind": "next_best_viable",
+            "pumpCpl": 169.8,
+            "adjustedCpl": 169.8,
+            "fillLitres": 40,
+            "grossFuelSaving": 6.44,
+            "detourKm": 4.17,
+            "detourMinutes": 3.1,
+            "detourFuelLitres": 0.34,
+            "detourCost": 0.58,
+            "timeCost": 0.47,
+            "timeCostDollarsPerMinute": 0.15,
+            "netSavingAfterDetourFuel": 5.86,
+            "netSavingAfterDetourFuelAndTime": 5.39
+          },
+          "decisionRule": {
+            "minSavingDollars": 1.5,
+            "maxDetourMinutes": 30
+          },
+          "alternatives": [
+            {
+              "kind": "best_value",
+              "label": "Best value",
+              "stationCode": "20632",
+              "stationName": "Budget Bexley South",
+              "note": "169.8 c/L, 3.1 min detour",
+              "adjustedCpl": 169.8,
+              "netSaving": 5.86,
+              "detourMinutes": 3.1,
+              "detourFuelLitres": 0.34,
+              "timeCost": 0.47,
+              "netAfterDetourAndTimeCost": 5.39,
+              "selected": true
+            },
+            {
+              "kind": "cheapest",
+              "label": "Cheapest",
+              "stationCode": "20632",
+              "stationName": "Budget Bexley South",
+              "note": "169.8 c/L after wallet",
+              "adjustedCpl": 169.8,
+              "netSaving": 5.86,
+              "detourMinutes": 3.1,
+              "detourFuelLitres": 0.34,
+              "timeCost": 0.47,
+              "netAfterDetourAndTimeCost": 5.39,
+              "selected": true
+            },
+            {
+              "kind": "closest",
+              "label": "Closest",
+              "stationCode": "20196",
+              "stationName": "Metro Petroleum Tempe",
+              "note": "0.0 min detour",
+              "adjustedCpl": 177.7,
+              "netSaving": 3.27,
+              "detourMinutes": 0,
+              "detourFuelLitres": 0,
+              "timeCost": 0.01,
+              "netAfterDetourAndTimeCost": 3.27,
+              "selected": false
+            },
+            {
+              "kind": "safest",
+              "label": "Safest",
+              "stationCode": "20632",
+              "stationName": "Budget Bexley South",
+              "note": "Open, reachable and clean",
+              "adjustedCpl": 169.8,
+              "netSaving": 5.86,
+              "detourMinutes": 3.1,
+              "detourFuelLitres": 0.34,
+              "timeCost": 0.47,
+              "netAfterDetourAndTimeCost": 5.39,
+              "selected": true
+            }
+          ],
+          "whyNotCheapest": "Cheapest also wins because the route saving stays ahead after detour time and fuel used.",
+          "trust": {
+            "source": "api_nsw_fuelcheck",
+            "sourceType": "official_live",
+            "officialLive": true,
+            "updatedAt": "2026-07-01T16:05:10.000Z",
+            "freshnessMinutes": 2308
+          }
+        }
+      }
+    },
+    {
+      "id": "vic-melbourne-ballarat-u91",
+      "route": {
+        "id": "vic-melbourne-ballarat",
+        "region": "VIC",
+        "from": {
+          "label": "Melbourne CBD VIC",
+          "lat": -37.8136,
+          "lon": 144.9631
+        },
+        "to": {
+          "label": "Ballarat VIC",
+          "lat": -37.5622,
+          "lon": 143.8503
+        }
+      },
+      "fuel": "U91",
+      "status": "passed",
+      "elapsedMs": 656,
+      "routeKm": 115.11,
+      "provider": "api_vic",
+      "source": "api_vic",
+      "capability": "live",
+      "cacheAgeSeconds": 277,
+      "cacheMode": "fresh",
+      "degraded": false,
+      "warning": "",
+      "providerCaveat": "VIC Servo Saver; fresh 5m ago; exact U91 price",
+      "recommendation": {
+        "stationCode": "VIC-ZZb5BkauV4qFwN0JzvQkfP414J0Rq9Cq9eD1Pa4LrhM=",
+        "stationName": "Metro Petroleum Golden Point",
+        "suburb": "GOLDEN POINT",
+        "brand": "Metro Petroleum",
+        "fuel": "U91",
+        "adjustedCpl": 149.3,
+        "pumpCpl": 149.3,
+        "detourMinutes": 2.1,
+        "bestPriceByCpl": 0.19999999999998863,
+        "comparisonCpl": 149.5,
+        "priceMatch": "exact U91 price"
+      },
+      "rawContext": {
+        "eligibleCandidates": 98,
+        "baselineCpl": 157.7,
+        "generatedAt": "2026-07-03T06:33:37.908Z",
+        "decisionSummary": {
+          "action": "fill_now",
+          "label": "Medium savings detour",
+          "reason": "Suggested detour adds 2.0 min and saves $3.04.",
+          "stationCode": "VIC-ZZb5BkauV4qFwN0JzvQkfP414J0Rq9Cq9eD1Pa4LrhM=",
+          "stationName": "Metro Petroleum Golden Point",
+          "economics": {
+            "baselineCpl": 157.7,
+            "comparisonCpl": 149.5,
+            "comparisonKind": "next_best_viable",
+            "pumpCpl": 149.3,
+            "adjustedCpl": 149.3,
+            "fillLitres": 40,
+            "grossFuelSaving": 3.36,
+            "detourKm": 2.65,
+            "detourMinutes": 2,
+            "detourFuelLitres": 0.22,
+            "detourCost": 0.32,
+            "timeCost": 0.3,
+            "timeCostDollarsPerMinute": 0.15,
+            "netSavingAfterDetourFuel": 3.04,
+            "netSavingAfterDetourFuelAndTime": 2.74
+          },
+          "decisionRule": {
+            "minSavingDollars": 1.5,
+            "maxDetourMinutes": 30
+          },
+          "alternatives": [
+            {
+              "kind": "best_value",
+              "label": "Best value",
+              "stationCode": "VIC-ZZb5BkauV4qFwN0JzvQkfP414J0Rq9Cq9eD1Pa4LrhM=",
+              "stationName": "Metro Petroleum Golden Point",
+              "note": "149.3 c/L, 2.0 min detour",
+              "adjustedCpl": 149.3,
+              "netSaving": 3.04,
+              "detourMinutes": 2,
+              "detourFuelLitres": 0.22,
+              "timeCost": 0.3,
+              "netAfterDetourAndTimeCost": 2.74,
+              "selected": true
+            },
+            {
+              "kind": "cheapest",
+              "label": "Cheapest",
+              "stationCode": "VIC-ZZb5BkauV4qFwN0JzvQkfP414J0Rq9Cq9eD1Pa4LrhM=",
+              "stationName": "Metro Petroleum Golden Point",
+              "note": "149.3 c/L after wallet",
+              "adjustedCpl": 149.3,
+              "netSaving": 3.04,
+              "detourMinutes": 2,
+              "detourFuelLitres": 0.22,
+              "timeCost": 0.3,
+              "netAfterDetourAndTimeCost": 2.74,
+              "selected": true
+            },
+            {
+              "kind": "closest",
+              "label": "Closest",
+              "stationCode": "VIC-jS/Rn0wVNjez2y+pxjw71brMSREay30DEh/Jsb/MFlY=",
+              "stationName": "7-Eleven Rockbank",
+              "note": "0.0 min detour",
+              "adjustedCpl": 149.9,
+              "netSaving": 3.11,
+              "detourMinutes": 0,
+              "detourFuelLitres": 0,
+              "timeCost": 0.01,
+              "netAfterDetourAndTimeCost": 3.11,
+              "selected": false
+            },
+            {
+              "kind": "safest",
+              "label": "Safest",
+              "stationCode": "VIC-ZZb5BkauV4qFwN0JzvQkfP414J0Rq9Cq9eD1Pa4LrhM=",
+              "stationName": "Metro Petroleum Golden Point",
+              "note": "Open, reachable and clean",
+              "adjustedCpl": 149.3,
+              "netSaving": 3.04,
+              "detourMinutes": 2,
+              "detourFuelLitres": 0.22,
+              "timeCost": 0.3,
+              "netAfterDetourAndTimeCost": 2.74,
+              "selected": true
+            }
+          ],
+          "whyNotCheapest": "Cheapest also wins because the route saving stays ahead after detour time and fuel used.",
+          "trust": {
+            "source": "api_vic_servo_saver",
+            "sourceType": "official_live",
+            "officialLive": true,
+            "updatedAt": "2026-07-01T20:31:13.000Z",
+            "freshnessMinutes": 2042
+          }
+        }
+      }
+    },
+    {
+      "id": "vic-melbourne-ballarat-pdl",
+      "route": {
+        "id": "vic-melbourne-ballarat",
+        "region": "VIC",
+        "from": {
+          "label": "Melbourne CBD VIC",
+          "lat": -37.8136,
+          "lon": 144.9631
+        },
+        "to": {
+          "label": "Ballarat VIC",
+          "lat": -37.5622,
+          "lon": 143.8503
+        }
+      },
+      "fuel": "PDL",
+      "status": "passed",
+      "elapsedMs": 645,
+      "routeKm": 115.11,
+      "provider": "api_vic",
+      "source": "api_vic",
+      "capability": "live",
+      "cacheAgeSeconds": 277,
+      "cacheMode": "fresh",
+      "degraded": false,
+      "warning": "",
+      "providerCaveat": "VIC Servo Saver; fresh 5m ago; exact PDL price",
+      "recommendation": {
+        "stationCode": "VIC-ZZb5BkauV4qFwN0JzvQkfP414J0Rq9Cq9eD1Pa4LrhM=",
+        "stationName": "Metro Petroleum Golden Point",
+        "suburb": "GOLDEN POINT",
+        "brand": "Metro Petroleum",
+        "fuel": "PDL",
+        "adjustedCpl": 163.3,
+        "pumpCpl": 163.3,
+        "detourMinutes": 2.1,
+        "bestPriceByCpl": 3.5999999999999943,
+        "comparisonCpl": 166.9,
+        "priceMatch": "exact PDL price"
+      },
+      "rawContext": {
+        "eligibleCandidates": 74,
+        "baselineCpl": 180.4,
+        "generatedAt": "2026-07-03T06:33:38.801Z",
+        "decisionSummary": {
+          "action": "fill_now",
+          "label": "Good savings detour",
+          "reason": "Suggested detour adds 2.0 min and saves $6.49.",
+          "stationCode": "VIC-ZZb5BkauV4qFwN0JzvQkfP414J0Rq9Cq9eD1Pa4LrhM=",
+          "stationName": "Metro Petroleum Golden Point",
+          "economics": {
+            "baselineCpl": 180.4,
+            "comparisonCpl": 166.9,
+            "comparisonKind": "next_best_viable",
+            "pumpCpl": 163.3,
+            "adjustedCpl": 163.3,
+            "fillLitres": 40,
+            "grossFuelSaving": 6.84,
+            "detourKm": 2.65,
+            "detourMinutes": 2,
+            "detourFuelLitres": 0.22,
+            "detourCost": 0.35,
+            "timeCost": 0.3,
+            "timeCostDollarsPerMinute": 0.15,
+            "netSavingAfterDetourFuel": 6.49,
+            "netSavingAfterDetourFuelAndTime": 6.19
+          },
+          "decisionRule": {
+            "minSavingDollars": 1.5,
+            "maxDetourMinutes": 30
+          },
+          "alternatives": [
+            {
+              "kind": "best_value",
+              "label": "Best value",
+              "stationCode": "VIC-ZZb5BkauV4qFwN0JzvQkfP414J0Rq9Cq9eD1Pa4LrhM=",
+              "stationName": "Metro Petroleum Golden Point",
+              "note": "163.3 c/L, 2.0 min detour",
+              "adjustedCpl": 163.3,
+              "netSaving": 6.49,
+              "detourMinutes": 2,
+              "detourFuelLitres": 0.22,
+              "timeCost": 0.3,
+              "netAfterDetourAndTimeCost": 6.19,
+              "selected": true
+            },
+            {
+              "kind": "cheapest",
+              "label": "Cheapest",
+              "stationCode": "VIC-ZZb5BkauV4qFwN0JzvQkfP414J0Rq9Cq9eD1Pa4LrhM=",
+              "stationName": "Metro Petroleum Golden Point",
+              "note": "163.3 c/L after wallet",
+              "adjustedCpl": 163.3,
+              "netSaving": 6.49,
+              "detourMinutes": 2,
+              "detourFuelLitres": 0.22,
+              "timeCost": 0.3,
+              "netAfterDetourAndTimeCost": 6.19,
+              "selected": true
+            },
+            {
+              "kind": "closest",
+              "label": "Closest",
+              "stationCode": "VIC-jS/Rn0wVNjez2y+pxjw71brMSREay30DEh/Jsb/MFlY=",
+              "stationName": "7-Eleven Rockbank",
+              "note": "0.0 min detour",
+              "adjustedCpl": 179.9,
+              "netSaving": 0.19,
+              "detourMinutes": 0,
+              "detourFuelLitres": 0,
+              "timeCost": 0.01,
+              "netAfterDetourAndTimeCost": 0.19,
+              "selected": false
+            },
+            {
+              "kind": "safest",
+              "label": "Safest",
+              "stationCode": "VIC-ZZb5BkauV4qFwN0JzvQkfP414J0Rq9Cq9eD1Pa4LrhM=",
+              "stationName": "Metro Petroleum Golden Point",
+              "note": "Open, reachable and clean",
+              "adjustedCpl": 163.3,
+              "netSaving": 6.49,
+              "detourMinutes": 2,
+              "detourFuelLitres": 0.22,
+              "timeCost": 0.3,
+              "netAfterDetourAndTimeCost": 6.19,
+              "selected": true
+            }
+          ],
+          "whyNotCheapest": "Cheapest also wins because the route saving stays ahead after detour time and fuel used.",
+          "trust": {
+            "source": "api_vic_servo_saver",
+            "sourceType": "official_live",
+            "officialLive": true,
+            "updatedAt": "2026-07-01T20:31:13.000Z",
+            "freshnessMinutes": 2042
+          }
+        }
+      }
+    },
+    {
+      "id": "qld-brisbane-longreach-u91",
+      "route": {
+        "id": "qld-brisbane-longreach",
+        "region": "QLD",
+        "from": {
+          "label": "Brisbane CBD QLD",
+          "lat": -27.4698,
+          "lon": 153.0251
+        },
+        "to": {
+          "label": "Longreach QLD",
+          "lat": -23.44,
+          "lon": 144.25
+        }
+      },
+      "fuel": "U91",
+      "status": "passed",
+      "elapsedMs": 1007,
+      "routeKm": 1176.34,
+      "provider": "api_qld",
+      "source": "api_qld",
+      "capability": "live",
+      "cacheAgeSeconds": 266,
+      "cacheMode": "fresh",
+      "degraded": false,
+      "warning": "",
+      "providerCaveat": "Queensland Fuel Prices; fresh 4m ago; exact U91 price",
+      "recommendation": {
+        "stationCode": "QLD-61477937",
+        "stationName": "United Woolloongabba",
+        "suburb": "Woolloongabba",
+        "brand": "United",
+        "fuel": "U91",
+        "adjustedCpl": 153.9,
+        "pumpCpl": 153.9,
+        "detourMinutes": 3.1,
+        "bestPriceByCpl": 1.5999999999999943,
+        "comparisonCpl": 155.5,
+        "priceMatch": "exact U91 price"
+      },
+      "rawContext": {
+        "eligibleCandidates": 114,
+        "baselineCpl": 167.9,
+        "generatedAt": "2026-07-03T06:33:40.012Z",
+        "decisionSummary": {
+          "action": "fill_now",
+          "label": "Medium savings detour",
+          "reason": "Suggested detour adds 4.7 min and saves $4.80.",
+          "stationCode": "QLD-61477937",
+          "stationName": "United Woolloongabba",
+          "economics": {
+            "baselineCpl": 167.9,
+            "comparisonCpl": 155.5,
+            "comparisonKind": "next_best_viable",
+            "pumpCpl": 153.9,
+            "adjustedCpl": 153.9,
+            "fillLitres": 40,
+            "grossFuelSaving": 5.6,
+            "detourKm": 6.32,
+            "detourMinutes": 4.7,
+            "detourFuelLitres": 0.52,
+            "detourCost": 0.8,
+            "timeCost": 0.71,
+            "timeCostDollarsPerMinute": 0.15,
+            "netSavingAfterDetourFuel": 4.8,
+            "netSavingAfterDetourFuelAndTime": 4.09
+          },
+          "decisionRule": {
+            "minSavingDollars": 1.5,
+            "maxDetourMinutes": 30
+          },
+          "alternatives": [
+            {
+              "kind": "best_value",
+              "label": "Best value",
+              "stationCode": "QLD-61477937",
+              "stationName": "United Woolloongabba",
+              "note": "153.9 c/L, 4.7 min detour",
+              "adjustedCpl": 153.9,
+              "netSaving": 4.8,
+              "detourMinutes": 4.7,
+              "detourFuelLitres": 0.52,
+              "timeCost": 0.71,
+              "netAfterDetourAndTimeCost": 4.09,
+              "selected": true
+            },
+            {
+              "kind": "cheapest",
+              "label": "Cheapest",
+              "stationCode": "QLD-61477937",
+              "stationName": "United Woolloongabba",
+              "note": "153.9 c/L after wallet",
+              "adjustedCpl": 153.9,
+              "netSaving": 4.8,
+              "detourMinutes": 4.7,
+              "detourFuelLitres": 0.52,
+              "timeCost": 0.71,
+              "netAfterDetourAndTimeCost": 4.09,
+              "selected": true
+            },
+            {
+              "kind": "closest",
+              "label": "Closest",
+              "stationCode": "QLD-61402414",
+              "stationName": "Freedom Fuels Hattonvale",
+              "note": "0.0 min detour",
+              "adjustedCpl": 159.5,
+              "netSaving": 3.36,
+              "detourMinutes": 0,
+              "detourFuelLitres": 0,
+              "timeCost": 0,
+              "netAfterDetourAndTimeCost": 3.35,
+              "selected": false
+            },
+            {
+              "kind": "safest",
+              "label": "Safest",
+              "stationCode": "QLD-61477937",
+              "stationName": "United Woolloongabba",
+              "note": "Open, reachable and clean",
+              "adjustedCpl": 153.9,
+              "netSaving": 4.8,
+              "detourMinutes": 4.7,
+              "detourFuelLitres": 0.52,
+              "timeCost": 0.71,
+              "netAfterDetourAndTimeCost": 4.09,
+              "selected": true
+            }
+          ],
+          "whyNotCheapest": "Cheapest also wins because the route saving stays ahead after detour time and fuel used.",
+          "trust": {
+            "source": "api_qld_fuelprices",
+            "sourceType": "official_live",
+            "officialLive": true,
+            "updatedAt": "2026-07-01T21:00:11.403Z",
+            "freshnessMinutes": 2013
+          }
+        }
+      }
+    },
+    {
+      "id": "qld-brisbane-longreach-pdl",
+      "route": {
+        "id": "qld-brisbane-longreach",
+        "region": "QLD",
+        "from": {
+          "label": "Brisbane CBD QLD",
+          "lat": -27.4698,
+          "lon": 153.0251
+        },
+        "to": {
+          "label": "Longreach QLD",
+          "lat": -23.44,
+          "lon": 144.25
+        }
+      },
+      "fuel": "PDL",
+      "status": "passed",
+      "elapsedMs": 1065,
+      "routeKm": 1176.34,
+      "provider": "api_qld",
+      "source": "api_qld",
+      "capability": "live",
+      "cacheAgeSeconds": 268,
+      "cacheMode": "fresh",
+      "degraded": false,
+      "warning": "",
+      "providerCaveat": "Queensland Fuel Prices; fresh 4m ago; exact PDL price",
+      "recommendation": {
+        "stationCode": "QLD-61477898",
+        "stationName": "Costco Ipswich Fuel Station",
+        "suburb": "Bundamba",
+        "brand": "Costco",
+        "fuel": "PDL",
+        "adjustedCpl": 172.7,
+        "pumpCpl": 172.7,
+        "detourMinutes": 3.1,
+        "bestPriceByCpl": 1.8000000000000114,
+        "comparisonCpl": 174.5,
+        "priceMatch": "exact PDL price"
+      },
+      "rawContext": {
+        "eligibleCandidates": 72,
+        "baselineCpl": 189.9,
+        "generatedAt": "2026-07-03T06:33:41.524Z",
+        "decisionSummary": {
+          "action": "fill_now",
+          "label": "Good savings detour",
+          "reason": "Suggested detour adds 0.6 min and saves $6.76.",
+          "stationCode": "QLD-61477898",
+          "stationName": "Costco Ipswich Fuel Station",
+          "economics": {
+            "baselineCpl": 189.9,
+            "comparisonCpl": 174.5,
+            "comparisonKind": "next_best_viable",
+            "pumpCpl": 172.7,
+            "adjustedCpl": 172.7,
+            "fillLitres": 40,
+            "grossFuelSaving": 6.88,
+            "detourKm": 0.85,
+            "detourMinutes": 0.6,
+            "detourFuelLitres": 0.07,
+            "detourCost": 0.12,
+            "timeCost": 0.1,
+            "timeCostDollarsPerMinute": 0.15,
+            "netSavingAfterDetourFuel": 6.76,
+            "netSavingAfterDetourFuelAndTime": 6.66
+          },
+          "decisionRule": {
+            "minSavingDollars": 1.5,
+            "maxDetourMinutes": 30
+          },
+          "alternatives": [
+            {
+              "kind": "best_value",
+              "label": "Best value",
+              "stationCode": "QLD-61477898",
+              "stationName": "Costco Ipswich Fuel Station",
+              "note": "172.7 c/L, 0.6 min detour",
+              "adjustedCpl": 172.7,
+              "netSaving": 6.76,
+              "detourMinutes": 0.6,
+              "detourFuelLitres": 0.07,
+              "timeCost": 0.1,
+              "netAfterDetourAndTimeCost": 6.66,
+              "selected": true
+            },
+            {
+              "kind": "cheapest",
+              "label": "Cheapest",
+              "stationCode": "QLD-61477898",
+              "stationName": "Costco Ipswich Fuel Station",
+              "note": "172.7 c/L after wallet",
+              "adjustedCpl": 172.7,
+              "netSaving": 6.76,
+              "detourMinutes": 0.6,
+              "detourFuelLitres": 0.07,
+              "timeCost": 0.1,
+              "netAfterDetourAndTimeCost": 6.66,
+              "selected": true
+            },
+            {
+              "kind": "closest",
+              "label": "Closest",
+              "stationCode": "QLD-61402063",
+              "stationName": "Ampol Foodary Miles",
+              "note": "0.0 min detour",
+              "adjustedCpl": 186.9,
+              "netSaving": 1.19,
+              "detourMinutes": 0,
+              "detourFuelLitres": 0,
+              "timeCost": 0.01,
+              "netAfterDetourAndTimeCost": 1.19,
+              "selected": false
+            },
+            {
+              "kind": "safest",
+              "label": "Safest",
+              "stationCode": "QLD-61477898",
+              "stationName": "Costco Ipswich Fuel Station",
+              "note": "Open, reachable and clean",
+              "adjustedCpl": 172.7,
+              "netSaving": 6.76,
+              "detourMinutes": 0.6,
+              "detourFuelLitres": 0.07,
+              "timeCost": 0.1,
+              "netAfterDetourAndTimeCost": 6.66,
+              "selected": true
+            }
+          ],
+          "whyNotCheapest": "Cheapest also wins because the route saving stays ahead after detour time and fuel used.",
+          "trust": {
+            "source": "api_qld_fuelprices",
+            "sourceType": "official_live",
+            "officialLive": true,
+            "updatedAt": "2026-07-03T00:28:13.183Z",
+            "freshnessMinutes": 365
+          }
+        }
+      }
+    },
+    {
+      "id": "wa-perth-broome-u91",
+      "route": {
+        "id": "wa-perth-broome",
+        "region": "WA",
+        "from": {
+          "label": "Perth CBD WA",
+          "lat": -31.9523,
+          "lon": 115.8613
+        },
+        "to": {
+          "label": "Broome WA",
+          "lat": -17.9644,
+          "lon": 122.2304
+        }
+      },
+      "fuel": "U91",
+      "status": "passed",
+      "elapsedMs": 2071,
+      "routeKm": 2218.14,
+      "provider": "api_wa",
+      "source": "api_wa",
+      "capability": "live",
+      "cacheAgeSeconds": 0,
+      "cacheMode": "refreshed",
+      "degraded": false,
+      "warning": "",
+      "providerCaveat": "WA FuelWatch; refreshed now; exact U91 price",
+      "recommendation": {
+        "stationCode": "WA-metro-petroleum-metro-bassendean-335-collier-rd-bassendean",
+        "stationName": "Metro Bassendean",
+        "suburb": "Bassendean",
+        "brand": "Metro Petroleum",
+        "fuel": "U91",
+        "adjustedCpl": 149.2,
+        "pumpCpl": 149.2,
+        "detourMinutes": 3.1,
+        "bestPriceByCpl": 8.100000000000023,
+        "comparisonCpl": 157.3,
+        "priceMatch": "exact U91 price"
+      },
+      "rawContext": {
+        "eligibleCandidates": 53,
+        "baselineCpl": 165.9,
+        "generatedAt": "2026-07-03T06:33:44.028Z",
+        "decisionSummary": {
+          "action": "fill_now",
+          "label": "Good savings detour",
+          "reason": "Suggested detour adds 4.7 min and saves $5.91.",
+          "stationCode": "WA-metro-petroleum-metro-bassendean-335-collier-rd-bassendean",
+          "stationName": "Metro Bassendean",
+          "economics": {
+            "baselineCpl": 165.9,
+            "comparisonCpl": 157.3,
+            "comparisonKind": "next_best_viable",
+            "pumpCpl": 149.2,
+            "adjustedCpl": 149.2,
+            "fillLitres": 40,
+            "grossFuelSaving": 6.68,
+            "detourKm": 6.31,
+            "detourMinutes": 4.7,
+            "detourFuelLitres": 0.52,
+            "detourCost": 0.77,
+            "timeCost": 0.71,
+            "timeCostDollarsPerMinute": 0.15,
+            "netSavingAfterDetourFuel": 5.91,
+            "netSavingAfterDetourFuelAndTime": 5.2
+          },
+          "decisionRule": {
+            "minSavingDollars": 1.5,
+            "maxDetourMinutes": 30
+          },
+          "alternatives": [
+            {
+              "kind": "best_value",
+              "label": "Best value",
+              "stationCode": "WA-metro-petroleum-metro-bassendean-335-collier-rd-bassendean",
+              "stationName": "Metro Bassendean",
+              "note": "149.2 c/L, 4.7 min detour",
+              "adjustedCpl": 149.2,
+              "netSaving": 5.91,
+              "detourMinutes": 4.7,
+              "detourFuelLitres": 0.52,
+              "timeCost": 0.71,
+              "netAfterDetourAndTimeCost": 5.2,
+              "selected": true
+            },
+            {
+              "kind": "cheapest",
+              "label": "Cheapest",
+              "stationCode": "WA-metro-petroleum-metro-bassendean-335-collier-rd-bassendean",
+              "stationName": "Metro Bassendean",
+              "note": "149.2 c/L after wallet",
+              "adjustedCpl": 149.2,
+              "netSaving": 5.91,
+              "detourMinutes": 4.7,
+              "detourFuelLitres": 0.52,
+              "timeCost": 0.71,
+              "netAfterDetourAndTimeCost": 5.2,
+              "selected": true
+            },
+            {
+              "kind": "closest",
+              "label": "Closest",
+              "stationCode": "WA-7-eleven-7-eleven-morley-162-russell-st-morley",
+              "stationName": "7-Eleven Morley",
+              "note": "0.0 min detour",
+              "adjustedCpl": 165.9,
+              "netSaving": 0,
+              "detourMinutes": 0,
+              "detourFuelLitres": 0,
+              "timeCost": 0,
+              "netAfterDetourAndTimeCost": -0.01,
+              "selected": false
+            },
+            {
+              "kind": "safest",
+              "label": "Safest",
+              "stationCode": "WA-metro-petroleum-metro-bassendean-335-collier-rd-bassendean",
+              "stationName": "Metro Bassendean",
+              "note": "Open, reachable and clean",
+              "adjustedCpl": 149.2,
+              "netSaving": 5.91,
+              "detourMinutes": 4.7,
+              "detourFuelLitres": 0.52,
+              "timeCost": 0.71,
+              "netAfterDetourAndTimeCost": 5.2,
+              "selected": true
+            }
+          ],
+          "whyNotCheapest": "Cheapest also wins because the route saving stays ahead after detour time and fuel used.",
+          "trust": {
+            "source": "api_wa_fuelwatch",
+            "sourceType": "official_live",
+            "officialLive": true,
+            "updatedAt": "2026-07-02T22:00:00.000Z",
+            "freshnessMinutes": 514
+          }
+        }
+      }
+    },
+    {
+      "id": "wa-perth-broome-pdl",
+      "route": {
+        "id": "wa-perth-broome",
+        "region": "WA",
+        "from": {
+          "label": "Perth CBD WA",
+          "lat": -31.9523,
+          "lon": 115.8613
+        },
+        "to": {
+          "label": "Broome WA",
+          "lat": -17.9644,
+          "lon": 122.2304
+        }
+      },
+      "fuel": "PDL",
+      "status": "passed",
+      "elapsedMs": 1247,
+      "routeKm": 2218.14,
+      "provider": "api_wa",
+      "source": "api_wa",
+      "capability": "live",
+      "cacheAgeSeconds": 0,
+      "cacheMode": "refreshed",
+      "degraded": false,
+      "warning": "",
+      "providerCaveat": "WA FuelWatch; refreshed now; exact PDL price",
+      "recommendation": {
+        "stationCode": "WA-solo-solo-morley-298-benara-rd-morley",
+        "stationName": "Solo Morley",
+        "suburb": "Morley",
+        "brand": "Solo",
+        "fuel": "PDL",
+        "adjustedCpl": 171.5,
+        "pumpCpl": 171.5,
+        "detourMinutes": 4.6,
+        "bestPriceByCpl": 3.8000000000000114,
+        "comparisonCpl": 175.3,
+        "priceMatch": "exact PDL price"
+      },
+      "rawContext": {
+        "eligibleCandidates": 35,
+        "baselineCpl": 185.9,
+        "generatedAt": "2026-07-03T06:33:45.886Z",
+        "decisionSummary": {
+          "action": "fill_now",
+          "label": "Good savings detour",
+          "reason": "Suggested detour adds 1.6 min and saves $5.47.",
+          "stationCode": "WA-solo-solo-morley-298-benara-rd-morley",
+          "stationName": "Solo Morley",
+          "economics": {
+            "baselineCpl": 185.9,
+            "comparisonCpl": 175.3,
+            "comparisonKind": "next_best_viable",
+            "pumpCpl": 171.5,
+            "adjustedCpl": 171.5,
+            "fillLitres": 40,
+            "grossFuelSaving": 5.76,
+            "detourKm": 2.07,
+            "detourMinutes": 1.6,
+            "detourFuelLitres": 0.17,
+            "detourCost": 0.29,
+            "timeCost": 0.23,
+            "timeCostDollarsPerMinute": 0.15,
+            "netSavingAfterDetourFuel": 5.47,
+            "netSavingAfterDetourFuelAndTime": 5.24
+          },
+          "decisionRule": {
+            "minSavingDollars": 1.5,
+            "maxDetourMinutes": 30
+          },
+          "alternatives": [
+            {
+              "kind": "best_value",
+              "label": "Best value",
+              "stationCode": "WA-solo-solo-morley-298-benara-rd-morley",
+              "stationName": "Solo Morley",
+              "note": "171.5 c/L, 1.6 min detour",
+              "adjustedCpl": 171.5,
+              "netSaving": 5.47,
+              "detourMinutes": 1.6,
+              "detourFuelLitres": 0.17,
+              "timeCost": 0.23,
+              "netAfterDetourAndTimeCost": 5.24,
+              "selected": true
+            },
+            {
+              "kind": "cheapest",
+              "label": "Cheapest",
+              "stationCode": "WA-solo-solo-morley-298-benara-rd-morley",
+              "stationName": "Solo Morley",
+              "note": "171.5 c/L after wallet",
+              "adjustedCpl": 171.5,
+              "netSaving": 5.47,
+              "detourMinutes": 1.6,
+              "detourFuelLitres": 0.17,
+              "timeCost": 0.23,
+              "netAfterDetourAndTimeCost": 5.24,
+              "selected": true
+            },
+            {
+              "kind": "closest",
+              "label": "Closest",
+              "stationCode": "WA-7-eleven-7-eleven-morley-162-russell-st-morley",
+              "stationName": "7-Eleven Morley",
+              "note": "0.0 min detour",
+              "adjustedCpl": 179.9,
+              "netSaving": 2.4,
+              "detourMinutes": 0,
+              "detourFuelLitres": 0,
+              "timeCost": 0,
+              "netAfterDetourAndTimeCost": 2.39,
+              "selected": false
+            },
+            {
+              "kind": "safest",
+              "label": "Safest",
+              "stationCode": "WA-solo-solo-morley-298-benara-rd-morley",
+              "stationName": "Solo Morley",
+              "note": "Open, reachable and clean",
+              "adjustedCpl": 171.5,
+              "netSaving": 5.47,
+              "detourMinutes": 1.6,
+              "detourFuelLitres": 0.17,
+              "timeCost": 0.23,
+              "netAfterDetourAndTimeCost": 5.24,
+              "selected": true
+            }
+          ],
+          "whyNotCheapest": "Cheapest also wins because the route saving stays ahead after detour time and fuel used.",
+          "trust": {
+            "source": "api_wa_fuelwatch",
+            "sourceType": "official_live",
+            "officialLive": true,
+            "updatedAt": "2026-07-02T22:00:00.000Z",
+            "freshnessMinutes": 514
+          }
+        }
+      }
+    },
+    {
+      "id": "sa-adelaide-coober-pedy-u91",
+      "route": {
+        "id": "sa-adelaide-coober-pedy",
+        "region": "SA",
+        "from": {
+          "label": "Adelaide CBD SA",
+          "lat": -34.9285,
+          "lon": 138.6007
+        },
+        "to": {
+          "label": "Coober Pedy SA",
+          "lat": -29.0139,
+          "lon": 134.7544
+        }
+      },
+      "fuel": "U91",
+      "status": "passed",
+      "elapsedMs": 1067,
+      "routeKm": 846.7,
+      "provider": "api_sa",
+      "source": "api_sa",
+      "capability": "live",
+      "cacheAgeSeconds": 268,
+      "cacheMode": "fresh",
+      "degraded": false,
+      "warning": "",
+      "providerCaveat": "SA Fuel Pricing; fresh 4m ago; exact U91 price",
+      "recommendation": {
+        "stationCode": "SA-61577032",
+        "stationName": "Costco Kilburn",
+        "suburb": "Kilburn",
+        "brand": "Costco",
+        "fuel": "U91",
+        "adjustedCpl": 150.7,
+        "pumpCpl": 150.7,
+        "detourMinutes": 4.7,
+        "bestPriceByCpl": 6.800000000000011,
+        "comparisonCpl": 157.5,
+        "priceMatch": "exact U91 price"
+      },
+      "rawContext": {
+        "eligibleCandidates": 69,
+        "baselineCpl": 161.9,
+        "generatedAt": "2026-07-03T06:33:47.614Z",
+        "decisionSummary": {
+          "action": "fill_now",
+          "label": "Medium savings detour",
+          "reason": "Suggested detour adds 2.8 min and saves $4.03.",
+          "stationCode": "SA-61577032",
+          "stationName": "Costco Kilburn",
+          "economics": {
+            "baselineCpl": 161.9,
+            "comparisonCpl": 157.5,
+            "comparisonKind": "next_best_viable",
+            "pumpCpl": 150.7,
+            "adjustedCpl": 150.7,
+            "fillLitres": 40,
+            "grossFuelSaving": 4.48,
+            "detourKm": 3.67,
+            "detourMinutes": 2.8,
+            "detourFuelLitres": 0.3,
+            "detourCost": 0.45,
+            "timeCost": 0.41,
+            "timeCostDollarsPerMinute": 0.15,
+            "netSavingAfterDetourFuel": 4.03,
+            "netSavingAfterDetourFuelAndTime": 3.61
+          },
+          "decisionRule": {
+            "minSavingDollars": 1.5,
+            "maxDetourMinutes": 30
+          },
+          "alternatives": [
+            {
+              "kind": "best_value",
+              "label": "Best value",
+              "stationCode": "SA-61577032",
+              "stationName": "Costco Kilburn",
+              "note": "150.7 c/L, 2.8 min detour",
+              "adjustedCpl": 150.7,
+              "netSaving": 4.03,
+              "detourMinutes": 2.8,
+              "detourFuelLitres": 0.3,
+              "timeCost": 0.41,
+              "netAfterDetourAndTimeCost": 3.61,
+              "selected": true
+            },
+            {
+              "kind": "cheapest",
+              "label": "Cheapest",
+              "stationCode": "SA-61577032",
+              "stationName": "Costco Kilburn",
+              "note": "150.7 c/L after wallet",
+              "adjustedCpl": 150.7,
+              "netSaving": 4.03,
+              "detourMinutes": 2.8,
+              "detourFuelLitres": 0.3,
+              "timeCost": 0.41,
+              "netAfterDetourAndTimeCost": 3.61,
+              "selected": true
+            },
+            {
+              "kind": "closest",
+              "label": "Closest",
+              "stationCode": "SA-61501082",
+              "stationName": "Caltex Thebarton",
+              "note": "0.0 min detour",
+              "adjustedCpl": 164.9,
+              "netSaving": -1.2,
+              "detourMinutes": 0,
+              "detourFuelLitres": 0,
+              "timeCost": 0,
+              "netAfterDetourAndTimeCost": -1.21,
+              "selected": false
+            },
+            {
+              "kind": "safest",
+              "label": "Safest",
+              "stationCode": "SA-61577032",
+              "stationName": "Costco Kilburn",
+              "note": "Open, reachable and clean",
+              "adjustedCpl": 150.7,
+              "netSaving": 4.03,
+              "detourMinutes": 2.8,
+              "detourFuelLitres": 0.3,
+              "timeCost": 0.41,
+              "netAfterDetourAndTimeCost": 3.61,
+              "selected": true
+            }
+          ],
+          "whyNotCheapest": "Cheapest also wins because the route saving stays ahead after detour time and fuel used.",
+          "trust": {
+            "source": "api_sa_fuel_price_reporting",
+            "sourceType": "official_live",
+            "officialLive": true,
+            "updatedAt": "2026-07-03T01:55:27.453Z",
+            "freshnessMinutes": 278
+          }
+        }
+      }
+    },
+    {
+      "id": "sa-adelaide-coober-pedy-pdl",
+      "route": {
+        "id": "sa-adelaide-coober-pedy",
+        "region": "SA",
+        "from": {
+          "label": "Adelaide CBD SA",
+          "lat": -34.9285,
+          "lon": 138.6007
+        },
+        "to": {
+          "label": "Coober Pedy SA",
+          "lat": -29.0139,
+          "lon": 134.7544
+        }
+      },
+      "fuel": "PDL",
+      "status": "passed",
+      "elapsedMs": 1034,
+      "routeKm": 846.7,
+      "provider": "api_sa",
+      "source": "api_sa",
+      "capability": "live",
+      "cacheAgeSeconds": 270,
+      "cacheMode": "fresh",
+      "degraded": false,
+      "warning": "",
+      "providerCaveat": "SA Fuel Pricing; fresh 5m ago; exact PDL price",
+      "recommendation": {
+        "stationCode": "SA-61577032",
+        "stationName": "Costco Kilburn",
+        "suburb": "Kilburn",
+        "brand": "Costco",
+        "fuel": "PDL",
+        "adjustedCpl": 171.7,
+        "pumpCpl": 171.7,
+        "detourMinutes": 4.7,
+        "bestPriceByCpl": 8.800000000000011,
+        "comparisonCpl": 180.5,
+        "priceMatch": "exact PDL price"
+      },
+      "rawContext": {
+        "eligibleCandidates": 57,
+        "baselineCpl": 186.9,
+        "generatedAt": "2026-07-03T06:33:49.107Z",
+        "decisionSummary": {
+          "action": "fill_now",
+          "label": "Good savings detour",
+          "reason": "Suggested detour adds 2.8 min and saves $5.56.",
+          "stationCode": "SA-61577032",
+          "stationName": "Costco Kilburn",
+          "economics": {
+            "baselineCpl": 186.9,
+            "comparisonCpl": 180.5,
+            "comparisonKind": "next_best_viable",
+            "pumpCpl": 171.7,
+            "adjustedCpl": 171.7,
+            "fillLitres": 40,
+            "grossFuelSaving": 6.08,
+            "detourKm": 3.67,
+            "detourMinutes": 2.8,
+            "detourFuelLitres": 0.3,
+            "detourCost": 0.52,
+            "timeCost": 0.41,
+            "timeCostDollarsPerMinute": 0.15,
+            "netSavingAfterDetourFuel": 5.56,
+            "netSavingAfterDetourFuelAndTime": 5.15
+          },
+          "decisionRule": {
+            "minSavingDollars": 1.5,
+            "maxDetourMinutes": 30
+          },
+          "alternatives": [
+            {
+              "kind": "best_value",
+              "label": "Best value",
+              "stationCode": "SA-61577032",
+              "stationName": "Costco Kilburn",
+              "note": "171.7 c/L, 2.8 min detour",
+              "adjustedCpl": 171.7,
+              "netSaving": 5.56,
+              "detourMinutes": 2.8,
+              "detourFuelLitres": 0.3,
+              "timeCost": 0.41,
+              "netAfterDetourAndTimeCost": 5.15,
+              "selected": true
+            },
+            {
+              "kind": "cheapest",
+              "label": "Cheapest",
+              "stationCode": "SA-61577032",
+              "stationName": "Costco Kilburn",
+              "note": "171.7 c/L after wallet",
+              "adjustedCpl": 171.7,
+              "netSaving": 5.56,
+              "detourMinutes": 2.8,
+              "detourFuelLitres": 0.3,
+              "timeCost": 0.41,
+              "netAfterDetourAndTimeCost": 5.15,
+              "selected": true
+            },
+            {
+              "kind": "closest",
+              "label": "Closest",
+              "stationCode": "SA-61577315",
+              "stationName": "24 Seven Port Wakefield",
+              "note": "0.0 min detour",
+              "adjustedCpl": 186.9,
+              "netSaving": -0.01,
+              "detourMinutes": 0,
+              "detourFuelLitres": 0.01,
+              "timeCost": 0.01,
+              "netAfterDetourAndTimeCost": -0.02,
+              "selected": false
+            },
+            {
+              "kind": "safest",
+              "label": "Safest",
+              "stationCode": "SA-61577032",
+              "stationName": "Costco Kilburn",
+              "note": "Open, reachable and clean",
+              "adjustedCpl": 171.7,
+              "netSaving": 5.56,
+              "detourMinutes": 2.8,
+              "detourFuelLitres": 0.3,
+              "timeCost": 0.41,
+              "netAfterDetourAndTimeCost": 5.15,
+              "selected": true
+            }
+          ],
+          "whyNotCheapest": "Cheapest also wins because the route saving stays ahead after detour time and fuel used.",
+          "trust": {
+            "source": "api_sa_fuel_price_reporting",
+            "sourceType": "official_live",
+            "officialLive": true,
+            "updatedAt": "2026-07-03T01:55:27.453Z",
+            "freshnessMinutes": 278
+          }
+        }
+      }
+    },
+    {
+      "id": "tas-hobart-strahan-u91",
+      "route": {
+        "id": "tas-hobart-strahan",
+        "region": "TAS",
+        "from": {
+          "label": "Hobart TAS",
+          "lat": -42.8821,
+          "lon": 147.3272
+        },
+        "to": {
+          "label": "Strahan TAS",
+          "lat": -42.1584,
+          "lon": 145.355
+        }
+      },
+      "fuel": "U91",
+      "status": "passed",
+      "elapsedMs": 2285,
+      "routeKm": 292.65,
+      "provider": "api_tas",
+      "source": "api_tas",
+      "capability": "live",
+      "cacheAgeSeconds": 0,
+      "cacheMode": "refreshed",
+      "degraded": false,
+      "warning": "",
+      "providerCaveat": "TAS FuelCheck; refreshed now; exact U91 price",
+      "recommendation": {
+        "stationCode": "TAS-144",
+        "stationName": "Ampol Brooker",
+        "suburb": "North Hobart",
+        "brand": "Ampol",
+        "fuel": "U91",
+        "adjustedCpl": 162.9,
+        "pumpCpl": 162.9,
+        "detourMinutes": 0,
+        "bestPriceByCpl": null,
+        "comparisonCpl": null,
+        "priceMatch": "exact U91 price"
+      },
+      "rawContext": {
+        "eligibleCandidates": 16,
+        "baselineCpl": 165.9,
+        "generatedAt": "2026-07-03T06:33:51.794Z",
+        "decisionSummary": {
+          "action": "skip",
+          "label": "Small savings detour",
+          "reason": "Probably not worth it: saves $1.19 after 0.1 min.",
+          "stationCode": "TAS-144",
+          "stationName": "Ampol Brooker",
+          "economics": {
+            "baselineCpl": 165.9,
+            "comparisonKind": "none",
+            "pumpCpl": 162.9,
+            "adjustedCpl": 162.9,
+            "fillLitres": 40,
+            "grossFuelSaving": 1.2,
+            "detourKm": 0.07,
+            "detourMinutes": 0.1,
+            "detourFuelLitres": 0.01,
+            "detourCost": 0.01,
+            "timeCost": 0.01,
+            "timeCostDollarsPerMinute": 0.15,
+            "netSavingAfterDetourFuel": 1.19,
+            "netSavingAfterDetourFuelAndTime": 1.18
+          },
+          "decisionRule": {
+            "minSavingDollars": 1.5,
+            "maxDetourMinutes": 30
+          },
+          "alternatives": [
+            {
+              "kind": "best_value",
+              "label": "Best value",
+              "stationCode": "TAS-144",
+              "stationName": "Ampol Brooker",
+              "note": "162.9 c/L, 0.1 min detour",
+              "adjustedCpl": 162.9,
+              "netSaving": 1.19,
+              "detourMinutes": 0.1,
+              "detourFuelLitres": 0.01,
+              "timeCost": 0.01,
+              "netAfterDetourAndTimeCost": 1.18,
+              "selected": true
+            },
+            {
+              "kind": "cheapest",
+              "label": "Cheapest",
+              "stationCode": "TAS-144",
+              "stationName": "Ampol Brooker",
+              "note": "162.9 c/L after wallet",
+              "adjustedCpl": 162.9,
+              "netSaving": 1.19,
+              "detourMinutes": 0.1,
+              "detourFuelLitres": 0.01,
+              "timeCost": 0.01,
+              "netAfterDetourAndTimeCost": 1.18,
+              "selected": true
+            },
+            {
+              "kind": "closest",
+              "label": "Closest",
+              "stationCode": "TAS-144",
+              "stationName": "Ampol Brooker",
+              "note": "0.1 min detour",
+              "adjustedCpl": 162.9,
+              "netSaving": 1.19,
+              "detourMinutes": 0.1,
+              "detourFuelLitres": 0.01,
+              "timeCost": 0.01,
+              "netAfterDetourAndTimeCost": 1.18,
+              "selected": true
+            },
+            {
+              "kind": "safest",
+              "label": "Safest",
+              "stationCode": "TAS-144",
+              "stationName": "Ampol Brooker",
+              "note": "Check caveats",
+              "adjustedCpl": 162.9,
+              "netSaving": 1.19,
+              "detourMinutes": 0.1,
+              "detourFuelLitres": 0.01,
+              "timeCost": 0.01,
+              "netAfterDetourAndTimeCost": 1.18,
+              "selected": true
+            }
+          ],
+          "whyNotCheapest": "Cheapest also wins because the route saving stays ahead after detour time and fuel used.",
+          "trust": {
+            "source": "api_tas_fuelcheck",
+            "sourceType": "official_live",
+            "officialLive": true,
+            "updatedAt": "2026-07-02T18:51:43.000Z",
+            "freshnessMinutes": 702
+          }
+        }
+      }
+    },
+    {
+      "id": "tas-hobart-strahan-pdl",
+      "route": {
+        "id": "tas-hobart-strahan",
+        "region": "TAS",
+        "from": {
+          "label": "Hobart TAS",
+          "lat": -42.8821,
+          "lon": 147.3272
+        },
+        "to": {
+          "label": "Strahan TAS",
+          "lat": -42.1584,
+          "lon": 145.355
+        }
+      },
+      "fuel": "PDL",
+      "status": "passed",
+      "elapsedMs": 1295,
+      "routeKm": 292.65,
+      "provider": "api_tas",
+      "source": "api_tas",
+      "capability": "live",
+      "cacheAgeSeconds": 0,
+      "cacheMode": "refreshed",
+      "degraded": false,
+      "warning": "",
+      "providerCaveat": "TAS FuelCheck; refreshed now; exact PDL price",
+      "recommendation": {
+        "stationCode": "TAS-211",
+        "stationName": "Tas Petroleum Moonah (unmanned)",
+        "suburb": "Moonah",
+        "brand": "Tas Petroleum",
+        "fuel": "PDL",
+        "adjustedCpl": 199.9,
+        "pumpCpl": 199.9,
+        "detourMinutes": 3.1,
+        "bestPriceByCpl": 3,
+        "comparisonCpl": 202.9,
+        "priceMatch": "exact PDL price"
+      },
+      "rawContext": {
+        "eligibleCandidates": 11,
+        "baselineCpl": 210.9,
+        "generatedAt": "2026-07-03T06:33:53.506Z",
+        "decisionSummary": {
+          "action": "fill_now",
+          "label": "Medium savings detour",
+          "reason": "Suggested detour adds 2.2 min and saves $3.92.",
+          "stationCode": "TAS-211",
+          "stationName": "Tas Petroleum Moonah (unmanned)",
+          "economics": {
+            "baselineCpl": 210.9,
+            "comparisonCpl": 202.9,
+            "comparisonKind": "next_best_viable",
+            "pumpCpl": 199.9,
+            "adjustedCpl": 199.9,
+            "fillLitres": 40,
+            "grossFuelSaving": 4.4,
+            "detourKm": 2.91,
+            "detourMinutes": 2.2,
+            "detourFuelLitres": 0.24,
+            "detourCost": 0.48,
+            "timeCost": 0.33,
+            "timeCostDollarsPerMinute": 0.15,
+            "netSavingAfterDetourFuel": 3.92,
+            "netSavingAfterDetourFuelAndTime": 3.6
+          },
+          "decisionRule": {
+            "minSavingDollars": 1.5,
+            "maxDetourMinutes": 30
+          },
+          "alternatives": [
+            {
+              "kind": "best_value",
+              "label": "Best value",
+              "stationCode": "TAS-211",
+              "stationName": "Tas Petroleum Moonah (unmanned)",
+              "note": "199.9 c/L, 2.2 min detour",
+              "adjustedCpl": 199.9,
+              "netSaving": 3.92,
+              "detourMinutes": 2.2,
+              "detourFuelLitres": 0.24,
+              "timeCost": 0.33,
+              "netAfterDetourAndTimeCost": 3.6,
+              "selected": true
+            },
+            {
+              "kind": "cheapest",
+              "label": "Cheapest",
+              "stationCode": "TAS-211",
+              "stationName": "Tas Petroleum Moonah (unmanned)",
+              "note": "199.9 c/L after wallet",
+              "adjustedCpl": 199.9,
+              "netSaving": 3.92,
+              "detourMinutes": 2.2,
+              "detourFuelLitres": 0.24,
+              "timeCost": 0.33,
+              "netAfterDetourAndTimeCost": 3.6,
+              "selected": true
+            },
+            {
+              "kind": "closest",
+              "label": "Closest",
+              "stationCode": "TAS-5",
+              "stationName": "BP Brooker",
+              "note": "0.1 min detour",
+              "adjustedCpl": 209.9,
+              "netSaving": 0.39,
+              "detourMinutes": 0.1,
+              "detourFuelLitres": 0.01,
+              "timeCost": 0.01,
+              "netAfterDetourAndTimeCost": 0.38,
+              "selected": false
+            },
+            {
+              "kind": "safest",
+              "label": "Safest",
+              "stationCode": "TAS-211",
+              "stationName": "Tas Petroleum Moonah (unmanned)",
+              "note": "Open, reachable and clean",
+              "adjustedCpl": 199.9,
+              "netSaving": 3.92,
+              "detourMinutes": 2.2,
+              "detourFuelLitres": 0.24,
+              "timeCost": 0.33,
+              "netAfterDetourAndTimeCost": 3.6,
+              "selected": true
+            }
+          ],
+          "whyNotCheapest": "Cheapest also wins because the route saving stays ahead after detour time and fuel used.",
+          "trust": {
+            "source": "api_tas_fuelcheck",
+            "sourceType": "official_live",
+            "officialLive": true,
+            "updatedAt": "2026-07-02T13:12:25.000Z",
+            "freshnessMinutes": 1041
+          }
+        }
+      }
+    },
+    {
+      "id": "nt-darwin-alice-springs-u91",
+      "route": {
+        "id": "nt-darwin-alice-springs",
+        "region": "NT",
+        "from": {
+          "label": "Darwin NT",
+          "lat": -12.4634,
+          "lon": 130.8456
+        },
+        "to": {
+          "label": "Alice Springs NT",
+          "lat": -23.698,
+          "lon": 133.8807
+        }
+      },
+      "fuel": "U91",
+      "status": "passed",
+      "elapsedMs": 10169,
+      "routeKm": 1492.96,
+      "provider": "api_nt",
+      "source": "api_nt",
+      "capability": "live",
+      "cacheAgeSeconds": 0,
+      "cacheMode": "refreshed",
+      "degraded": false,
+      "warning": "",
+      "providerCaveat": "MyFuel NT; refreshed now; exact U91 price",
+      "recommendation": {
+        "stationCode": "NT-08200045",
+        "stationName": "NT-08200045",
+        "suburb": "Winnellie",
+        "brand": "Unknown",
+        "fuel": "U91",
+        "adjustedCpl": 164.5,
+        "pumpCpl": 164.5,
+        "detourMinutes": 2.5,
+        "bestPriceByCpl": 0.4000000000000057,
+        "comparisonCpl": 164.9,
+        "priceMatch": "exact U91 price"
+      },
+      "rawContext": {
+        "eligibleCandidates": 36,
+        "baselineCpl": 172.9,
+        "generatedAt": "2026-07-03T06:34:04.110Z",
+        "decisionSummary": {
+          "action": "fill_now",
+          "label": "Medium savings detour",
+          "reason": "Suggested detour adds 0.4 min and saves $3.29.",
+          "stationCode": "NT-08200045",
+          "stationName": "NT-08200045",
+          "economics": {
+            "baselineCpl": 172.9,
+            "comparisonCpl": 164.9,
+            "comparisonKind": "next_best_viable",
+            "pumpCpl": 164.5,
+            "adjustedCpl": 164.5,
+            "fillLitres": 40,
+            "grossFuelSaving": 3.36,
+            "detourKm": 0.54,
+            "detourMinutes": 0.4,
+            "detourFuelLitres": 0.04,
+            "detourCost": 0.07,
+            "timeCost": 0.06,
+            "timeCostDollarsPerMinute": 0.15,
+            "netSavingAfterDetourFuel": 3.29,
+            "netSavingAfterDetourFuelAndTime": 3.23
+          },
+          "decisionRule": {
+            "minSavingDollars": 1.5,
+            "maxDetourMinutes": 30
+          },
+          "alternatives": [
+            {
+              "kind": "best_value",
+              "label": "Best value",
+              "stationCode": "NT-08200045",
+              "stationName": "NT-08200045",
+              "note": "164.5 c/L, 0.4 min detour",
+              "adjustedCpl": 164.5,
+              "netSaving": 3.29,
+              "detourMinutes": 0.4,
+              "detourFuelLitres": 0.04,
+              "timeCost": 0.06,
+              "netAfterDetourAndTimeCost": 3.23,
+              "selected": true
+            },
+            {
+              "kind": "cheapest",
+              "label": "Cheapest",
+              "stationCode": "NT-08200045",
+              "stationName": "NT-08200045",
+              "note": "164.5 c/L after wallet",
+              "adjustedCpl": 164.5,
+              "netSaving": 3.29,
+              "detourMinutes": 0.4,
+              "detourFuelLitres": 0.04,
+              "timeCost": 0.06,
+              "netAfterDetourAndTimeCost": 3.23,
+              "selected": true
+            },
+            {
+              "kind": "closest",
+              "label": "Closest",
+              "stationCode": "NT-08370063",
+              "stationName": "NT-08370063",
+              "note": "0.0 min detour",
+              "adjustedCpl": 172.9,
+              "netSaving": 0,
+              "detourMinutes": 0,
+              "detourFuelLitres": 0,
+              "timeCost": 0,
+              "netAfterDetourAndTimeCost": 0,
+              "selected": false
+            },
+            {
+              "kind": "safest",
+              "label": "Safest",
+              "stationCode": "NT-08200045",
+              "stationName": "NT-08200045",
+              "note": "Freshness caution",
+              "adjustedCpl": 164.5,
+              "netSaving": 3.29,
+              "detourMinutes": 0.4,
+              "detourFuelLitres": 0.04,
+              "timeCost": 0.06,
+              "netAfterDetourAndTimeCost": 3.23,
+              "selected": true
+            }
+          ],
+          "whyNotCheapest": "Cheapest also wins because the route saving stays ahead after detour time and fuel used.",
+          "trust": {
+            "source": "api_nt_myfuel",
+            "sourceType": "official_live",
+            "officialLive": true
+          }
+        }
+      }
+    },
+    {
+      "id": "nt-darwin-alice-springs-pdl",
+      "route": {
+        "id": "nt-darwin-alice-springs",
+        "region": "NT",
+        "from": {
+          "label": "Darwin NT",
+          "lat": -12.4634,
+          "lon": 130.8456
+        },
+        "to": {
+          "label": "Alice Springs NT",
+          "lat": -23.698,
+          "lon": 133.8807
+        }
+      },
+      "fuel": "PDL",
+      "status": "warning",
+      "elapsedMs": 825,
+      "routeKm": 1492.96,
+      "provider": "api_nt",
+      "source": "api_nt",
+      "capability": "live",
+      "cacheAgeSeconds": 1,
+      "cacheMode": "fresh",
+      "degraded": false,
+      "warning": "",
+      "providerCaveat": "MyFuel NT; fresh now",
+      "recommendation": null,
+      "rawContext": {
+        "eligibleCandidates": 0,
+        "baselineCpl": 205,
+        "generatedAt": "2026-07-03T06:34:05.395Z",
+        "decisionSummary": {
+          "action": "skip",
+          "label": "No eligible fuel stop",
+          "reason": "No station met the route, fuel, freshness and eligibility checks.",
+          "alternatives": [],
+          "whyNotCheapest": "",
+          "economics": null,
+          "decisionRule": {
+            "minSavingDollars": 1.5,
+            "maxDetourMinutes": 30
+          },
+          "trust": {
+            "source": "unknown",
+            "sourceType": "unknown",
+            "officialLive": false
+          }
+        }
+      }
+    }
+  ]
+}

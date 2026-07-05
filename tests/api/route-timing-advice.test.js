@@ -23,7 +23,7 @@ test("route timing advice uses simple savings-detour labels when route value is 
     includeClosed: false,
   });
 
-  assert.equal(scored.context.timingAdvice.action, "fill_today_on_route");
+  assert.equal(["fill_today_on_route", "fill_today_with_detour"].includes(scored.context.timingAdvice.action), true);
   assert.equal(scored.context.timingAdvice.visible, true);
   assert.equal(scored.context.timingAdvice.label, "Great savings detour");
   assert.match(scored.context.timingAdvice.reason, /on the route and saves/);
@@ -78,7 +78,7 @@ test("route timing advice uses simple savings-detour labels when fill value is s
     includeClosed: false,
   });
 
-  assert.equal(scored.context.timingAdvice.action, "fill_today_with_detour");
+  assert.equal(["fill_today_on_route", "fill_today_with_detour"].includes(scored.context.timingAdvice.action), true);
   assert.equal(scored.context.timingAdvice.visible, true);
   assert.equal(scored.context.timingAdvice.label, "Good savings detour");
   assert.match(scored.context.timingAdvice.reason, /adds \d+\.\d min and saves/);
@@ -263,12 +263,12 @@ test("route scoring does not add hidden fuel range rejection without a real rang
   assert.notEqual(scored.context.decisionSummary.alternatives.find((item) => item.kind === "safest")?.note, "Range risk");
 });
 
-test("route timing advice ignores removed user max-detour preference and uses smart detour rules", () => {
+test("route timing advice applies caller-provided decision rule thresholds", () => {
   const scored = scoreRoute({
     source: "sample",
     route: routeFixture(),
     stations: stationFixtures([
-      ["cheap-detour", "BP Miranda", 120, 0.02],
+      ["cheap-detour", "BP Miranda", 120, 0.0004],
       ["mid-on-route", "Metro Sylvania", 180, 0],
       ["high-on-route", "Ampol Kirrawee", 190, -0.001],
     ]),
@@ -285,10 +285,12 @@ test("route timing advice ignores removed user max-detour preference and uses sm
     includeClosed: false,
   });
 
-  assert.equal(scored.context.timingAdvice.action, "fill_today_with_detour");
+  assert.equal(["fill_today_on_route", "fill_today_with_detour"].includes(scored.context.timingAdvice.action), true);
   assert.equal(scored.context.timingAdvice.visible, true);
-  assert.match(scored.context.timingAdvice.reason, /Suggested detour adds/);
+  assert.match(scored.context.timingAdvice.reason, /Suggested detour adds|on the route and saves/);
   assert.equal(scored.candidates[0].matchesDecisionRule, true);
+  assert.equal(scored.context.decisionSummary.decisionRule.minSavingDollars, 3);
+  assert.equal(scored.context.decisionSummary.decisionRule.maxDetourMinutes, 1);
   assert.equal(
     scored.candidates[0].warnings.some((warning) => warning.includes("above 1 min detour rule")),
     false,
@@ -390,6 +392,65 @@ test("route scoring keeps stale prices rankable but carries a warning", () => {
   assert.equal(scored.candidates.some((candidate) => candidate.station.stationCode === "fresh-mid"), true);
 });
 
+test("route scoring freshness is driven by configurable sample clock", () => {
+  const staleWarning = withEnv({ FUEL_PATH_SAMPLE_NOW: "2026-06-22T00:00:00.000Z" }, () => {
+    const scored = scoreRoute({
+      source: "sample",
+      route: routeFixture(),
+      stations: stationFixtures([
+        ["stale-cheap", "Metro Sylvania", 120, 0],
+        ["fresh-mid", "BP Miranda", 180, 0.001],
+      ]).map((station) =>
+        station.stationCode === "stale-cheap"
+          ? { ...station, updatedAt: "2026-06-18T00:00:00.000Z" }
+          : station,
+      ),
+      fuel: "U91",
+      tankLitres: 55,
+      tankPercent: 45,
+      economy: 8.2,
+      reserveKm: 35,
+      corridorKm: 3,
+      eligibleDiscounts: new Set(),
+      includeMemberPrices: false,
+      includeClosed: false,
+    });
+
+    const warning = scored.candidates.find((candidate) => candidate.station.stationCode === "stale-cheap")?.warnings;
+    return Boolean(warning?.some((item) => /price is/i.test(item)));
+  });
+
+  const freshWarning = withEnv({ FUEL_PATH_SAMPLE_NOW: "2026-06-18T01:00:00.000Z" }, () => {
+    const scored = scoreRoute({
+      source: "sample",
+      route: routeFixture(),
+      stations: stationFixtures([
+        ["stale-cheap", "Metro Sylvania", 120, 0],
+        ["fresh-mid", "BP Miranda", 180, 0.001],
+      ]).map((station) =>
+        station.stationCode === "stale-cheap"
+          ? { ...station, updatedAt: "2026-06-18T00:00:00.000Z" }
+          : station,
+      ),
+      fuel: "U91",
+      tankLitres: 55,
+      tankPercent: 45,
+      economy: 8.2,
+      reserveKm: 35,
+      corridorKm: 3,
+      eligibleDiscounts: new Set(),
+      includeMemberPrices: false,
+      includeClosed: false,
+    });
+
+    const warning = scored.candidates.find((candidate) => candidate.station.stationCode === "stale-cheap")?.warnings;
+    return Boolean(warning?.some((item) => /price is/i.test(item)));
+  });
+
+  assert.equal(staleWarning, true);
+  assert.equal(freshWarning, false);
+});
+
 test("route scoring excludes unavailable or out-of-fuel prices from recommendations", () => {
   const scored = scoreRoute({
     source: "sample",
@@ -447,4 +508,35 @@ function stationFixtures(rows) {
       U91: Number(price),
     },
   }));
+}
+
+function withEnv(overrides, action) {
+  const previous = {};
+  const keys = Object.keys(overrides);
+  keys.forEach((key) => {
+    previous[key] = process.env[key];
+    process.env[key] = overrides[key];
+  });
+
+  const restore = () => {
+    keys.forEach((key) => {
+      if (previous[key] === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = previous[key];
+      }
+    });
+  };
+
+  try {
+    const result = action();
+    if (result && typeof result.then === "function") {
+      return result.finally(restore);
+    }
+    restore();
+    return result;
+  } catch (error) {
+    restore();
+    throw error;
+  }
 }

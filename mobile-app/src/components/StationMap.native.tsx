@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import MapView, {
   Marker,
   Polyline,
@@ -12,11 +12,21 @@ import { colors, mapSkin, radii, shadow, spacing } from "../theme";
 import { MapPoint, StationViewModel } from "../types";
 import { BrandBadge } from "./BrandBadge";
 
-const maxStationMarkers = 240;
-const maxPriceMarkers = 18;
-const maxDotMarkers = 56;
-const markerGridSize = 132;
-const compactMarkerGridSize = 48;
+const maxStationMarkers = 420;
+const defaultMarkerDensity = {
+  maxPriceMarkers: 8,
+  maxDotMarkers: 18,
+  markerGridSize: 240,
+  compactMarkerGridSize: 128,
+};
+const compactMarkerDensity = {
+  maxPriceMarkers: 3,
+  maxDotMarkers: 8,
+  markerGridSize: 390,
+  compactMarkerGridSize: 230,
+};
+const nearbyInitialRegionDelta = 0.035;
+const nearbyInitialMarkerRadiusKm = 4.2;
 const decorativeStationMarkerAccessibility = {
   accessibilityElementsHidden: true,
   importantForAccessibility: "no-hide-descendants" as const,
@@ -27,6 +37,13 @@ type CameraInsets = {
   right?: number;
   bottom?: number;
   left?: number;
+};
+
+type ClusterMarker = {
+  count: number;
+  items: StationViewModel[];
+  lat: number;
+  lon: number;
 };
 
 export function StationMap({
@@ -56,6 +73,7 @@ export function StationMap({
   cameraInsets?: CameraInsets;
   userLocation?: MapPoint;
 }) {
+  const { width } = useWindowDimensions();
   const mapRef = useRef<MapView | null>(null);
   const markerRefs = useRef<Record<string, MapMarker | null>>({});
   const lastCameraKeyRef = useRef("");
@@ -72,13 +90,14 @@ export function StationMap({
     () => (routePoints.length >= 2 ? sampleRoutePoints(routePoints, 180) : []),
     [routePoints],
   );
+  const markerDensity = useMemo(() => nativeMarkerDensity(width), [width]);
   const activeInsets = useMemo(
     () => resolveCameraInsets(routeEndpoints ? "route" : "nearby", cameraInsets),
     [cameraInsets, routeEndpoints],
   );
   const cameraCoordinates = useMemo(() => {
     if (routeEndpoints) {
-      const routeStationCameraPoints = stations.slice(0, maxPriceMarkers).map((item) => ({
+      const routeStationCameraPoints = stations.slice(0, markerDensity.maxPriceMarkers).map((item) => ({
         lat: item.station.lat,
         lon: item.station.lon,
         label: item.station.name,
@@ -86,22 +105,21 @@ export function StationMap({
       if (visibleRoutePoints.length >= 2) return [...visibleRoutePoints, ...routeStationCameraPoints];
       return [routeEndpoints.from, routeEndpoints.to, ...routeStationCameraPoints];
     }
-    const cameraStations = showCentreMarker
-      ? nearestStationsForCamera(stations, centre, 12)
-      : stations.slice(0, maxStationMarkers);
-    return [
-      centre,
-      ...cameraStations.map((item) => ({
-        lat: item.station.lat,
-        lon: item.station.lon,
-        label: item.station.name,
-      })),
-    ];
-  }, [centre, routeEndpoints, showCentreMarker, stations, visibleRoutePoints]);
+    return nearbyCameraPointsForCentre(centre, nearbyInitialMarkerRadiusKm);
+  }, [centre, markerDensity.maxPriceMarkers, routeEndpoints, showCentreMarker, stations, visibleRoutePoints]);
   const initialRegion = useMemo(() => regionForPoint(centre), [centre]);
   const markerGroups = useMemo(
-    () => visibleMarkerGroups(stations.slice(0, maxStationMarkers), currentRegion, selectedStationCode),
-    [currentRegion, selectedStationCode, stations],
+    () => {
+      if (routeEndpoints) {
+        return {
+          priceMarkers: stations.slice(0, markerDensity.maxPriceMarkers),
+          dotMarkers: [],
+          clusterMarkers: [],
+        };
+      }
+      return visibleMarkerGroups(stations.slice(0, maxStationMarkers), currentRegion, markerDensity, selectedStationCode);
+    },
+    [currentRegion, markerDensity, routeEndpoints, selectedStationCode, stations],
   );
 
   useEffect(() => {
@@ -122,6 +140,10 @@ export function StationMap({
     }
 
     runProgrammaticMapMove(programmaticMoveRef, () => {
+      if (!routeEndpoints) {
+        mapRef.current?.animateToRegion(regionForPoint(centre, nearbyInitialRegionDelta), 260);
+        return;
+      }
       if (cameraCoordinates.length === 1) {
         mapRef.current?.animateToRegion(regionForPoint(cameraCoordinates[0]), 260);
         return;
@@ -197,6 +219,21 @@ export function StationMap({
 
   const handleMarkerPress = (stationCode: string) => {
     onSelect(stationCode);
+  };
+
+  const handleClusterPress = (cluster: ClusterMarker) => {
+    runProgrammaticMapMove(programmaticMoveRef, () => {
+      mapRef.current?.fitToCoordinates(
+        cluster.items.map((item) => ({
+          latitude: item.station.lat,
+          longitude: item.station.lon,
+        })),
+        {
+          animated: true,
+          edgePadding: activeInsets,
+        },
+      );
+    });
   };
 
   return (
@@ -286,8 +323,26 @@ export function StationMap({
           </Marker>
         ))}
 
+        {markerGroups.clusterMarkers
+          .filter((cluster) => clusterFitsInteractiveRegion(cluster, currentRegion, activeInsets))
+          .map((cluster) => (
+          <Marker
+            {...decorativeStationMarkerAccessibility}
+            coordinate={{ latitude: cluster.lat, longitude: cluster.lon }}
+            key={`cluster-${cluster.lat.toFixed(5)}-${cluster.lon.toFixed(5)}-${cluster.count}`}
+            onPress={() => handleClusterPress(cluster)}
+            tracksViewChanges={false}
+            zIndex={680}
+          >
+            <View style={styles.clusterPin}>
+              <Text style={styles.clusterCount}>{cluster.count}</Text>
+            </View>
+          </Marker>
+        ))}
+
         {markerGroups.priceMarkers.map((item) => {
           const selected = item.station.stationCode === selectedStationCode;
+          const subdued = Boolean(routeEndpoints && selectedStationCode && !selected);
           return (
             <Marker
               {...decorativeStationMarkerAccessibility}
@@ -298,10 +353,10 @@ export function StationMap({
                 markerRefs.current[item.station.stationCode] = marker;
               }}
               tracksViewChanges={false}
-              zIndex={selected ? 700 : 500}
+              zIndex={selected ? 700 : subdued ? 420 : 500}
             >
               <View style={styles.pinAnchor}>
-                <View style={[styles.pin, selected && styles.pinSelected]}>
+                <View style={[styles.pin, subdued && styles.pinSubdued, selected && styles.pinSelected]}>
                   <Text style={[styles.pinPrice, selected && styles.pinPriceSelected]}>
                     {item.adjustedCpl.toFixed(1)}
                   </Text>
@@ -336,12 +391,12 @@ export function StationMap({
   );
 }
 
-function regionForPoint(point: MapPoint): Region {
+function regionForPoint(point: MapPoint, delta = 0.09): Region {
   return {
     latitude: point.lat,
     longitude: point.lon,
-    latitudeDelta: 0.09,
-    longitudeDelta: 0.09,
+    latitudeDelta: delta,
+    longitudeDelta: delta,
   };
 }
 
@@ -364,15 +419,18 @@ function stationCodesInRegion(stations: StationViewModel[], region: Region) {
 function visibleMarkerGroups(
   stations: StationViewModel[],
   region: Region,
+  density: typeof defaultMarkerDensity,
   selectedStationCode?: string,
 ) {
   const protectedCodes = protectedStationCodes(stations, selectedStationCode);
   const priceCells = new Set<string>();
   const compactCells = new Set<string>();
+  const clusterGroups = new Map<string, StationViewModel[]>();
   const priceMarkers: StationViewModel[] = [];
   const dotMarkers: StationViewModel[] = [];
+  const visibleStations = stations.filter((item) => stationInRegion(item, region));
 
-  const ranked = [...stations].sort((left, right) => {
+  const ranked = [...visibleStations].sort((left, right) => {
     const leftProtected = protectedCodes.has(left.station.stationCode) ? 0 : 1;
     const rightProtected = protectedCodes.has(right.station.stationCode) ? 0 : 1;
     return (
@@ -383,13 +441,13 @@ function visibleMarkerGroups(
 
   for (const item of ranked) {
     const code = item.station.stationCode;
-    const priceCell = markerCell(item, region, markerGridSize);
-    const compactCell = markerCell(item, region, compactMarkerGridSize);
+    const priceCell = markerCell(item, region, density.markerGridSize);
+    const compactCell = markerCell(item, region, density.compactMarkerGridSize);
     const protectedMarker = protectedCodes.has(code);
 
     if (
       protectedMarker ||
-      (priceMarkers.length < maxPriceMarkers && !priceCells.has(priceCell))
+      (priceMarkers.length < density.maxPriceMarkers && !priceCells.has(priceCell))
     ) {
       priceMarkers.push(item);
       priceCells.add(priceCell);
@@ -397,13 +455,87 @@ function visibleMarkerGroups(
       continue;
     }
 
-    if (dotMarkers.length < maxDotMarkers && !compactCells.has(compactCell)) {
+    if (dotMarkers.length < density.maxDotMarkers && !compactCells.has(compactCell)) {
       dotMarkers.push(item);
       compactCells.add(compactCell);
+      continue;
     }
+
+    const grouped = clusterGroups.get(compactCell) || [];
+    grouped.push(item);
+    clusterGroups.set(compactCell, grouped);
   }
 
-  return { priceMarkers, dotMarkers };
+  const singletonMarkers: StationViewModel[] = [];
+  const clusterItems: StationViewModel[][] = [];
+  for (const items of clusterGroups.values()) {
+    if (items.length === 1) {
+      singletonMarkers.push(items[0]);
+    } else {
+      clusterItems.push(items);
+    }
+  }
+  priceMarkers.push(...singletonMarkers);
+
+  const clusterMarkers = clusterItems
+    .map(clusterMarkerForItems)
+    .sort((left, right) => right.count - left.count);
+
+  return { priceMarkers, dotMarkers, clusterMarkers };
+}
+
+function stationInRegion(item: StationViewModel, region: Region) {
+  const minLat = region.latitude - region.latitudeDelta / 2;
+  const maxLat = region.latitude + region.latitudeDelta / 2;
+  const minLon = region.longitude - region.longitudeDelta / 2;
+  const maxLon = region.longitude + region.longitudeDelta / 2;
+  return (
+    item.station.lat >= minLat &&
+    item.station.lat <= maxLat &&
+    item.station.lon >= minLon &&
+    item.station.lon <= maxLon
+  );
+}
+
+function clusterMarkerForItems(items: StationViewModel[]): ClusterMarker {
+  const totals = items.reduce(
+    (current, item) => ({
+      count: current.count + 1,
+      lat: current.lat + item.station.lat,
+      lon: current.lon + item.station.lon,
+    }),
+    { count: 0, lat: 0, lon: 0 },
+  );
+  return {
+    count: totals.count,
+    items,
+    lat: totals.lat / totals.count,
+    lon: totals.lon / totals.count,
+  };
+}
+
+function clusterFitsInteractiveRegion(
+  cluster: ClusterMarker,
+  region: Region,
+  insets: Required<CameraInsets>,
+) {
+  const safeLatDelta = Math.max(region.latitudeDelta, 0.005);
+  const safeLonDelta = Math.max(region.longitudeDelta, 0.005);
+  const yRatio = 1 - (cluster.lat - (region.latitude - safeLatDelta / 2)) / safeLatDelta;
+  const xRatio = (cluster.lon - (region.longitude - safeLonDelta / 2)) / safeLonDelta;
+  const topRatio = Math.min(0.46, Math.max(0.08, insets.top / 900));
+  const bottomRatio = Math.min(0.48, Math.max(0.12, insets.bottom / 900));
+  const sideRatio = 0.12;
+  return (
+    xRatio >= sideRatio &&
+    xRatio <= 1 - sideRatio &&
+    yRatio >= topRatio &&
+    yRatio <= 1 - bottomRatio
+  );
+}
+
+function nativeMarkerDensity(width: number) {
+  return width <= 430 ? compactMarkerDensity : defaultMarkerDensity;
 }
 
 function protectedStationCodes(stations: StationViewModel[], selectedStationCode?: string) {
@@ -433,6 +565,18 @@ function minBy<T>(items: T[], score: (item: T) => number) {
 
 function markerPriorityScore(item: StationViewModel) {
   return item.adjustedCpl + item.distanceKm * 0.85;
+}
+
+function nearbyCameraPointsForCentre(centre: MapPoint, radiusKm: number) {
+  const latDelta = radiusKm / 111;
+  const lonDelta = radiusKm / Math.max(35, 111 * Math.cos(toRad(centre.lat)));
+  return [
+    centre,
+    { lat: centre.lat + latDelta, lon: centre.lon, label: centre.label },
+    { lat: centre.lat - latDelta, lon: centre.lon, label: centre.label },
+    { lat: centre.lat, lon: centre.lon + lonDelta, label: centre.label },
+    { lat: centre.lat, lon: centre.lon - lonDelta, label: centre.label },
+  ];
 }
 
 function nearestStationsForCamera(
@@ -630,6 +774,10 @@ const styles = StyleSheet.create({
     borderColor: colors.black,
     boxShadow: "0 0 0 4px rgba(255, 106, 61, 0.35)",
   },
+  pinSubdued: {
+    opacity: 0.68,
+    transform: [{ scale: 0.94 }],
+  },
   pinPrice: {
     backgroundColor: colors.greenDark,
     color: colors.white,
@@ -673,6 +821,23 @@ const styles = StyleSheet.create({
     borderWidth: 3,
     height: 18,
     width: 18,
+  },
+  clusterPin: {
+    ...shadow.soft,
+    alignItems: "center",
+    backgroundColor: colors.greenDark,
+    borderColor: colors.white,
+    borderRadius: radii.pill,
+    borderWidth: 2,
+    height: 30,
+    justifyContent: "center",
+    minWidth: 30,
+    paddingHorizontal: spacing.xs,
+  },
+  clusterCount: {
+    color: colors.white,
+    fontSize: 11,
+    fontWeight: "900",
   },
   recenterButton: {
     ...shadow.soft,

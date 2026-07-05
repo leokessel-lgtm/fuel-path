@@ -1,33 +1,26 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  StyleSheet,
-  View,
-} from "react-native";
+import { StyleSheet, View } from "react-native";
 
 import { geocodeAddress } from "../api/fuelPathApi";
 import { NearbyLocationSearch } from "../components/NearbyLocationSearch";
 import { NearbyCombinedPanel } from "../components/NearbyCombinedPanel";
 import { NearbyFuelPanel } from "../components/NearbyFuelPanel";
 import { NearbySortMode } from "../components/NearbyStationSheet";
+import { StationBrandFilterPill } from "../components/StationBrandFilterPill";
 import { StationMap } from "../components/StationMap";
 import { useNearbyLocationSearch } from "../hooks/useNearbyLocationSearch";
 import { useNearbyResults } from "../hooks/useNearbyResults";
+import { useStationBrandFilterOverride } from "../hooks/useStationBrandFilterOverride";
+import { useVisibleStationCodes } from "../hooks/useVisibleStationCodes";
 import { getCurrentMapPoint, getGrantedCurrentMapPoint } from "../services/currentLocation";
-import { colors, radii, shadow, spacing, surfaces, typeScale, typography } from "../theme";
+import { spacing } from "../theme";
 import { AppPreferences, EvCharger, EvConnector, EvPowerMode, FuelCode, MapPoint, NearbySheetSnap, StationViewModel } from "../types";
-import {
-  EvChargerPanel,
-  NearbyEnergyChoice,
-  NearbyEnergySelector,
-  NearbyMode,
-} from "../components/NearbyEvControls";
+import { EvChargerPanel, NearbyEnergyChoice, NearbyEnergySelector, NearbyMode } from "../components/NearbyEvControls";
 import { sortStations } from "../utils/pricing";
 import {
-  combinedNearbyNotice,
   distanceKm,
   openDirections,
   preferredNearbyMode,
-  sameStationCodes,
   shortLocationLabel,
   toggleConnectorFilter,
 } from "./NearbyScreen.utils";
@@ -37,11 +30,11 @@ const defaultNearbyCentre: MapPoint = {
   lon: 115.861309,
   label: "Perth CBD WA 6000",
 };
-const defaultNearbyRadiusKm = 8;
-const minMapSearchRadiusKm = 10;
+const defaultNearbyRadiusKm = 16;
+const minMapSearchRadiusKm = 16;
 const emptyMapRetryRadiusKm = 32;
 const maxMapSearchRadiusKm = 90;
-const nearbyCameraInsets = { top: 170, right: 18, bottom: 330, left: 18 };
+const nearbyCameraInsets = { top: 240, right: 18, bottom: 330, left: 18 };
 
 type MapSearchArea = {
   centre: MapPoint;
@@ -60,8 +53,8 @@ export function NearbyScreen({
   const [nearbyRadiusKm, setNearbyRadiusKm] = useState(defaultNearbyRadiusKm);
   const [cameraFocusVersion, setCameraFocusVersion] = useState(0);
   const [selectedCode, setSelectedCode] = useState<string>();
+  const [selectedStation, setSelectedStation] = useState<StationViewModel>();
   const [selectionDismissed, setSelectionDismissed] = useState(false);
-  const [visibleStationCodes, setVisibleStationCodes] = useState<string[]>([]);
   const [sortMode, setSortMode] = useState<NearbySortMode | undefined>(undefined);
   const [sheetSnap, setSheetSnap] = useState<NearbySheetSnap>("browse");
   const previousSortMode = useRef<NearbySortMode | undefined>(sortMode);
@@ -70,6 +63,7 @@ export function NearbyScreen({
   const [evConnectors, setEvConnectors] = useState<EvConnector[]>(preferences.evConnectors || []);
   const [evPowerMode, setEvPowerMode] = useState<EvPowerMode>("");
   const [energySelectorOpen, setEnergySelectorOpen] = useState(false);
+  const { handleViewportStationsChange, visibleStationCodes } = useVisibleStationCodes();
   const sheetExpanded = sheetSnap === "full";
   const setSheetExpanded = (expanded: boolean) => {
     setSheetSnap(expanded ? "full" : "browse");
@@ -96,13 +90,30 @@ export function NearbyScreen({
     () => ({ near: centre, nearRadiusKm: Math.max(nearbyRadiusKm, minMapSearchRadiusKm) }),
     [centre, nearbyRadiusKm],
   );
-  const { chargers, error, evNotice, loading, stationNotice, stations } = useNearbyResults({
+
+  useEffect(() => {
+    setNearbyMode(preferredNearbyMode(preferences));
+    setEvConnectors(preferences.evConnectors || []);
+    setSelectedCode(undefined);
+    setSelectionDismissed(false);
+    setSortMode(undefined);
+  }, [preferences.activeVehicleId]);
+
+  const {
+    brandFilterActive,
+    preferredBrands,
+    setShowAllStationBrandsOnce,
+    showAllStationBrandsOnce,
+    stationBrandFilterLabel,
+  } = useStationBrandFilterOverride({ centre, preferences });
+  const { chargers, error, evNotice, loading, stationContext, stationNotice, stations } = useNearbyResults({
     centre,
     evConnectors,
     evPowerMode,
     nearbyMode,
     nearbyRadiusKm,
     preferences,
+    showAllStationBrandsOnce,
   });
   const {
     addRecentLocation,
@@ -119,7 +130,6 @@ export function NearbyScreen({
     suggestionsLoading,
     updateLocationQuery,
   } = useNearbyLocationSearch(locationSearchContext);
-
 
   const applyLocationSearch = async () => {
     const query = locationQuery.trim();
@@ -168,12 +178,6 @@ export function NearbyScreen({
     } finally {
       setResolvingLocation(false);
     }
-  };
-
-  const handleViewportStationsChange = (stationCodes: string[]) => {
-    setVisibleStationCodes((current) =>
-      sameStationCodes(current, stationCodes) ? current : stationCodes,
-    );
   };
 
   const handleMapSearchAreaChange = useCallback((area: MapSearchArea) => {
@@ -236,6 +240,7 @@ export function NearbyScreen({
     [listSourceStations, sortMode],
   );
   const selected = stations.find((item) => item.station.stationCode === selectedCode);
+  const selectedForPanel = selectedStation && selectedStation.station.stationCode === selectedCode ? selectedStation : selected;
   const selectedCharger = chargers.find((item) => item.id === selectedCode) || chargers[0];
   const selectedPlaceActive = locationQuery.trim().length > 0 && locationQuery.trim() === centre.label;
 
@@ -266,6 +271,7 @@ export function NearbyScreen({
   const handleCloseSelectedStation = useCallback(() => {
     setSelectedCode(undefined);
     setSelectionDismissed(true);
+    setSelectedStation(undefined);
   }, []);
 
   const handleNavigateToStation = useCallback(async (item: StationViewModel) => {
@@ -281,6 +287,7 @@ export function NearbyScreen({
     if (nearbyMode !== "fuel") return;
     if (!sortedStations.length) {
       setSelectedCode(undefined);
+      setSelectedStation(undefined);
       return;
     }
     const selectedExists = stations.some((item) => item.station.stationCode === selectedCode);
@@ -292,6 +299,21 @@ export function NearbyScreen({
     if (selectionDismissed && !selectedCode) return;
     previousSortMode.current = sortMode;
   }, [nearbyMode, selectedCode, selectionDismissed, sortMode, sortedStations, stations]);
+
+  useEffect(() => {
+    if (!selectedCode) {
+      setSelectedStation(undefined);
+      return;
+    }
+    const stationMatch = stations.find((item) => item.station.stationCode === selectedCode);
+    if (stationMatch) {
+      setSelectedStation(stationMatch);
+      return;
+    }
+    setSelectedStation((current) =>
+      current?.station.stationCode === selectedCode ? current : undefined,
+    );
+  }, [selectedCode, stations]);
 
   return (
     <View style={styles.screen}>
@@ -346,14 +368,24 @@ export function NearbyScreen({
           onSortPress={handleSortPress}
           onSnapChange={setSheetSnap}
           onToggleExpanded={setSheetExpanded}
-          selected={selected}
+          selected={selectedForPanel}
           selectedCode={selectedCode}
           sheetSnap={sheetSnap}
           sheetExpanded={sheetExpanded}
           sortedStations={sortedStations}
           sortMode={sortMode}
+          stationContext={stationContext}
           stationNotice={stationNotice}
           stations={stations}
+          topControls={
+            preferredBrands.length ? (
+              <StationBrandFilterPill
+                active={brandFilterActive}
+                label={stationBrandFilterLabel}
+                onPress={() => setShowAllStationBrandsOnce((current) => !current)}
+              />
+            ) : null
+          }
         />
       ) : nearbyMode === "both" ? (
         <NearbyCombinedPanel
@@ -378,11 +410,12 @@ export function NearbyScreen({
           preferences={preferences}
           selectedCharger={selectedCharger}
           selectedCode={selectedCode}
-          selectedStation={selected}
+          selectedStation={selectedForPanel}
           sheetSnap={sheetSnap}
           sheetExpanded={sheetExpanded}
           sortedStations={sortedStations}
-          stationNotice={combinedNearbyNotice(stationNotice, evNotice, chargers.length)}
+          stationContext={stationContext}
+          stationNotice={stationNotice}
         />
       ) : (
         <EvChargerPanel
@@ -419,10 +452,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   mapLayer: { bottom: 0,
-    left: 0,
-    position: "absolute",
-    right: 0,
-    top: 0,
+    left: 0, position: "absolute", right: 0, top: 0,
   },
   topControls: {
     gap: spacing.sm,

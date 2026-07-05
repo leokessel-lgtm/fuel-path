@@ -47,8 +47,8 @@ Failure-path pass:
 
 ## Remaining Gaps
 
-- iOS map and geolocation validation remains blocked until full Xcode/simctl or physical iOS evidence is available.
-- Lower-end Android map/performance validation is still needed before broad public performance claims.
+- Source-level iOS simulator map validation now exists, but signed iOS preview/development validation is still needed before notification, push-token or store-readiness claims.
+- Fresh Android installed-build and physical performance validation are still needed for the current localParity build; lower-end Android map/performance validation is also still needed before broad public performance claims.
 - Manual in-app-browser permission-prompt behaviour should still be checked by a human because automated Chromium permission state does not perfectly match the embedded browser permission sheet.
 - Native current-location behaviour with denied permission should be captured on physical Android and iOS, including the exact OS permission copy and recovery path.
 

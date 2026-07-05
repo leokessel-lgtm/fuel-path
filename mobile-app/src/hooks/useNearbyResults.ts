@@ -2,8 +2,13 @@ import { useEffect, useState } from "react";
 
 import { getNearbyEvChargers, getNearbyStations } from "../api/fuelPathApi";
 import { evPowerOptions, NearbyMode } from "../components/NearbyEvControls";
-import { AppPreferences, EvCharger, EvConnector, EvPowerMode, MapPoint, StationViewModel } from "../types";
+import { AppPreferences, EvCharger, EvConnector, EvPowerMode, MapPoint, NearbyResponse, StationViewModel } from "../types";
 import { stationPriceView } from "../utils/pricing";
+import {
+  activePreferredStationBrands,
+  filterStationsByPreferredBrands,
+  stationBrandFilterNotice,
+} from "../utils/stationBrandPreferences";
 
 const emptyMapRetryRadiusKm = 32;
 
@@ -14,6 +19,7 @@ export function useNearbyResults({
   nearbyMode,
   nearbyRadiusKm,
   preferences,
+  showAllStationBrandsOnce = false,
 }: {
   centre: MapPoint;
   evConnectors: EvConnector[];
@@ -21,12 +27,14 @@ export function useNearbyResults({
   nearbyMode: NearbyMode;
   nearbyRadiusKm: number;
   preferences: AppPreferences;
+  showAllStationBrandsOnce?: boolean;
 }) {
   const [stations, setStations] = useState<StationViewModel[]>([]);
   const [chargers, setChargers] = useState<EvCharger[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [stationNotice, setStationNotice] = useState("");
+  const [stationContext, setStationContext] = useState<NearbyResponse["context"]>();
   const [evNotice, setEvNotice] = useState("");
 
   useEffect(() => {
@@ -34,6 +42,7 @@ export function useNearbyResults({
     setLoading(true);
     setError("");
     setStationNotice("");
+    setStationContext(undefined);
     setEvNotice("");
     async function loadStations() {
       const shouldLoadChargers = nearbyMode === "ev" || nearbyMode === "both";
@@ -52,39 +61,50 @@ export function useNearbyResults({
         return { notice, chargers: sortChargersForPreference(response.chargers, preferences.evChargingPreference) };
       };
       const loadPricedStations = async () => {
+        const preferredBrands = showAllStationBrandsOnce ? [] : activePreferredStationBrands(preferences);
         const response = await getNearbyStations({
           fuel: preferences.fuel,
           centre,
           radiusKm: nearbyRadiusKm,
           limit: stationLimitForRadius(nearbyRadiusKm),
         });
-        let notice = stationContextNotice(response.context);
-        let priced = response.stations
+        let context = response.context;
+        let notice = stationContextNotice(context);
+        let pricedAll = response.stations
           .map((station) => stationPriceView(station, preferences.fuel, preferences))
           .filter((item): item is StationViewModel => Boolean(item));
-        if (!priced.length && nearbyRadiusKm < emptyMapRetryRadiusKm) {
+        let priced = filterStationsByPreferredBrands(pricedAll, preferredBrands);
+        if (!pricedAll.length && nearbyRadiusKm < emptyMapRetryRadiusKm) {
           const retryResponse = await getNearbyStations({
             fuel: preferences.fuel,
             centre,
             radiusKm: emptyMapRetryRadiusKm,
             limit: stationLimitForRadius(emptyMapRetryRadiusKm),
           });
+          context = retryResponse.context;
           notice = stationContextNotice(retryResponse.context) || notice;
-          priced = retryResponse.stations
+          pricedAll = retryResponse.stations
             .map((station) => stationPriceView(station, preferences.fuel, preferences))
             .filter((item): item is StationViewModel => Boolean(item));
+          priced = filterStationsByPreferredBrands(pricedAll, preferredBrands);
         }
-        if (!priced.length && !notice) {
+        const hiddenCount = Math.max(0, pricedAll.length - priced.length);
+        const brandNotice = stationBrandFilterNotice(preferredBrands, hiddenCount);
+        if (brandNotice) notice = [brandNotice, notice].filter(Boolean).join(" ");
+        if (!priced.length && preferredBrands.length) {
+          notice = `No preferred brands found around ${centre.label}. Show all brands once to compare every station.`;
+        } else if (!priced.length && !notice) {
           notice = `No ${preferences.fuel} prices found around ${centre.label}.`;
         }
-        return { notice, priced };
+        return { context, notice, priced };
       };
 
       const [stationResult, chargerResult] = await Promise.all([
-        shouldLoadStations ? loadPricedStations() : Promise.resolve({ notice: "", priced: [] }),
+        shouldLoadStations ? loadPricedStations() : Promise.resolve({ context: undefined, notice: "", priced: [] }),
         shouldLoadChargers ? loadChargers() : Promise.resolve({ notice: "", chargers: [] }),
       ]);
       return {
+        context: stationResult.context,
         notice: stationResult.notice,
         priced: stationResult.priced,
         chargers: chargerResult.chargers,
@@ -93,10 +113,11 @@ export function useNearbyResults({
     }
 
     loadStations()
-      .then(({ notice, priced, chargers, evNotice }) => {
+      .then(({ context, notice, priced, chargers, evNotice }) => {
         if (!active) return;
         setStations(priced);
         setChargers(chargers);
+        setStationContext(context);
         setStationNotice(notice);
         setEvNotice(nearbyMode === "ev" || nearbyMode === "both" ? evNotice : "");
       })
@@ -109,9 +130,9 @@ export function useNearbyResults({
     return () => {
       active = false;
     };
-  }, [centre, evConnectors, evPowerMode, nearbyMode, nearbyRadiusKm, preferences]);
+  }, [centre, evConnectors, evPowerMode, nearbyMode, nearbyRadiusKm, preferences, showAllStationBrandsOnce]);
 
-  return { chargers, error, evNotice, loading, stationNotice, stations };
+  return { chargers, error, evNotice, loading, stationContext, stationNotice, stations };
 }
 
 function sortChargersForPreference(
@@ -150,29 +171,65 @@ function chargerPreferenceScore(
 
 function stationLimitForRadius(radiusKm: number) {
   if (radiusKm >= 60) return 420;
-  if (radiusKm >= 35) return 320;
-  if (radiusKm >= 20) return 240;
-  return 160;
+  if (radiusKm >= 35) return 360;
+  if (radiusKm >= 15) return 320;
+  return 200;
 }
 
 function stationContextNotice(context: {
   warning?: string;
+  cacheAgeSeconds?: number;
+  cacheMode?: string;
   capability?: string;
+  degraded?: boolean;
   regionCapabilities?: Array<{ region: string; capability: string; blocker?: string }>;
 }) {
-  if (context.warning) return context.warning;
+  const notices = [];
+  if (context.warning && shouldShowProviderWarning(context.warning)) {
+    notices.push(context.warning);
+  }
+  if (shouldShowCacheNotice(context)) {
+    const age = Number(context.cacheAgeSeconds || 0);
+    const ageText = age > 0 ? ` Cached ${formatCacheAge(age)} ago.` : "";
+    notices.push(`Price feed is stale.${ageText} Confirm before choosing a stop.`);
+  }
   const limited = context.regionCapabilities?.find((item) =>
     ["limited", "pending_access", "fallback", "unsupported"].includes(item.capability),
   );
-  if (!limited) return "";
+  if (!limited) return uniqueNotices(notices).join(" ");
   if (limited.capability === "pending_access") {
-    return `${limited.region} live prices are not enabled yet. ${limited.blocker || ""}`.trim();
+    notices.push(`${limited.region} live prices are not enabled yet. ${limited.blocker || ""}`.trim());
+    return uniqueNotices(notices).join(" ");
   }
   if (limited.capability === "limited") {
-    return `${limited.region} live coverage is limited. Confirm freshness before driving.`;
+    notices.push(`${limited.region} live coverage is limited. Confirm freshness before driving.`);
+    return uniqueNotices(notices).join(" ");
   }
   if (limited.capability === "fallback") {
-    return `Using fallback data for ${limited.region}. Do not treat it as a live price recommendation.`;
+    notices.push(`Using fallback data for ${limited.region}. Do not treat it as a live price recommendation.`);
+    return uniqueNotices(notices).join(" ");
   }
-  return "No live fuel provider covers this area yet.";
+  notices.push("No live fuel provider covers this area yet.");
+  return uniqueNotices(notices).join(" ");
+}
+
+function shouldShowProviderWarning(warning: string) {
+  return !/tomorrow locked prices are checked/i.test(warning);
+}
+
+function shouldShowCacheNotice(context: { cacheAgeSeconds?: number; cacheMode?: string; degraded?: boolean }) {
+  if (context.cacheMode !== "stale") return false;
+  const age = Number(context.cacheAgeSeconds || 0);
+  return Number.isFinite(age) && age >= 30 * 60;
+}
+
+function formatCacheAge(seconds: number) {
+  if (seconds < 90) return `${Math.round(seconds)} seconds`;
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 90) return `${minutes} minutes`;
+  return `${Math.round(minutes / 60)} hours`;
+}
+
+function uniqueNotices(notices: string[]) {
+  return Array.from(new Set(notices.map((notice) => notice.trim()).filter(Boolean)));
 }

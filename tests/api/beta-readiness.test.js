@@ -73,6 +73,140 @@ test("beta readiness keeps emulator map smoke separate from physical-device read
   assert.match(payload.nextAction, /Apple privacy, Google Data Safety, provider limitation and support-process review evidence/i);
 });
 
+test("beta readiness blocks when EV charging budget controls are not ready", async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-beta-readiness-"));
+  const providerTerms = writeJson(path.join(tmp, "provider-terms.json"), {
+    status: "ready",
+    publicLivePriceClaimsAllowed: true,
+    blockers: [],
+    accessBlockers: [],
+    publicLiveRegions: ["NSW", "ACT", "QLD", "WA", "SA", "TAS"],
+  });
+  const nativeSmoke = writeJson(path.join(tmp, "native-smoke.json"), {
+    status: "passed",
+    renderStatus: "passed",
+    performanceStatus: "passed",
+    artifactName: "fuel-path-preview-android.apk",
+    device: physicalAndroidDevice(),
+    mapWarningLines: [],
+    mapTileSummaries: physicalMapTileSummaries(),
+    frameSummary: {
+      jankyPercent: 3.2,
+      percentile95Ms: 24,
+    },
+    attentionItems: [],
+  });
+  const nativePerformanceSummary = writePassedNativePerformanceSummary(tmp, nativeSmoke);
+  const nativeBlockerPacket = writeNativeBlockerPacket(tmp, {
+    status: "ready",
+    blockers: [],
+  });
+  const evCharging = writeEvChargingStatus(tmp, {
+    status: "blocked",
+    blockers: ["google_places_ev_hard_stop_reached"],
+    cap: {
+      googlePlacesDailyLookupCap: 25,
+      googlePlacesEvLookupsToday: 25,
+      googlePlacesEvHardStopAt: "2026-07-05T00:00:00.000Z",
+      googlePlacesEvHysteresisEnabled: true,
+    },
+  });
+
+  const { stdout } = await execFileAsync(
+    process.execPath,
+    [
+      "scripts/check-beta-readiness.mjs",
+      "--provider-terms-json",
+      providerTerms,
+      "--native-smoke",
+      nativeSmoke,
+      "--native-performance-summary",
+      nativePerformanceSummary,
+      "--native-blocker-packet",
+      nativeBlockerPacket,
+      "--ev-charging-json",
+      evCharging,
+      ...storeReadyArgs(),
+      "--allow-blocked",
+    ],
+    { cwd: ROOT, timeout: 10_000 },
+  );
+  const payload = JSON.parse(stdout);
+
+  assert.equal(payload.status, "blocked");
+  assert.deepEqual(payload.blockers, ["ev_charging_budget_controls_not_ready"]);
+  assert.equal(payload.evCharging.status, "blocked");
+  assert.deepEqual(payload.evCharging.blockers, ["google_places_ev_hard_stop_reached"]);
+  assert.equal(payload.evCharging.cap.googlePlacesDailyLookupCap, 25);
+  assert.match(payload.nextAction, /pause paid Google EV charging lookups until budget hard-stop\/cap state is clear/i);
+});
+
+test("beta readiness is clear when EV charging controls are ready", async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-beta-readiness-"));
+  const providerTerms = writeJson(path.join(tmp, "provider-terms.json"), {
+    status: "ready",
+    publicLivePriceClaimsAllowed: true,
+    blockers: [],
+    accessBlockers: [],
+    publicLiveRegions: ["NSW", "ACT", "QLD", "WA", "SA", "TAS"],
+  });
+  const nativeSmoke = writeJson(path.join(tmp, "native-smoke.json"), {
+    status: "passed",
+    renderStatus: "passed",
+    performanceStatus: "passed",
+    artifactName: "fuel-path-preview-android.apk",
+    device: physicalAndroidDevice(),
+    mapWarningLines: [],
+    mapTileSummaries: physicalMapTileSummaries(),
+    frameSummary: {
+      jankyPercent: 3.2,
+      percentile95Ms: 24,
+    },
+    attentionItems: [],
+  });
+  const nativePerformanceSummary = writePassedNativePerformanceSummary(tmp, nativeSmoke);
+  const nativeBlockerPacket = writeNativeBlockerPacket(tmp, {
+    status: "ready",
+    blockers: [],
+  });
+  const evCharging = writeEvChargingStatus(tmp, {
+    status: "ready",
+    blockers: [],
+    cap: {
+      googlePlacesDailyLookupCap: 5000,
+      googlePlacesEvLookupsToday: 18,
+      googlePlacesEvHardStopAt: "2026-07-05T23:59:59.000Z",
+      googlePlacesEvHysteresisEnabled: false,
+    },
+  });
+
+  const { stdout } = await execFileAsync(
+    process.execPath,
+    [
+      "scripts/check-beta-readiness.mjs",
+      "--provider-terms-json",
+      providerTerms,
+      "--native-smoke",
+      nativeSmoke,
+      "--native-performance-summary",
+      nativePerformanceSummary,
+      "--native-blocker-packet",
+      nativeBlockerPacket,
+      "--ev-charging-json",
+      evCharging,
+      ...storeReadyArgs(),
+    ],
+    { cwd: ROOT, timeout: 10_000 },
+  );
+  const payload = JSON.parse(stdout);
+
+  assert.equal(payload.status, "ready");
+  assert.deepEqual(payload.blockers, []);
+  assert.equal(payload.evCharging.status, "ready");
+  assert.deepEqual(payload.evCharging.blockers, []);
+  assert.equal(payload.evCharging.cap.googlePlacesDailyLookupCap, 5000);
+});
+
 test("beta readiness passes when all Phase 0 gates are proven", async () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-beta-readiness-"));
   const providerTerms = writeJson(path.join(tmp, "provider-terms.json"), {
@@ -684,6 +818,12 @@ test("beta readiness can load privacy contact and store links from an evidence f
     reviewedAt: "2026-06-19",
     reviewer: "Leo Kesselring",
   });
+  const supportEvidence = writeJson(path.join(tmp, "support-evidence.json"), {
+    runbook: READY_SUPPORT_RUNBOOK_SOURCE,
+    supportContact: "privacy@fuelpath.app",
+    supportOwner: "Leo Kesselring",
+    reviewedAt: "2026-06-20",
+  });
 
   const { stdout } = await execFileAsync(
     process.execPath,
@@ -699,14 +839,8 @@ test("beta readiness can load privacy contact and store links from an evidence f
       nativeBlockerPacket,
       "--store-evidence-json",
       storeEvidence,
-      "--support-contact",
-      "privacy@fuelpath.app",
-      "--support-owner",
-      "Leo Kesselring",
-      "--support-reviewed-at",
-      "2026-06-20",
-      "--support-runbook",
-      READY_SUPPORT_RUNBOOK_SOURCE,
+      "--support-evidence-json",
+      supportEvidence,
     ],
     { cwd: ROOT, timeout: 10_000 },
   );
@@ -717,6 +851,8 @@ test("beta readiness can load privacy contact and store links from an evidence f
   assert.equal(payload.store.storeListingLinksConfirmed, true);
   assert.equal(payload.store.appStoreListingReady, true);
   assert.equal(payload.store.googlePlayListingReady, true);
+  assert.equal(payload.support.evidence.provided, true);
+  assert.equal(payload.supportContactMatchesPrivacyContact, true);
 });
 
 test("beta readiness requires support readiness when support process is claimed ready", async () => {
@@ -797,7 +933,6 @@ test("beta readiness requires support readiness when support process is claimed 
   assert.deepEqual(payload.support.blockers, [
     "support_contact_missing",
     "support_owner_missing",
-    "support_review_date_missing",
   ]);
   assert.equal(payload.supportContactComparisonReady, false);
   assert.equal(payload.supportContactMatchesPrivacyContact, false);
@@ -1444,7 +1579,13 @@ test("beta readiness passes custom store review freshness into store evidence ga
   assert.equal(payload.store.reviewMaxAgeDays, 0.5);
   assert.equal(payload.store.reviewEvidenceReady, true);
   assert.equal(payload.store.reviewFresh, false);
-  assert.deepEqual(payload.blockers, ["store_review_evidence_stale"]);
+  assert.deepEqual(payload.blockers, [
+    "apple_privacy_review_evidence_missing",
+    "google_data_safety_review_evidence_missing",
+    "provider_limitations_disclosure_evidence_missing",
+    "support_process_evidence_missing",
+    "store_review_evidence_stale",
+  ]);
 });
 
 test("beta readiness ignores excessive store review freshness windows", async () => {
@@ -2148,6 +2289,10 @@ function physicalMapTileSummaries() {
     { screenshot: screenshots.nearby, blankMapLikely: false },
     { screenshot: screenshots.nearbyAfterPan, blankMapLikely: false },
   ];
+}
+
+function writeEvChargingStatus(tmp, payload) {
+  return writeJson(path.join(tmp, "ev-charging-status.json"), payload);
 }
 
 function storeReadyArgs() {

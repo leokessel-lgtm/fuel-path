@@ -14,7 +14,13 @@ import {
   CommuteAlertStatus,
   NotificationPermissionState,
   SavedCommute,
+  Weekday,
 } from "../types";
+
+type CommuteAlertSettingsUpdate = Partial<Pick<
+  SavedCommute,
+  "alertDays" | "alertTime" | "localReminderEnabled" | "maxDetourMinutes" | "minSavingDollars" | "tankThresholdPercent" | "vehicleId"
+>>;
 
 export function useRouteAlerts({
   preferences,
@@ -29,7 +35,7 @@ export function useRouteAlerts({
   const [notificationPermission, setNotificationPermission] =
     useState<NotificationPermissionState>("unknown");
   const [notificationMessage, setNotificationMessage] = useState(
-    "Enable alerts when you want Fuel Path to check saved routes for you.",
+    "Watch saved routes when you want Fuel Path to alert only on useful fuel decisions.",
   );
 
   useEffect(() => {
@@ -74,6 +80,7 @@ export function useRouteAlerts({
                   backendSyncedAt: backendSync.syncedAt,
                   nextAlertAt: undefined,
                   scheduledNotificationId: undefined,
+                  scheduledNotificationIds: undefined,
                 })
               : commute,
           ),
@@ -97,6 +104,7 @@ export function useRouteAlerts({
                   alertStatusMessage: permission.message,
                   nextAlertAt: undefined,
                   scheduledNotificationId: undefined,
+                  scheduledNotificationIds: undefined,
                 })
               : commute,
           ),
@@ -126,17 +134,18 @@ export function useRouteAlerts({
             ? alertStateUpdate(commute, {
                 alertEnabled: result.status === "scheduled" || backendSynced,
                 alertStatus: backendSynced ? "backend_synced" : result.status,
-                alertStatusMessage: alertStatusMessage(
+                  alertStatusMessage: alertStatusMessage(
                   backendSynced
-                    ? "Price-triggered backend alert synced."
+                    ? "Route watch is on."
                     : result.message,
                   backendSynced && result.status === "scheduled"
-                    ? "Local daily reminder also scheduled."
+                    ? "Reminder scheduled for selected days."
                     : backendSync.message,
                 ),
                 backendSyncedAt: backendSync.syncedAt,
                 nextAlertAt: result.nextAlertAt,
                 scheduledNotificationId: result.notificationId,
+                scheduledNotificationIds: result.notificationIds,
               })
             : commute,
         ),
@@ -165,6 +174,7 @@ export function useRouteAlerts({
                   backendSyncedAt: commute.backendSyncedAt,
                   nextAlertAt: commute.nextAlertAt,
                   scheduledNotificationId: commute.scheduledNotificationId,
+                  scheduledNotificationIds: commute.scheduledNotificationIds,
                 })
               : commute,
           ),
@@ -227,6 +237,58 @@ export function useRouteAlerts({
     }
   }, [alertSyncingCommuteId, preferences, savedCommutes, setSavedCommutes]);
 
+  const updateCommuteAlertSettings = useCallback(async (
+    commuteId: string,
+    updates: CommuteAlertSettingsUpdate,
+  ) => {
+    const targetCommute = savedCommutes.find((commute) => commute.id === commuteId);
+    if (!targetCommute || alertSyncingCommuteId) return;
+    const updatedCommute = normaliseCommuteAlertSettingsUpdate({
+      ...targetCommute,
+      ...updates,
+      updatedAt: new Date().toISOString(),
+    });
+
+    setSavedCommutes((current) =>
+      current.map((commute) => (commute.id === commuteId ? updatedCommute : commute)),
+    );
+
+    if (!targetCommute.alertEnabled) return;
+
+    setAlertSyncingCommuteId(commuteId);
+    try {
+      const localSchedule = await scheduleSavedCommuteAlert(updatedCommute);
+      const backendSync = await syncSavedRouteAlert({
+        commute: updatedCommute,
+        enabled: true,
+        preferences,
+      });
+      const backendSynced = backendSync.status === "synced";
+      setSavedCommutes((current) =>
+        current.map((commute) =>
+          commute.id === commuteId
+            ? alertStateUpdate(commute, {
+                alertEnabled: commute.alertEnabled,
+                alertStatus: backendSynced ? "backend_synced" : localSchedule.status,
+                alertStatusMessage: alertStatusMessage(
+                  backendSynced ? "Route watch updated." : localSchedule.message,
+                  backendSynced && localSchedule.status === "scheduled"
+                    ? "Reminder updated for selected days."
+                    : backendSync.message,
+                ),
+                backendSyncedAt: backendSync.syncedAt || commute.backendSyncedAt,
+                nextAlertAt: localSchedule.nextAlertAt,
+                scheduledNotificationId: localSchedule.notificationId,
+                scheduledNotificationIds: localSchedule.notificationIds,
+              })
+            : commute,
+        ),
+      );
+    } finally {
+      setAlertSyncingCommuteId(null);
+    }
+  }, [alertSyncingCommuteId, preferences, savedCommutes, setSavedCommutes]);
+
   return {
     alertSyncingCommuteId,
     notificationMessage,
@@ -234,6 +296,7 @@ export function useRouteAlerts({
     removeCommute,
     requestNotifications,
     toggleCommuteAlert,
+    updateCommuteAlertSettings,
     updateCommuteAlertRule,
   };
 }
@@ -247,6 +310,7 @@ function alertStateUpdate(
     backendSyncedAt?: string;
     nextAlertAt?: string;
     scheduledNotificationId?: string;
+    scheduledNotificationIds?: string[];
   },
 ) {
   return {
@@ -258,4 +322,26 @@ function alertStateUpdate(
 
 function alertStatusMessage(primary: string, secondary?: string) {
   return [primary, secondary].filter(Boolean).join(" ");
+}
+
+const weekdays: Weekday[] = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
+
+function normaliseCommuteAlertSettingsUpdate(commute: SavedCommute): SavedCommute {
+  const alertDays = Array.isArray(commute.alertDays)
+    ? weekdays.filter((day) => commute.alertDays?.includes(day))
+    : weekdays;
+  return {
+    ...commute,
+    alertDays: alertDays.length ? alertDays : weekdays,
+    alertTime: /^([01]\d|2[0-3]):[0-5]\d$/.test(commute.alertTime) ? commute.alertTime : "07:30",
+    minSavingDollars: boundedNumber(commute.minSavingDollars, 1, 25, 5),
+    maxDetourMinutes: boundedNumber(commute.maxDetourMinutes, 1, 30, 8),
+    tankThresholdPercent: boundedNumber(commute.tankThresholdPercent, 5, 95, 45),
+  };
+}
+
+function boundedNumber(value: unknown, min: number, max: number, fallback: number) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(min, Math.min(max, Math.round(parsed)));
 }

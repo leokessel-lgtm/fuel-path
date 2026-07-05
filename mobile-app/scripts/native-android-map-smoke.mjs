@@ -10,6 +10,7 @@ const port = process.env.FUEL_PATH_ANDROID_SMOKE_PORT || "8082";
 const sdkRoot = findAndroidSdkRoot();
 const adb = join(sdkRoot, "platform-tools", "adb");
 const emulator = join(sdkRoot, "emulator", "emulator");
+const deviceSerial = process.env.FUEL_PATH_ANDROID_DEVICE_SERIAL || "";
 const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
 const reportJson = join(outputRoot, `android-map-smoke-${timestamp}.json`);
 const reportMd = join(outputRoot, `android-map-smoke-${timestamp}.md`);
@@ -307,9 +308,12 @@ function assertTool(path, label) {
 }
 
 function command(cmd, args) {
-  const result = spawnSync(cmd, args, { encoding: "utf8", maxBuffer: 8 * 1024 * 1024 });
+  const finalArgs = cmd === adb && deviceSerial && args[0] !== "devices" && args[0] !== "emu"
+    ? ["-s", deviceSerial, ...args]
+    : args;
+  const result = spawnSync(cmd, finalArgs, { encoding: "utf8", maxBuffer: 8 * 1024 * 1024 });
   if (result.status !== 0) {
-    throw new Error(result.stderr || result.stdout || `${cmd} ${args.join(" ")} failed`);
+    throw new Error(result.stderr || result.stdout || `${cmd} ${finalArgs.join(" ")} failed`);
   }
   return result;
 }

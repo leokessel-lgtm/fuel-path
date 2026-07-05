@@ -173,6 +173,91 @@ Use 0 to 2 for each:
 
 Proceed only if most real sessions score at least 7/12 and the strongest objections are fixable.
 
+## Loop 010 + Loop 009 Execution Plan (go-live testing cadence)
+
+### Why this order
+
+- Start with Loop 010 to get a full-surface, evidence-backed baseline on all user-facing surfaces.
+- Follow with Loop 009 at a strict bar to harden regressions quickly and prevent intermittent failures from slipping back in.
+
+### Loop 010: Full product evaluation loop (initial run)
+
+- Target date: 5 July 2026
+- Environment:
+  - Use production-like local data where possible.
+  - Reuse the current inventory from `docs/user-facing-production-readiness-inventory-2026-07-03.md` as baseline.
+  - Record unavoidable differences between local setup and production in the run notes.
+- Pass gate:
+  - Every inventoried surface and finite risk edge case is tested with reproducible evidence.
+- Execution order:
+  1. Rebuild synthetic dataset: `FUEL_PATH_SAMPLE_SCALE=100 FUEL_PATH_SAMPLE_SEED=2026 FUEL_PATH_SAMPLE_JITTER_KM=0.8`
+  2. Re-run user-facing inventory in full scope (Plan, Nearby, Account).
+  3. Execute a realistic pass across:
+     - route planning and plan-result transitions,
+     - nearby search, map/list panel transitions, and marker interaction,
+     - policy, discount, alert, and account flows,
+     - failure and degraded states,
+     - provider-capability and pricing freshness boundaries,
+     - accessibility and mobile/web responsive checks.
+  4. Log each bug with reproduction steps, expected vs observed result, and evidence path.
+  5. Group findings by root cause, apply coherent fixes, then rerun the full inventory.
+- Suggested command baseline (adapt as needed):
+  - `npm run test:production-smoke-matrix`
+  - `npm run test:frontend-failure-states`
+  - `npm run test:route-adversarial`
+  - `npm run test:plan-route-browser-clicks`
+  - `npm run test:claim-safety`
+  - `npm run test:map-density`
+  - `npm run test:map-interactions`
+  - `node --test tests/api/sample-data-production-like.test.js`
+  - `npm run check:validation-results -- --results-json VALIDATION-RESULTS-YYYY-MM-DD.json --allow-blocked`
+- Stop condition:
+  - Clean rerun of all inventory surfaces, or explicit blocked handoff if production-risk gaps remain unresolved.
+
+### Loop 009: Quality streak loop (hardening run)
+
+- Start only after Loop 010 clean pass.
+- Set streak target: **N = 20 consecutive realistic cases**.
+- Scope for streak cases:
+  - commuter/high-frequency and roadmap-sensitive edge cases first,
+  - one fresh case per prior failure class before restarting the bar.
+- Run steps:
+  1. Pick one failure class and one representative case.
+  2. Log evidence and fix root cause.
+  3. Add/extend regression + benchmark coverage.
+  4. Reset streak to zero on each failure.
+  5. Continue until 20 consecutive passes at original bar.
+- Suggested command baseline:
+  - `npm run test:plan-route-live-api`
+  - `npm run check:beta-readiness`
+  - `npm run check:support-readiness`
+- Stop condition:
+  - 20/20 consecutive cases with unchanged bar, or explicit blocked handoff when case design itself blocks coverage.
+
+### Run notes format (recommended)
+
+Create `tmp/fuel-path-eval-loop-2026-07-05.md` and add:
+
+- pass date/time (Australia/Sydney),
+- environment command and variables,
+- inventory list executed,
+- defects with reproduction evidence,
+- fixes applied and regression hooks added,
+- loop step reached (full pass / streak count),
+- final decision (`clean`, `blocked`, or `handoff`).
+
+### Initial case seeds for this cycle
+
+| Loop 010 area | Priority case | Expected signal |
+| --- | --- | --- |
+| Route scoring integrity | Same-route input, high detour edge, stale prices | recommendation downgraded or blocked with reason |
+| Evidence and trust | aged station, untrusted provider path | clear freshness and source state visible to user |
+| Policy + discounts | policy mismatch, duplicate wallet entry | no accidental inclusion of disallowed station |
+| Nearby interactions | marker burst + fast pane swaps on small screen | no stale row focus and no blocked action |
+| Failure resilience | geocode timeout + provider 429/500 | no false-success and actionable error state |
+| Alert flows | watch a saved route with notification denied | clear permission and no phantom active watch |
+| Accessibility/responsiveness | map/list transition, keyboard tab order, dynamic text | controls remain discoverable and usable |
+
 ## Synthesis Table
 
 | Session | Segment | Behaviour change | Trust issue | Alert wanted | Saving threshold | Decision |

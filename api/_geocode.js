@@ -349,8 +349,8 @@ function createGeocoder({ fetchJson, loadStationData }) {
   function geocodeItemPayload({ label, lat, lon, provider, kind = "place", providerId = "", ...extra }) {
     return {
       label,
-      lat: Number(lat),
-      lon: Number(lon),
+      lat: lat === null || lat === undefined ? null : Number(lat),
+      lon: lon === null || lon === undefined ? null : Number(lon),
       type: kind,
       provider,
       ...(providerId ? { providerId } : {}),
@@ -656,15 +656,10 @@ function createGeocoder({ fetchJson, loadStationData }) {
     });
   }
 
-  async function googleGeocode(query, limit, sessionToken) {
+  async function googleGeocode(query, limit, sessionToken, { details = true, searchContext = null } = {}) {
     await assertGooglePlacesFallbackAllowed(query, sessionToken);
     const payload = await fetchJson("https://places.googleapis.com/v1/places:autocomplete", {
-      data: {
-        input: query,
-        sessionToken,
-        includedRegionCodes: ["au"],
-        languageCode: "en-AU",
-      },
+      data: googlePlacesAutocompleteRequest(query, sessionToken, searchContext),
       headers: {
         "X-Goog-Api-Key": googlePlacesApiKey(),
         "X-Goog-FieldMask": "suggestions.placePrediction.placeId,suggestions.placePrediction.text,suggestions.placePrediction.types",
@@ -673,14 +668,49 @@ function createGeocoder({ fetchJson, loadStationData }) {
     });
     const suggestions = [];
     for (const item of payload?.suggestions || []) {
-      const placeId = item?.placePrediction?.placeId;
+      const prediction = item?.placePrediction || {};
+      const placeId = prediction.placeId;
       if (!placeId) continue;
-      const details = await googlePlaceDetails(String(placeId), sessionToken);
-      if (details) suggestions.push(details);
+      if (details) {
+        const detail = await googlePlaceDetails(String(placeId), sessionToken);
+        if (detail) suggestions.push(detail);
+      } else {
+        suggestions.push(geocodeItemPayload({
+          label: String(prediction.text?.text || query),
+          lat: null,
+          lon: null,
+          kind: (prediction.types || []).join(",") || "place",
+          provider: "google",
+          providerId: String(placeId),
+          matchType: "google_places_autocomplete",
+          refineRequired: true,
+          refineHint: "Select this place to confirm its map location.",
+        }));
+      }
       if (suggestions.length >= limit) break;
     }
     if (!suggestions.length) throw new Error(`No location found for ${query}`);
     return suggestions;
+  }
+
+  function googlePlacesAutocompleteRequest(query, sessionToken, searchContext) {
+    const request = {
+      input: query,
+      sessionToken,
+      includedRegionCodes: ["au"],
+      languageCode: "en-AU",
+    };
+    const nearLat = Number(searchContext?.nearLat);
+    const nearLon = Number(searchContext?.nearLon);
+    if (Number.isFinite(nearLat) && Number.isFinite(nearLon)) {
+      request.locationBias = {
+        circle: {
+          center: { latitude: nearLat, longitude: nearLon },
+          radius: Math.max(1000, Math.min(Number(searchContext?.nearRadiusKm || 50) * 1000, 50000)),
+        },
+      };
+    }
+    return request;
   }
 
   async function assertGooglePlacesFallbackAllowed(query, sessionToken) {
@@ -847,24 +877,43 @@ function createGeocoder({ fetchJson, loadStationData }) {
     return titleCase(value).replace(/\b(Nsw|Act|Nt|Qld|Sa|Tas|Vic|Wa|Ot)\b/g, (match) => match.toUpperCase());
   }
 
-  async function geocode({ query, limit, sessionToken, provider, searchContext }) {
+  async function geocode({ query, limit, sessionToken, provider, providerPlaceId, purpose, searchContext }) {
     const selectedProvider = selectGeocodeProvider(provider || process.env.FUEL_PATH_GEOCODE_PROVIDER || "auto");
-    const addressIndex = addressIndexStatus();
-    const safeSearchContext = normaliseSearchContext(searchContext);
-    const cacheKey = geocodeCacheKey({ provider: selectedProvider, query, limit, addressIndex, searchContext: safeSearchContext });
-    const cached = readGeocodeCache(cacheKey);
-    if (cached) {
-      const cachedCacheMode = cached.lookupStatus === "ok" ? "fresh" : geocodeCacheMode(cached.lookupStatus);
+    const planAutocompleteCascade = purpose === "plan_autocomplete" && planAutocompleteProviderCascadeEnabled();
+    if (providerPlaceId && selectedProvider === "google") {
+      await assertGooglePlacesFallbackAllowed(query, sessionToken);
+      const detail = await googlePlaceDetails(providerPlaceId, sessionToken);
+      const suggestions = detail ? [detail] : [];
+      const lookupStatus = suggestions.length ? "ok" : "no_match";
       return {
-        ...cached,
+        provider: selectedProvider,
+        providerMode: "production_candidate",
+        recommendedProductionProvider: RECOMMENDED_GEOCODE_PROVIDER,
+        requestedProvider: provider || process.env.FUEL_PATH_GEOCODE_PROVIDER || "auto",
+        sessionToken,
+        query,
+        location: suggestions[0] || null,
+        suggestions,
+        lookupStatus,
+        cache: "miss",
+        cacheMode: geocodeCacheMode(lookupStatus),
+        providerHealth: geocodeProviderHealth(selectedProvider, lookupStatus, "", geocodeCacheMode(lookupStatus)),
+        degraded: lookupStatus !== "ok",
+      };
+    }
+    const safeSearchContext = normaliseSearchContext(searchContext);
+    const fastLocalCacheKey = geocodeCacheKey({ provider: selectedProvider, query, limit, addressIndex: null, purpose, searchContext: safeSearchContext });
+    const cachedFastLocal = readGeocodeCache(fastLocalCacheKey);
+    if (cachedFastLocal?.fastPath === "local_autocomplete") {
+      return {
+        ...cachedFastLocal,
         cache: "hit",
-        cacheMode: cachedCacheMode,
-        providerHealth: geocodeProviderHealth(cached.provider, cached.lookupStatus, cached.warning, cachedCacheMode),
-        degraded: cached.lookupStatus !== "ok",
+        cacheMode: "fresh",
+        providerHealth: geocodeProviderHealth(cachedFastLocal.provider, cachedFastLocal.lookupStatus, cachedFastLocal.warning, "fresh"),
+        degraded: cachedFastLocal.lookupStatus !== "ok",
         sessionToken,
       };
     }
-    const addressLookupLimit = safeSearchContext ? Math.max(limit * 4, 20) : limit;
     const requiresExactAddress = requiresExactAddressLookup(query);
     const hintSuggestions = localHintGeocode(query, limit);
     const strongHintSuggestions = hintSuggestions.filter(isStrongLocalHintSuggestion);
@@ -899,9 +948,24 @@ function createGeocoder({ fetchJson, loadStationData }) {
         degraded: false,
         fastPath: "local_autocomplete",
       };
-      writeGeocodeCache(cacheKey, payload, true);
+      writeGeocodeCache(fastLocalCacheKey, payload, true);
       return payload;
     }
+    const addressIndex = addressIndexStatus();
+    const cacheKey = geocodeCacheKey({ provider: selectedProvider, query, limit, addressIndex, purpose, searchContext: safeSearchContext });
+    const cached = readGeocodeCache(cacheKey);
+    if (cached) {
+      const cachedCacheMode = cached.lookupStatus === "ok" ? "fresh" : geocodeCacheMode(cached.lookupStatus);
+      return {
+        ...cached,
+        cache: "hit",
+        cacheMode: cachedCacheMode,
+        providerHealth: geocodeProviderHealth(cached.provider, cached.lookupStatus, cached.warning, cachedCacheMode),
+        degraded: cached.lookupStatus !== "ok",
+        sessionToken,
+      };
+    }
+    const addressLookupLimit = safeSearchContext ? Math.max(limit * 4, 20) : limit;
     const rawAddressSuggestions = shouldSkipAddressIndex(query, addressIndex)
       ? []
       : await searchAddressIndex(query, addressLookupLimit, { searchContext: safeSearchContext });
@@ -937,7 +1001,7 @@ function createGeocoder({ fetchJson, loadStationData }) {
           selectedProvider,
           () => {
             return selectedProvider === "google"
-              ? googleGeocode(query, limit, sessionToken)
+              ? googleGeocode(query, limit, sessionToken, { details: !planAutocompleteCascade, searchContext: safeSearchContext })
               : selectedProvider === "addressr"
                 ? addressrGeocode(query, limit)
                 : selectedProvider === "mapbox"
@@ -955,6 +1019,17 @@ function createGeocoder({ fetchJson, loadStationData }) {
         );
       } catch (error) {
         providerWarning = geocodeProviderWarning(error, selectedProvider);
+        if (planAutocompleteCascade && selectedProvider === "google" && hereApiKey()) {
+          try {
+            providerSuggestions = await withProviderRetries("here", () => hereGeocode(query, limit), {
+              retries: 1,
+              isRetriableError: (fallbackError) => isRetriableGeocodeError(fallbackError, "here"),
+            });
+            providerWarning = "Google Places autocomplete unavailable; using HERE fallback.";
+          } catch (fallbackError) {
+            providerWarning = `${providerWarning} ${geocodeProviderWarning(fallbackError, "here")}`.trim();
+          }
+        }
       }
     }
     if (!providerWarning && hasUsefulLocalFallback(query, localSuggestions)) {
@@ -966,15 +1041,31 @@ function createGeocoder({ fetchJson, loadStationData }) {
     const nonExactLocalSuggestions = localSuggestions.filter((item) => !
       exactLocalAddressMatches.some((exactItem) => geocodeSuggestionKey(exactItem) === geocodeSuggestionKey(item))
     );
-    const suggestions =
-      selectedProvider === "nominatim"
-        ? mergeGeocodeSuggestions([...localSuggestions, ...providerSuggestions], limit)
-        : mergeGeocodeSuggestions([
-          ...(requiresExactAddress ? exactLocalAddressMatches : localSuggestions),
-          ...providerSuggestions,
-          ...(requiresExactAddress ? nonExactLocalSuggestions : []),
-          ...(requiresExactAddress ? strictAddressSuggestions : addressSuggestions),
-        ], limit);
+    const planAutocompleteLocalFirstSuggestions = planAutocompleteCascade
+      ? localSuggestions.filter((item) =>
+        item?.matchType === "exact_address" ||
+        (item?.provider === "fuel_path_hint" && item?.confidence !== "low")
+      )
+      : localSuggestions;
+    const planAutocompleteLocalFallbackSuggestions = planAutocompleteCascade
+      ? localSuggestions.filter((item) =>
+        !planAutocompleteLocalFirstSuggestions.some((firstItem) => geocodeSuggestionKey(firstItem) === geocodeSuggestionKey(item))
+      )
+      : [];
+    const suggestions = mergeSuggestionsByFallbackPolicy({
+      addressSuggestions,
+      exactLocalAddressMatches,
+      limit,
+      localSuggestions,
+      nonExactLocalSuggestions,
+      planAutocompleteCascade,
+      planAutocompleteLocalFallbackSuggestions,
+      planAutocompleteLocalFirstSuggestions,
+      providerSuggestions,
+      requiresExactAddress,
+      selectedProvider,
+      strictAddressSuggestions,
+    });
     const lookupStatus = suggestions.length
       ? providerWarning
         ? "local_fallback"
@@ -1008,8 +1099,44 @@ function createGeocoder({ fetchJson, loadStationData }) {
     return process.env.FUEL_PATH_DISABLE_STATION_GEOCODE === "1";
   }
 
-  function geocodeCacheKey({ provider, query, limit, addressIndex, searchContext }) {
-    return `${provider}:${limit}:${addressIndexSignature(addressIndex)}:${searchContextSignature(searchContext)}:${explicitStateCodeSignature(query)}:${normaliseSearchText(query)}`;
+  function planAutocompleteProviderCascadeEnabled() {
+    return ["1", "true", "yes", "on"].includes(String(process.env.FUEL_PATH_PLAN_AUTOCOMPLETE_PROVIDER_CASCADE_ENABLED || "").toLowerCase());
+  }
+
+  function geocodeCacheKey({ provider, query, limit, addressIndex, purpose, searchContext }) {
+    return `${provider}:${limit}:${String(purpose || "geocode")}:${addressIndexSignature(addressIndex)}:${searchContextSignature(searchContext)}:${explicitStateCodeSignature(query)}:${normaliseSearchText(query)}`;
+  }
+
+  function mergeSuggestionsByFallbackPolicy({
+    addressSuggestions,
+    exactLocalAddressMatches,
+    limit,
+    localSuggestions,
+    nonExactLocalSuggestions,
+    planAutocompleteCascade,
+    planAutocompleteLocalFallbackSuggestions,
+    planAutocompleteLocalFirstSuggestions,
+    providerSuggestions,
+    requiresExactAddress,
+    selectedProvider,
+    strictAddressSuggestions,
+  }) {
+    if (selectedProvider === "nominatim") {
+      return mergeGeocodeSuggestions([...localSuggestions, ...providerSuggestions], limit);
+    }
+    if (planAutocompleteCascade) {
+      return mergeGeocodeSuggestions([
+        ...planAutocompleteLocalFirstSuggestions,
+        ...providerSuggestions,
+        ...planAutocompleteLocalFallbackSuggestions,
+      ], limit);
+    }
+    return mergeGeocodeSuggestions([
+      ...(requiresExactAddress ? exactLocalAddressMatches : localSuggestions),
+      ...providerSuggestions,
+      ...(requiresExactAddress ? nonExactLocalSuggestions : []),
+      ...(requiresExactAddress ? strictAddressSuggestions : addressSuggestions),
+    ], limit);
   }
 
   function shouldReturnFastLocalAutocomplete(query, suggestions, requiresExactAddress) {
@@ -1463,6 +1590,9 @@ function createGeocoder({ fetchJson, loadStationData }) {
     if (label === needle) score -= 36;
     else if (label.startsWith(needle)) score -= 18;
     else if (label.includes(needle)) score -= 4;
+    if (item?.provider === "fuel_path_hint" && item?.type === "city" && label.startsWith(needle)) {
+      score -= 24;
+    }
     const unitLabelMatches = unitIntent === "specific" && labelMatchesUnitIntent(query, item?.label);
     if (!refineRequired && unitIntent === "specific") {
       score += unitLabelMatches ? -35 : 35;
@@ -1484,6 +1614,17 @@ function createGeocoder({ fetchJson, loadStationData }) {
       : 0;
     if (localPoiBoost) {
       score -= localPoiBoost;
+    }
+    if (item?.provider === "fuel_path_hint" && item?.matchType === "exact_hint") {
+      score -= 50;
+    }
+    if (
+      item?.provider === "fuel_path_hint" &&
+      needle.length >= 5 &&
+      needle.includes(" ") &&
+      localSuggestionPrimaryName(item).startsWith(needle)
+    ) {
+      score -= 32;
     }
     if (item?.provider === "fuel_path_hint" && isLocalPoiSuggestion(item) && localSuggestionPrimaryName(item) === needle) {
       score -= 100;
@@ -1527,16 +1668,21 @@ function createGeocoder({ fetchJson, loadStationData }) {
   }
 
   function searchContextBoost(item, searchContext) {
-    if (!searchContext || item?.provider !== "fuel_path_gnaf") return 0;
+    if (!searchContext || !isLocalContextRankableSuggestion(item)) return 0;
     const lat = Number(item?.lat);
     const lon = Number(item?.lon);
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) return 0;
     const distance = distanceKm({ lat, lon }, { lat: searchContext.nearLat, lon: searchContext.nearLon });
     if (!Number.isFinite(distance)) return 0;
     const radius = searchContext.nearRadiusKm;
-    if (distance <= radius) return 14 + Math.max(0, 1 - distance / radius) * 4;
-    if (distance <= radius * 2) return 4;
+    const providerBoost = item?.provider === "fuel_path_gnaf" ? 1 : 1.35;
+    if (distance <= radius) return (24 + Math.max(0, 1 - distance / radius) * 12) * providerBoost;
+    if (distance <= radius * 2) return 8 * providerBoost;
     return 0;
+  }
+
+  function isLocalContextRankableSuggestion(item) {
+    return ["fuel_path_gnaf", "fuel_path_hint", "fuel_path_regional_gazetteer"].includes(String(item?.provider || ""));
   }
 
   function localMatchTypeRank(matchType) {

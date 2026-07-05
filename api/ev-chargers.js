@@ -1,5 +1,6 @@
 const {
   boolParam,
+  routeFromPayload,
   buildRoute,
   methodAllowed,
   numberParam,
@@ -7,9 +8,20 @@ const {
   stringParam,
 } = require("./_backend");
 const { createApiNinjasAdapter } = require("./_evApiNinjas");
-const { defaultEvProvider, evProviderConfigured, fallbackEvProviders, normaliseEvProvider } = require("./_evProviderPolicy");
+const { createGooglePlacesEvAdapter } = require("./_evGooglePlaces");
+const { createLocalPrototypeEvDirectoryAdapter } = require("./_evLocalPrototypeDirectory");
+const {
+  googlePlacesRouteChargingDecision,
+  defaultEvProvider,
+  evProviderConfigured,
+  fallbackEvProviders,
+  normaliseEvProvider,
+} = require("./_evProviderPolicy");
+const {
+  isOpenWebNinjaRateLimited,
+  markOpenWebNinjaRateLimit,
+} = require("./_evProviderState");
 const { createOpenWebNinjaAdapter } = require("./_evOpenWebNinja");
-const { routeFromPayload } = require("./_backend");
 const { createEvRouteFallbackScorer } = require("./_evRouteFallback");
 const {
   createOpenChargeMapAdapter,
@@ -19,29 +31,41 @@ const {
 
 const { loadEvChargers: loadOpenChargeMapEvChargers } = createOpenChargeMapAdapter();
 const { loadEvChargers: loadApiNinjasEvChargers } = createApiNinjasAdapter();
+const { loadEvChargers: loadGooglePlacesEvChargers } = createGooglePlacesEvAdapter();
+const { loadEvChargers: loadLocalPrototypeEvChargers } = createLocalPrototypeEvDirectoryAdapter();
 const { loadEvChargers: loadOpenWebNinjaEvChargers } = createOpenWebNinjaAdapter();
 const { scoreEvRouteFallback } = createEvRouteFallbackScorer({
   buildRoute,
   loadEvChargers: (request) => loadDefaultProviderCascade(defaultEvProvider(), request),
 });
+const {
+  incrementRouteChargingRequest,
+  recordEvRouteChargingAttempt,
+  recordEvRouteChargingFailure,
+  recordEvRouteChargingPolicyBlock,
+  recordEvRouteChargingResult,
+} = require("./_evProviderTelemetry");
 
 module.exports = async function handler(req, res) {
   if (!methodAllowed(req, res, ["GET", "POST"])) return;
   try {
     if (req.method === "POST") {
       const body = req.body || {};
-      if (body.mode !== "route_fallback") throw new Error("mode must be route_fallback for POST");
+      if (!["route_fallback", "route_charging"].includes(body.mode)) throw new Error("mode must be route_charging for POST");
       const route = routeFromPayload(body.route || {});
+      route.distanceKm = Number(body.route?.distanceKm || body.route?.routeDistanceKm || 0) || route.distanceKm;
       const connectors = Array.isArray(body.connectors)
         ? body.connectors.map(String).filter(Boolean)
         : [];
-      const radiusKm = Math.max(1, Math.min(50, Number(body.radiusKm) || 18));
-      const limit = Math.max(1, Math.min(8, Math.round(Number(body.limit) || 3)));
+      const radiusKm = Math.max(1, Math.min(50, Number(body.radiusKm) || 30));
+      const limit = Math.max(1, Math.min(12, Math.round(Number(body.limit) || 10)));
+      incrementRouteChargingRequest();
       sendJson(res, 200, await scoreEvRouteFallback({
         connectors,
         limit,
         radiusKm,
         route,
+        selectedRangeKm: Number(body.selectedRangeKm || 0),
       }));
       return;
     }
@@ -74,9 +98,29 @@ module.exports = async function handler(req, res) {
       powerMode,
       forceRefresh: boolParam(req.query.forceRefresh),
     };
-    const payload = requestedProvider
-      ? await loadSingleProvider(provider, request)
-      : await loadDefaultProviderCascade(provider, request);
+
+    let payload;
+    if (requestedProvider) {
+      if (provider === "google_places_ev") {
+        const decision = googlePlacesRouteChargingDecision();
+        if (!decision.allowed) {
+          payload = providerSignalHoldoffResult({
+            provider,
+            request,
+            reason: `${googlePlacesHoldoffReason(decision)} Route lookup is temporarily paused.`,
+          });
+        } else {
+          payload = await loadSingleProvider(provider, request);
+        }
+      } else if (provider === "openweb_ninja" && isOpenWebNinjaRateLimited()) {
+        payload = providerRateLimitResult({ provider: "openweb_ninja", request });
+      } else {
+        payload = await loadSingleProvider(provider, request);
+      }
+    } else {
+      payload = await loadDefaultProviderCascade(provider, request);
+    }
+
     sendJson(res, 200, payload);
   } catch (error) {
     sendJson(res, 400, {
@@ -91,6 +135,7 @@ function coordinateParam(value, name, min, max) {
 }
 
 async function loadSingleProvider(provider, request) {
+  if (provider === "google_places_ev") return loadGooglePlacesEvChargers(request);
   if (provider === "open_charge_map") return loadOpenChargeMapEvChargers(request);
   if (provider === "openweb_ninja") return loadOpenWebNinjaEvChargers(request);
   if (provider === "api_ninjas") return loadApiNinjasEvChargers(request);
@@ -111,16 +156,49 @@ async function loadDefaultProviderCascade(provider, request) {
   const results = [];
   for (const candidate of providers) {
     if (!evProviderConfigured(candidate)) continue;
+    const isFallback = candidate !== provider;
+    if (candidate === "google_places_ev") {
+      const decision = googlePlacesRouteChargingDecision();
+      if (!decision.allowed) {
+        const blockerText = googlePlacesHoldoffReason(decision);
+        recordEvRouteChargingPolicyBlock({ provider: candidate, reason: "google_places_ev_route_guard_blocked" });
+        results.push(providerSignalHoldoffResult({
+          provider: candidate,
+          request,
+          reason: `${blockerText} Route lookup is temporarily paused.`,
+        }));
+        continue;
+      }
+    }
+    recordEvRouteChargingAttempt({ provider: candidate, isFallback });
     try {
+      if (candidate === "openweb_ninja" && isOpenWebNinjaRateLimited()) {
+        recordEvRouteChargingPolicyBlock({ provider: candidate, reason: "openweb_ninja_rate_limited" });
+        results.push(providerRateLimitResult({ provider: candidate, request }));
+        continue;
+      }
       const result = await loadSingleProvider(candidate, request);
       results.push(result);
-      if (result.chargers?.length) break;
+      recordEvRouteChargingResult({
+        provider: candidate,
+        chargersCount: Number(Array.isArray(result?.chargers) ? result.chargers.length : 0),
+        cacheMode: result?.context?.cacheMode,
+      });
+      if (result.chargers?.length && !evResultNeedsEnrichment(result, request)) break;
     } catch (error) {
+      const message = String(error?.message || "");
+      const isRateLimit = isRateLimitError(error);
+      recordEvRouteChargingFailure({ provider: candidate, isFallback, isCapHit: String(error?.message || "").toLowerCase().includes("daily cap reached"), reason: message });
+      if (candidate === "openweb_ninja" && isRateLimit) {
+        markOpenWebNinjaRateLimit(message);
+        results.push(providerRateLimitResult({ provider: candidate, request, reason: message }));
+        continue;
+      }
       results.push(providerErrorResult({ error, provider: candidate, request }));
     }
   }
-  if (!results.length) return loadSingleProvider(provider, request);
-  if (results.length === 1) return results[0];
+  if (!results.length) return loadLocalPrototypeEvChargers(request);
+  if (results.length === 1 && results[0].chargers?.length) return results[0];
   return mergeProviderResults(results, request);
 }
 
@@ -156,6 +234,70 @@ function providerErrorResult({ error, provider, request }) {
   };
 }
 
+function providerRateLimitResult({ provider, request, reason = "" }) {
+  return {
+    context: {
+      provider,
+      source: provider,
+      capability: "prototype",
+      radiusKm: request.radiusKm,
+      centre: request.centre,
+      filters: {
+        connectors: request.connectors,
+        minPowerKw: request.minPowerKw,
+        powerMode: request.powerMode,
+      },
+      chargerCount: 0,
+      returnedCount: 0,
+      generatedAt: new Date().toISOString(),
+      cacheHit: false,
+      cacheAgeSeconds: 0,
+      cacheMode: "rate_limited",
+      degraded: false,
+      provenance: {
+        source: provider,
+        label: `${provider} EV charger data`,
+        licence: "provider terms",
+        realTimeAvailability: false,
+      },
+      warning: `${provider} is temporarily rate-limited. ${reason ? reason + ". " : ""}Skipping this enrichment source and keeping route result.`,
+    },
+    chargers: [],
+  };
+}
+
+function providerSignalHoldoffResult({ provider, request, reason = "" }) {
+  return {
+    context: {
+      provider,
+      source: provider,
+      capability: "prototype",
+      radiusKm: request.radiusKm,
+      centre: request.centre,
+      filters: {
+        connectors: request.connectors,
+        minPowerKw: request.minPowerKw,
+        powerMode: request.powerMode,
+      },
+      chargerCount: 0,
+      returnedCount: 0,
+      generatedAt: new Date().toISOString(),
+      cacheHit: false,
+      cacheAgeSeconds: 0,
+      cacheMode: "policy_blocked",
+      degraded: true,
+      provenance: {
+        source: provider,
+        label: `${provider} EV charger data`,
+        licence: "provider terms",
+        realTimeAvailability: false,
+      },
+      warning: `${provider} route lookup is currently paused by route-quality guard. ${reason ? reason : "Quality signal limits reached."}`,
+    },
+    chargers: [],
+  };
+}
+
 function mergeProviderResults(results, request) {
   const chargers = [];
   const seen = new Set();
@@ -169,7 +311,14 @@ function mergeProviderResults(results, request) {
   }
   chargers.sort((left, right) => Number(left.distanceKm || 0) - Number(right.distanceKm || 0));
   const providers = results.map((result) => result.context?.provider).filter(Boolean);
-  const warnings = results.map((result) => result.context?.warning).filter(Boolean);
+  const warnings = results.map((result) => cascadeWarning(result, chargers.length > 0)).filter(Boolean);
+  const emptyProviders = results
+    .filter((result) => !result.chargers?.length && result.context?.cacheMode !== "provider_error")
+    .map((result) => result.context?.provider)
+    .filter(Boolean);
+  const degraded = chargers.length
+    ? results.some((result) => result.context?.degraded && result.context?.cacheMode !== "provider_error")
+    : results.some((result) => result.context?.degraded);
   return {
     context: {
       provider: providers.join("+"),
@@ -188,17 +337,53 @@ function mergeProviderResults(results, request) {
       cacheHit: results.every((result) => result.context?.cacheHit),
       cacheAgeSeconds: Math.max(...results.map((result) => Number(result.context?.cacheAgeSeconds || 0))),
       cacheMode: "cascade",
-      degraded: results.some((result) => result.context?.degraded),
+      degraded,
       provenance: {
         source: providers.join("+"),
         label: `Charger data from ${providers.join(" and ")}`,
         licence: "provider terms",
         realTimeAvailability: false,
       },
-      warning: `EV charger directory cascade used ${providers.join(", ")}. ${warnings.join(" ")}`.trim(),
+      warning: [
+        `EV charger directory cascade used ${providers.join(", ")}.`,
+        emptyProviders.length ? `No usable charger rows returned from ${emptyProviders.join(", ")}.` : "",
+        warnings.join(" "),
+      ].filter(Boolean).join(" ").trim(),
     },
     chargers,
   };
+}
+
+  function cascadeWarning(result, hasUsableRows) {
+  const warning = result?.context?.warning;
+  if (!warning) return "";
+  if (hasUsableRows && result?.context?.cacheMode === "provider_error") {
+    return `Optional ${result.context.provider} enrichment unavailable.`;
+  }
+  return warning;
+}
+
+function googlePlacesHoldoffReason(decision = {}) {
+  const blockers = Array.from(new Set(Array.isArray(decision.blockers) ? decision.blockers : []));
+  return blockers.length
+    ? `Quality blockers: ${blockers.join(", ")}.`
+    : "Google Places EV cost controls or readiness blockers are active.";
+}
+
+function evResultNeedsEnrichment(result, request) {
+  const chargers = result?.chargers || [];
+  if (!chargers.length) return false;
+  if (request.minPowerKw || request.powerMode) return true;
+  const withPower = chargers.filter((charger) => Number.isFinite(Number(charger.maxPowerKw)) && Number(charger.maxPowerKw) > 0).length;
+  const withOperator = chargers.filter((charger) => charger.operator && charger.operator !== "Unknown operator").length;
+  const powerCoverage = withPower / chargers.length;
+  const operatorCoverage = withOperator / chargers.length;
+  return powerCoverage < 0.5 || operatorCoverage < 0.5;
+}
+
+function isRateLimitError(error) {
+  const message = String(error?.message || error || "").toLowerCase();
+  return message.includes("429") || /rate limit|rate-limited|ratelimit|too many requests/.test(message);
 }
 
 function boundedNumberParam(value, name, fallback, { min, max, clampMax = true }) {

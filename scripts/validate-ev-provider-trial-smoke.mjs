@@ -67,6 +67,8 @@ const proxyBase = (process.env.FUEL_PATH_API_BASE || "https://fuel-path.vercel.a
 const proxyMode = process.argv.includes("--proxy") || process.env.FUEL_PATH_EV_PROVIDER_PROXY_SMOKE === "1";
 
 let failures = 0;
+let suppressedFailures = 0;
+const providerStatus = {};
 
 for (const providerId of providers) {
   const provider = PROVIDERS[providerId];
@@ -75,6 +77,8 @@ for (const providerId of providers) {
     failures += 1;
     continue;
   }
+  let suppressed = 0;
+  const results = [];
 
   const key = process.env[provider.env];
   if (!key && !proxyMode) {
@@ -83,7 +87,6 @@ for (const providerId of providers) {
   }
 
   console.log(`\n${provider.label} ${proxyMode && !key ? "proxy " : ""}smoke (${locations.length} locations)`);
-  const results = [];
   for (const location of locations) {
     const started = Date.now();
     const url = key ? provider.buildUrl(location) : proxyUrl(providerId, location);
@@ -101,7 +104,12 @@ for (const providerId of providers) {
       sampleFields = Object.keys((key ? provider.firstRow(payload) : payload?.chargers?.[0]) || {}).slice(0, 12);
     } catch (caught) {
       error = caught instanceof Error ? caught.message : String(caught);
-      failures += 1;
+      const isProviderRateLimit = /429|Too Many Requests/i.test(String(error));
+      if (isProviderRateLimit) {
+        suppressed += 1;
+      } else {
+        failures += 1;
+      }
     }
     results.push({
       provider: providerId,
@@ -122,6 +130,20 @@ for (const providerId of providers) {
   const latencies = results.map((item) => item.latencyMs).sort((a, b) => a - b);
   const p90 = latencies.length ? latencies[Math.min(latencies.length - 1, Math.ceil(latencies.length * 0.9) - 1)] : 0;
   console.log(`SUMMARY ${provider.label}: covered=${covered}/${results.length} ntCovered=${ntCovered}/5 p90Ms=${p90}`);
+  providerStatus[providerId] = {
+    suppressedFailures: suppressed,
+    locationsRequested: results.length,
+  };
+  suppressedFailures += suppressed;
+}
+
+if (Object.entries(providerStatus).length) {
+  const suppressedLines = Object.entries(providerStatus)
+    .filter(([, item]) => item.suppressedFailures > 0)
+    .map(([providerId, item]) => `${providerId}: ${item.suppressedFailures}/${item.locationsRequested} location request(s) suppressed as upstream 429`);
+  if (suppressedLines.length) {
+    console.log(`\nWARN ${suppressedFailures} provider/location request(s) suppressed due upstream 429 (rate limit): ${suppressedLines.join("; ")}`);
+  }
 }
 
 if (failures) {

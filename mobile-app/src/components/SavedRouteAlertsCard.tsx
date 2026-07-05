@@ -1,40 +1,67 @@
+import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { colors, radii, shadow, spacing, surfaces, typeScale, typography } from "../theme";
-import { NotificationPermissionState, SavedCommute } from "../types";
+import {
+  AppPreferences,
+  NotificationPermissionState,
+  SavedCommute,
+  VehicleProfile,
+  Weekday,
+} from "../types";
 import { alertGateSummary, commuteAlertRuleLine } from "../utils/decisionEvidence";
+
+const weekdays: Weekday[] = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
+const weekdayLabels: Record<Weekday, string> = {
+  mon: "M",
+  tue: "T",
+  wed: "W",
+  thu: "T",
+  fri: "F",
+  sat: "S",
+  sun: "S",
+};
+const alertTimeOptions = ["06:30", "07:30", "08:30", "16:30", "17:30"];
 
 export function SavedRouteAlertsCard({
   alertSyncingCommuteId,
   notificationMessage,
   notificationPermission,
+  preferences,
   savedCommutes,
   onRemoveCommute,
   onRequestNotifications,
   onToggleCommuteAlert,
+  onUpdateCommuteAlertSettings,
 }: {
   alertSyncingCommuteId: string | null;
   notificationMessage: string;
   notificationPermission: NotificationPermissionState;
+  preferences: AppPreferences;
   savedCommutes: SavedCommute[];
   onRemoveCommute: (commuteId: string) => void;
   onRequestNotifications: () => void;
   onToggleCommuteAlert: (commuteId: string) => void;
+  onUpdateCommuteAlertSettings: (
+    commuteId: string,
+    updates: Partial<Pick<SavedCommute, "alertDays" | "alertTime" | "minSavingDollars" | "vehicleId">>,
+  ) => void;
 }) {
+  const [editingCommuteId, setEditingCommuteId] = useState<string | null>(null);
   const notificationsReady = notificationPermission === "granted";
   const notificationButtonLabel = notificationsReady
     ? "Permission enabled"
     : notificationPermission === "unavailable"
       ? "Check device support"
-      : "Enable route alerts";
+      : "Enable notifications";
 
   return (
     <View style={styles.card}>
       <Text style={styles.eyebrow}>Notifications</Text>
-      <Text style={styles.title}>Saved route alerts</Text>
+      <Text style={styles.title}>Watch saved routes</Text>
       <Text style={styles.muted}>{notificationMessage}</Text>
       <View style={styles.ruleCard}>
-        <Text style={styles.ruleTitle}>Alert rule</Text>
+        <Text style={styles.ruleTitle}>Only alert when worth it</Text>
         <Text style={styles.ruleText}>{alertGateSummary(notificationPermission)}</Text>
       </View>
       <Pressable
@@ -49,72 +76,104 @@ export function SavedRouteAlertsCard({
 
       {savedCommutes.length ? (
         <View style={styles.alertList}>
-          {savedCommutes.map((commute) => (
-            <View
-              key={commute.id}
-              style={[
-                styles.alertRow,
-                alertSyncingCommuteId === commute.id && styles.alertRowDisabled,
-              ]}
-            >
-              <Pressable
-                accessibilityLabel={`${commute.alertEnabled ? "Disable" : "Enable"} ${commute.name} route alert`}
-                accessibilityRole="switch"
-                accessibilityState={{
-                  checked: commute.alertEnabled,
-                  disabled: alertSyncingCommuteId === commute.id,
-                }}
-                disabled={alertSyncingCommuteId === commute.id}
-                onPress={() => onToggleCommuteAlert(commute.id)}
-                style={styles.alertToggleArea}
+          {savedCommutes.map((commute) => {
+            const syncing = alertSyncingCommuteId === commute.id;
+            const vehicle = routeVehicle(commute, preferences);
+            const editing = editingCommuteId === commute.id;
+            return (
+              <View
+                key={commute.id}
+                style={[
+                  styles.alertRow,
+                  syncing && styles.alertRowDisabled,
+                ]}
               >
-                <View style={styles.alertCopy}>
-                  <Text numberOfLines={1} style={styles.alertName}>
-                    {commute.name}
-                  </Text>
-                  <Text numberOfLines={1} style={styles.alertMeta}>
-                    {commute.fuel} | Daily check {commute.alertTime}
-                  </Text>
-                  {commute.alertStatusMessage ? (
-                    <Text numberOfLines={2} style={styles.alertStatusMessage}>
-                      {commute.alertStatusMessage}
+                <View style={styles.alertRowTop}>
+                  <Pressable
+                    accessibilityLabel={`${commute.alertEnabled ? "Disable" : "Watch"} ${commute.name}`}
+                    accessibilityRole="switch"
+                    accessibilityState={{
+                      checked: commute.alertEnabled,
+                      disabled: syncing,
+                    }}
+                    disabled={syncing}
+                    onPress={() => onToggleCommuteAlert(commute.id)}
+                    style={styles.alertToggleArea}
+                  >
+                    <View style={styles.alertCopy}>
+                      <Text numberOfLines={1} style={styles.alertName}>
+                        {commute.name}
+                      </Text>
+                      <Text numberOfLines={1} style={styles.alertMeta}>
+                        {vehicleLabel(vehicle)} | {alertDaysSummary(commute.alertDays)} {commute.alertTime}
+                      </Text>
+                      <Text numberOfLines={1} style={styles.alertMeta}>
+                        Minimum saving {formatMoney(commute.minSavingDollars)}
+                      </Text>
+                    </View>
+                    <Text style={[
+                      styles.alertState,
+                      commute.alertEnabled && styles.alertStateOn,
+                      commute.alertStatus === "needs_permission" && styles.alertStateNeedsPermission,
+                    ]}>
+                      {syncing
+                        ? "Saving"
+                        : commute.alertStatus === "needs_permission"
+                          ? "Needs permission"
+                          : commute.alertEnabled
+                            ? "Watching"
+                            : "Off"}
                     </Text>
-                  ) : null}
-                  <Text numberOfLines={2} style={styles.alertRuleLine}>
-                    {commuteAlertRuleLine(commute)}
-                  </Text>
-                  {commute.backendSyncedAt ? (
-                    <Text numberOfLines={1} style={styles.alertMeta}>
-                      Synced {formatAlertTimestamp(commute.backendSyncedAt)}
-                    </Text>
-                  ) : null}
+                  </Pressable>
                 </View>
-                <Text style={[styles.alertState, commute.alertEnabled && styles.alertStateOn]}>
-                  {alertSyncingCommuteId === commute.id
-                    ? "Saving"
-                    : commute.alertEnabled
-                      ? "Watching"
-                      : "Off"}
+
+                {commute.alertStatusMessage ? (
+                  <Text numberOfLines={2} style={styles.alertStatusMessage}>
+                    {commute.alertStatusMessage}
+                  </Text>
+                ) : null}
+                <Text numberOfLines={2} style={styles.alertRuleLine}>
+                  {commuteAlertRuleLine(commute)}
                 </Text>
-              </Pressable>
-              <Pressable
-                accessibilityLabel={`Remove saved commute ${commute.name}`}
-                accessibilityHint="Cancels local reminders and deletes the backend route alert when sync is configured."
-                accessibilityRole="button"
-                accessibilityState={{ disabled: alertSyncingCommuteId === commute.id }}
-                disabled={alertSyncingCommuteId === commute.id}
-                onPress={() => onRemoveCommute(commute.id)}
-                style={styles.alertRemoveButton}
-              >
-                <Text style={styles.alertRemoveButtonText}>Remove</Text>
-              </Pressable>
-            </View>
-          ))}
+
+                <View style={styles.rowActions}>
+                  <Pressable
+                    accessibilityLabel={`${editing ? "Close" : "Edit"} notification settings for ${commute.name}`}
+                    accessibilityRole="button"
+                    disabled={syncing}
+                    onPress={() => setEditingCommuteId(editing ? null : commute.id)}
+                    style={styles.secondaryButton}
+                  >
+                    <Text style={styles.secondaryButtonText}>{editing ? "Done" : "Edit"}</Text>
+                  </Pressable>
+                  <Pressable
+                    accessibilityLabel={`Remove saved route ${commute.name}`}
+                    accessibilityHint="Cancels route notifications and removes the saved route."
+                    accessibilityRole="button"
+                    accessibilityState={{ disabled: syncing }}
+                    disabled={syncing}
+                    onPress={() => onRemoveCommute(commute.id)}
+                    style={styles.removeButton}
+                  >
+                    <Text style={styles.removeButtonText}>Remove</Text>
+                  </Pressable>
+                </View>
+
+                {editing ? (
+                  <RouteAlertEditPanel
+                    commute={commute}
+                    preferences={preferences}
+                    onUpdate={(updates) => onUpdateCommuteAlertSettings(commute.id, updates)}
+                  />
+                ) : null}
+              </View>
+            );
+          })}
         </View>
       ) : (
         <View style={styles.emptyAlert}>
           <Text style={styles.emptyAlertText}>
-            Save a route from Plan Trip to create commute alerts.
+            Save a route from Plan to watch it for useful fuel alerts.
           </Text>
         </View>
       )}
@@ -122,15 +181,138 @@ export function SavedRouteAlertsCard({
   );
 }
 
-function formatAlertTimestamp(value: string) {
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return "time unknown";
-  return new Intl.DateTimeFormat("en-AU", {
-    day: "2-digit",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(parsed);
+function RouteAlertEditPanel({
+  commute,
+  preferences,
+  onUpdate,
+}: {
+  commute: SavedCommute;
+  preferences: AppPreferences;
+  onUpdate: (updates: Partial<Pick<SavedCommute, "alertDays" | "alertTime" | "minSavingDollars" | "vehicleId">>) => void;
+}) {
+  const selectedDays = commute.alertDays?.length ? commute.alertDays : weekdays;
+  return (
+    <View style={styles.editPanel}>
+      <Text style={styles.editTitle}>Route notification settings</Text>
+      <Text style={styles.editLabel}>Vehicle</Text>
+      <View style={styles.chipRow}>
+        {preferences.vehicles.map((vehicle) => {
+          const selected = vehicle.id === (commute.vehicleId || preferences.activeVehicleId);
+          return (
+            <Pressable
+              key={vehicle.id}
+              accessibilityLabel={`Use ${vehicleLabel(vehicle)} for this route`}
+              accessibilityRole="button"
+              accessibilityState={{ selected }}
+              onPress={() => onUpdate({ vehicleId: vehicle.id })}
+              style={[styles.chip, selected && styles.chipSelected]}
+            >
+              <Text style={[styles.chipText, selected && styles.chipTextSelected]}>
+                {vehicleLabel(vehicle)}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      <Text style={styles.editLabel}>Commute days</Text>
+      <View style={styles.dayRow}>
+        {weekdays.map((day) => {
+          const selected = selectedDays.includes(day);
+          return (
+            <Pressable
+              key={day}
+              accessibilityLabel={`${selected ? "Remove" : "Add"} ${day} alert day`}
+              accessibilityRole="button"
+              accessibilityState={{ selected }}
+              onPress={() => onUpdate({ alertDays: toggleAlertDay(selectedDays, day) })}
+              style={[styles.dayChip, selected && styles.dayChipSelected]}
+            >
+              <Text style={[styles.dayChipText, selected && styles.dayChipTextSelected]}>
+                {weekdayLabels[day]}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      <Text style={styles.editLabel}>Time</Text>
+      <View style={styles.chipRow}>
+        {alertTimeOptions.map((alertTime) => {
+          const selected = alertTime === commute.alertTime;
+          return (
+            <Pressable
+              key={alertTime}
+              accessibilityLabel={`Set alert time to ${alertTime}`}
+              accessibilityRole="button"
+              accessibilityState={{ selected }}
+              onPress={() => onUpdate({ alertTime })}
+              style={[styles.chip, selected && styles.chipSelected]}
+            >
+              <Text style={[styles.chipText, selected && styles.chipTextSelected]}>
+                {alertTime}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      <Text style={styles.editLabel}>Minimum saving</Text>
+      <View style={styles.stepperRow}>
+        <Pressable
+          accessibilityLabel="Decrease minimum saving"
+          accessibilityRole="button"
+          onPress={() => onUpdate({ minSavingDollars: Math.max(1, commute.minSavingDollars - 1) })}
+          style={styles.stepperButton}
+        >
+          <Text style={styles.stepperButtonText}>−</Text>
+        </Pressable>
+        <Text style={styles.stepperValue}>{formatMoney(commute.minSavingDollars)}</Text>
+        <Pressable
+          accessibilityLabel="Increase minimum saving"
+          accessibilityRole="button"
+          onPress={() => onUpdate({ minSavingDollars: Math.min(25, commute.minSavingDollars + 1) })}
+          style={styles.stepperButton}
+        >
+          <Text style={styles.stepperButtonText}>+</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+function routeVehicle(commute: SavedCommute, preferences: AppPreferences) {
+  return preferences.vehicles.find((vehicle) => vehicle.id === commute.vehicleId)
+    || preferences.vehicles.find((vehicle) => vehicle.id === preferences.activeVehicleId)
+    || preferences.vehicles[0];
+}
+
+function vehicleLabel(vehicle: VehicleProfile | undefined) {
+  if (!vehicle) return "Active vehicle";
+  if (vehicle.rego) return vehicle.rego;
+  if (vehicle.name) return vehicle.name;
+  if (vehicle.vehicleEnergyType === "electric") return "Electric vehicle";
+  return vehicle.fuel;
+}
+
+function alertDaysSummary(days: Weekday[] | undefined) {
+  const selected = days?.length ? days : weekdays;
+  if (selected.length === 7) return "Every day";
+  if (selected.join(",") === "mon,tue,wed,thu,fri") return "Weekdays";
+  if (selected.join(",") === "sat,sun") return "Weekends";
+  return selected.map((day) => weekdayLabels[day]).join("");
+}
+
+function toggleAlertDay(selectedDays: Weekday[], day: Weekday) {
+  const selected = new Set(selectedDays);
+  if (selected.has(day)) selected.delete(day);
+  else selected.add(day);
+  const days = weekdays.filter((item) => selected.has(item));
+  return days.length ? days : selectedDays;
+}
+
+function formatMoney(value: number) {
+  return `$${Math.round(value)}`;
 }
 
 const styles = StyleSheet.create({
@@ -196,14 +378,14 @@ const styles = StyleSheet.create({
     alignItems: "stretch",
     ...surfaces.softPanel,
     borderRadius: radii.xl,
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing.md,
-    justifyContent: "space-between",
+    gap: spacing.sm,
     padding: spacing.md,
   },
   alertRowDisabled: {
     opacity: 0.7,
+  },
+  alertRowTop: {
+    flexDirection: "row",
   },
   alertToggleArea: {
     alignItems: "center",
@@ -233,14 +415,12 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "400",
     lineHeight: 15,
-    marginTop: spacing.xs,
   },
   alertRuleLine: {
     color: colors.ink,
     fontSize: 11,
     fontWeight: "400",
     lineHeight: 15,
-    marginTop: spacing.xs,
   },
   alertState: {
     backgroundColor: colors.white,
@@ -260,9 +440,18 @@ const styles = StyleSheet.create({
     color: colors.greenDark,
     fontWeight: "700",
   },
-  alertRemoveButton: {
+  alertStateNeedsPermission: {
+    backgroundColor: colors.amberSoft,
+    borderColor: colors.amber,
+    color: colors.ink,
+  },
+  rowActions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+  },
+  secondaryButton: {
     alignItems: "center",
-    alignSelf: "center",
     backgroundColor: colors.white,
     borderColor: colors.line,
     borderRadius: radii.pill,
@@ -271,10 +460,122 @@ const styles = StyleSheet.create({
     minHeight: 36,
     paddingHorizontal: spacing.md,
   },
-  alertRemoveButtonText: {
+  secondaryButtonText: {
+    color: colors.ink,
+    fontSize: typeScale.caption,
+    fontWeight: "600",
+  },
+  removeButton: {
+    alignItems: "center",
+    backgroundColor: colors.white,
+    borderColor: colors.line,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    justifyContent: "center",
+    minHeight: 36,
+    paddingHorizontal: spacing.md,
+  },
+  removeButtonText: {
     color: colors.red,
     fontSize: typeScale.caption,
     fontWeight: "600",
+  },
+  editPanel: {
+    backgroundColor: colors.white,
+    borderColor: colors.line,
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    gap: spacing.sm,
+    padding: spacing.md,
+  },
+  editTitle: {
+    color: colors.ink,
+    fontSize: typeScale.caption,
+    fontWeight: "700",
+  },
+  editLabel: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: "700",
+    textTransform: "uppercase",
+  },
+  chipRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.xs,
+  },
+  chip: {
+    backgroundColor: colors.white,
+    borderColor: colors.line,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+  },
+  chipSelected: {
+    backgroundColor: colors.greenSoft,
+    borderColor: colors.green,
+  },
+  chipText: {
+    color: colors.muted,
+    fontSize: typeScale.caption,
+    fontWeight: "600",
+  },
+  chipTextSelected: {
+    color: colors.greenDark,
+  },
+  dayRow: {
+    flexDirection: "row",
+    gap: spacing.xs,
+  },
+  dayChip: {
+    alignItems: "center",
+    backgroundColor: colors.white,
+    borderColor: colors.line,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    height: 34,
+    justifyContent: "center",
+    width: 34,
+  },
+  dayChipSelected: {
+    backgroundColor: colors.greenSoft,
+    borderColor: colors.green,
+  },
+  dayChipText: {
+    color: colors.muted,
+    fontSize: typeScale.caption,
+    fontWeight: "700",
+  },
+  dayChipTextSelected: {
+    color: colors.greenDark,
+  },
+  stepperRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: spacing.md,
+  },
+  stepperButton: {
+    alignItems: "center",
+    backgroundColor: colors.white,
+    borderColor: colors.line,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    height: 36,
+    justifyContent: "center",
+    width: 36,
+  },
+  stepperButtonText: {
+    color: colors.ink,
+    fontSize: typeScale.body,
+    fontWeight: "700",
+  },
+  stepperValue: {
+    color: colors.ink,
+    fontSize: typeScale.body,
+    fontWeight: "700",
+    minWidth: 48,
+    textAlign: "center",
   },
   emptyAlert: {
     ...surfaces.softPanel,

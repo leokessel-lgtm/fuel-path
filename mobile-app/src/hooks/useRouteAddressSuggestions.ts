@@ -25,6 +25,7 @@ export function useRouteAddressSuggestions({
     from: makeLocationSessionToken(),
     to: makeLocationSessionToken(),
   });
+  const activeAddressFieldRef = useRef<RouteAddressField | null>(null);
 
   useEffect(() => {
     const field = activeAddressField;
@@ -46,7 +47,7 @@ export function useRouteAddressSuggestions({
         query,
         5,
         addressSessionTokensRef.current[field],
-        field === "from" ? fromContext : toContext,
+        { ...(field === "from" ? fromContext : toContext), purpose: "plan_autocomplete" },
       )
         .then((suggestions) => {
           if (!active) return;
@@ -55,7 +56,7 @@ export function useRouteAddressSuggestions({
         .catch(() => {
           if (!active) return;
           setAddressSuggestions(field, []);
-          setSuggestionsError("");
+          setSuggestionsError("Location suggestions are unavailable. Check the local API and try again.");
         })
         .finally(() => {
           if (active) setSuggestionsLoading(null);
@@ -91,6 +92,14 @@ export function useRouteAddressSuggestions({
     addressSessionTokensRef.current[field] = makeLocationSessionToken();
   };
 
+  const setAddressSessionField = (field: RouteAddressField | null) => {
+    if (field && activeAddressFieldRef.current !== field) {
+      resetAddressSessionToken(field);
+    }
+    activeAddressFieldRef.current = field;
+    setActiveAddressField(field);
+  };
+
   function setAddressSuggestions(field: RouteAddressField, suggestions: MapPoint[]) {
     if (field === "from") {
       setFromSuggestions(suggestions);
@@ -106,7 +115,7 @@ export function useRouteAddressSuggestions({
     fromSuggestions,
     getAddressSessionToken,
     resetAddressSessionToken,
-    setActiveAddressField,
+    setActiveAddressField: setAddressSessionField,
     suggestionsError,
     suggestionsLoading,
     toSuggestions,

@@ -41,9 +41,9 @@ Fuel Path is planned as a whole-of-Australia fuel decision app. Store readiness 
 | NSW/ACT FuelCheck | Confirm app/commercial usage, caching, attribution and public-sharing conditions, then set `FUEL_PATH_NSW_ACT_USAGE_TERMS_CONFIRMED=1`. Production is fail-closed until then. |
 | QLD Fuel Prices | Confirm licence obligations and attribution for public/commercial release, then set `FUEL_PATH_QLD_USAGE_TERMS_CONFIRMED=1`. Production is fail-closed until then. |
 | WA FuelWatch | Confirm attribution and caching rules for today/tomorrow prices. |
-| VIC Servo Saver | Implement only after approved API access and schema are available. |
+| VIC Servo Saver | Live adapter is implemented. Keep API key server-side, preserve attribution/non-endorsement copy, and pass the provider evidence gate before public live-price claims. |
 | SA | Implement only after approved data/API path is confirmed. |
-| TAS | Confirm API.NSW/FuelCheck TAS usage, caching and attribution terms, then set `FUEL_PATH_TAS_USAGE_TERMS_CONFIRMED=1`. Production is fail-closed until then. |
+| TAS | Confirm API.NSW/FuelCheck TAS usage, caching and attribution terms, then set `FUEL_PATH_TAS_USAGE_TERMS_CONFIRMED=1`. Adapter exists for internal validation, but production is fail-closed until terms evidence passes. |
 | NT MyFuel | Implement only after approved data/API path is confirmed. |
 | Google Maps/Places/Routes | Use restricted keys, billing caps, session tokens, field masks and monitoring before live production enablement. |
 | Nominatim | Keep as validation fallback only, not production autocomplete. |
@@ -54,7 +54,7 @@ Beta readiness audit:
 npm run check:beta-readiness -- --api-base https://fuel-path.vercel.app --allow-blocked
 ```
 
-Use this as the Phase 0 summary gate. It should remain blocked until provider terms, an explicit passed iOS validation report, privacy contact, public policy URL, store listing links and reviewed store disclosure evidence are all proven. Android physical-device render and performance evidence is now captured for the current preview APK, but that does not clear the separate iOS, provider, privacy/store or support gates.
+Use this as the Phase 0 summary gate. It should remain blocked until provider terms evidence, a fresh Android installed-build/native-performance pass for the current build, privacy contact, public policy URL, store listing links and reviewed store disclosure evidence are all proven. Source-level iOS simulator validation is captured, but a signed iOS preview/development build is still required before notification, push-token or store-readiness claims.
 
 Store/privacy evidence inputs:
 
@@ -119,8 +119,9 @@ The readiness scripts reject placeholder/example privacy contacts, public person
 ## Native Build Gates
 
 - [x] EAS project id configured and strict native preflight passes.
-- [x] Android Google Maps key renders tiles in the latest installed preview APK smoke with package `com.fuelpath.app` and SHA-1 `cbd45223bd0f8a6791c9ab9d783ff895736ac39e`; keep restrictions unchanged unless a fresh smoke proves any key update.
-- [ ] iOS app validation report captured on simulator or device through `npm run native:ios-validation-report`, with Plan, Nearby and Account screenshot evidence and no runtime failures.
+- [ ] Android Google Maps key renders tiles in a fresh installed preview/localParity APK smoke for the current build; older APK evidence is historical only.
+- [x] Source-level iOS simulator validation report captured through `npm run native:ios-validation-report`, with Plan, Nearby and Account screenshot evidence and no runtime failures.
+- [ ] Signed iOS preview/development build validation captured before push, notification or store claims.
 - [ ] Expo push token registration tested on physical iOS and Android devices.
 - [ ] Notification permission states tested: undetermined, granted, denied and unavailable.
 - [ ] Location permission states tested: undetermined, granted, denied, blocked and services off.

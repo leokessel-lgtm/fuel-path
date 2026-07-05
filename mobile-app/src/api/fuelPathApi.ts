@@ -1,4 +1,5 @@
 import { API_BASE_URL } from "../config";
+import { stationBrandFilterValues } from "../data/brandAssets";
 import {
   FuelCode,
   EvChargerResponse,
@@ -25,6 +26,9 @@ type GeocodeResponse = {
 export type LocationSearchContext = {
   near?: MapPoint;
   nearRadiusKm?: number;
+  providerPlaceId?: string;
+  provider?: string;
+  purpose?: "plan_autocomplete";
 };
 
 type RouteResponse = {
@@ -58,6 +62,27 @@ export type EvChargingStatus = {
   liveAvailabilityClaimsAllowed: boolean;
   coverage: string;
   warning: string;
+};
+
+export type ProviderObservabilityStatus = {
+  status: "normal" | "watch" | "stopped";
+  summary: string;
+  activePaidLookupCount: number;
+  paidLookups: Array<{
+    key: string;
+    label: string;
+    enabled: boolean;
+    configured: boolean;
+    status: "normal" | "watch" | "stopped" | "configured_off" | "not_configured";
+    cap: number;
+    used: number;
+    remaining: number;
+    usagePercent: number;
+    blockers: string[];
+    warnings: string[];
+  }>;
+  blockers: string[];
+  warnings: string[];
 };
 
 type LookupReadiness = {
@@ -135,20 +160,24 @@ export async function getApiStatus() {
       mapboxConfigured: boolean;
       lookupReadiness?: LookupReadiness;
     };
+    providerObservability?: ProviderObservabilityStatus;
   }>("/api/status");
 }
 
 export async function getNearbyStations({
+  brands = [],
   fuel,
   centre,
   radiusKm = 8,
   limit = 160,
 }: {
+  brands?: string[];
   fuel: FuelCode;
   centre: MapPoint;
   radiusKm?: number;
   limit?: number;
 }) {
+  const selectedBrands = brands.map((brand) => brand.trim()).filter(Boolean);
   return fetchJson<NearbyResponse>(
     `/api/stations?${query({
       source: "live",
@@ -160,6 +189,8 @@ export async function getNearbyStations({
       includeMemberPrices: 0,
       includeClosed: 0,
       limit,
+      brandFilter: selectedBrands.length > 0,
+      brands: selectedBrands.join(","),
     })}`,
   );
 }
@@ -198,14 +229,16 @@ export async function getNearbyEvChargers({
 
 export async function getRouteEvFallbackChargers({
   connectors = [],
-  limit = 3,
-  radiusKm = 18,
+  limit = 10,
+  radiusKm = 30,
   route,
+  selectedRangeKm = 0,
 }: {
   connectors?: string[];
   limit?: number;
   radiusKm?: number;
   route: RouteResponse;
+  selectedRangeKm?: number;
 }) {
   return fetchJson<EvChargerResponse>("/api/ev-chargers", {
     method: "POST",
@@ -215,9 +248,11 @@ export async function getRouteEvFallbackChargers({
     body: JSON.stringify({
       connectors,
       limit,
-      mode: "route_fallback",
+      mode: "route_charging",
       radiusKm,
+      selectedRangeKm,
       route: {
+        distanceKm: route.distanceKm,
         id: "native-ev-route",
         name: "Native EV planned route",
         provider: route.provider,
@@ -259,6 +294,9 @@ export async function searchLocations(label: string, limit = 5, sessionToken?: s
         nearLat: context?.near?.lat,
         nearLon: context?.near?.lon,
         nearRadiusKm: context?.nearRadiusKm,
+        providerPlaceId: context?.providerPlaceId,
+        provider: context?.provider,
+        purpose: context?.purpose,
       }),
     });
   } catch (error) {
@@ -285,11 +323,14 @@ export async function searchLocations(label: string, limit = 5, sessionToken?: s
 }
 
 function locationSearchContextKey(context?: LocationSearchContext) {
-  if (!context?.near) return "none";
+  if (!context?.near && !context?.providerPlaceId && !context?.purpose) return "none";
   return [
-    context.near.lat.toFixed(3),
-    context.near.lon.toFixed(3),
+    context.near?.lat?.toFixed(3) || "",
+    context.near?.lon?.toFixed(3) || "",
     Math.round(context.nearRadiusKm || 40),
+    context.provider || "",
+    context.providerPlaceId || "",
+    context.purpose || "",
   ].join(":");
 }
 
@@ -354,7 +395,9 @@ function lookupSourceLabel(provider?: string, matchType?: string, lookupStatus?:
     return "Suburb/area";
   }
   if (provider === "fuel_path") return "Fuel station";
-  if (provider === "google" || provider === "addressr") return "External lookup";
+  if (provider === "google") return "Google Places";
+  if (provider === "here") return "HERE Places";
+  if (provider === "addressr") return "External lookup";
   if (provider === "nominatim") {
     if (addressLikeQuery(queryText)) return "Needs confirmation";
     return "Validation lookup";
@@ -397,16 +440,21 @@ export async function getRoute(from: MapPoint, to: MapPoint) {
 
 export async function scoreRoute({
   approvedPolicyBrands = [],
+  stationBrands,
   fuel,
   eligibleDiscounts,
   route,
 }: {
   approvedPolicyBrands?: string[];
+  stationBrands?: string[];
   fuel: FuelCode;
   eligibleDiscounts: string[];
   route: RouteResponse;
 }) {
   const policyBrands = approvedPolicyBrands.map((brand) => brand.trim()).filter(Boolean);
+  const preferredBrands = stationBrands?.map((brand) => brand.trim()).filter(Boolean) || [];
+  const selectedBrands = preferredBrands.length ? stationBrandFilterValues(preferredBrands) : policyBrands;
+  const selectedBrandLabels = preferredBrands.length ? preferredBrands : policyBrands;
   return fetchJson<ScoreResponse>("/api/score", {
     method: "POST",
     headers: {
@@ -428,8 +476,9 @@ export async function scoreRoute({
       reserveKm: 35,
       corridorKm: 2.5,
       eligibleDiscounts,
-      brandFilter: policyBrands.length > 0,
-      brands: policyBrands,
+      brandFilter: selectedBrands.length > 0,
+      brandLabels: selectedBrandLabels,
+      brands: selectedBrands,
       includeMemberPrices: false,
       includeClosed: false,
     }),
@@ -441,16 +490,21 @@ export async function planFuelRoute({
   eligibleDiscounts,
   from,
   fuel,
+  stationBrands,
   to,
 }: {
   approvedPolicyBrands?: string[];
   eligibleDiscounts: string[];
   from: MapPoint;
   fuel: FuelCode;
+  stationBrands?: string[];
   to: MapPoint;
 }) {
   const policyBrands = approvedPolicyBrands.map((brand) => brand.trim()).filter(Boolean);
-  return fetchJson<PlanRouteResponse>("/api/score", {
+  const preferredBrands = stationBrands?.map((brand) => brand.trim()).filter(Boolean) || [];
+  const selectedBrands = preferredBrands.length ? stationBrandFilterValues(preferredBrands) : policyBrands;
+  const selectedBrandLabels = preferredBrands.length ? preferredBrands : policyBrands;
+  const payload = await fetchJson<PlanRouteResponse | ScoreResponse>("/api/score", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -466,12 +520,30 @@ export async function planFuelRoute({
       corridorKm: 2.5,
       detourSpeedKmh: 80,
       eligibleDiscounts,
-      brandFilter: policyBrands.length > 0,
-      brands: policyBrands,
+      brandFilter: selectedBrands.length > 0,
+      brandLabels: selectedBrandLabels,
+      brands: selectedBrands,
       includeMemberPrices: false,
       includeClosed: false,
     }),
   });
+  return normalisePlanRouteResponse(payload, from, to);
+}
+
+function normalisePlanRouteResponse(payload: PlanRouteResponse | ScoreResponse, from: MapPoint, to: MapPoint): PlanRouteResponse {
+  const planned = payload as PlanRouteResponse;
+  if (planned.route?.points?.length && planned.score) return planned;
+
+  const score = payload as ScoreResponse;
+  return {
+    route: {
+      provider: "score_only",
+      distanceKm: score.context?.routeDistanceKm ?? 0,
+      durationMin: 0,
+      points: [from, to],
+    },
+    score,
+  };
 }
 
 function compactPoints(points: MapPoint[], maxPoints = 180) {

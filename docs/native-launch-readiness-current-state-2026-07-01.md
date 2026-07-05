@@ -6,13 +6,14 @@ This is the short current-state companion to the longer simulator stress log. Us
 
 Fuel Path is not yet native-launch green.
 
-It is simulator-evidence-ready for iOS and render-evidence-ready for Android, but not launch-ready across both app stores because the remaining gaps need physical-device proof.
+It is simulator-evidence-ready for iOS and now has a current physical Android performance pass for the notification-preview APK, but it is not launch-ready across both app stores because iOS real-device notification, permissions and TestFlight-style behaviour remain unproven.
 
 ## Green
 
 - iOS signed simulator builds launch and render Plan, Nearby and Account.
 - iOS fixed chrome now survives extreme Dynamic Type better after capping fixed header/nav text scaling.
 - Android current preview APK launches and renders non-blank map tiles in emulator smoke.
+- Android current notification-preview APK has a Pixel 9 Pro physical-device performance pass with matching smoke and summary evidence.
 - Production route, POI route, smoke matrix and map-density stress suites pass.
 - Native preflight and mobile verification pass.
 
@@ -22,13 +23,13 @@ It is simulator-evidence-ready for iOS and render-evidence-ready for Android, bu
 - Broad Plan route latency is reliable enough for beta, but still not instant.
 - Android tablet renders, but the UX is phone-layout-on-tablet. Do not claim tablet launch polish.
 - Android emulator frame evidence is poor. Treat it as emulator stress evidence, not customer-device performance.
+- Pixel 9 Pro performance is acceptable for controlled beta evidence, but add lower-end Android coverage before broad public performance claims.
 
 ## Red / not claimable
 
-- Android physical-device performance for the current APK has not been proven.
 - iOS real-device notification, permissions and TestFlight-style behaviour have not been proven.
 - Tablet UX should not be marketed as launch-ready.
-- Store/privacy/support readiness still needs a separate release-readiness pass.
+- Store/privacy/support/provider readiness is now covered by separate release evidence for controlled beta, but public live-price claims remain WA-only until other provider access gates clear.
 
 ## Current evidence sources
 
@@ -53,6 +54,9 @@ It is simulator-evidence-ready for iOS and render-evidence-ready for Android, bu
 - Native preflight: `node scripts/native-validation-preflight.mjs` passed with expected local warnings for alerts token, physical-device API URL and Android Maps key.
 - Plan route latency budget: `tmp/plan-route-live-api-stress-2026-07-01T04-43-45-706Z.md`, 12/12 passed, p90 4030 ms, p95 5496 ms, 11/12 recommendations.
 - POI route journey stress: `tmp/poi-route-journey-stress-2026-07-01T04-44-09-000Z.md`, 200/200 passed, zero geocode/route/score failures, p90 2601 ms, p95 3676 ms, 178/200 recommendations.
+- Android physical performance smoke: `tmp/native-smoke/android-preview-smoke-2026-07-05T20-59-03-701Z.md`, Pixel 9 Pro `49231FDAP0017N`, notification-preview APK `fuel-path-notifications-883d2176.apk`, 194 rendered frames, 1 janky frame, p95 9 ms, p99 22 ms, non-blank Plan/Nearby/Nearby-after-pan map screenshots and no Maps warning lines.
+- Android performance summary: `tmp/native-smoke/android-performance-summary-2026-07-05T21-00-11-713Z.md`, status `passed`, no blockers, source report matched the physical smoke above.
+- Beta readiness with provider, store and support evidence: `status: ready`, zero blockers, `performanceClaimAllowed: true`, next action `Phase 0 beta readiness gates are clear for controlled real-user testing.`
 
 ## Android-specific latest judgement
 
@@ -63,12 +67,12 @@ Android repeated launch/render is better than the earlier emulator evidence:
 - Google map tiles are visible in sampled screenshots.
 - The bottom sheet and bottom nav layout are stable.
 
-But Android native launch readiness remains amber/red:
+Android native readiness remains amber for broad launch claims:
 
-- The cold-start report is `partial`, not green, because logcat still captured Google Maps warning lines.
-- The selected device was an emulator, not a physical phone.
-- Emulator render repeatability cannot prove customer-device performance.
-- A physical Android performance pass on `mobile-app/native-artifacts/fuel-path-preview-android-localParity-0e5f2daa.apk` is still required before any Android launch-quality claim.
+- The current physical run is on a Pixel 9 Pro only.
+- Lower-end Android hardware has not been rechecked.
+- Tablet UX remains phone-layout-on-tablet.
+- The latest physical run clears controlled-beta performance evidence, not broad public Android performance marketing.
 
 ## iOS-specific latest judgement
 

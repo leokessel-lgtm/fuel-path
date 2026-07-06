@@ -143,8 +143,8 @@ test("combined score endpoint returns broad Plan route display suggestions", asy
   );
 
   const score = payload.score;
-  assert.equal(score.context.recommendationLimit, 140);
-  assert.equal(score.context.routeContextStationLimit, 180);
+  assert.equal(score.context.recommendationLimit, 80);
+  assert.equal(score.context.routeContextStationLimit, 100);
   assert.equal(score.recommendations.length, 64);
   assert.equal(score.recommendations[0].station.stationCode, "ROUTE-1");
   assert.ok(score.recommendations.some((candidate) => candidate.distanceAlongRouteKm > 70));

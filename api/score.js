@@ -95,8 +95,8 @@ module.exports = async function handler(req, res) {
       trafficPreference,
       tollPreference,
     });
-    const recommendationLimit = combinedPlanRoute ? 140 : 20;
-    const routeContextStationLimit = combinedPlanRoute ? 180 : 40;
+    const recommendationLimit = combinedPlanRoute ? 80 : 20;
+    const routeContextStationLimit = combinedPlanRoute ? 100 : 40;
     const recommendations = refinedRecommendations.slice(0, recommendationLimit);
     const excludedCodes = new Set(recommendations.map((candidate) => String(candidate.station.stationCode)));
 

@@ -13,8 +13,8 @@ import { MapPoint, StationViewModel } from "../types";
 import { BrandBadge } from "./BrandBadge";
 
 const maxStationMarkers = 420;
-const routeMaxPriceMarkers = 44;
-const compactRouteMaxPriceMarkers = 32;
+const routeMaxPriceMarkers = 24;
+const compactRouteMaxPriceMarkers = 18;
 const defaultMarkerDensity = {
   maxPriceMarkers: 8,
   maxDotMarkers: 18,

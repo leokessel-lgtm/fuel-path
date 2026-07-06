@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 
 import { getNearbyEvChargers, getNearbyStations } from "../api/fuelPathApi";
-import { evPowerOptions, NearbyMode } from "../components/NearbyEvControls";
+import { NearbyMode } from "../components/NearbyEvControls";
 import { AppPreferences, EvCharger, EvConnector, EvPowerMode, MapPoint, NearbyResponse, StationViewModel } from "../types";
+import { evPowerOptions } from "../utils/evChargingDisplay";
 import { stationPriceView } from "../utils/pricing";
 import {
   activePreferredStationBrands,
@@ -231,5 +232,8 @@ function formatCacheAge(seconds: number) {
 }
 
 function uniqueNotices(notices: string[]) {
-  return Array.from(new Set(notices.map((notice) => notice.trim()).filter(Boolean)));
+  return Array.from(new Set(notices.flatMap((notice) => {
+    const trimmed = notice.trim();
+    return trimmed ? [trimmed] : [];
+  })));
 }

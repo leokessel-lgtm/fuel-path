@@ -10,40 +10,21 @@ export function useNearbyLocationSearch(context?: LocationSearchContext) {
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   const [locationSearchActive, setLocationSearchActive] = useState(false);
   const [locationError, setLocationError] = useState("");
-  const addressSessionTokenRef = useRef(makeLocationSessionToken());
+  const addressSessionTokenRef = useRef<string | null>(null);
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchRequestRef = useRef(0);
+  const contextRef = useRef(context);
+
+  if (!addressSessionTokenRef.current) {
+    addressSessionTokenRef.current = makeLocationSessionToken();
+  }
+  contextRef.current = context;
 
   useEffect(() => {
-    if (!locationSearchActive) return;
-    const query = locationQuery.trim();
-    if (query.length < 3) {
-      setLocationSuggestions([]);
-      setSuggestionsLoading(false);
-      return;
-    }
-
-    let active = true;
-    setSuggestionsLoading(true);
-    setLocationError("");
-    const timer = setTimeout(() => {
-      searchLocations(query, 5, addressSessionTokenRef.current, context)
-        .then((suggestions) => {
-          if (active) setLocationSuggestions(suggestions);
-        })
-        .catch(() => {
-          if (!active) return;
-          setLocationSuggestions([]);
-          setLocationError("");
-        })
-        .finally(() => {
-          if (active) setSuggestionsLoading(false);
-        });
-    }, 650);
-
     return () => {
-      active = false;
-      clearTimeout(timer);
+      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
     };
-  }, [context?.near?.lat, context?.near?.lon, context?.nearRadiusKm, locationQuery, locationSearchActive]);
+  }, []);
 
   const addRecentLocation = (location: MapPoint) => {
     setRecentLocations((current) => {
@@ -53,21 +34,48 @@ export function useNearbyLocationSearch(context?: LocationSearchContext) {
   };
 
   const clearLocationSearch = () => {
+    searchRequestRef.current += 1;
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
     setLocationSuggestions([]);
+    setSuggestionsLoading(false);
     setLocationSearchActive(false);
     setLocationError("");
   };
 
-  const getAddressSessionToken = () => addressSessionTokenRef.current;
+  const getAddressSessionToken = () => addressSessionTokenRef.current || "";
 
   const resetAddressSessionToken = () => {
     addressSessionTokenRef.current = makeLocationSessionToken();
   };
 
   const updateLocationQuery = (value: string) => {
+    const query = value.trim();
+    const requestId = searchRequestRef.current + 1;
+    searchRequestRef.current = requestId;
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
     setLocationQuery(value);
     setLocationError("");
     setLocationSearchActive(true);
+    if (query.length < 3) {
+      setLocationSuggestions([]);
+      setSuggestionsLoading(false);
+      return;
+    }
+    setSuggestionsLoading(true);
+    searchTimerRef.current = setTimeout(() => {
+      searchLocations(query, 5, getAddressSessionToken(), contextRef.current)
+        .then((suggestions) => {
+          if (searchRequestRef.current === requestId) setLocationSuggestions(suggestions);
+        })
+        .catch(() => {
+          if (searchRequestRef.current !== requestId) return;
+          setLocationSuggestions([]);
+          setLocationError("");
+        })
+        .finally(() => {
+          if (searchRequestRef.current === requestId) setSuggestionsLoading(false);
+        });
+    }, 650);
   };
 
   return {

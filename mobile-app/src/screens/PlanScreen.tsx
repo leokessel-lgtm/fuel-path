@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import {
   Pressable,
   StyleSheet,
@@ -11,7 +11,6 @@ import { PlanRouteEditorCard } from "../components/PlanRouteEditorCard";
 import { PlanRouteSummaryCard } from "../components/PlanRouteSummaryCard";
 import { PlanRouteSheet } from "../components/PlanRouteSheet";
 import { QuickPlace } from "../components/QuickPlaceShortcuts";
-import { routeInputPrecisionHint } from "../components/RouteAddressSuggestions";
 import { StationMap } from "../components/StationMap";
 import { usePlanSheetState } from "../hooks/usePlanSheetState";
 import { usePlanCameraInsets } from "../hooks/usePlanCameraInsets";
@@ -23,6 +22,11 @@ import {
   recordRoutePlanCompletedEvidence,
   recordSavedCommuteCreatedEvidence,
 } from "./PlanScreen.behaviour";
+import {
+  emptyEvFallback,
+  initialPlanRouteState,
+  planRouteReducer,
+} from "./PlanScreen.routeState";
 import { spacing } from "../theme";
 import {
   AppPreferences,
@@ -35,6 +39,7 @@ import {
   StationViewModel,
 } from "../types";
 import { eligibleDiscountIds } from "../utils/discountRedemptions";
+import { routeInputPrecisionHint } from "../utils/routeInputPrecision";
 import { activePreferredStationBrands } from "../utils/stationBrandPreferences";
 import {
   commuteName,
@@ -83,18 +88,13 @@ const defaultPlanCentre: MapPoint = {
   label: "Perth CBD WA 6000",
 };
 
-const emptyRoute = { endpoints: undefined, points: [], distanceKm: null } as { endpoints?: { from: MapPoint; to: MapPoint }; points: MapPoint[]; distanceKm: number | null };
-const emptyEvFallback = { chargers: [], context: null, loading: false, error: "" } as {
-  chargers: EvCharger[];
-  context: EvChargerResponse["context"] | null;
-  loading: boolean;
-  error: string;
-};
+const emptyRecentLocations: MapPoint[] = [];
+
 const evRoutePlanningUnavailable =
   "EV route charging is not available yet. Use Nearby EV charging for compatible chargers while route charger planning is added.";
 
 export function PlanScreen({
-  recentLocations = [],
+  recentLocations = emptyRecentLocations,
   preferences,
   onAddRecentLocation,
   onClearRecentLocations,
@@ -110,16 +110,19 @@ export function PlanScreen({
   const [to, setTo] = useState("");
   const [fromPoint, setFromPoint] = useState<MapPoint>();
   const [toPoint, setToPoint] = useState<MapPoint>();
-  const [result, setResult] = useState<ScoreResponse | null>(null);
-  const [routeStarted, setRouteStarted] = useState(false);
-  const [routeData, setRouteData] = useState(emptyRoute);
-  const [evFallback, setEvFallback] = useState(emptyEvFallback);
-  const [selectedCode, setSelectedCode] = useState<string>();
-  const [selectedChargerId, setSelectedChargerId] = useState<string>();
-  const [loading, setLoading] = useState(false);
+  const [routeState, dispatchRoute] = useReducer(planRouteReducer, initialPlanRouteState);
   const [locatingFrom, setLocatingFrom] = useState(false);
-  const [routeControlsCollapsed, setRouteControlsCollapsed] = useState(false);
-  const [error, setError] = useState("");
+  const {
+    error,
+    evFallback,
+    loading,
+    result,
+    routeControlsCollapsed,
+    routeData,
+    routeStarted,
+    selectedChargerId,
+    selectedCode,
+  } = routeState;
   const {
     closePanels,
     openStationPanel,
@@ -174,30 +177,24 @@ export function PlanScreen({
     const fromLabel = (overrideFromLabel || from).trim();
     const toLabel = (overrideToLabel || to).trim();
     if (!overrideFromPoint && !fromPoint && !fromLabel) {
-      setError("Add a start location before planning this route.");
-      setRouteControlsCollapsed(false);
+      dispatchRoute({ type: "validation-error", error: "Add a start location before planning this route." });
       return;
     }
     if (!overrideToPoint && !toPoint && !toLabel) {
-      setError("Add a destination before planning this route.");
-      setRouteControlsCollapsed(false);
+      dispatchRoute({ type: "validation-error", error: "Add a destination before planning this route." });
       return;
     }
     const precisionHint =
       (!overrideFromPoint && !fromPoint ? routeInputPrecisionHint("start", fromLabel) : "") ||
       (!overrideToPoint && !toPoint ? routeInputPrecisionHint("destination", toLabel) : "");
     if (precisionHint) {
-      setError(precisionHint);
-      setRouteControlsCollapsed(false);
+      dispatchRoute({ type: "validation-error", error: precisionHint });
       return;
     }
     const requestId = routeRequestIdRef.current + 1;
     const editVersionAtStart = routeEditVersionRef.current;
     routeRequestIdRef.current = requestId;
-    setRouteStarted(true);
-    setLoading(true);
-    setEvFallback(emptyEvFallback);
-    setError("");
+    dispatchRoute({ type: "start-loading" });
     clearAddressSuggestionError();
     setActiveAddressField(null);
     try {
@@ -217,7 +214,7 @@ export function PlanScreen({
         let fallbackChargers: EvCharger[] = [];
         let fallbackContext: EvChargerResponse["context"] | null = null;
         let fallbackError = "";
-        setEvFallback((current) => ({ ...current, loading: true, error: "" }));
+        dispatchRoute({ type: "ev-fallback-loading", loading: true });
         try {
           const fallbackResponse = await getRouteEvFallbackChargers({
             connectors: preferences.evConnectors,
@@ -231,7 +228,7 @@ export function PlanScreen({
             ? fallbackErr.message
             : "Could not load EV fallback chargers.";
         } finally {
-          setEvFallback((current) => ({ ...current, loading: false }));
+          dispatchRoute({ type: "ev-fallback-loading", loading: false });
         }
         if (
           requestId !== routeRequestIdRef.current ||
@@ -243,15 +240,16 @@ export function PlanScreen({
         setToPoint(resolvedToPoint);
         setFrom(displayLocationLabel(resolvedFromPoint, fromLabel));
         setTo(displayLocationLabel(resolvedToPoint, toLabel));
-        setRouteData({ endpoints: { from: resolvedFromPoint, to: resolvedToPoint }, points: route.points, distanceKm: route.distanceKm });
-        setEvFallback({ chargers: fallbackChargers, context: fallbackContext, loading: false, error: fallbackError });
-        setResult(null);
-        setSelectedCode(undefined);
-        setSelectedChargerId(fallbackChargers[0]?.id);
+        dispatchRoute({
+          type: "ev-success",
+          collapseControls: collapseOnSuccess,
+          evFallback: { chargers: fallbackChargers, context: fallbackContext, loading: false, error: fallbackError },
+          routeData: { endpoints: { from: resolvedFromPoint, to: resolvedToPoint }, points: route.points, distanceKm: route.distanceKm },
+          selectedChargerId: fallbackChargers[0]?.id,
+        });
         onAddRecentLocation?.(resolvedFromPoint);
         onAddRecentLocation?.(resolvedToPoint);
         closePanels();
-        setRouteControlsCollapsed(collapseOnSuccess);
         resetAddressSessionToken("from");
         resetAddressSessionToken("to");
         return;
@@ -275,14 +273,16 @@ export function PlanScreen({
       setToPoint(resolvedToPoint);
       setFrom(displayLocationLabel(resolvedFromPoint, fromLabel));
       setTo(displayLocationLabel(resolvedToPoint, toLabel));
-      setRouteData({ endpoints: { from: resolvedFromPoint, to: resolvedToPoint }, points: planned.route.points, distanceKm: planned.route.distanceKm });
-      setEvFallback(emptyEvFallback);
-      setResult(planned.score);
-      setSelectedCode(planned.score.recommendations[0]?.station.stationCode);
+      dispatchRoute({
+        type: "fuel-success",
+        collapseControls: collapseOnSuccess,
+        result: planned.score,
+        routeData: { endpoints: { from: resolvedFromPoint, to: resolvedToPoint }, points: planned.route.points, distanceKm: planned.route.distanceKm },
+        selectedCode: planned.score.recommendations[0]?.station.stationCode,
+      });
       onAddRecentLocation?.(resolvedFromPoint);
       onAddRecentLocation?.(resolvedToPoint);
       closePanels();
-      setRouteControlsCollapsed(collapseOnSuccess);
       resetAddressSessionToken("from");
       resetAddressSessionToken("to");
     } catch (err) {
@@ -292,45 +292,22 @@ export function PlanScreen({
       ) {
         return;
       }
-      setRouteData(emptyRoute);
-      setEvFallback(emptyEvFallback);
-      setResult(null);
-      setRouteControlsCollapsed(false);
       closePanels();
-      setError(routePlanningErrorMessage(err));
+      dispatchRoute({ type: "error", error: routePlanningErrorMessage(err) });
     } finally {
       if (requestId === routeRequestIdRef.current) {
-        setLoading(false);
+        dispatchRoute({ type: "finish-loading" });
       }
     }
   };
 
-  const routePlanningErrorMessage = (err: unknown) => {
-    const message = err instanceof Error ? err.message : String(err || "");
-    if (/route engine temporarily unavailable|provider failure|503/i.test(message)) {
-      return "Route engine temporarily unavailable. Try again shortly, or check Nearby fuel.";
-    }
-    if (/no eligible stations|no recommendations|empty results|no fuel stops/i.test(message)) {
-      return "No suitable fuel stop was found on this route. Try a different fuel, expand the route, or check Nearby fuel.";
-    }
-    if (/cannot read|undefined|null|points|typeerror|referenceerror/i.test(message)) {
-      return "Route planning needs attention. Try again, edit the route, or check Nearby fuel.";
-    }
-    return message || "Could not plan this route right now. Try again or edit the route.";
-  };
-
   const markRouteEdited = () => {
     routeEditVersionRef.current += 1;
-    setRouteStarted(false);
-    setRouteData(emptyRoute);
-    setEvFallback(emptyEvFallback);
-    setResult(null);
-    setSelectedCode(undefined);
-    setError("");
+    dispatchRoute({ type: "edit" });
   };
 
   const reopenRouteEditor = () => {
-    setRouteControlsCollapsed(false);
+    dispatchRoute({ type: "collapse-controls", collapsed: false });
     closePanels();
   };
 
@@ -363,7 +340,7 @@ export function PlanScreen({
           providerPlaceId: point.providerId,
         });
       } catch {
-        setError("Choose another suggestion, or try a fuller address, suburb or place.");
+        dispatchRoute({ type: "transient-error", error: "Choose another suggestion, or try a fuller address, suburb or place." });
         return;
       }
     }
@@ -384,7 +361,7 @@ export function PlanScreen({
 
   const useCurrentFromLocation = async () => {
     setLocatingFrom(true);
-    setError("");
+    dispatchRoute({ type: "clear-error" });
     try {
       const nextFromPoint = await getCurrentMapPoint();
       markRouteEdited();
@@ -394,7 +371,7 @@ export function PlanScreen({
       setActiveAddressField(null);
       resetAddressSessionToken("from");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Current location is not available.");
+      dispatchRoute({ type: "transient-error", error: err instanceof Error ? err.message : "Current location is not available." });
     } finally {
       setLocatingFrom(false);
     }
@@ -438,17 +415,16 @@ export function PlanScreen({
     resetAddressSessionToken(field);
   };
 
+  const clearBlockedRoutePlanning = () => {
+    closePanels();
+    dispatchRoute({ type: "blocked", error: evRoutePlanningUnavailable });
+  };
+
+  if (routePlanningBlocked && routeData.endpoints && error !== evRoutePlanningUnavailable) clearBlockedRoutePlanning();
+
   useEffect(() => {
     if (!routeData.endpoints) return;
-    if (routePlanningBlocked) {
-      setResult(null);
-      setRouteData((current) => ({ ...current, points: [] }));
-      setSelectedCode(undefined);
-      closePanels();
-      setRouteControlsCollapsed(false);
-      setError(evRoutePlanningUnavailable);
-      return;
-    }
+    if (routePlanningBlocked) return;
     loadRoute({ collapseOnSuccess: routeControlsCollapsed });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -534,14 +510,12 @@ export function PlanScreen({
   });
   const routeSummary = `${from} to ${to}`;
   const handleStationSelect = (stationCode: string) => {
-    setSelectedCode(stationCode);
-    setSelectedChargerId(undefined);
+    dispatchRoute({ type: "select-station", stationCode });
     openStationPanel();
   };
 
   const handleChargerSelect = (chargerId: string) => {
-    setSelectedChargerId(chargerId);
-    setSelectedCode(undefined);
+    dispatchRoute({ type: "select-charger", chargerId });
     closePanels();
   };
 
@@ -608,7 +582,7 @@ export function PlanScreen({
           <PlanRouteSummaryCard
             policyActive={preferences.fuelPolicyEnabled}
             routeSummary={routeSummary}
-            onPress={() => setRouteControlsCollapsed(false)}
+            onPress={() => dispatchRoute({ type: "collapse-controls", collapsed: false })}
           />
         ) : (
           <PlanRouteEditorCard
@@ -671,7 +645,7 @@ export function PlanScreen({
           onSaveCommute={handleSaveCurrentCommute}
           onNavigationOpened={handleNavigationOpened}
           onSelectStation={handleStationSelect}
-          onShowStops={() => { setStationPanelOpen(false); if (best) setSelectedCode(best.station.stationCode); }}
+          onShowStops={() => { setStationPanelOpen(false); if (best) dispatchRoute({ type: "select-station", stationCode: best.station.stationCode }); }}
           onWatchRoute={
             currentSavedCommute && onToggleCommuteAlert
               ? handleWatchCurrentRoute
@@ -724,3 +698,17 @@ const styles = StyleSheet.create({
     top: spacing.md,
   },
 });
+
+function routePlanningErrorMessage(err: unknown) {
+  const message = err instanceof Error ? err.message : String(err || "");
+  if (/route engine temporarily unavailable|provider failure|503/i.test(message)) {
+    return "Route engine temporarily unavailable. Try again shortly, or check Nearby fuel.";
+  }
+  if (/no eligible stations|no recommendations|empty results|no fuel stops/i.test(message)) {
+    return "No suitable fuel stop was found on this route. Try a different fuel, expand the route, or check Nearby fuel.";
+  }
+  if (/cannot read|undefined|null|points|typeerror|referenceerror/i.test(message)) {
+    return "Route planning needs attention. Try again, edit the route, or check Nearby fuel.";
+  }
+  return message || "Could not plan this route right now. Try again or edit the route.";
+}

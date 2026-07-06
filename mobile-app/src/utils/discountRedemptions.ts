@@ -16,7 +16,7 @@ export function isDiscountRedeemedToday(
   return localDateKey(redemption.updatedAt) === localDateKey(now.toISOString());
 }
 
-export function discountRedemptionLabel(preferences: AppPreferences, discountId: string) {
+function discountRedemptionLabel(preferences: AppPreferences, discountId: string) {
   return isDiscountRedeemedToday(preferences, discountId) ? "Used today" : "Unused";
 }
 

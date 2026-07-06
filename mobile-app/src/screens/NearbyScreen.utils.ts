@@ -21,7 +21,7 @@ export function toggleConnectorFilter(current: EvConnector[], connector: EvConne
     : [...current, connector];
 }
 
-export function combinedNearbyNotice(stationNotice: string, evNotice: string, chargerCount: number) {
+function combinedNearbyNotice(stationNotice: string, evNotice: string, chargerCount: number) {
   const chargerNotice = chargerCount
     ? `${chargerCount} charger pins shown. Charger availability is directory-only.`
     : evNotice;

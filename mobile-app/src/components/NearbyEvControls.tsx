@@ -1,18 +1,16 @@
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useCallback } from "react";
+import { FlatList, Pressable, ScrollView, StyleSheet, Text, View, type ListRenderItem } from "react-native";
 
 import { colors, radii, shadow, spacing, surfaces, typeScale, typography } from "../theme";
 import { EvCharger, EvChargingPreference, EvConnector, EvPowerMode, FuelCode, NearbySheetSnap } from "../types";
+import { evChargingPreferenceLabel, evPowerOptions } from "../utils/evChargingDisplay";
 
 export type NearbyMode = "fuel" | "ev" | "both";
 export type NearbyEnergyChoice = FuelCode | "EV";
 
-export const evConnectorOptions: EvConnector[] = ["CCS2", "CHADEMO", "TYPE2", "TESLA"];
-export const evPowerOptions: Array<{ label: string; value: EvPowerMode; minPowerKw: number }> = [
-  { label: "Any", value: "", minPowerKw: 0 },
-  { label: "AC", value: "ac", minPowerKw: 0 },
-  { label: "Fast", value: "dc_fast", minPowerKw: 50 },
-];
+const evConnectorOptions: EvConnector[] = ["CCS2", "CHADEMO", "TYPE2", "TESLA"];
 const nearbySheetBottomOffset = 8;
+const evChargerKeyExtractor = (charger: EvCharger) => charger.id;
 const energyOptions: Array<{ label: string; shortLabel: string; value: NearbyEnergyChoice }> = [
   { label: "E10", shortLabel: "E10", value: "E10" },
   { label: "U91", shortLabel: "U91", value: "U91" },
@@ -106,7 +104,7 @@ export function NearbyControlDeck({
   );
 }
 
-export function NearbyModeToggle({
+function NearbyModeToggle({
   mode,
   onModeChange,
 }: {
@@ -217,6 +215,17 @@ export function EvChargerPanel({
     }
     onToggleExpanded(snap === "full");
   };
+  const renderChargerItem = useCallback<ListRenderItem<EvCharger>>(
+    ({ item }) => (
+      <EvChargerListRow
+        charger={item}
+        onNavigate={onNavigate}
+        onSelectCharger={onSelectCharger}
+        selected={item.id === selectedChargerId}
+      />
+    ),
+    [onNavigate, onSelectCharger, selectedChargerId],
+  );
 
   return (
     <View style={[styles.evPanel, isFull ? [styles.evPanelExpanded, { top: expandedSheetTop }] : isPeek ? styles.evPanelPeek : styles.evPanelCollapsed]}>
@@ -283,17 +292,14 @@ export function EvChargerPanel({
         </>
       ) : null}
       {!loading && !error && isFull ? (
-        <ScrollView style={styles.evList} contentContainerStyle={styles.evListContent} showsVerticalScrollIndicator>
-          {chargers.map((charger) => (
-            <EvChargerRow
-              charger={charger}
-              key={charger.id}
-              selected={charger.id === selectedChargerId}
-              onNavigate={onNavigate}
-              onPress={() => onSelectCharger(charger.id)}
-            />
-          ))}
-        </ScrollView>
+        <FlatList
+          contentContainerStyle={styles.evListContent}
+          data={chargers}
+          keyExtractor={evChargerKeyExtractor}
+          renderItem={renderChargerItem}
+          showsVerticalScrollIndicator
+          style={styles.evList}
+        />
       ) : null}
       {!loading && !error && !chargers.length ? (
         <View style={styles.evEmptyCard}>
@@ -369,7 +375,7 @@ export function EvSheetFilters({
   );
 }
 
-export function EvPowerFilterRow({
+function EvPowerFilterRow({
   onPowerModeChange,
   powerMode,
 }: {
@@ -398,34 +404,13 @@ export function EvPowerFilterRow({
   );
 }
 
-export function evChargingPreferenceLabel(value?: EvChargingPreference) {
-  if (value === "cheap") return "cheapest";
-  if (value === "fast") return "fastest";
-  if (value === "reliable") return "reliable";
-  if (value === "nearby") return "closest";
-  return "balanced";
-}
-
-export function nearbyModeContextLabel(mode: NearbyMode, fuel: FuelCode) {
+function nearbyModeContextLabel(mode: NearbyMode, fuel: FuelCode) {
   if (mode === "both") return "Best mix for your vehicle";
   if (mode === "ev") return "Compatible chargers near you";
   return `${fuel} prices near you`;
 }
 
-export function vehicleProfileHint(
-  fuel: FuelCode,
-  connectors: EvConnector[],
-  chargingPreference?: EvChargingPreference,
-  energyType?: string,
-) {
-  const connectorLabel = connectors.length ? connectors.join(" / ") : "all connector types";
-  if (energyType === "electric") {
-    return `Best for your EV: ${connectorLabel}, ${evChargingPreferenceLabel(chargingPreference)} charging.`;
-  }
-  return `Best for your vehicle: ${fuel}.`;
-}
-
-export function chargerProfileHint(
+function chargerProfileHint(
   connectors: EvConnector[],
   chargingPreference?: EvChargingPreference,
 ) {
@@ -498,6 +483,31 @@ export function EvChargerRow({
   );
 }
 
+function EvChargerListRow({
+  charger,
+  onNavigate,
+  onSelectCharger,
+  selected,
+}: {
+  charger: EvCharger;
+  onNavigate: (charger: EvCharger) => void;
+  onSelectCharger: (chargerId: string) => void;
+  selected: boolean;
+}) {
+  const handlePress = useCallback(
+    () => onSelectCharger(charger.id),
+    [charger.id, onSelectCharger],
+  );
+  return (
+    <EvChargerRow
+      charger={charger}
+      selected={selected}
+      onNavigate={onNavigate}
+      onPress={handlePress}
+    />
+  );
+}
+
 function formatEvDistance(distanceKm: number | undefined, suffix = "") {
   if (!Number.isFinite(distanceKm)) return suffix ? "distance unknown" : "Distance unknown";
   if (Number(distanceKm) < 0.05) return suffix ? "at this point" : "Here";
@@ -507,8 +517,7 @@ function formatEvDistance(distanceKm: number | undefined, suffix = "") {
 function chargerConnectorSummary(charger: EvCharger) {
   if (charger.connectors.length) return charger.connectors.join(" | ");
   const labels = charger.connections
-    .map((connection) => connection.connectorLabel)
-    .filter(Boolean)
+    .flatMap((connection) => connection.connectorLabel ? [connection.connectorLabel] : [])
     .slice(0, 2);
   return labels.length ? labels.join(" | ") : "Connector details unknown";
 }

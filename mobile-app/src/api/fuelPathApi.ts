@@ -6,8 +6,6 @@ import {
   EvPowerMode,
   MapPoint,
   NearbyResponse,
-  RegionCapability,
-  RegionCapabilityStatus,
   ScoreResponse,
   Station,
 } from "../types";
@@ -43,77 +41,6 @@ type PlanRouteResponse = {
   score: ScoreResponse;
 };
 
-export type FuelProviderStatus = {
-  selection: string;
-  capabilityLabels: RegionCapabilityStatus[];
-  capabilitySummary: Partial<Record<RegionCapabilityStatus, number>>;
-  capabilities: RegionCapability[];
-};
-
-export type EvChargingStatus = {
-  provider: string;
-  configured: boolean;
-  capability: string;
-  defaultProvider: string;
-  providerSelection: string;
-  apiNinjasConfigured: boolean;
-  openChargeMapConfigured: boolean;
-  realTimeAvailability: boolean;
-  liveAvailabilityClaimsAllowed: boolean;
-  coverage: string;
-  warning: string;
-};
-
-export type ProviderObservabilityStatus = {
-  status: "normal" | "watch" | "stopped";
-  summary: string;
-  activePaidLookupCount: number;
-  paidLookups: Array<{
-    key: string;
-    label: string;
-    enabled: boolean;
-    configured: boolean;
-    status: "normal" | "watch" | "stopped" | "configured_off" | "not_configured";
-    cap: number;
-    used: number;
-    remaining: number;
-    usagePercent: number;
-    blockers: string[];
-    warnings: string[];
-  }>;
-  blockers: string[];
-  warnings: string[];
-};
-
-type LookupReadiness = {
-  status: "ready" | "not_ready";
-  publicExactAddressClaimsAllowed: boolean;
-  blockers: string[];
-  nextAction: string;
-  addressIndex: {
-    mode: string;
-    hosted: boolean;
-    reportedAddressRows: number | null;
-    minAddressRows: number;
-    rowCountReady: boolean | null;
-  };
-  exactSmoke: {
-    status: string;
-    passed: boolean;
-  };
-  hostedBenchmark: {
-    status: string;
-    passed: boolean;
-    lastRunAt: string;
-    cases: number | null;
-    requiredCases: number;
-    addressTopRate: number | null;
-    poiTopRate: number | null;
-    addressP90Chars: number | null;
-    poiP90Chars: number | null;
-  };
-};
-
 async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
@@ -137,33 +64,6 @@ function query(params: Record<string, string | number | boolean | undefined>) {
   return search.toString();
 }
 
-export async function getApiStatus() {
-  return fetchJson<{
-    defaultSource: "live" | "sample";
-    credentialsConfigured: boolean;
-    cacheSeconds: number;
-    fuelProviders?: {
-      selection: string;
-      capabilityLabels: RegionCapabilityStatus[];
-      capabilitySummary: Partial<Record<RegionCapabilityStatus, number>>;
-      capabilities: RegionCapability[];
-    };
-    evCharging?: EvChargingStatus;
-    geocoding?: {
-      activeProvider: string;
-      activeMode: string;
-      recommendedProductionProvider: string;
-      requestedProvider: string;
-      backendProxyRequired: boolean;
-      sessionTokenRequired: boolean;
-      googlePlacesConfigured: boolean;
-      mapboxConfigured: boolean;
-      lookupReadiness?: LookupReadiness;
-    };
-    providerObservability?: ProviderObservabilityStatus;
-  }>("/api/status");
-}
-
 export async function getNearbyStations({
   brands = [],
   fuel,
@@ -177,7 +77,10 @@ export async function getNearbyStations({
   radiusKm?: number;
   limit?: number;
 }) {
-  const selectedBrands = brands.map((brand) => brand.trim()).filter(Boolean);
+  const selectedBrands = brands.flatMap((brand) => {
+    const trimmed = brand.trim();
+    return trimmed ? [trimmed] : [];
+  });
   return fetchJson<NearbyResponse>(
     `/api/stations?${query({
       source: "live",
@@ -367,6 +270,8 @@ function addressQueryParts(value: string) {
   };
 }
 
+const addressLikeSuggestionTypes = new Set(["address", "house", "residential", "road"]);
+
 function addressSuggestionScore(point: MapPoint, expected: { houseNumber: string; streetWords: string[] }) {
   const label = point.label.toLowerCase();
   const title = point.label.split(",")[0]?.trim().toLowerCase() || "";
@@ -376,7 +281,7 @@ function addressSuggestionScore(point: MapPoint, expected: { houseNumber: string
   for (const word of expected.streetWords) {
     if (!label.includes(word)) score += 20;
   }
-  if (point.type && !["address", "house", "residential", "road"].includes(point.type)) score += 25;
+  if (point.type && !addressLikeSuggestionTypes.has(point.type)) score += 25;
   return score;
 }
 
@@ -438,7 +343,7 @@ export async function getRoute(from: MapPoint, to: MapPoint) {
   );
 }
 
-export async function scoreRoute({
+async function scoreRoute({
   approvedPolicyBrands = [],
   stationBrands,
   fuel,
@@ -451,8 +356,8 @@ export async function scoreRoute({
   eligibleDiscounts: string[];
   route: RouteResponse;
 }) {
-  const policyBrands = approvedPolicyBrands.map((brand) => brand.trim()).filter(Boolean);
-  const preferredBrands = stationBrands?.map((brand) => brand.trim()).filter(Boolean) || [];
+  const policyBrands = cleanBrandList(approvedPolicyBrands);
+  const preferredBrands = cleanBrandList(stationBrands || []);
   const selectedBrands = preferredBrands.length ? stationBrandFilterValues(preferredBrands) : policyBrands;
   const selectedBrandLabels = preferredBrands.length ? preferredBrands : policyBrands;
   return fetchJson<ScoreResponse>("/api/score", {
@@ -500,8 +405,8 @@ export async function planFuelRoute({
   stationBrands?: string[];
   to: MapPoint;
 }) {
-  const policyBrands = approvedPolicyBrands.map((brand) => brand.trim()).filter(Boolean);
-  const preferredBrands = stationBrands?.map((brand) => brand.trim()).filter(Boolean) || [];
+  const policyBrands = cleanBrandList(approvedPolicyBrands);
+  const preferredBrands = cleanBrandList(stationBrands || []);
   const selectedBrands = preferredBrands.length ? stationBrandFilterValues(preferredBrands) : policyBrands;
   const selectedBrandLabels = preferredBrands.length ? preferredBrands : policyBrands;
   const payload = await fetchJson<PlanRouteResponse | ScoreResponse>("/api/score", {
@@ -546,6 +451,13 @@ function normalisePlanRouteResponse(payload: PlanRouteResponse | ScoreResponse, 
   };
 }
 
+function cleanBrandList(brands: string[]) {
+  return brands.flatMap((brand) => {
+    const trimmed = brand.trim();
+    return trimmed ? [trimmed] : [];
+  });
+}
+
 function compactPoints(points: MapPoint[], maxPoints = 1200) {
   if (points.length <= maxPoints) return points;
   const compacted: MapPoint[] = [];
@@ -560,7 +472,7 @@ function compactPoints(points: MapPoint[], maxPoints = 1200) {
   return compacted;
 }
 
-export function stationPoint(station: Station): MapPoint {
+function stationPoint(station: Station): MapPoint {
   return {
     lat: station.lat,
     lon: station.lon,

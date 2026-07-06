@@ -31,7 +31,10 @@ function usefulBadge(point: MapPoint) {
 }
 
 function suggestionParts(point: MapPoint) {
-  return point.label.split(",").map((part) => part.trim()).filter(Boolean);
+  return point.label.split(",").flatMap((part) => {
+    const trimmed = part.trim();
+    return trimmed ? [trimmed] : [];
+  });
 }
 
 function titleConsumesStreetNumber(parts: string[]) {

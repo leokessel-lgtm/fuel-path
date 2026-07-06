@@ -1,6 +1,7 @@
-import { ReactNode, useRef, useState } from "react";
+import { ReactNode, useCallback, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  FlatList,
   Platform,
   Pressable,
   ScrollView,
@@ -8,6 +9,7 @@ import {
   Text,
   View,
   type GestureResponderEvent,
+  type ListRenderItem,
 } from "react-native";
 
 import { colors, radii, shadow, spacing, surfaces, typeScale, typography } from "../theme";
@@ -19,14 +21,15 @@ import { StationRow } from "./StationRow";
 
 export type NearbySortMode = "distance" | "price" | "value";
 
-export const defaultNearbySortMode: NearbySortMode = "value";
+const defaultNearbySortMode: NearbySortMode = "value";
 const nearbySheetBottomOffset = 8;
 const sheetDragActivatePx = 8;
 const sheetExpandDragPx = -60;
 const sheetCollapseDragPx = 70;
 const sheetDismissDragPx = 170;
+const stationKeyExtractor = (item: StationViewModel) => item.station.stationCode;
 
-export const nearbySortOptions: Array<{
+const nearbySortOptions: Array<{
   key: NearbySortMode;
   label: string;
   accessibilityLabel: string;
@@ -96,6 +99,16 @@ export function NearbyStationSheet({
   const requestMap = () => {
     requestSnap("browse");
   };
+  const renderStationItem = useCallback<ListRenderItem<StationViewModel>>(
+    ({ item }) => (
+      <NearbyStationListRow
+        item={item}
+        selected={item.station.stationCode === selectedCode}
+        onSelectStation={onSelectStation}
+      />
+    ),
+    [onSelectStation, selectedCode],
+  );
 
   const settleSheetDrag = (dy: number, toggleOnTap = true) => {
     setDragOffsetY(0);
@@ -159,7 +172,7 @@ export function NearbyStationSheet({
               finishWebDrag(touch?.pageY || dragStartYRef.current);
             };
             window.addEventListener("touchmove", handleMove, { passive: true });
-            window.addEventListener("touchend", handleEnd, { once: true });
+            window.addEventListener("touchend", handleEnd, { once: true, passive: true });
           },
         } as Record<string, unknown>)
       : {};
@@ -287,20 +300,14 @@ export function NearbyStationSheet({
             })}
           </View> : null}
           {sheetExpanded ? (
-            <ScrollView
-              style={styles.list}
+            <FlatList
               contentContainerStyle={styles.listContent}
+              data={sortedStations}
+              keyExtractor={stationKeyExtractor}
+              renderItem={renderStationItem}
               showsVerticalScrollIndicator
-            >
-              {sortedStations.map((item) => (
-                <StationRow
-                  item={item}
-                  key={item.station.stationCode}
-                  selected={item.station.stationCode === selectedCode}
-                  onPress={() => onSelectStation(item.station.stationCode)}
-                />
-              ))}
-            </ScrollView>
+              style={styles.list}
+            />
           ) : null}
         </>
       ) : null}
@@ -322,6 +329,22 @@ function nextSnap(activeSnap: NearbySheetSnap): NearbySheetSnap {
   if (activeSnap === "peek") return "browse";
   if (activeSnap === "browse") return "full";
   return "browse";
+}
+
+function NearbyStationListRow({
+  item,
+  onSelectStation,
+  selected,
+}: {
+  item: StationViewModel;
+  onSelectStation: (stationCode: string) => void;
+  selected: boolean;
+}) {
+  const handlePress = useCallback(
+    () => onSelectStation(item.station.stationCode),
+    [item.station.stationCode, onSelectStation],
+  );
+  return <StationRow item={item} selected={selected} onPress={handlePress} />;
 }
 
 function SelectedStationCard({

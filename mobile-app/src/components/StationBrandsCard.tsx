@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { Image, ImageSourcePropType, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Image, type ImageProps } from "expo-image";
+import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { stationBrandOptions } from "../data/brandAssets";
 import { colors, radii, spacing, surfaces, typeScale, typography } from "../theme";
@@ -147,7 +148,7 @@ function BrandLogo({
 }: {
   brand?: {
     color: string;
-    icon?: ImageSourcePropType;
+    icon?: ImageProps["source"];
     initials: string;
   };
   size: number;
@@ -166,7 +167,7 @@ function BrandLogo({
       ]}
     >
       {fallback.icon ? (
-        <Image source={fallback.icon} style={styles.brandLogoImage} resizeMode="contain" />
+        <Image cachePolicy="memory-disk" contentFit="contain" source={fallback.icon} style={styles.brandLogoImage} />
       ) : (
         <Text style={[styles.brandInitialsText, { fontSize: Math.max(9, size * 0.34) }]}>
           {fallback.initials}

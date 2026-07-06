@@ -41,9 +41,9 @@ export function QuickPlaceShortcuts({
         ) : null}
       </View>
       <ScrollView
+        contentContainerStyle={styles.row}
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.row}
       >
         {places.map((place) => (
           <View key={place.key} style={styles.group}>

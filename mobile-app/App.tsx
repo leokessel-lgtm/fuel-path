@@ -9,7 +9,6 @@ import {
 } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 
-import { getApiStatus, EvChargingStatus, FuelProviderStatus } from "./src/api/fuelPathApi";
 import { AccountScreen } from "./src/screens/AccountScreen";
 import { NearbyScreen } from "./src/screens/NearbyScreen";
 import { PlanScreen } from "./src/screens/PlanScreen";
@@ -35,6 +34,13 @@ const tabs: Array<{ key: TabKey; label: string; hint: string }> = [
 const chromeTextScale = 1.2;
 const releaseBuildId = process.env.EXPO_PUBLIC_FUEL_PATH_BUILD_ID || "";
 const releaseCheckIntervalMs = 5 * 60 * 1000;
+
+async function fetchLatestReleaseBuildId() {
+  const response = await fetch(`/build-version.json?ts=${Date.now()}`, { cache: "no-store" });
+  if (!response.ok) return "";
+  const payload = await response.json();
+  return typeof payload.buildId === "string" ? payload.buildId.trim() : "";
+}
 
 function initialTab(): TabKey {
   const configured = process.env.EXPO_PUBLIC_FUEL_PATH_INITIAL_TAB;
@@ -82,8 +88,6 @@ function TabIcon({ tab, selected }: { tab: TabKey; selected: boolean }) {
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabKey>(() => initialTab());
-  const [evChargingStatus, setEvChargingStatus] = useState<EvChargingStatus>();
-  const [fuelProviderStatus, setFuelProviderStatus] = useState<FuelProviderStatus>();
   const [releaseUpdateAvailable, setReleaseUpdateAvailable] = useState(false);
   const {
     clearNamedPlace,
@@ -131,28 +135,11 @@ export default function App() {
     setSavedCommutes,
   });
   useEffect(() => {
-    let active = true;
-    getApiStatus()
-      .then((status) => {
-        if (active) {
-          setEvChargingStatus(status.evCharging);
-          setFuelProviderStatus(status.fuelProviders);
-        }
-      })
-      .catch(() => undefined);
-    return () => {
-      active = false;
-    };
-  }, []);
-  useEffect(() => {
     if (Platform.OS !== "web" || !releaseBuildId) return undefined;
     let active = true;
     const checkLatestRelease = async () => {
       try {
-        const response = await fetch(`/build-version.json?ts=${Date.now()}`, { cache: "no-store" });
-        if (!response.ok) return;
-        const payload = await response.json();
-        const latestBuildId = typeof payload.buildId === "string" ? payload.buildId.trim() : "";
+        const latestBuildId = await fetchLatestReleaseBuildId();
         if (active && latestBuildId && latestBuildId !== releaseBuildId) {
           setReleaseUpdateAvailable(true);
         }

@@ -12,6 +12,7 @@ const decisionEvidencePanel = read("src/components/DecisionEvidencePanel.tsx");
 const discountWalletCard = read("src/components/DiscountWalletCard.tsx");
 const quickPlaceShortcuts = read("src/components/QuickPlaceShortcuts.tsx");
 const routeAddressSuggestions = read("src/components/RouteAddressSuggestions.tsx");
+const routeInputPrecision = read("src/utils/routeInputPrecision.ts");
 const locationSuggestionDisplay = read("src/utils/locationSuggestionDisplay.ts");
 const savedCommuteShortcuts = read("src/components/SavedCommuteShortcuts.tsx");
 const planRouteSheet = read("src/components/PlanRouteSheet.tsx");
@@ -36,6 +37,7 @@ const nearbyResults = read("src/hooks/useNearbyResults.ts");
 const stationBrandFilterPill = read("src/components/StationBrandFilterPill.tsx");
 const stationBrandFilterOverride = read("src/hooks/useStationBrandFilterOverride.ts");
 const planScreen = read("src/screens/PlanScreen.tsx");
+const planRouteState = read("src/screens/PlanScreen.routeState.ts");
 const planScreenUtils = read("src/screens/PlanScreen.utils.ts");
 const accountScreen = read("src/screens/AccountScreen.tsx");
 const stationRow = read("src/components/StationRow.tsx");
@@ -252,7 +254,7 @@ const checks = [
       nativeMap.includes("<BrandBadge station={item.station} size={22} />") &&
       nativeMap.includes("const routeStationCameraPoints = stations.slice(0, routePriceMarkerLimit).map") &&
       nativeMap.includes("return [...visibleRoutePoints, ...routeStationCameraPoints]") &&
-      brandBadge.includes('resizeMode="contain"') &&
+      brandBadge.includes('contentFit="contain"') &&
       !nativeMap.includes("scale: 1.05") &&
       nativeMap.includes("const subdued = Boolean(routeEndpoints && selectedStationCode && !selected);") &&
       nativeMap.includes("subdued && styles.pinSubdued") &&
@@ -501,7 +503,7 @@ const checks = [
   {
     label: "plan returns to recommended stop after alternative detail",
     ok:
-      planScreen.includes("if (best) setSelectedCode(best.station.stationCode);") &&
+      planScreen.includes('if (best) dispatchRoute({ type: "select-station", stationCode: best.station.stationCode });') &&
       planRouteSheet.includes('accessibilityLabel="Show recommended stop"') &&
       planRouteSheet.includes("<Text style={styles.textButtonLabel}>Recommended</Text>") &&
       !planRouteSheet.includes("<Text style={styles.textButtonLabel}>Stops</Text>"),
@@ -509,12 +511,13 @@ const checks = [
   {
     label: "plan keeps map visible while route sheet stays hidden until route starts",
     ok:
-      planScreen.includes("const [routeStarted, setRouteStarted] = useState(false);") &&
+      planScreen.includes("routeStarted,") &&
       planScreen.includes("const defaultPlanCentre: MapPoint") &&
       planScreen.includes('label: "Perth CBD WA 6000"') &&
       planScreen.includes("showCentreMarker={Boolean(fromPoint)}") &&
-      planScreen.includes("setRouteStarted(true);") &&
-      planScreen.includes("setRouteStarted(false);") &&
+      planScreen.includes('dispatchRoute({ type: "start-loading" });') &&
+      planRouteState.includes("routeStarted: false") &&
+      planRouteState.includes("routeStarted: true") &&
       planScreen.includes("const showPlanningShortcuts = routeStarted;") &&
       planScreen.includes("cameraInsets: routeCameraInsets") &&
       routeCameraInsets.includes("const routeHorizontalInset = 26;") &&
@@ -590,9 +593,11 @@ const checks = [
       planScreen.includes("requestId !== routeRequestIdRef.current") &&
       planScreen.includes("editVersionAtStart !== routeEditVersionRef.current") &&
       planScreen.includes("routeEditVersionRef.current += 1;") &&
-      planScreen.includes("setRouteData(emptyRoute);") &&
-      planScreen.includes("setRouteData((current) => ({ ...current, points: [] }))") &&
-      planScreen.includes("setResult(null);"),
+      planScreen.includes('dispatchRoute({ type: "edit" });') &&
+      planScreen.includes('dispatchRoute({ type: "blocked", error: evRoutePlanningUnavailable });') &&
+      planRouteState.includes("routeData: emptyRoute") &&
+      planRouteState.includes("routeData: { ...state.routeData, points: [] }") &&
+      planRouteState.includes("result: null"),
   },
   {
     label: "mobile saved commute route switch replans from selected commute points",
@@ -747,8 +752,8 @@ const checks = [
       planScreen.includes("PlanRouteEditorCard") &&
       planRouteEditorCard.includes("AddressSuggestions") &&
       routeAddressSuggestions.includes("addressLocalityHint") &&
-      routeAddressSuggestions.includes("Add suburb or postcode to narrow the address.") &&
-      routeAddressSuggestions.includes("Street found. Add suburb or postcode to choose the right area.") &&
+      routeInputPrecision.includes("Add suburb or postcode to narrow the address.") &&
+      routeInputPrecision.includes("Street found. Add suburb or postcode to choose the right area.") &&
       planRouteEditorCard.includes("query={from}") &&
       planRouteEditorCard.includes("query={to}"),
   },
@@ -756,13 +761,13 @@ const checks = [
     label: "typed address route planning rejects weak automatic area matches",
     ok:
       planScreen.includes("routeInputPrecisionHint") &&
-      routeAddressSuggestions.includes("hasAddressLocalityContext") &&
-      routeAddressSuggestions.includes('replace(/\\b(nsw|act|qld|vic|wa|sa|tas|nt)\\b/gi, " ")') &&
+      routeInputPrecision.includes("hasAddressLocalityContext") &&
+      routeInputPrecision.includes('replace(/\\b(nsw|act|qld|vic|wa|sa|tas|nt)\\b/gi, " ")') &&
       planScreen.includes("routePrecisionHint") &&
-      routeAddressSuggestions.includes("Choose a start suggestion, or add suburb or postcode before planning.") &&
-      routeAddressSuggestions.includes("Choose a destination suggestion, or add suburb or postcode before planning.") &&
-      routeAddressSuggestions.includes("Choose a start suggestion to confirm this address.") &&
-      routeAddressSuggestions.includes("Choose a destination suggestion to confirm this address.") &&
+      routeInputPrecision.includes("Choose a start suggestion, or add suburb or postcode before planning.") &&
+      routeInputPrecision.includes("Choose a destination suggestion, or add suburb or postcode before planning.") &&
+      routeInputPrecision.includes("Choose a start suggestion to confirm this address.") &&
+      routeInputPrecision.includes("Choose a destination suggestion to confirm this address.") &&
       planScreen.includes('routeInputPrecisionHint("start", fromLabel)') &&
       planScreen.includes('routeInputPrecisionHint("destination", toLabel)') &&
       planScreen.includes('routeInputPrecisionHint("start", from)') &&

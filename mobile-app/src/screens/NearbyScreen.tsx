@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
 
 import { geocodeAddress } from "../api/fuelPathApi";
@@ -54,11 +54,10 @@ export function NearbyScreen({
   const [cameraFocusVersion, setCameraFocusVersion] = useState(0);
   const [selectedCode, setSelectedCode] = useState<string>();
   const [selectedStation, setSelectedStation] = useState<StationViewModel>();
-  const [selectionDismissed, setSelectionDismissed] = useState(false);
   const [sortMode, setSortMode] = useState<NearbySortMode | undefined>(undefined);
   const [sheetSnap, setSheetSnap] = useState<NearbySheetSnap>("browse");
-  const previousSortMode = useRef<NearbySortMode | undefined>(sortMode);
   const [resolvingLocation, setResolvingLocation] = useState(false);
+  const [activeVehicleId, setActiveVehicleId] = useState(preferences.activeVehicleId);
   const [nearbyMode, setNearbyMode] = useState<NearbyMode>(() => preferredNearbyMode(preferences));
   const [evConnectors, setEvConnectors] = useState<EvConnector[]>(preferences.evConnectors || []);
   const [evPowerMode, setEvPowerMode] = useState<EvPowerMode>("");
@@ -79,7 +78,6 @@ export function NearbyScreen({
   const changeSelectedEnergy = (value: NearbyEnergyChoice) => {
     setEnergySelectorOpen(false);
     setSelectedCode(undefined);
-    setSelectionDismissed(false);
     setNearbySheetSnap("browse");
     if (value === "EV") {
       setNearbyMode("ev");
@@ -94,13 +92,13 @@ export function NearbyScreen({
     [centre, nearbyRadiusKm],
   );
 
-  useEffect(() => {
+  if (activeVehicleId !== preferences.activeVehicleId) {
+    setActiveVehicleId(preferences.activeVehicleId);
     setNearbyMode(preferredNearbyMode(preferences));
     setEvConnectors(preferences.evConnectors || []);
     setSelectedCode(undefined);
-    setSelectionDismissed(false);
     setSortMode(undefined);
-  }, [preferences.activeVehicleId]);
+  }
 
   const {
     brandFilterActive,
@@ -246,30 +244,25 @@ export function NearbyScreen({
   const handleSortPress = (nextSortMode: NearbySortMode) => {
     setSortMode(nextSortMode);
     setNearbySheetSnap("full");
-    setSelectionDismissed(false);
   };
 
   const handleMapStationSelect = useCallback((stationCode: string) => {
     setSelectedCode(stationCode);
     setSortMode(undefined);
-    setSelectionDismissed(false);
     setSheetSnap("peek");
   }, []);
 
   const handleMapChargerSelect = useCallback((chargerId: string) => {
     setSelectedCode(chargerId);
-    setSelectionDismissed(false);
     setSheetSnap("peek");
   }, []);
 
   const handleListStationSelect = useCallback((stationCode: string) => {
     setSelectedCode(stationCode);
-    setSelectionDismissed(false);
   }, []);
 
   const handleCloseSelectedStation = useCallback(() => {
     setSelectedCode(undefined);
-    setSelectionDismissed(true);
     setSelectedStation(undefined);
   }, []);
 
@@ -282,37 +275,23 @@ export function NearbyScreen({
     }
   }, []);
 
-  useEffect(() => {
-    if (nearbyMode !== "fuel") return;
+  if (nearbyMode === "fuel") {
     if (!sortedStations.length) {
+      if (selectedCode) setSelectedCode(undefined);
+      if (selectedStation) setSelectedStation(undefined);
+    } else if (!sortMode && selectedCode && !selected) {
       setSelectedCode(undefined);
+    }
+  }
+  if (!selectedCode) {
+    if (selectedStation) {
       setSelectedStation(undefined);
-      return;
     }
-    const selectedExists = stations.some((item) => item.station.stationCode === selectedCode);
-    if (!sortMode) {
-      if (selectedCode && !selectedExists) setSelectedCode(undefined);
-      previousSortMode.current = sortMode;
-      return;
-    }
-    if (selectionDismissed && !selectedCode) return;
-    previousSortMode.current = sortMode;
-  }, [nearbyMode, selectedCode, selectionDismissed, sortMode, sortedStations, stations]);
-
-  useEffect(() => {
-    if (!selectedCode) {
-      setSelectedStation(undefined);
-      return;
-    }
-    const stationMatch = stations.find((item) => item.station.stationCode === selectedCode);
-    if (stationMatch) {
-      setSelectedStation(stationMatch);
-      return;
-    }
-    setSelectedStation((current) =>
-      current?.station.stationCode === selectedCode ? current : undefined,
-    );
-  }, [selectedCode, stations]);
+  } else if (selected && selectedStation !== selected) {
+    setSelectedStation(selected);
+  } else if (!selected && selectedStation?.station.stationCode !== selectedCode) {
+    setSelectedStation(undefined);
+  }
 
   return (
     <View style={styles.screen}>

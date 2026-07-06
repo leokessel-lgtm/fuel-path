@@ -33,6 +33,9 @@ function alternativeFuelCodes(context: FuelContext) {
     ? context.alternativeFuelCodes
     : undefined;
   return Array.isArray(value)
-    ? value.map((item) => String(item || "").trim().toUpperCase()).filter(Boolean)
+    ? value.flatMap((item) => {
+        const code = String(item || "").trim().toUpperCase();
+        return code ? [code] : [];
+      })
     : [];
 }

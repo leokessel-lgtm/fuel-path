@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View, type LayoutChangeEvent } from "react-native";
+import { useCallback, useState } from "react";
+import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, Text, View, type LayoutChangeEvent, type ListRenderItem } from "react-native";
 
 import { colors, radii, shadow, spacing, surfaces, typeScale, typography } from "../theme";
 import { EvCharger, EvChargerResponse, MapPoint, ScoreResponse, StationViewModel, VehicleEnergyType } from "../types";
@@ -15,6 +15,9 @@ import { BrandBadge } from "./BrandBadge";
 import { DecisionEvidencePanel } from "./DecisionEvidencePanel";
 import { StationRow } from "./StationRow";
 import { openDirections, openRouteDirectionsViaStop } from "../screens/NearbyScreen.utils";
+
+const emptyEvFallbackChargers: EvCharger[] = [];
+const stopKeyExtractor = (item: StationViewModel) => item.station.stationCode;
 
 export function PlanRouteSheet({
   best,
@@ -288,7 +291,7 @@ function RouteResultsPanel({
   decisionSummary,
   error,
   emptyRouteTitle,
-  evFallbackChargers = [],
+  evFallbackChargers = emptyEvFallbackChargers,
   evRouteContext = null,
   evFallbackError = "",
   evFallbackLoading = false,
@@ -358,6 +361,16 @@ function RouteResultsPanel({
   const [evidenceExpanded, setEvidenceExpanded] = useState(false);
   const eligibility = best ? discountEligibilitySummary(best, policyActive) : null;
   const routeFuelMismatch = fuelMismatchLine(best, { scope: "route" }) || fuelMismatchContextLine(resultContext, { scope: "route" });
+  const renderStopItem = useCallback<ListRenderItem<StationViewModel>>(
+    ({ item }) => (
+      <PlanStopRow
+        item={item}
+        selected={item.station.stationCode === selectedCode}
+        onSelectStation={onSelectStation}
+      />
+    ),
+    [onSelectStation, selectedCode],
+  );
 
   return (
     <>
@@ -594,24 +607,34 @@ function RouteResultsPanel({
               <Text style={styles.muted}>Tap for detail</Text>
             )}
           </View>
-          <ScrollView
+          <FlatList
             contentContainerStyle={styles.stopsListContent}
+            data={candidates}
+            keyExtractor={stopKeyExtractor}
+            renderItem={renderStopItem}
             showsVerticalScrollIndicator
             style={styles.stopsList}
-          >
-            {candidates.map((item) => (
-              <StationRow
-                item={item}
-                key={item.station.stationCode}
-                selected={item.station.stationCode === selectedCode}
-                onPress={() => onSelectStation(item.station.stationCode)}
-              />
-            ))}
-          </ScrollView>
+          />
         </>
       ) : null}
     </>
   );
+}
+
+function PlanStopRow({
+  item,
+  onSelectStation,
+  selected,
+}: {
+  item: StationViewModel;
+  onSelectStation: (stationCode: string) => void;
+  selected: boolean;
+}) {
+  const handlePress = useCallback(
+    () => onSelectStation(item.station.stationCode),
+    [item.station.stationCode, onSelectStation],
+  );
+  return <StationRow item={item} selected={selected} onPress={handlePress} />;
 }
 
 function openPlanStationDirections(
@@ -935,8 +958,7 @@ function evRouteMeta(context?: EvChargerResponse["context"] | null, vehicleEnerg
 function chargerConnectorSummary(charger: EvCharger) {
   if (charger.connectors.length) return charger.connectors.join(" | ");
   const labels = charger.connections
-    .map((connection) => connection.connectorLabel)
-    .filter(Boolean)
+    .flatMap((connection) => connection.connectorLabel ? [connection.connectorLabel] : [])
     .slice(0, 2);
   return labels.length ? labels.join(" | ") : "Connector unknown";
 }

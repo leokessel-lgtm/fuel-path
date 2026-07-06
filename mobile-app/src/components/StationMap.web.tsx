@@ -18,6 +18,8 @@ const mixedEnergyMaxPriceMarkers = 8;
 const mixedEnergyMarkerGridSize = 190;
 const nearbyInitialCameraZoom = 12.5;
 const nearbyInitialMarkerRadiusKm = 4.2;
+const emptyChargers: EvCharger[] = [];
+const emptyRoutePoints: MapPoint[] = [];
 
 type ClusterMarker = {
   count: number;
@@ -36,7 +38,7 @@ type CameraInsets = {
 
 export function StationMap({
   centre,
-  chargers = [],
+  chargers = emptyChargers,
   stations,
   selectedChargerId,
   selectedStationCode,
@@ -47,7 +49,7 @@ export function StationMap({
   cameraFocusKey,
   showCentreMarker = true,
   routeEndpoints,
-  routePoints = [],
+  routePoints = emptyRoutePoints,
   cameraInsets,
   userLocation,
 }: {

@@ -21,74 +21,40 @@ export function useRouteAddressSuggestions({
   const [toSuggestions, setToSuggestions] = useState<MapPoint[]>([]);
   const [suggestionsLoading, setSuggestionsLoading] = useState<RouteAddressField | null>(null);
   const [suggestionsError, setSuggestionsError] = useState("");
-  const addressSessionTokensRef = useRef({
-    from: makeLocationSessionToken(),
-    to: makeLocationSessionToken(),
-  });
+  const addressSessionTokensRef = useRef<{ from: string; to: string } | null>(null);
   const activeAddressFieldRef = useRef<RouteAddressField | null>(null);
+  const latestInputsRef = useRef({ from, fromContext, to, toContext });
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchRequestRef = useRef(0);
+
+  if (!addressSessionTokensRef.current) {
+    addressSessionTokensRef.current = {
+      from: makeLocationSessionToken(),
+      to: makeLocationSessionToken(),
+    };
+  }
+  latestInputsRef.current = { from, fromContext, to, toContext };
 
   useEffect(() => {
-    const field = activeAddressField;
-    if (!field) return;
-
-    const query = (field === "from" ? from : to).trim();
-    if (query.length < 3) {
-      clearAddressSuggestions(field);
-      setSuggestionsLoading(null);
-      setSuggestionsError("");
-      return;
-    }
-
-    let active = true;
-    setSuggestionsLoading(field);
-    setSuggestionsError("");
-    const timer = setTimeout(() => {
-      searchLocations(
-        query,
-        5,
-        addressSessionTokensRef.current[field],
-        { ...(field === "from" ? fromContext : toContext), purpose: "plan_autocomplete" },
-      )
-        .then((suggestions) => {
-          if (!active) return;
-          setAddressSuggestions(field, suggestions);
-        })
-        .catch(() => {
-          if (!active) return;
-          setAddressSuggestions(field, []);
-          setSuggestionsError("Location suggestions are unavailable. Check the local API and try again.");
-        })
-        .finally(() => {
-          if (active) setSuggestionsLoading(null);
-        });
-    }, 350);
-
     return () => {
-      active = false;
-      clearTimeout(timer);
+      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
     };
-  }, [
-    activeAddressField,
-    from,
-    fromContext?.near?.lat,
-    fromContext?.near?.lon,
-    fromContext?.nearRadiusKm,
-    to,
-    toContext?.near?.lat,
-    toContext?.near?.lon,
-    toContext?.nearRadiusKm,
-  ]);
+  }, []);
 
   const clearAddressSuggestionError = () => setSuggestionsError("");
 
   const clearAddressSuggestions = (field: RouteAddressField) => {
+    searchRequestRef.current += 1;
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
     setAddressSuggestions(field, []);
+    setSuggestionsLoading(null);
   };
 
   const getAddressSessionToken = (field: RouteAddressField) =>
-    addressSessionTokensRef.current[field];
+    addressSessionTokensRef.current?.[field] || "";
 
   const resetAddressSessionToken = (field: RouteAddressField) => {
+    if (!addressSessionTokensRef.current) return;
     addressSessionTokensRef.current[field] = makeLocationSessionToken();
   };
 
@@ -98,7 +64,53 @@ export function useRouteAddressSuggestions({
     }
     activeAddressFieldRef.current = field;
     setActiveAddressField(field);
+    if (field) {
+      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+      searchTimerRef.current = setTimeout(() => {
+        queueAddressSearch(field);
+      }, 0);
+    }
+    else {
+      searchRequestRef.current += 1;
+      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+      setSuggestionsLoading(null);
+    }
   };
+
+  function queueAddressSearch(field: RouteAddressField, queryOverride?: string) {
+    const { from: latestFrom, fromContext: latestFromContext, to: latestTo, toContext: latestToContext } = latestInputsRef.current;
+    const query = (queryOverride ?? (field === "from" ? latestFrom : latestTo)).trim();
+    const requestId = searchRequestRef.current + 1;
+    searchRequestRef.current = requestId;
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    if (query.length < 3) {
+      setAddressSuggestions(field, []);
+      setSuggestionsLoading(null);
+      setSuggestionsError("");
+      return;
+    }
+    setSuggestionsLoading(field);
+    setSuggestionsError("");
+    searchTimerRef.current = setTimeout(() => {
+      searchLocations(
+        query,
+        5,
+        getAddressSessionToken(field),
+        { ...(field === "from" ? latestFromContext : latestToContext), purpose: "plan_autocomplete" },
+      )
+        .then((suggestions) => {
+          if (searchRequestRef.current === requestId) setAddressSuggestions(field, suggestions);
+        })
+        .catch(() => {
+          if (searchRequestRef.current !== requestId) return;
+          setAddressSuggestions(field, []);
+          setSuggestionsError("Location suggestions are unavailable. Check the local API and try again.");
+        })
+        .finally(() => {
+          if (searchRequestRef.current === requestId) setSuggestionsLoading(null);
+        });
+    }, 350);
+  }
 
   function setAddressSuggestions(field: RouteAddressField, suggestions: MapPoint[]) {
     if (field === "from") {

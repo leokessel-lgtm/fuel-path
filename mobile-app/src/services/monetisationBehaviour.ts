@@ -50,7 +50,7 @@ export async function recordMonetisationBehaviourEvent(
   }
 }
 
-export async function readMonetisationBehaviourEvents() {
+async function readMonetisationBehaviourEvents() {
   return readEvents();
 }
 
@@ -133,7 +133,7 @@ export type PersonalisedCommuteReadiness = {
   guidance: string;
 };
 
-export function personalisedCommuteReadiness(
+function personalisedCommuteReadiness(
   events: MonetisationBehaviourEvent[],
   savedCommuteCount: number,
 ): PersonalisedCommuteReadiness {

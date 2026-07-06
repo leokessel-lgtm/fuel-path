@@ -106,7 +106,7 @@ export function locationEvidence(point: MapPoint): LocationEvidence {
   };
 }
 
-export function locationEvidenceSummary(point: MapPoint) {
+function locationEvidenceSummary(point: MapPoint) {
   const evidence = locationEvidence(point);
   return `${evidence.label} | ${evidence.detail}`;
 }

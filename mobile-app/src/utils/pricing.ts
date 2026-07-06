@@ -2,6 +2,12 @@ import { AppPreferences, Station, StationViewModel } from "../types";
 import { eligibleDiscountIds, isDiscountRedeemedToday } from "./discountRedemptions";
 
 const VALUE_DISTANCE_PENALTY_CPL_PER_KM = 0.85;
+const updatedAtFormatter = new Intl.DateTimeFormat("en-AU", {
+  day: "2-digit",
+  month: "short",
+  hour: "2-digit",
+  minute: "2-digit",
+});
 
 export function stationPriceView(
   station: Station,
@@ -14,7 +20,7 @@ export function stationPriceView(
 
   let discountCpl = 0;
   let discountLabel = "";
-  const eligibleDiscounts = eligibleDiscountIds(preferences);
+  const eligibleDiscounts = new Set(eligibleDiscountIds(preferences));
   for (const discount of station.discounts || []) {
     const effectiveDiscountCpl = effectiveDiscountCentsPerLitre(discount, {
       fillLitres: preferences.fuelTankLitres,
@@ -22,7 +28,7 @@ export function stationPriceView(
       station,
     });
     if (
-      eligibleDiscounts.includes(discount.id) &&
+      eligibleDiscounts.has(discount.id) &&
       effectiveDiscountCpl > discountCpl
     ) {
       discountCpl = effectiveDiscountCpl;
@@ -206,16 +212,11 @@ function inferFuelForPumpPrice(station: Station, pumpCpl?: number) {
   return match?.[0] || "";
 }
 
-export function formatUpdatedAt(value?: string) {
+function formatUpdatedAt(value?: string) {
   if (!value) return "No timestamp";
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return "Timestamp unknown";
-  return new Intl.DateTimeFormat("en-AU", {
-    day: "2-digit",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(parsed);
+  return updatedAtFormatter.format(parsed);
 }
 
 export function formatRelativeUpdatedAt(value?: string, now = new Date()) {

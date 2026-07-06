@@ -120,7 +120,6 @@ function routeSavingCplForEvent(
 
 function routeRegionSet(regionCapabilities?: ScoreResponse["context"]["regionCapabilities"]) {
   return (regionCapabilities || [])
-    .map((capability) => capability.region)
-    .filter(Boolean)
+    .flatMap((capability) => capability.region ? [capability.region] : [])
     .sort();
 }

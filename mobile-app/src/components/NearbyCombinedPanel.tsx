@@ -1,18 +1,20 @@
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useCallback } from "react";
+import { FlatList, Pressable, StyleSheet, Text, View, type ListRenderItem } from "react-native";
 
 import {
   EvChargerRow,
   EvSheetFilters,
   NearbyControlDeck,
   NearbyMode,
-  vehicleProfileHint,
 } from "./NearbyEvControls";
 import { StationRow } from "./StationRow";
 import { colors, radii, shadow, spacing, surfaces, typeScale } from "../theme";
 import { AppPreferences, EvCharger, EvConnector, EvPowerMode, FuelCode, NearbyResponse, NearbySheetSnap, StationViewModel } from "../types";
+import { vehicleProfileHint } from "../utils/evChargingDisplay";
 import { fuelMismatchContextLine } from "../utils/fuelMismatch";
 
 const nearbySheetBottomOffset = 8;
+const combinedRowKeyExtractor = (row: CombinedNearbyRow) => `${row.type}-${row.id}`;
 
 export function NearbyCombinedPanel({
   chargers,
@@ -86,6 +88,18 @@ export function NearbyCombinedPanel({
   const isPeek = sheetSnap === "peek";
   const isFull = sheetSnap === "full";
   const fuelNotice = fuelMismatchContextLine(stationContext) || (!combinedRows.length ? stationNotice : "");
+  const renderCombinedItem = useCallback<ListRenderItem<CombinedNearbyRow>>(
+    ({ item }) => (
+      <CombinedNearbyListRow
+        onNavigateToCharger={onNavigateToCharger}
+        onSelectCharger={onSelectCharger}
+        onSelectStation={onSelectStation}
+        row={item}
+        selected={item.id === selectedCode}
+      />
+    ),
+    [onNavigateToCharger, onSelectCharger, onSelectStation, selectedCode],
+  );
   const requestSnap = (snap: NearbySheetSnap) => {
     if (onSnapChange) {
       onSnapChange(snap);
@@ -176,16 +190,30 @@ export function NearbyCombinedPanel({
             {!isPeek ? (
               <Text numberOfLines={1} style={styles.peekHint}>Browse view. Full list for more.</Text>
             ) : null}
-            {previewRows.map((row) => renderCombinedRow(row, selectedCode, onSelectStation, onSelectCharger, onNavigateToCharger))}
+            {previewRows.map((row) => (
+              <CombinedNearbyListRow
+                key={combinedRowKeyExtractor(row)}
+                onNavigateToCharger={onNavigateToCharger}
+                onSelectCharger={onSelectCharger}
+                onSelectStation={onSelectStation}
+                row={row}
+                selected={row.id === selectedCode}
+              />
+            ))}
           </>
         )
         : null}
 
       {!loading && !error && isFull ? (
-        <ScrollView style={styles.list} contentContainerStyle={styles.listContent} showsVerticalScrollIndicator>
-          <Text style={styles.sectionLabel}>Best nearby mix</Text>
-          {combinedRows.map((row) => renderCombinedRow(row, selectedCode, onSelectStation, onSelectCharger, onNavigateToCharger))}
-        </ScrollView>
+        <FlatList
+          ListHeaderComponent={<Text style={styles.sectionLabel}>Best nearby mix</Text>}
+          contentContainerStyle={styles.listContent}
+          data={combinedRows}
+          keyExtractor={combinedRowKeyExtractor}
+          renderItem={renderCombinedItem}
+          showsVerticalScrollIndicator
+          style={styles.list}
+        />
       ) : null}
 
       {!loading && !error && !combinedRows.length ? (
@@ -306,32 +334,44 @@ function chargerSourceLabel(chargers: EvCharger[]) {
   return "Charger directory data";
 }
 
-function renderCombinedRow(
-  row: CombinedNearbyRow,
-  selectedCode: string | undefined,
-  onSelectStation: (stationCode: string) => void,
-  onSelectCharger: (chargerId: string) => void,
-  onNavigateToCharger: (charger: EvCharger) => void,
-) {
+function CombinedNearbyListRow({
+  onNavigateToCharger,
+  onSelectCharger,
+  onSelectStation,
+  row,
+  selected,
+}: {
+  onNavigateToCharger: (charger: EvCharger) => void;
+  onSelectCharger: (chargerId: string) => void;
+  onSelectStation: (stationCode: string) => void;
+  row: CombinedNearbyRow;
+  selected: boolean;
+}) {
+  const handleFuelPress = useCallback(
+    () => onSelectStation(row.id),
+    [onSelectStation, row.id],
+  );
+  const handleChargerPress = useCallback(
+    () => onSelectCharger(row.id),
+    [onSelectCharger, row.id],
+  );
   if (row.type === "fuel") {
     return (
       <StationRow
         item={row.station}
-        key={`fuel-${row.id}`}
         rankReason={row.rankReason}
-        selected={row.id === selectedCode}
-        onPress={() => onSelectStation(row.id)}
+        selected={selected}
+        onPress={handleFuelPress}
       />
     );
   }
   return (
     <EvChargerRow
       charger={row.charger}
-      key={`charger-${row.id}`}
       rankReason={row.rankReason}
-      selected={row.id === selectedCode}
+      selected={selected}
       onNavigate={onNavigateToCharger}
-      onPress={() => onSelectCharger(row.id)}
+      onPress={handleChargerPress}
     />
   );
 }

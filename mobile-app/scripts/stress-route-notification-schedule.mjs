@@ -48,7 +48,7 @@ const report = {
 };
 
 function plain(value) {
-  return JSON.parse(JSON.stringify(value));
+  return structuredClone(value);
 }
 
 function check(label, fn) {

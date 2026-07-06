@@ -57,7 +57,7 @@ export function routeContextStationToView(
   };
 }
 
-export function vehiclePlanSummary(preferences: AppPreferences) {
+function vehiclePlanSummary(preferences: AppPreferences) {
   const vehicle = preferences.vehicleName || preferences.vehicleRego || "Vehicle";
   if (preferences.vehicleEnergyType === "electric") return `${vehicle} | EV | ${preferences.evRangeKm} km`;
   if (preferences.vehicleEnergyType === "diesel") return `${vehicle} | Diesel | ${preferences.fuel}`;
@@ -252,7 +252,10 @@ export function routeContextNotice(context: ScoreResponse["context"]) {
 
 export function displayLocationLabel(point: MapPoint, fallback: string) {
   const label = point.label || fallback;
-  const parts = label.split(",").map((part) => part.trim()).filter(Boolean);
+  const parts = label.split(",").flatMap((part) => {
+    const trimmed = part.trim();
+    return trimmed ? [trimmed] : [];
+  });
   return parts.slice(0, 3).join(", ") || fallback;
 }
 

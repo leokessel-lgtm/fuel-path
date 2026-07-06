@@ -23,7 +23,7 @@ export type StationConfidence = {
   reason: string;
 };
 
-export function isOfficialLivePriceSource(source?: string) {
+function isOfficialLivePriceSource(source?: string) {
   return new Set([
     "api_nsw_fuelcheck",
     "api_nsw",
@@ -63,8 +63,10 @@ export function fuelProviderLabel(source?: string): string {
   const parts = value.split("+").filter(Boolean);
   if (parts.length > 1) {
     return parts
-      .map((part) => fuelProviderLabel(part))
-      .filter(Boolean)
+      .flatMap((part) => {
+        const label = fuelProviderLabel(part);
+        return label ? [label] : [];
+      })
       .join(" + ");
   }
   if (value.includes("nsw")) return "NSW FuelCheck";
@@ -80,7 +82,7 @@ export function fuelProviderLabel(source?: string): string {
   return "";
 }
 
-export function stationFreshness(station: Station, now = new Date()) {
+function stationFreshness(station: Station, now = new Date()) {
   if (!station.updatedAt) {
     return {
       label: "Freshness unknown",
@@ -108,7 +110,7 @@ export function stationFreshness(station: Station, now = new Date()) {
   };
 }
 
-export function stationConfidence(item: StationViewModel): StationConfidence {
+function stationConfidence(item: StationViewModel): StationConfidence {
   const freshness = stationFreshness(item.station);
   const source = stationSourceLabel(item.station.source);
   const officialLivePrice = isOfficialLivePriceSource(item.station.source);
@@ -181,12 +183,14 @@ function priceUnchangedLine(value: string, now = new Date()) {
   return `Price unchanged for ${formatLongAge(ageDays)}`;
 }
 
+const timeOfDayFormatter = new Intl.DateTimeFormat("en-AU", {
+  hour: "numeric",
+  minute: "2-digit",
+  hour12: true,
+});
+
 function formatTimeOfDay(value: Date) {
-  return new Intl.DateTimeFormat("en-AU", {
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  })
+  return timeOfDayFormatter
     .format(value)
     .replace(/\s/g, "")
     .toLowerCase();
@@ -211,7 +215,7 @@ export function stationOpenLabel(openNow?: boolean) {
   return "Hours unknown";
 }
 
-export function routeValueCue(item: StationViewModel) {
+function routeValueCue(item: StationViewModel) {
   const saving = Number(item.netSaving || 0);
   const detour = Number(item.detourMinutes || 0);
   if (saving >= 1) {
@@ -220,7 +224,7 @@ export function routeValueCue(item: StationViewModel) {
   return `Probably not worth it: saves ${formatMoney(saving)} after ${detour.toFixed(1)} min.`;
 }
 
-export function routeOutcomeLabel(item: StationViewModel) {
+function routeOutcomeLabel(item: StationViewModel) {
   const saving = Number(item.netSaving || 0);
   if (saving < 2) return "Small savings detour";
   if (saving < 5) return "Medium savings detour";
@@ -229,7 +233,7 @@ export function routeOutcomeLabel(item: StationViewModel) {
   return "Strong savings detour";
 }
 
-export function predictionDisciplineCue(item: StationViewModel) {
+function predictionDisciplineCue(item: StationViewModel) {
   const fuel = item.fuel || "";
   const tomorrow = fuel ? item.station.futurePrices?.tomorrow?.prices?.[fuel] : undefined;
   if (Number.isFinite(Number(tomorrow))) return "Tomorrow price is locked by source.";

@@ -1,4 +1,5 @@
-import { Image, StyleSheet, Text, View } from "react-native";
+import { Image } from "expo-image";
+import { StyleSheet, Text, View } from "react-native";
 
 import { brandStyleForStation } from "../data/brandAssets";
 import { colors } from "../theme";
@@ -19,7 +20,7 @@ export function BrandBadge({ station, size = 34 }: { station: Station; size?: nu
       ]}
     >
       {style.icon ? (
-        <Image source={style.icon} style={styles.image} resizeMode="contain" />
+        <Image cachePolicy="memory-disk" contentFit="contain" source={style.icon} style={styles.image} />
       ) : (
         <Text style={[styles.initials, { fontSize: Math.max(10, size * 0.34) }]}>
           {style.initials}

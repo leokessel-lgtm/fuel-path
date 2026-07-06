@@ -2,13 +2,13 @@ import { StationViewModel } from "../types";
 
 type RouteEvidenceCandidate = Pick<StationViewModel, "actualDetour" | "detourMinutes">;
 
-export function routeDetourEvidenceKind(candidate?: Pick<StationViewModel, "actualDetour">) {
+function routeDetourEvidenceKind(candidate?: Pick<StationViewModel, "actualDetour">) {
   return candidate?.actualDetour?.source === "route_engine_via_station"
     ? "route_checked"
     : "estimated";
 }
 
-export function routeDetourEvidenceLabel(candidate?: Pick<StationViewModel, "actualDetour">) {
+function routeDetourEvidenceLabel(candidate?: Pick<StationViewModel, "actualDetour">) {
   return routeDetourEvidenceKind(candidate) === "route_checked"
     ? "Checked"
     : "Estimated";
@@ -35,7 +35,7 @@ export function routeDetourEvidenceLine(
     : "Estimated on-route stop";
 }
 
-export function routeDetourNoticePhrase(
+function routeDetourNoticePhrase(
   candidate?: RouteEvidenceCandidate,
   fallbackMinutes = 0,
 ) {

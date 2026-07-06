@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useReducer, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -16,93 +16,120 @@ import { CurrentLocationFieldButton, currentLocationFieldInset } from "./Current
 import { LocationEvidenceChip } from "./LocationEvidenceChip";
 import { StationMap } from "./StationMap";
 
-export function SavedPlaceEditor({
-  kind,
-  label,
-  onClear,
-  onSave,
-  point,
-}: {
+type SavedPlaceEditorProps = {
   kind: "home" | "work";
   label: string;
   onClear: () => void;
   onSave: (point: MapPoint) => void;
   point?: MapPoint;
-}) {
-  const [query, setQuery] = useState(point?.label || "");
-  const [suggestions, setSuggestions] = useState<MapPoint[]>([]);
-  const [loading, setLoading] = useState(false);
+};
+
+type EditorState = {
+  loading: boolean;
+  mapDraft?: MapPoint;
+  message: string;
+  query: string;
+  suggestions: MapPoint[];
+};
+
+type EditorAction =
+  | { type: "clear"; label: string }
+  | { type: "map-draft"; label: string; point: MapPoint }
+  | { type: "query"; query: string }
+  | { type: "saved"; label: string; point: MapPoint }
+  | { type: "search-error"; message: string }
+  | { type: "search-clear" }
+  | { type: "search-idle" }
+  | { type: "search-loading" }
+  | { type: "search-results"; suggestions: MapPoint[] };
+
+export function SavedPlaceEditor(props: SavedPlaceEditorProps) {
+  return (
+    <SavedPlaceEditorFields
+      {...props}
+      key={`${props.kind}:${props.point?.lat || ""}:${props.point?.lon || ""}:${props.point?.label || ""}`}
+    />
+  );
+}
+
+function SavedPlaceEditorFields({
+  kind,
+  label,
+  onClear,
+  onSave,
+  point,
+}: SavedPlaceEditorProps) {
+  const [editor, dispatchEditor] = useReducer(editorReducer, point, initialEditorState);
   const [locating, setLocating] = useState(false);
-  const [mapDraft, setMapDraft] = useState<MapPoint | undefined>(point);
-  const [message, setMessage] = useState("");
-  const sessionTokenRef = useRef(makeLocationSessionToken());
+  const sessionTokenRef = useRef<string | null>(null);
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchRequestRef = useRef(0);
+
+  if (!sessionTokenRef.current) {
+    sessionTokenRef.current = makeLocationSessionToken();
+  }
 
   useEffect(() => {
-    setQuery(point?.label || "");
-    setMapDraft(point);
-  }, [point]);
+    return () => {
+      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    };
+  }, []);
 
-  useEffect(() => {
-    const trimmed = query.trim();
+  const updateQuery = (value: string) => {
+    const trimmed = value.trim();
+    const requestId = searchRequestRef.current + 1;
+    searchRequestRef.current = requestId;
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    dispatchEditor({ type: "query", query: value });
     if (trimmed.length < 3 || trimmed === point?.label) {
-      setSuggestions([]);
-      setLoading(false);
+      dispatchEditor({ type: "search-clear" });
       return;
     }
-
-    let active = true;
-    setLoading(true);
-    setMessage("");
-    const timer = setTimeout(() => {
-      searchLocations(trimmed, 4, sessionTokenRef.current)
+    dispatchEditor({ type: "search-loading" });
+    searchTimerRef.current = setTimeout(() => {
+      searchLocations(trimmed, 4, sessionTokenRef.current || "")
         .then((results) => {
-          if (!active) return;
-          setSuggestions(results);
+          if (searchRequestRef.current === requestId) dispatchEditor({ type: "search-results", suggestions: results });
         })
         .catch((err: Error) => {
-          if (!active) return;
-          setSuggestions([]);
-          setMessage(err.message);
+          if (searchRequestRef.current !== requestId) return;
+          dispatchEditor({ type: "search-error", message: err.message });
         })
         .finally(() => {
-          if (active) setLoading(false);
+          if (searchRequestRef.current === requestId) dispatchEditor({ type: "search-idle" });
         });
     }, 550);
-
-    return () => {
-      active = false;
-      clearTimeout(timer);
-    };
-  }, [point?.label, query]);
+  };
 
   const savePoint = (nextPoint: MapPoint) => {
+    searchRequestRef.current += 1;
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
     onSave(nextPoint);
-    setQuery(nextPoint.label);
-    setMapDraft(nextPoint);
-    setSuggestions([]);
-    setMessage(`${label} saved.`);
+    dispatchEditor({ type: "saved", label, point: nextPoint });
     sessionTokenRef.current = makeLocationSessionToken();
   };
 
   const useCurrentLocation = async () => {
     setLocating(true);
-    setMessage("");
+    dispatchEditor({ type: "search-clear" });
     try {
       const nextPoint = await getCurrentMapPoint(`${label} location`);
       savePoint(nextPoint);
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Current location is not available.");
+      dispatchEditor({
+        type: "search-error",
+        message: err instanceof Error ? err.message : "Current location is not available.",
+      });
     } finally {
       setLocating(false);
     }
   };
 
   const clearPlace = () => {
+    searchRequestRef.current += 1;
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
     onClear();
-    setQuery("");
-    setSuggestions([]);
-    setMapDraft(undefined);
-    setMessage(`${label} cleared.`);
+    dispatchEditor({ type: "clear", label });
     sessionTokenRef.current = makeLocationSessionToken();
   };
 
@@ -136,15 +163,14 @@ export function SavedPlaceEditor({
           accessibilityLabel={`Search ${label.toLowerCase()} address or place`}
           accessibilityHint={`Type a ${label.toLowerCase()} address, suburb or place and choose a suggestion.`}
           onChangeText={(value) => {
-            setQuery(value);
-            setMessage("");
+            updateQuery(value);
           }}
           placeholder={`${label} address or place`}
           returnKeyType="search"
-          style={[styles.input, loading && styles.inputWithLoading]}
-          value={query}
+          style={[styles.input, editor.loading && styles.inputWithLoading]}
+          value={editor.query}
         />
-        {loading ? <ActivityIndicator color={colors.green} style={styles.lookupSpinner} /> : null}
+        {editor.loading ? <ActivityIndicator color={colors.green} style={styles.lookupSpinner} /> : null}
         <CurrentLocationFieldButton
           accessibilityHint={`Requests location permission and saves the current position as ${label.toLowerCase()}.`}
           accessibilityLabel={`Use current location for ${label.toLowerCase()}`}
@@ -153,9 +179,9 @@ export function SavedPlaceEditor({
         />
       </View>
 
-      {suggestions.length ? (
+      {editor.suggestions.length ? (
         <View style={styles.suggestionList}>
-          {suggestions.map((suggestion) => (
+          {editor.suggestions.map((suggestion) => (
             <Pressable
               accessibilityLabel={`Save ${suggestion.label} as ${label.toLowerCase()}`}
               accessibilityHint={`Sets this location as ${label.toLowerCase()}.`}
@@ -184,17 +210,20 @@ export function SavedPlaceEditor({
         </View>
       ) : null}
 
-      {mapDraft ? (
+      {editor.mapDraft ? (
         <View style={styles.mapBox}>
           <StationMap
-            centre={mapDraft}
+            centre={editor.mapDraft}
             onMapSearchAreaChange={({ centre }) => {
-              setMapDraft({
-                ...centre,
-                label: `${label} map centre`,
-                type: "map_refine",
+              dispatchEditor({
+                type: "map-draft",
+                label,
+                point: {
+                  ...centre,
+                  label: `${label} map centre`,
+                  type: "map_refine",
+                },
               });
-              setMessage("Move the map, then save the refined centre.");
             }}
             onSelect={() => {}}
             stations={[]}
@@ -203,7 +232,9 @@ export function SavedPlaceEditor({
             accessibilityLabel={`Save refined ${label.toLowerCase()} map centre`}
             accessibilityHint={`Saves the current map centre as ${label.toLowerCase()}.`}
             accessibilityRole="button"
-            onPress={() => savePoint(mapDraft)}
+            onPress={() => {
+              if (editor.mapDraft) savePoint(editor.mapDraft);
+            }}
             style={styles.mapButton}
           >
             <Text style={styles.mapButtonText}>Save map centre</Text>
@@ -211,13 +242,54 @@ export function SavedPlaceEditor({
         </View>
       ) : null}
 
-      {message ? (
+      {editor.message ? (
         <Text accessibilityLiveRegion="polite" numberOfLines={2} style={styles.message}>
-          {message}
+          {editor.message}
         </Text>
       ) : null}
     </View>
   );
+}
+
+function initialEditorState(point?: MapPoint): EditorState {
+  return {
+    loading: false,
+    mapDraft: point,
+    message: "",
+    query: point?.label || "",
+    suggestions: [],
+  };
+}
+
+function editorReducer(state: EditorState, action: EditorAction): EditorState {
+  switch (action.type) {
+    case "clear":
+      return { loading: false, mapDraft: undefined, message: `${action.label} cleared.`, query: "", suggestions: [] };
+    case "map-draft":
+      return { ...state, mapDraft: action.point, message: "Move the map, then save the refined centre." };
+    case "query":
+      return { ...state, message: "", query: action.query };
+    case "saved":
+      return {
+        loading: false,
+        mapDraft: action.point,
+        message: `${action.label} saved.`,
+        query: action.point.label,
+        suggestions: [],
+      };
+    case "search-error":
+      return { ...state, loading: false, message: action.message, suggestions: [] };
+    case "search-clear":
+      return { ...state, loading: false, suggestions: [] };
+    case "search-idle":
+      return { ...state, loading: false };
+    case "search-loading":
+      return { ...state, loading: true, message: "" };
+    case "search-results":
+      return { ...state, suggestions: action.suggestions };
+    default:
+      return state;
+  }
 }
 
 function makeLocationSessionToken() {
@@ -229,7 +301,10 @@ function shortPlaceTitle(point: MapPoint) {
 }
 
 function shortPlaceMeta(point: MapPoint) {
-  const parts = point.label.split(",").map((part) => part.trim()).filter(Boolean);
+  const parts = point.label.split(",").flatMap((part) => {
+    const trimmed = part.trim();
+    return trimmed ? [trimmed] : [];
+  });
   return parts.slice(1, 4).join(", ") || "Australia";
 }
 

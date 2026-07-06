@@ -7,6 +7,8 @@ import { BrandBadge } from "./BrandBadge";
 
 const maxStationMarkers = 240;
 const mixedEnergyMaxStationMarkers = 48;
+const emptyChargers: EvCharger[] = [];
+const emptyRoutePoints: MapPoint[] = [];
 
 type CameraInsets = {
   top?: number;
@@ -17,7 +19,7 @@ type CameraInsets = {
 
 export function StationMap({
   centre,
-  chargers = [],
+  chargers = emptyChargers,
   stations,
   selectedChargerId,
   selectedStationCode,
@@ -28,7 +30,7 @@ export function StationMap({
   cameraFocusKey: _cameraFocusKey,
   showCentreMarker = true,
   routeEndpoints,
-  routePoints = [],
+  routePoints = emptyRoutePoints,
   cameraInsets,
   userLocation,
 }: {

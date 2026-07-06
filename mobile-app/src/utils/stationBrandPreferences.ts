@@ -16,7 +16,7 @@ export function preferredStationBrandSummary(preferences: AppPreferences) {
   return `${selected.length} preferred brands`;
 }
 
-export function stationMatchesPreferredBrands(
+function stationMatchesPreferredBrands(
   station: Station,
   preferredBrands: string[],
 ) {

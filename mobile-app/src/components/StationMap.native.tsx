@@ -48,6 +48,8 @@ type ClusterMarker = {
   lon: number;
 };
 
+const emptyRoutePoints: MapPoint[] = [];
+
 export function StationMap({
   centre,
   stations,
@@ -58,7 +60,7 @@ export function StationMap({
   cameraFocusKey,
   showCentreMarker = true,
   routeEndpoints,
-  routePoints = [],
+  routePoints = emptyRoutePoints,
   cameraInsets,
   userLocation,
 }: {
@@ -98,6 +100,15 @@ export function StationMap({
     () => resolveCameraInsets(routeEndpoints ? "route" : "nearby", cameraInsets),
     [cameraInsets, routeEndpoints],
   );
+  const cameraKey = useMemo(
+    () => [
+      routeEndpoints ? "route" : "nearby",
+      cameraFocusKey || "initial",
+      cameraResetVersion,
+      cameraInsetsKey(activeInsets),
+    ].join("|"),
+    [activeInsets, cameraFocusKey, cameraResetVersion, routeEndpoints],
+  );
   const cameraCoordinates = useMemo(() => {
     if (routeEndpoints) {
       const routeStationCameraPoints = stations.slice(0, routePriceMarkerLimit).map((item) => ({
@@ -109,7 +120,7 @@ export function StationMap({
       return [routeEndpoints.from, routeEndpoints.to, ...routeStationCameraPoints];
     }
     return nearbyCameraPointsForCentre(centre, nearbyInitialMarkerRadiusKm);
-  }, [centre, routeEndpoints, routePriceMarkerLimit, showCentreMarker, stations, visibleRoutePoints]);
+  }, [centre, routeEndpoints, routePriceMarkerLimit, stations, visibleRoutePoints]);
   const initialRegion = useMemo(() => regionForPoint(centre), [centre]);
   const markerGroups = useMemo(
     () => {
@@ -124,22 +135,22 @@ export function StationMap({
     },
     [currentRegion, markerDensity, routeEndpoints, routePriceMarkerLimit, selectedStationCode, stations],
   );
+  const interactiveClusterMarkers = useMemo(
+    () =>
+      markerGroups.clusterMarkers.filter((cluster) =>
+        clusterFitsInteractiveRegion(cluster, currentRegion, activeInsets),
+      ),
+    [activeInsets, currentRegion, markerGroups.clusterMarkers],
+  );
 
   useEffect(() => {
     if (!mapReady || !mapRef.current || !cameraCoordinates.length) return;
 
-    const cameraKey = [
-      routeEndpoints ? "route" : "nearby",
-      cameraFocusKey || "initial",
-      cameraResetVersion,
-      cameraInsetsKey(activeInsets),
-    ].join("|");
     const cameraContextChanged = cameraKey !== lastCameraKeyRef.current;
     if (!cameraContextChanged && userMovedMapRef.current) return;
     if (cameraContextChanged) {
       userGestureStartedRef.current = false;
       lastReportedUserCentreKeyRef.current = "";
-      setMapMovedByUser(false);
     }
 
     runProgrammaticMapMove(programmaticMoveRef, () => {
@@ -166,9 +177,9 @@ export function StationMap({
     userMovedMapRef.current = false;
   }, [
     activeInsets,
+    centre,
     cameraCoordinates,
-    cameraFocusKey,
-    cameraResetVersion,
+    cameraKey,
     mapReady,
     routeEndpoints,
   ]);
@@ -335,9 +346,7 @@ export function StationMap({
           </Marker>
         ))}
 
-        {markerGroups.clusterMarkers
-          .filter((cluster) => clusterFitsInteractiveRegion(cluster, currentRegion, activeInsets))
-          .map((cluster) => (
+        {interactiveClusterMarkers.map((cluster) => (
           <Marker
             {...decorativeStationMarkerAccessibility}
             coordinate={{ latitude: cluster.lat, longitude: cluster.lon }}
@@ -383,7 +392,7 @@ export function StationMap({
         })}
       </MapView>
 
-      {mapMovedByUser ? (
+      {mapMovedByUser && cameraKey === lastCameraKeyRef.current ? (
         <Pressable
           accessibilityLabel={routeEndpoints ? "Return to route" : "Recenter map"}
           accessibilityRole="button"
@@ -417,15 +426,14 @@ function stationCodesInRegion(stations: StationViewModel[], region: Region) {
   const maxLat = region.latitude + region.latitudeDelta / 2;
   const minLon = region.longitude - region.longitudeDelta / 2;
   const maxLon = region.longitude + region.longitudeDelta / 2;
-  return stations
-    .filter(
-      (item) =>
-        item.station.lat >= minLat &&
-        item.station.lat <= maxLat &&
-        item.station.lon >= minLon &&
-        item.station.lon <= maxLon,
-    )
-    .map((item) => item.station.stationCode);
+  return stations.flatMap((item) =>
+    item.station.lat >= minLat &&
+    item.station.lat <= maxLat &&
+    item.station.lon >= minLon &&
+    item.station.lon <= maxLon
+      ? [item.station.stationCode]
+      : [],
+  );
 }
 
 function visibleMarkerGroups(

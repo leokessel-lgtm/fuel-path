@@ -14,15 +14,15 @@ export function SavedCommuteShortcuts({
 
   return (
     <ScrollView
+      contentContainerStyle={styles.row}
       horizontal
       showsHorizontalScrollIndicator={false}
-      contentContainerStyle={styles.row}
     >
       {savedCommutes.map((commute) => (
         <Pressable
+          key={commute.id}
           accessibilityLabel={`Use saved commute ${commute.name}`}
           accessibilityRole="button"
-          key={commute.id}
           onPress={() => onSelect(commute)}
           style={({ pressed }) => [
             styles.chip,

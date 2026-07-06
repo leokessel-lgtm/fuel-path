@@ -95,7 +95,9 @@ module.exports = async function handler(req, res) {
       trafficPreference,
       tollPreference,
     });
-    const recommendations = refinedRecommendations.slice(0, 20);
+    const recommendationLimit = combinedPlanRoute ? 140 : 20;
+    const routeContextStationLimit = combinedPlanRoute ? 180 : 40;
+    const recommendations = refinedRecommendations.slice(0, recommendationLimit);
     const excludedCodes = new Set(recommendations.map((candidate) => String(candidate.station.stationCode)));
 
     const payload = {
@@ -110,6 +112,8 @@ module.exports = async function handler(req, res) {
         tollPreference,
         trafficPreference,
         actualDetours: actualDetourContext({ actualDetours, recommendations: refinedRecommendations }),
+        recommendationLimit,
+        routeContextStationLimit,
         brandFilter,
         brands: brandFilter ? Array.from(brandLabels.size ? brandLabels : brands) : [],
         generatedAt: new Date().toISOString(),
@@ -136,6 +140,7 @@ module.exports = async function handler(req, res) {
         corridorKm: scored.context.corridorKm,
         includeMemberPrices,
         includeClosed,
+        limit: routeContextStationLimit,
       }),
     };
     sendJson(res, 200, combinedPlanRoute ? { route: routePlan.builtRoute, score: payload } : payload);

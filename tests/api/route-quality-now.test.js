@@ -119,6 +119,37 @@ test("combined score endpoint can explicitly disable actual detour refinement", 
   assert.deepEqual(calls.map((call) => call.tollPreference), ["avoid"]);
 });
 
+test("combined score endpoint returns broad Plan route display suggestions", async () => {
+  const calls = [];
+  const routeStations = Array.from({ length: 64 }, (_, index) =>
+    station(
+      `ROUTE-${index + 1}`,
+      `Route option ${index + 1}`,
+      "Metro",
+      160 + (index % 18),
+      0.003,
+      0.01 + index * 0.015,
+    ),
+  );
+  const payload = await withMockedScoreBackend(calls, async (handler) =>
+    callScore(handler, {
+      actualDetours: false,
+      from: { lat: 0, lon: 0, label: "Start" },
+      to: { lat: 0, lon: 1, label: "End" },
+      fuel: "U91",
+      source: "sample",
+    }),
+    { stations: routeStations },
+  );
+
+  const score = payload.score;
+  assert.equal(score.context.recommendationLimit, 140);
+  assert.equal(score.context.routeContextStationLimit, 180);
+  assert.equal(score.recommendations.length, 64);
+  assert.equal(score.recommendations[0].station.stationCode, "ROUTE-1");
+  assert.ok(score.recommendations.some((candidate) => candidate.distanceAlongRouteKm > 70));
+});
+
 test("score endpoint can refine top candidate detour through route engine behind flag", async () => {
   const calls = [];
   const payload = await withMockedScoreBackend(calls, async (handler) =>

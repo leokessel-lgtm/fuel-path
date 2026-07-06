@@ -128,7 +128,7 @@ EV route charger ordering is route-guidance, not charger-stop optimisation. The 
 
 The score may be returned for diagnostics, but user-facing copy must not call the first EV row `best`, `optimised` or `guaranteed available` until commercial provider evidence and availability semantics are approved.
 
-Plan route maps should keep the recommended station plus the next three route candidates as direct price markers where possible. Do not let marker clustering hide those first four route candidates, because they are the stations users compare immediately after a route recommendation.
+Plan route maps should keep one clear recommended station while also showing broad fuel-price coverage along the trip. The recommendation card and first sheet rows may stay tightly ranked, but the map should not collapse a long route to only a few early-route pins. For Plan routes, return and render a broader display set of route candidates/context stations so users can see later-trip fuel options and understand that the route has been checked end to end. Map-only marker ordering may spread candidates by route progress; it must not change the ranked recommendation order or the selected best-stop logic.
 
 Plan route failure states should never show raw JavaScript errors, undefined route-shape errors or provider stack details. If scoring returns a valid score payload without a route shape, the frontend should preserve the route endpoints and show the score result or an empty recommendation state rather than crashing. If routing or scoring is unavailable, show a plain recovery message that points users back to retrying, editing the route or checking Nearby fuel.
 

@@ -185,6 +185,7 @@ export type StationViewModel = {
   possibleLowerDisclosure?: string;
   possibleDiscountCpl?: number;
   distanceKm: number;
+  distanceAlongRouteKm?: number;
   fuel?: string;
   requestedFuel?: string;
   exactFuelMatch?: boolean;
@@ -465,6 +466,8 @@ export type ScoreResponse = {
     eligibleCandidates: number;
     minSavingDollars?: number;
     maxDetourMinutes?: number;
+    recommendationLimit?: number;
+    routeContextStationLimit?: number;
     brandFilter?: boolean;
     brands?: string[];
     staleExcludedCandidates?: number;

@@ -10,6 +10,8 @@ const LEAFLET_CSS_ID = "fuel-path-leaflet-css";
 const LEAFLET_CUSTOM_CSS_ID = "fuel-path-leaflet-custom-css";
 const maxStationMarkers = 420;
 const maxPriceMarkers = 14;
+const routeMaxPriceMarkers = 180;
+const routeCameraStationPointLimit = 40;
 const maxEvMarkers = 96;
 const markerGridSize = 132;
 const mixedEnergyMaxPriceMarkers = 8;
@@ -160,7 +162,7 @@ export function StationMap({
     const cameraChargers = chargers.slice(0, 16);
     const routeStationCameraPoints = routeEndpoints
       ? stations
-          .slice(0, maxPriceMarkers)
+          .slice(0, routeCameraStationPointLimit)
           .map((item) => [item.station.lat, item.station.lon] as [number, number])
       : [];
     const cameraPoints = routeEndpoints
@@ -231,7 +233,7 @@ export function StationMap({
     const markerStations = prioritiseSelectedStations(stations, selectedStationCode);
     const markerGroups = routeEndpoints
       ? {
-          priceMarkers: markerStations.slice(0, maxPriceMarkers),
+          priceMarkers: markerStations.slice(0, routeMaxPriceMarkers),
           clusterMarkers: [],
         }
       : visibleMarkerGroups(

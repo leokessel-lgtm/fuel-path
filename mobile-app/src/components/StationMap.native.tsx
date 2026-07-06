@@ -13,6 +13,8 @@ import { MapPoint, StationViewModel } from "../types";
 import { BrandBadge } from "./BrandBadge";
 
 const maxStationMarkers = 420;
+const routeMaxPriceMarkers = 140;
+const compactRouteMaxPriceMarkers = 96;
 const defaultMarkerDensity = {
   maxPriceMarkers: 8,
   maxDotMarkers: 18,
@@ -91,13 +93,14 @@ export function StationMap({
     [routePoints],
   );
   const markerDensity = useMemo(() => nativeMarkerDensity(width), [width]);
+  const routePriceMarkerLimit = useMemo(() => nativeRoutePriceMarkerLimit(width), [width]);
   const activeInsets = useMemo(
     () => resolveCameraInsets(routeEndpoints ? "route" : "nearby", cameraInsets),
     [cameraInsets, routeEndpoints],
   );
   const cameraCoordinates = useMemo(() => {
     if (routeEndpoints) {
-      const routeStationCameraPoints = stations.slice(0, markerDensity.maxPriceMarkers).map((item) => ({
+      const routeStationCameraPoints = stations.slice(0, routePriceMarkerLimit).map((item) => ({
         lat: item.station.lat,
         lon: item.station.lon,
         label: item.station.name,
@@ -106,20 +109,20 @@ export function StationMap({
       return [routeEndpoints.from, routeEndpoints.to, ...routeStationCameraPoints];
     }
     return nearbyCameraPointsForCentre(centre, nearbyInitialMarkerRadiusKm);
-  }, [centre, markerDensity.maxPriceMarkers, routeEndpoints, showCentreMarker, stations, visibleRoutePoints]);
+  }, [centre, routeEndpoints, routePriceMarkerLimit, showCentreMarker, stations, visibleRoutePoints]);
   const initialRegion = useMemo(() => regionForPoint(centre), [centre]);
   const markerGroups = useMemo(
     () => {
       if (routeEndpoints) {
         return {
-          priceMarkers: stations.slice(0, markerDensity.maxPriceMarkers),
+          priceMarkers: prioritiseSelectedStations(stations, selectedStationCode).slice(0, routePriceMarkerLimit),
           dotMarkers: [],
           clusterMarkers: [],
         };
       }
       return visibleMarkerGroups(stations.slice(0, maxStationMarkers), currentRegion, markerDensity, selectedStationCode);
     },
-    [currentRegion, markerDensity, routeEndpoints, selectedStationCode, stations],
+    [currentRegion, markerDensity, routeEndpoints, routePriceMarkerLimit, selectedStationCode, stations],
   );
 
   useEffect(() => {
@@ -545,6 +548,17 @@ function clusterFitsInteractiveRegion(
 
 function nativeMarkerDensity(width: number) {
   return width <= 430 ? compactMarkerDensity : defaultMarkerDensity;
+}
+
+function prioritiseSelectedStations(stations: StationViewModel[], selectedStationCode?: string) {
+  if (!selectedStationCode) return stations;
+  const selected = stations.find((item) => item.station.stationCode === selectedStationCode);
+  if (!selected) return stations;
+  return [selected, ...stations.filter((item) => item.station.stationCode !== selectedStationCode)];
+}
+
+function nativeRoutePriceMarkerLimit(width: number) {
+  return width <= 430 ? compactRouteMaxPriceMarkers : routeMaxPriceMarkers;
 }
 
 function protectedStationCodes(stations: StationViewModel[], selectedStationCode?: string) {

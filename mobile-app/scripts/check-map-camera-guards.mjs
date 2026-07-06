@@ -250,7 +250,7 @@ const checks = [
       nativeMap.includes("height: 46") &&
       nativeMap.includes("minHeight: 24") &&
       nativeMap.includes("<BrandBadge station={item.station} size={22} />") &&
-      nativeMap.includes("const routeStationCameraPoints = stations.slice(0, markerDensity.maxPriceMarkers).map") &&
+      nativeMap.includes("const routeStationCameraPoints = stations.slice(0, routePriceMarkerLimit).map") &&
       nativeMap.includes("return [...visibleRoutePoints, ...routeStationCameraPoints]") &&
       brandBadge.includes('resizeMode="contain"') &&
       !nativeMap.includes("scale: 1.05") &&
@@ -455,6 +455,20 @@ const checks = [
       !webMap.includes(">VIA<") &&
       !nativeMap.includes("routeStopBadge") &&
       !nativeMap.includes(">VIA<"),
+  },
+  {
+    label: "plan route maps show broad route price coverage",
+    ok:
+      webMap.includes("const routeMaxPriceMarkers = 180;") &&
+      webMap.includes("markerStations.slice(0, routeMaxPriceMarkers)") &&
+      nativeMap.includes("const routeMaxPriceMarkers = 140;") &&
+      nativeMap.includes("const compactRouteMaxPriceMarkers = 96;") &&
+      nativeMap.includes("nativeRoutePriceMarkerLimit(width)") &&
+      planScreen.includes("const candidates = useMemo(() => routeRecommendations.slice(0, 10), [routeRecommendations]);") &&
+      planScreen.includes("routeMapStations(uniqueStations([...routeRecommendations, ...contextStations]), selectedCode)") &&
+      planScreenUtils.includes("export function routeMapStations") &&
+      planScreenUtils.includes("Array.from({ length: 12 }") &&
+      planScreenUtils.includes("routeMarkerDisplayOrder"),
   },
   {
     label: "native Plan route keeps enough geometry to follow roads",

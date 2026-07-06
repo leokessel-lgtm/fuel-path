@@ -23,6 +23,7 @@ export function routeCandidateToStation(candidate: ScoreCandidate, index: number
     possibleLowerDisclosure: candidate.possibleLowerDisclosure,
     possibleDiscountCpl: candidate.possibleDiscountCpl,
     distanceKm: Number(candidate.distanceToRouteKm || candidate.distanceKm || 0),
+    distanceAlongRouteKm: Number(candidate.distanceAlongRouteKm || 0),
     fuel: candidate.fuel,
     netSaving: Number(candidate.netSaving || 0),
     detourMinutes: Number(candidate.detourMinutes || 0),
@@ -52,6 +53,7 @@ export function routeContextStationToView(
   return {
     ...view,
     distanceKm: Number(contextStation.distanceToRouteKm || view.distanceKm || 0),
+    distanceAlongRouteKm: Number(contextStation.distanceAlongRouteKm || 0),
   };
 }
 
@@ -97,6 +99,65 @@ export function uniqueStations(stations: StationViewModel[]) {
     seen.add(code);
     return true;
   });
+}
+
+export function routeMapStations(stations: StationViewModel[], selectedStationCode?: string) {
+  const selected = selectedStationCode
+    ? stations.find((item) => item.station.stationCode === selectedStationCode)
+    : undefined;
+  const remaining = selected
+    ? stations.filter((item) => item.station.stationCode !== selected.station.stationCode)
+    : stations;
+  const maxAlong = remaining.reduce(
+    (max, item) => Math.max(max, Number(item.distanceAlongRouteKm || 0)),
+    Number(selected?.distanceAlongRouteKm || 0),
+  );
+  const buckets = Array.from({ length: 12 }, () => [] as StationViewModel[]);
+  const unpositioned: StationViewModel[] = [];
+  for (const item of remaining) {
+    const progress = routeMarkerProgress(item, maxAlong);
+    if (!Number.isFinite(progress)) {
+      unpositioned.push(item);
+      continue;
+    }
+    const index = Math.max(0, Math.min(buckets.length - 1, Math.floor(progress * buckets.length)));
+    buckets[index].push(item);
+  }
+  for (const bucket of buckets) {
+    bucket.sort(routeMarkerDisplayOrder);
+  }
+  unpositioned.sort(routeMarkerDisplayOrder);
+  const ordered: StationViewModel[] = selected ? [selected] : [];
+  let added = true;
+  while (added) {
+    added = false;
+    for (const bucket of buckets) {
+      const next = bucket.shift();
+      if (!next) continue;
+      ordered.push(next);
+      added = true;
+    }
+  }
+  ordered.push(...unpositioned);
+  return ordered;
+}
+
+function routeMarkerProgress(item: StationViewModel, maxAlong: number) {
+  if (Number.isFinite(item.routePosition?.progressRatio)) return Number(item.routePosition?.progressRatio);
+  const along = Number(item.distanceAlongRouteKm);
+  if (Number.isFinite(along) && Number.isFinite(maxAlong) && maxAlong > 0) {
+    return along / maxAlong;
+  }
+  return Number.NaN;
+}
+
+function routeMarkerDisplayOrder(left: StationViewModel, right: StationViewModel) {
+  return (
+    Number(left.adjustedCpl || left.pumpCpl || Number.POSITIVE_INFINITY) -
+      Number(right.adjustedCpl || right.pumpCpl || Number.POSITIVE_INFINITY) ||
+    Number(left.distanceKm || Number.POSITIVE_INFINITY) -
+      Number(right.distanceKm || Number.POSITIVE_INFINITY)
+  );
 }
 
 export function routeRecommendationCopy(

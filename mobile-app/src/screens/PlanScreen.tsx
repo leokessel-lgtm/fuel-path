@@ -42,6 +42,7 @@ import {
   routeCandidateToStation,
   routeContextNotice,
   routeContextStationToView,
+  routeMapStations,
   routeRecommendationCopy,
   sameSavedCommuteRoute,
   shortPointName,
@@ -475,8 +476,8 @@ export function PlanScreen({
     [preferences, result],
   );
   const mapStations = useMemo(
-    () => uniqueStations([...routeRecommendations, ...contextStations]),
-    [contextStations, routeRecommendations],
+    () => routeMapStations(uniqueStations([...routeRecommendations, ...contextStations]), selectedCode),
+    [contextStations, routeRecommendations, selectedCode],
   );
   const best = candidates[0];
   const selected = mapStations.find((item) => item.station.stationCode === selectedCode) || best;

@@ -106,7 +106,7 @@ export function PlanRouteSheet({
     : routeEndpointsPresent
       ? "Show route panel"
       : "Show route panel";
-  const routeSheetRestoreText = stationPanelOpen ? "Detail" : routeEndpointsPresent ? "Stops" : "Panel";
+  const routeSheetRestoreText = stationPanelOpen ? "Detail" : routeEndpointsPresent ? "Recommended" : "Panel";
 
   return (
     <View
@@ -219,12 +219,12 @@ function StationDetailPanel({
       <View style={styles.sheetHeaderRow}>
         <View />
         <Pressable
-          accessibilityLabel="Show route options"
+          accessibilityLabel="Show recommended stop"
           accessibilityRole="button"
           onPress={onShowStops}
           style={styles.textButton}
         >
-          <Text style={styles.textButtonLabel}>Stops</Text>
+          <Text style={styles.textButtonLabel}>Recommended</Text>
         </Pressable>
       </View>
       <StationRow hideWhyLine item={selected} selected onPress={onNavigate} />

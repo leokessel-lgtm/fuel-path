@@ -471,8 +471,9 @@ const checks = [
     label: "plan returns to recommended stop after alternative detail",
     ok:
       planScreen.includes("if (best) setSelectedCode(best.station.stationCode);") &&
-      planRouteSheet.includes('accessibilityLabel="Show route options"') &&
-      planRouteSheet.includes("<Text style={styles.textButtonLabel}>Stops</Text>"),
+      planRouteSheet.includes('accessibilityLabel="Show recommended stop"') &&
+      planRouteSheet.includes("<Text style={styles.textButtonLabel}>Recommended</Text>") &&
+      !planRouteSheet.includes("<Text style={styles.textButtonLabel}>Stops</Text>"),
   },
   {
     label: "plan keeps map visible while route sheet stays hidden until route starts",
@@ -495,13 +496,13 @@ const checks = [
       planScreen.includes("!routeStarted && styles.topControlsOnly"),
   },
   {
-    label: "plan sheet exposes map and stops recovery controls",
+    label: "plan sheet exposes map and recommended-stop recovery controls",
     ok:
       planScreen.includes("onMinimise") &&
       planScreen.includes("onShowStops") &&
       planRouteSheet.includes('accessibilityLabel="Show more map"') &&
       planRouteSheet.includes("const routeSheetRestoreLabel = stationPanelOpen") &&
-      planRouteSheet.includes("Show route options") &&
+      planRouteSheet.includes("Show recommended stop") &&
       planRouteSheet.includes("Show route panel"),
   },
   {

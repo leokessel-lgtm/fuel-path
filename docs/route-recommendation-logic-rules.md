@@ -596,6 +596,7 @@ Allowed:
 
 ```text
 Best stop for this trip
+Recommended
 Saves 20.0 c/L on this trip
 Compared with the next-best route option at 176.9 c/L. Your price includes eligible discounts.
 Suggested stop adds a 0.1 min detour and is best by 20.0 c/L.

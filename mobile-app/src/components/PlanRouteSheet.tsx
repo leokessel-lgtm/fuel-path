@@ -397,11 +397,11 @@ function RouteResultsPanel({
               <Text numberOfLines={2} style={styles.compactDecisionTitle}>
                 {recommendationTitle(recommendationCopy?.title, recommendationSavingCpl)}
               </Text>
-              {recommendationSavingCpl > 0.05 ? (
-                <Text numberOfLines={1} style={styles.compactSavingLine}>
-                  Saves {recommendationSavingCpl.toFixed(1)} c/L on this trip
-                </Text>
-              ) : null}
+              <Text numberOfLines={1} style={styles.compactSavingLine}>
+                {recommendationSavingCpl > 0.05
+                  ? `Saves ${recommendationSavingCpl.toFixed(1)} c/L on this trip`
+                  : "Best route value found"}
+              </Text>
               <Text numberOfLines={1} style={styles.compactDetourLine}>
                 {routeDetourEvidenceLine(best, decisionSummary?.economics?.detourMinutes)}
               </Text>

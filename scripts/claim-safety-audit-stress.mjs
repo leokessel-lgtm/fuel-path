@@ -26,8 +26,9 @@ const checks = [
   checkAbsent("Plan UI does not show Fuel used", [files.planSheet, files.evidence], /Fuel used/i),
   checkAbsent("Plan route notice does not mention standard fill estimate", [files.planUtils, files.planSheet], /standard fill estimate/i),
   checkAbsent("Plan UI does not use route saving label", [files.planSheet, files.evidence, files.planUtils], /Route saving/i),
-  checkAbsent("Plan UI does not show guaranteed total dollar saving copy", [files.planSheet, files.evidence, files.planUtils], /\b(Saving|Saves)\s+\$|total saving|guaranteed saving/i),
-  checkPresent("Plan recommendation uses Best price by", files.planSheet, /Best price by \{recommendationSavingCpl\.toFixed\(1\)\} c\/L/),
+  checkAbsent("Plan UI does not show guaranteed total dollar saving copy", [files.planSheet, files.evidence, files.planUtils], /\b(Saving|Saves)\s+\$(?!\{)|total saving|guaranteed saving/i),
+  checkPresent("Plan recommendation uses trip c/L saving", files.planSheet, /Saves \$\{recommendationSavingCpl\.toFixed\(1\)\} c\/L on this trip/),
+  checkPresent("Plan recommendation has non-savings fallback", files.planSheet, /Best route value found/),
   checkPresent("Why-this-stop uses Best price by metric", files.evidence, /<EvidenceMetric label="Best price by"/),
   checkPresent("Why-this-stop compares next-best route option", files.evidence, /Compared with the next-best route option/),
   checkPresent("Selected Plan station hides station why line", files.planSheet, /<StationRow hideWhyLine item=\{selected\} selected onPress=\{onNavigate\} \/>/),
@@ -39,7 +40,7 @@ const checks = [
   checkPresent("Logic doc requires next-best viable comparison", files.routeRules, /next-best viable route option/i),
   checkPresent("Logic doc forbids total dollar savings", files.routeRules, /Never show as a guaranteed total saving/i),
   checkPresent("Logic doc records stale price must not decide winner", files.routeRules, /Do not reject or down-rank solely because of stale price age/i),
-  checkPresent("Logic doc allowed wording uses Best price by", files.routeRules, /Best price by 20\.0 c\/L/),
+  checkPresent("Logic doc allowed wording uses trip c/L saving", files.routeRules, /Saves 20\.0 c\/L on this trip/),
   checkPresent("Logic doc not-allowed wording still names retired examples", files.routeRules, /Not allowed:[\s\S]*Suggested fuel stops[\s\S]*Fuel used/),
 ];
 

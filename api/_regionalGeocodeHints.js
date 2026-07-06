@@ -195,6 +195,7 @@ const REGIONAL_TOWNS = [
   town("New Norfolk", "TAS", -42.7826, 147.0595, "7140"),
   town("St Helens", "TAS", -41.32, 148.25, "7216"),
   town("Smithton", "TAS", -40.842, 145.124, "7330"),
+  town("Strahan", "TAS", -42.154, 145.327, "7468"),
   town("Bruny Island", "TAS", -43.365, 147.246, "7150"),
   town("Cradle Mountain", "TAS", -41.684, 145.951, "7306"),
 
@@ -475,6 +476,7 @@ const NATIONAL_EXTRA_PLACES = [
   town("Salamanca", "TAS", -42.886, 147.331, "7000"),
   town("Glenorchy", "TAS", -42.833, 147.276, "7010"),
   town("Moonah", "TAS", -42.847, 147.303, "7009"),
+  town("Strahan", "TAS", -42.154, 145.327, "7468"),
   nationalPoi("Salamanca Market, Hobart TAS 7000", "TAS", -42.886, 147.331, ["salamanca market"]),
   nationalPoi("Service Tasmania Hobart, Hobart TAS 7000", "TAS", -42.882, 147.327, ["service tasmania hobart"]),
 

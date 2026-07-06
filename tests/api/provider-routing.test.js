@@ -547,9 +547,11 @@ test("VIC side of the border remains on VIC provider coverage", () => {
   assert.equal(pointInVic(wodonga), true);
   assert.equal(pointInVic(echuca), true);
   assert.equal(pointInVic(melbourne), true);
-  assert.deepEqual(liveProviderKeysForArea([wodonga], 8), ["vic"]);
-  assert.deepEqual(liveProviderKeysForArea([echuca], 8), ["vic"]);
-  assert.deepEqual(liveProviderKeysForArea([melbourne], 8), ["vic"]);
+  withEnv({ VIC_SERVO_SAVER_API_KEY: "test-vic-key" }, () => {
+    assert.deepEqual(liveProviderKeysForArea([wodonga], 8), ["vic"]);
+    assert.deepEqual(liveProviderKeysForArea([echuca], 8), ["vic"]);
+    assert.deepEqual(liveProviderKeysForArea([melbourne], 8), ["vic"]);
+  });
 });
 
 test("eastern NSW route points do not get misclassified as VIC", () => {
@@ -568,9 +570,36 @@ test("multi-point NSW/VIC routes include the correct live provider order", () =>
   const albury = { lat: -36.0737, lon: 146.9135 };
   const wodonga = { lat: -36.1241, lon: 146.8818 };
 
-  withEnv({ NSW_FUEL_API_KEY: "test-nsw-key", NSW_FUEL_API_SECRET: "test-nsw-secret" }, () => {
-    assert.deepEqual(liveProviderKeysForArea([albury, wodonga], 8), ["vic", "nsw"]);
+  withEnv({ NSW_FUEL_API_KEY: "test-nsw-key", NSW_FUEL_API_SECRET: "test-nsw-secret", VIC_SERVO_SAVER_API_KEY: "test-vic-key" }, () => {
+    assert.deepEqual(liveProviderKeysForArea([albury, wodonga], 8), ["nsw", "vic"]);
   });
+});
+
+test("multi-state routes include every configured provider touched by route geometry", () => {
+  const townsville = { lat: -19.259, lon: 146.8169 };
+  const tennantCreek = { lat: -19.648, lon: 134.191 };
+  const adelaide = { lat: -34.9285, lon: 138.6007 };
+  const perth = { lat: -31.9523, lon: 115.8613 };
+  const strahan = { lat: -42.154, lon: 145.327 };
+  const melbourne = { lat: -37.8136, lon: 144.9631 };
+
+  withEnv(
+    {
+      QLD_FUEL_API_TOKEN: "test-qld-token",
+      SA_FUEL_API_TOKEN: "test-sa-token",
+      FUEL_PATH_WA_FUELWATCH_ENABLED: "1",
+      VIC_SERVO_SAVER_API_KEY: "test-vic-key",
+      NSW_FUEL_API_KEY: "test-nsw-key",
+      NSW_FUEL_API_SECRET: "test-nsw-secret",
+      NT_MYFUEL_USERNAME: "test-nt-user",
+      NT_MYFUEL_PASSWORD: "test-nt-password",
+    },
+    () => {
+      assert.deepEqual(liveProviderKeysForArea([townsville, tennantCreek], 8), ["qld", "nt"]);
+      assert.deepEqual(liveProviderKeysForArea([adelaide, perth], 8), ["wa", "sa"]);
+      assert.deepEqual(liveProviderKeysForArea([strahan, melbourne], 8), ["vic", "tas"]);
+    },
+  );
 });
 
 test("unsupported geographies do not fall through to NSW", () => {

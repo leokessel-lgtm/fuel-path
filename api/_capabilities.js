@@ -418,24 +418,17 @@ function liveProviderKeysForArea(points = [], radiusKm = 0) {
   const hasTasPoint = points.some(pointInTas);
   const hasNtPoint = points.some(pointInNt);
   const hasNswPoint = points.some(pointInNswOrAct);
-  if (hasWaPoint) return ["wa"];
-  if (hasSaPoint) return hasSaCredentials() ? ["sa"] : [];
-  if (hasTasPoint) return hasTasLiveAccess() ? ["tas"] : [];
-  if (hasNtPoint) return hasNtLiveAccess() ? ["nt"] : [];
-  if (hasVicPoint) {
-    const providers = ["vic"];
-    if (hasNswPoint && hasNswLiveAccess()) providers.push("nsw");
-    return providers;
+  const providers = [];
+  if ((hasNswPoint || (hasQldPoint && points.some((point) => qldNswBorderArea(point, radiusKm)))) && hasNswLiveAccess()) {
+    providers.push("nsw");
   }
-  if (hasQldPoint) {
-    const providers = hasQldLiveAccess() ? ["qld"] : [];
-    if ((hasNswPoint || points.some((point) => qldNswBorderArea(point, radiusKm))) && hasNswLiveAccess()) {
-      providers.push("nsw");
-    }
-    return providers;
-  }
-  if (hasNswPoint) return hasNswLiveAccess() ? ["nsw"] : [];
-  return [];
+  if (hasQldPoint && hasQldLiveAccess()) providers.push("qld");
+  if (hasWaPoint && hasWaProvider()) providers.push("wa");
+  if (hasVicPoint && hasVicCredentials()) providers.push("vic");
+  if (hasSaPoint && hasSaCredentials()) providers.push("sa");
+  if (hasTasPoint && hasTasLiveAccess()) providers.push("tas");
+  if (hasNtPoint && hasNtLiveAccess()) providers.push("nt");
+  return [...new Set(providers)];
 }
 
 function regionCodeForPoint(point) {

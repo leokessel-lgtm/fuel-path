@@ -51,7 +51,7 @@ Expanded Plan evidence may show:
 - `Pump price` when no selected discount is applied
 - `Pump` and `Your price` only when a selected discount changes the displayed price
 - `Best price by` only when the next-best viable route option is dearer than the recommendation
-- `Route-checked detour` only when the route engine checked the via-station route
+- `Checked detour` only when the route engine checked the via-station route
 - `Estimated detour` when the stop uses smart-detour estimation or route-engine refinement is unavailable
 - diagnostic data detail, when expanded evidence or support tooling needs it:
   - source/provider
@@ -215,9 +215,9 @@ Rules:
 
 ### Detour evidence
 
-Plan must distinguish route-checked detours from estimated detours.
+Plan must distinguish checked detours from estimated detours.
 
-`Route-checked detour` means the backend route engine compared:
+`Detour checked` means the backend route engine compared:
 
 ```text
 origin -> station -> destination
@@ -230,13 +230,13 @@ origin -> destination
 Example:
 
 ```text
-ROUTE-CHECKED
+CHECKED DETOUR
 0.1 min
 ```
 
 Rules:
 
-- Show `Route-checked detour` only when the candidate has `actualDetour.source = route_engine_via_station`.
+- Show `Detour checked` only when the candidate has `actualDetour.source = route_engine_via_station`.
 - Show `Estimated detour` for all other fuel route candidates.
 - Do not expose approximate same-side-road, turn-friction, traffic-aware or toll-optimised claims in Plan recommendation copy.
 - Do not imply a stop is exact, traffic-aware or toll-cost optimised unless the provider supplied that signal and the scoring path used it.
@@ -382,7 +382,7 @@ Rules:
 - include route-position metadata for candidates, including near-origin, mid-route, near-destination and endpoint-adjacent/backtracking-risk hints
 - include approximate same-side-road and turn-friction metadata only as route-geometry hints, not as proven navigation truth
 - do not claim live traffic or toll-aware optimisation unless the route provider actually supplied that signal
-- user-facing Plan copy should show only `Route-checked` or `Estimated` detour evidence, not same-side-road, turn-friction, traffic or toll claims
+- user-facing Plan copy should show only `Checked detour` or `Estimated detour` evidence, not same-side-road, turn-friction, traffic or toll claims
 - keep approximate smart-detour scoring as the safe fallback when actual detour routing is unavailable
 - use dynamic corridor attempts: narrower for short urban routes and wider for long regional/remote routes
 
@@ -569,7 +569,7 @@ api_tas_fuelcheck
 api_nt_myfuel
 ```
 
-Plan route scoring may need live fuel data from more than one provider region. Independent regional provider loads should run in parallel and then be aggregated in stable provider order. This keeps multi-state route latency bounded by the slowest required provider rather than the sum of every required provider. Do not change ranking, rejection, source attribution or warning semantics just to optimise latency.
+Plan route scoring may need live fuel data from more than one provider region. Independent regional provider loads should run in parallel and then be aggregated in stable provider order. Multi-state routes must request every configured provider touched by the route geometry rather than stopping at the first matching state. This keeps multi-state route latency bounded by the slowest required provider rather than the sum of every required provider. Do not change ranking, rejection, source attribution or warning semantics just to optimise latency.
 
 Fuel Plan routes should use the combined `/api/score` mode from the app by sending `from` and `to` points instead of a pre-built `route`. This returns both route geometry and route scoring in one response, and it may preload endpoint fuel providers while route geometry is being built. The old `/api/route` then `/api/score` sequence should be kept only for legacy/testing paths or non-fuel route flows such as EV fallback.
 
@@ -598,9 +598,12 @@ Allowed:
 Best stop for this trip
 Recommended
 Saves 20.0 c/L on this trip
+Best route value found
 Compared with the next-best route option at 176.9 c/L. Your price includes eligible discounts.
 Suggested stop adds a 0.1 min detour and is best by 20.0 c/L.
 ```
+
+Route navigation must preserve the route contract when the user opens directions from a Plan recommendation. The outbound URL must include origin, the recommended station as a waypoint, and the final destination. Use the Google Maps universal directions URL for this route-via-stop action because it supports cross-platform directions with waypoints. Do not silently switch this action to Apple Maps or Waze unless the implementation can preserve the detour stop plus final destination; single-destination native links are not equivalent.
 
 Not allowed:
 

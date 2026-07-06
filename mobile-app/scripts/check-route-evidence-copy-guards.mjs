@@ -20,23 +20,25 @@ const text = Object.fromEntries(
 
 const required = [
   ["helper", "route_engine_via_station"],
-  ["helper", "Route-checked"],
+  ["helper", "Detour checked"],
   ["helper", "Estimated"],
   ["sheet", "routeDetourEvidenceLine"],
   ["sheet", "Best stop for this trip"],
-  ["sheet", "Saves {recommendationSavingCpl.toFixed(1)} c/L on this trip"],
+  ["sheet", "`Saves ${recommendationSavingCpl.toFixed(1)} c/L on this trip`"],
+  ["sheet", "Best route value found"],
   ["sheet", "compactChipRow"],
   ["sheet", "Why?"],
   ["sheet", "Save route"],
   ["evidence", "routeDetourEvidenceMetricLabel"],
   ["mapper", "actualDetour: candidate.actualDetour"],
   ["mapper", "routePosition: candidate.routePosition"],
-  ["doc", "`Route-checked detour`"],
+  ["doc", "`Detour checked`"],
   ["doc", "`Estimated detour`"],
   ["doc", "`Why?` action"],
   ["doc", "compact eligibility chip"],
   ["doc", "`Best stop for this trip`"],
   ["doc", "Saves 20.0 c/L on this trip"],
+  ["doc", "Best route value found"],
 ];
 
 const failures = [];

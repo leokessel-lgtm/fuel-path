@@ -10,13 +10,13 @@ export function routeDetourEvidenceKind(candidate?: Pick<StationViewModel, "actu
 
 export function routeDetourEvidenceLabel(candidate?: Pick<StationViewModel, "actualDetour">) {
   return routeDetourEvidenceKind(candidate) === "route_checked"
-    ? "Route-checked"
+    ? "Checked"
     : "Estimated";
 }
 
 export function routeDetourEvidenceMetricLabel(candidate?: Pick<StationViewModel, "actualDetour">) {
   return routeDetourEvidenceKind(candidate) === "route_checked"
-    ? "Route-checked"
+    ? "Checked detour"
     : "Est. detour";
 }
 
@@ -25,10 +25,13 @@ export function routeDetourEvidenceLine(
   fallbackMinutes = 0,
 ) {
   const minutes = routeDetourMinutes(candidate, fallbackMinutes);
-  const label = routeDetourEvidenceLabel(candidate);
-  if (minutes > 0.05) return `${label} detour: ${minutes.toFixed(1)} min`;
+  if (minutes > 0.05) {
+    return routeDetourEvidenceKind(candidate) === "route_checked"
+      ? `Detour checked: ${minutes.toFixed(1)} min`
+      : `Estimated detour: ${minutes.toFixed(1)} min`;
+  }
   return routeDetourEvidenceKind(candidate) === "route_checked"
-    ? "Route-checked stop"
+    ? "Checked on-route stop"
     : "Estimated on-route stop";
 }
 
@@ -40,10 +43,10 @@ export function routeDetourNoticePhrase(
   const checked = routeDetourEvidenceKind(candidate) === "route_checked";
   if (minutes > 0.05) {
     return checked
-      ? `Route-checked stop adds about ${minutes.toFixed(1)} min`
+      ? `Checked detour adds about ${minutes.toFixed(1)} min`
       : `Estimated stop adds about ${minutes.toFixed(1)} min`;
   }
-  return checked ? "Route-checked stop is on the route" : "Suggested stop is estimated on the route";
+  return checked ? "Checked stop is on the route" : "Suggested stop is estimated on the route";
 }
 
 export function routeDetourMinutes(candidate?: RouteEvidenceCandidate, fallbackMinutes = 0) {

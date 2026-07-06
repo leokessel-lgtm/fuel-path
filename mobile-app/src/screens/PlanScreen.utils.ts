@@ -145,12 +145,12 @@ function timingAdviceLabel(action: RouteTimingAdvice["action"]) {
 function routeValueReason(best: StationViewModel) {
   const saving = Number(best.netSaving || 0);
   const detourMinutes = Number(best.detourMinutes || 0);
-  const detourKind = best.actualDetour?.source === "route_engine_via_station" ? "Route-checked stop" : "Estimated stop";
+  const detourKind = best.actualDetour?.source === "route_engine_via_station" ? "Checked detour" : "Estimated detour";
   if (detourMinutes > 0.05) {
     return `${detourKind} adds about ${detourMinutes.toFixed(1)} min for a better route price.`;
   }
   return best.actualDetour?.source === "route_engine_via_station"
-    ? "Route-checked stop is on the route with the best route price found."
+    ? "Checked stop is on the route with the best route price found."
     : "Suggested stop is estimated on the route with the best route price found.";
 }
 

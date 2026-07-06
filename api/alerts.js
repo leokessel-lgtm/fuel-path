@@ -4,6 +4,7 @@ const {
   alertsWriteSecurity,
   deleteBackendSavedRoute,
   evaluateSavedRouteAlert,
+  issueAlertClientCapability,
   listBackendAlertEvaluations,
   listBackendPushDevices,
   listBackendSavedRoutes,
@@ -64,6 +65,13 @@ module.exports = async function handler(req, res) {
       return;
     }
 
+    const action = stringParam(req.query.action || req.body?.action, "evaluate");
+    if (action === "client-capability") {
+      const capability = issueAlertClientCapability(req.body || {});
+      sendJson(res, capability.accepted ? 202 : 403, capability);
+      return;
+    }
+
     if (!alertsWriteAuthorised(req)) {
       const writeSecurity = alertsWriteSecurity();
       sendJson(res, 401, {
@@ -75,7 +83,6 @@ module.exports = async function handler(req, res) {
       return;
     }
 
-    const action = stringParam(req.query.action || req.body?.action, "evaluate");
     if (action === "register-device") {
       sendJson(res, 202, await registerPushDevice(req.body || {}));
       return;

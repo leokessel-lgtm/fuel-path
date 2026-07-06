@@ -269,17 +269,19 @@ function checkSimctl() {
 
 function checkNativePublicEnv() {
   const baseUrl = process.env.EXPO_PUBLIC_FUEL_PATH_API_BASE_URL || "";
-  const token = process.env.EXPO_PUBLIC_FUEL_PATH_ALERTS_VALIDATION_TOKEN || "";
   const validBaseUrl = Boolean(baseUrl) && !["127.0.0.1", "localhost", "::1"].some((host) => baseUrl.includes(host));
+  const capabilityConfigured =
+    process.env.ALERTS_CLIENT_WRITE_ENABLED === "1" &&
+    Boolean(process.env.ALERTS_CLIENT_CAPABILITY_SECRET || process.env.ALERTS_CLIENT_WRITE_TOKEN);
   checks.push({
     name: "Physical-device API URL exported locally",
     detail: validBaseUrl ? "" : "Export EXPO_PUBLIC_FUEL_PATH_API_BASE_URL to a LAN or HTTPS URL before device runs.",
     status: validBaseUrl ? "pass" : "warn",
   });
   checks.push({
-    name: "Preview alerts validation token exported locally",
-    detail: token ? "" : "EAS preview env may hold this, but the local shell does not.",
-    status: token ? "pass" : "warn",
+    name: "Preview alerts capability issuing configured locally",
+    detail: capabilityConfigured ? "" : "Preview backend env may hold this, but the local shell does not.",
+    status: capabilityConfigured ? "pass" : "warn",
   });
 }
 

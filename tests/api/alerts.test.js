@@ -283,6 +283,52 @@ test("durable alert storage can use a separate preview client validation token",
   }
 });
 
+test("backend mints scoped client capability for saved-route sync without exposing public token", async () => {
+  const originalAdminToken = process.env.ALERTS_WRITE_TOKEN;
+  const originalClientEnabled = process.env.ALERTS_CLIENT_WRITE_ENABLED;
+  const originalClientToken = process.env.ALERTS_CLIENT_WRITE_TOKEN;
+  const originalCapabilitySecret = process.env.ALERTS_CLIENT_CAPABILITY_SECRET;
+  delete process.env.ALERTS_WRITE_TOKEN;
+  delete process.env.ALERTS_CLIENT_WRITE_TOKEN;
+  process.env.ALERTS_CLIENT_WRITE_ENABLED = "1";
+  process.env.ALERTS_CLIENT_CAPABILITY_SECRET = "preview-capability-secret";
+  const store = memoryDurableStore();
+  setAlertStorageForTests(store);
+
+  try {
+    const rejected = await callSavedRoutes("POST", {}, route);
+    const capability = await callAlerts("POST", { action: "client-capability" }, {
+      userId: route.userId,
+      deviceId: device.deviceId,
+    });
+    const headers = { authorization: `Bearer ${capability.payload.token}` };
+    const accepted = await callSavedRoutes("POST", {}, route, headers);
+    const registered = await callPushRegister(device, headers);
+    const status = await callStatus();
+
+    assert.equal(rejected.status, 401);
+    assert.equal(capability.status, 202);
+    assert.equal(capability.payload.accepted, true);
+    assert.equal(typeof capability.payload.token, "string");
+    assert.match(capability.payload.token, /\./);
+    assert.equal(accepted.status, 202);
+    assert.equal(registered.status, 202);
+    assert.equal(status.payload.alerts.writeSecurity.clientCapabilityConfigured, true);
+    assert.equal(status.payload.alerts.writeSecurity.clientTokenConfigured, false);
+    assert.equal(status.payload.alerts.writeSecurity.writeEnabled, true);
+  } finally {
+    setAlertStorageForTests(null);
+    if (originalAdminToken === undefined) delete process.env.ALERTS_WRITE_TOKEN;
+    else process.env.ALERTS_WRITE_TOKEN = originalAdminToken;
+    if (originalClientEnabled === undefined) delete process.env.ALERTS_CLIENT_WRITE_ENABLED;
+    else process.env.ALERTS_CLIENT_WRITE_ENABLED = originalClientEnabled;
+    if (originalClientToken === undefined) delete process.env.ALERTS_CLIENT_WRITE_TOKEN;
+    else process.env.ALERTS_CLIENT_WRITE_TOKEN = originalClientToken;
+    if (originalCapabilitySecret === undefined) delete process.env.ALERTS_CLIENT_CAPABILITY_SECRET;
+    else process.env.ALERTS_CLIENT_CAPABILITY_SECRET = originalCapabilitySecret;
+  }
+});
+
 test("saved-route delete removes backend route behind write token", async () => {
   const original = process.env.ALERTS_WRITE_TOKEN;
   process.env.ALERTS_WRITE_TOKEN = "alert-token";

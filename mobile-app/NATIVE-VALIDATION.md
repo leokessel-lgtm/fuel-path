@@ -12,13 +12,13 @@ Last reviewed: 5 July 2026, Australia/Sydney.
 - EAS CLI: available as `eas-cli/20.2.0` when run with the repo-local npm cache.
 - EAS account state: logged in as `leokessel`.
 - EAS project: `@leokessel/fuel-path`, project id `240831fe-3325-4f8e-bbf5-2f4d82842f9f`.
-- EAS preview env: production API URL, preview alerts validation token and Android Maps key configured.
+- EAS preview env: production API URL, backend alert capability issuing and Android Maps key configured.
 - Vercel production env: `ALERTS_CLIENT_WRITE_ENABLED` and `ALERTS_CLIENT_WRITE_TOKEN` configured for preview validation without reusing `ALERTS_WRITE_TOKEN`.
 - iOS source-level simulator validation: passed through `npm run native:ios-validation-report` on iPhone 17 Pro / iOS 26.5 simulator, with Plan, Nearby and Account screenshots. This is Expo Go/source evidence, not signed iOS preview-build evidence.
 - Android installed APK validation: physical-device smoke now passes on Pixel 9 Pro `49231FDAP0017N` for fresh EAS localParity build `81613239-1a07-4dfc-84f5-64e71c883458`, downloaded as `fuel-path-preview-android-localParity-81613239.apk`.
 - Device validation: source-level iOS simulator evidence exists; Android physical-device container, map/performance and EV Plan route evidence are current as of 5 July 2026.
 - Push-token readiness: native config injects `extra.eas.projectId` when `EXPO_PUBLIC_EAS_PROJECT_ID`, `EAS_PROJECT_ID` or the static EAS project id is set; strict preview-environment preflight now passes through `npm run native:preflight`.
-- Local shell strict preflight remains blocked unless `EXPO_PUBLIC_FUEL_PATH_API_BASE_URL`, `EXPO_PUBLIC_FUEL_PATH_ALERTS_VALIDATION_TOKEN` and `FUEL_PATH_ANDROID_GOOGLE_MAPS_API_KEY` are exported locally.
+- Local shell strict preflight remains blocked unless `EXPO_PUBLIC_FUEL_PATH_API_BASE_URL`, backend alert capability issuing env and `FUEL_PATH_ANDROID_GOOGLE_MAPS_API_KEY` are exported locally.
 
 ## Required Environment
 
@@ -28,14 +28,15 @@ Set the backend URL for physical device builds because phones cannot reach the M
 export EXPO_PUBLIC_FUEL_PATH_API_BASE_URL=http://YOUR-MAC-LAN-IP:4174
 ```
 
-For backend push-token registration, set the EAS project id and preview-only alerts validation token before building:
+For backend push-token registration, set the EAS project id for the app and keep the alert capability secret in the backend environment:
 
 ```sh
 export EXPO_PUBLIC_EAS_PROJECT_ID=YOUR_EAS_PROJECT_ID
-export EXPO_PUBLIC_FUEL_PATH_ALERTS_VALIDATION_TOKEN=YOUR_PREVIEW_VALIDATION_TOKEN
+export ALERTS_CLIENT_WRITE_ENABLED=1
+export ALERTS_CLIENT_CAPABILITY_SECRET=YOUR_BACKEND_ONLY_CAPABILITY_SECRET
 ```
 
-The EAS project id is written into the native public config as `extra.eas.projectId`, which Expo push-token creation needs at runtime. Do not put the production `ALERTS_WRITE_TOKEN` into an `EXPO_PUBLIC_` variable; public mobile values are bundled into the app. Use a separate backend `ALERTS_CLIENT_WRITE_TOKEN` with `ALERTS_CLIENT_WRITE_ENABLED=1` for preview validation, then rotate or disable it before public release.
+The EAS project id is written into the native public config as `extra.eas.projectId`, which Expo push-token creation needs at runtime. Do not put `ALERTS_WRITE_TOKEN`, `ALERTS_CLIENT_WRITE_TOKEN` or any alert capability secret into an `EXPO_PUBLIC_` variable; public mobile values are bundled into the app. The app requests a scoped alert capability from the backend, and the signing secret must stay server-side.
 
 For Android builds using Google Maps, set a restricted Maps SDK for Android key before building:
 
@@ -51,7 +52,7 @@ The key should be restricted to:
 
 ## Local Preflight
 
-From `mobile-app/`, the plain preflight command uses the EAS preview environment because the alerts validation token and Android Maps key are stored as sensitive EAS variables:
+From `mobile-app/`, the plain preflight command uses the EAS preview environment because the alert capability secret and Android Maps key are stored as sensitive EAS variables:
 
 ```sh
 npm run typecheck

@@ -49,9 +49,9 @@ check("EAS project id available to native build", Boolean(easProjectId()), {
   detail: "Set EXPO_PUBLIC_EAS_PROJECT_ID or EAS_PROJECT_ID before building.",
 });
 
-check("Backend alerts validation token configured", Boolean(alertsValidationToken()), {
+check("Backend alerts capability issuing configured", Boolean(alertCapabilityConfigured()), {
   fail: strict,
-  detail: "Set EXPO_PUBLIC_FUEL_PATH_ALERTS_VALIDATION_TOKEN before backend push sync validation.",
+  detail: "Set ALERTS_CLIENT_WRITE_ENABLED=1 and ALERTS_CLIENT_WRITE_TOKEN or ALERTS_CLIENT_CAPABILITY_SECRET in the preview backend environment.",
 });
 
 check("Physical-device API base URL configured", validDeviceApiBaseUrl(), {
@@ -106,8 +106,9 @@ function easProjectId() {
   return env.EXPO_PUBLIC_EAS_PROJECT_ID || env.EAS_PROJECT_ID || appJson.extra?.eas?.projectId || "";
 }
 
-function alertsValidationToken() {
-  return env.EXPO_PUBLIC_FUEL_PATH_ALERTS_VALIDATION_TOKEN || env.EXPO_PUBLIC_FUEL_PATH_ALERTS_TOKEN || "";
+function alertCapabilityConfigured() {
+  if (env.ALERTS_CLIENT_WRITE_ENABLED !== "1") return false;
+  return Boolean(env.ALERTS_CLIENT_CAPABILITY_SECRET || env.ALERTS_CLIENT_WRITE_TOKEN);
 }
 
 function validDeviceApiBaseUrl() {
@@ -125,7 +126,6 @@ function validDeviceApiBaseUrl() {
 function bundleSafePublicEnvAccess() {
   return (
     appConfigSource.includes("process.env.EXPO_PUBLIC_FUEL_PATH_API_BASE_URL") &&
-    appConfigSource.includes("process.env.EXPO_PUBLIC_FUEL_PATH_ALERTS_VALIDATION_TOKEN") &&
     appConfigSource.includes("process.env.EXPO_PUBLIC_EAS_PROJECT_ID") &&
     !appConfigSource.includes("process?.env") &&
     !appConfigSource.includes("process.env?.")

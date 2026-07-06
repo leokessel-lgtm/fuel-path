@@ -60,7 +60,7 @@ Before creating an EAS preview build, run the strict native validation gate:
 npm run native:preflight
 ```
 
-That gate checks the EAS project id, preview alerts validation token, device-reachable API URL and Android Maps key needed for route-alert push-token validation.
+That gate checks the EAS project id, backend alert capability issuing, device-reachable API URL and Android Maps key needed for route-alert push-token validation.
 
 See `NATIVE-VALIDATION.md` for the native build checklist, EAS commands and first build-size baseline table.
 

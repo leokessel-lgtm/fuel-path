@@ -9,10 +9,6 @@ declare const __DEV__: boolean;
 
 const PRODUCTION_API_BASE_URL = "https://fuel-path.vercel.app";
 const CONFIGURED_API_BASE_URL = process.env.EXPO_PUBLIC_FUEL_PATH_API_BASE_URL;
-const CONFIGURED_ALERTS_SYNC_TOKEN =
-  process.env.EXPO_PUBLIC_FUEL_PATH_ALERTS_VALIDATION_TOKEN ||
-  process.env.EXPO_PUBLIC_FUEL_PATH_ALERTS_TOKEN ||
-  "";
 const CONFIGURED_EAS_PROJECT_ID = process.env.EXPO_PUBLIC_EAS_PROJECT_ID || "";
 
 function defaultApiBaseUrl() {
@@ -45,9 +41,6 @@ function configuredApiBaseUrl() {
 
 export const API_BASE_URL =
   configuredApiBaseUrl();
-
-export const ALERTS_SYNC_TOKEN =
-  CONFIGURED_ALERTS_SYNC_TOKEN;
 
 export const EAS_PROJECT_ID =
   CONFIGURED_EAS_PROJECT_ID;

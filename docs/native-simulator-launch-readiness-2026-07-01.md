@@ -24,7 +24,7 @@ This report records the Android and iOS simulator checks run after Xcode and iOS
 | --- | --- | --- |
 | Mobile app verify suite | Pass | `npm run verify` in `mobile-app/` |
 | EAS preview native preflight | Pass | `npm run native:preflight` |
-| Strict local native readiness | Pass | `EXPO_PUBLIC_FUEL_PATH_API_BASE_URL=https://fuel-path.vercel.app EXPO_PUBLIC_FUEL_PATH_ALERTS_VALIDATION_TOKEN=local-validation-placeholder npm run native:readiness -- --strict` |
+| Strict local native readiness | Pass | `EXPO_PUBLIC_FUEL_PATH_API_BASE_URL=https://fuel-path.vercel.app ALERTS_CLIENT_WRITE_ENABLED=1 ALERTS_CLIENT_CAPABILITY_SECRET=local-validation-placeholder npm run native:readiness -- --strict` |
 | iOS simulator setup plan | Pass | `npm run native:ios-simulator-plan` |
 | iOS simulator render validation | Pass | `tmp/native-smoke/ios-validation-2026-06-30T23-16-23-867Z.md` |
 | Android source-level Expo Go map smoke | Partial | `tmp/native-smoke/android-map-smoke-2026-06-30T23-12-13-493Z.md` |

@@ -26,8 +26,11 @@ const {
   normalisePushDevice,
 } = require("./_alertRecords");
 const { providerHealth } = require("./_providerRuntime");
+const { createHmac, timingSafeEqual } = require("node:crypto");
 
 const ALERT_MAX_RECORDS = 500;
+const ALERT_CAPABILITY_SCOPE = "alerts-client-write-v1";
+const ALERT_CAPABILITY_TTL_SECONDS = 60 * 60 * 24 * 30;
 
 function createAlertOrchestration({ buildRoute, capabilitiesForPoints, loadStationData, scoreRoute }) {
   let alertRouteScorerForTests;
@@ -106,6 +109,7 @@ function createAlertOrchestration({ buildRoute, capabilitiesForPoints, loadStati
     const adminTokenConfigured = Boolean(process.env.ALERTS_WRITE_TOKEN);
     const clientTokenEnabled = process.env.ALERTS_CLIENT_WRITE_ENABLED === "1";
     const clientTokenConfigured = clientTokenEnabled && Boolean(process.env.ALERTS_CLIENT_WRITE_TOKEN);
+    const clientCapabilityConfigured = clientTokenEnabled && Boolean(alertClientCapabilitySecret());
     const tokenConfigured = adminTokenConfigured || clientTokenConfigured;
     const storage = alertStorageStatus({ maxRecords: ALERT_MAX_RECORDS });
     const tokenRequired = tokenConfigured || Boolean(storage.durable);
@@ -114,8 +118,9 @@ function createAlertOrchestration({ buildRoute, capabilitiesForPoints, loadStati
       adminTokenConfigured,
       clientTokenEnabled,
       clientTokenConfigured,
+      clientCapabilityConfigured,
       tokenRequired,
-      writeEnabled: !tokenRequired || tokenConfigured,
+      writeEnabled: !tokenRequired || tokenConfigured || clientCapabilityConfigured,
       acceptedHeaders: ["Authorization: Bearer <token>", "X-Fuel-Path-Alerts-Token"],
     };
   }
@@ -130,10 +135,68 @@ function createAlertOrchestration({ buildRoute, capabilitiesForPoints, loadStati
     const bearer = String(auth).replace(/^Bearer\s+/i, "").trim();
     const supplied = bearer || String(direct).trim();
     if (process.env.ALERTS_WRITE_TOKEN && supplied === process.env.ALERTS_WRITE_TOKEN) return true;
+    if (verifyAlertClientCapability(supplied)) return true;
     return (
       security.clientTokenConfigured &&
       Boolean(process.env.ALERTS_CLIENT_WRITE_TOKEN) &&
       supplied === process.env.ALERTS_CLIENT_WRITE_TOKEN
+    );
+  }
+
+  function issueAlertClientCapability({ userId = "", deviceId = "" } = {}) {
+    const security = alertsWriteSecurity();
+    if (!security.clientTokenEnabled || !security.clientCapabilityConfigured) {
+      return {
+        accepted: false,
+        error: "Alert client capability issuing is disabled.",
+        alerts: security,
+      };
+    }
+    const safeUserId = cleanCapabilityText(userId);
+    const safeDeviceId = cleanCapabilityText(deviceId);
+    if (!safeUserId || !safeDeviceId) {
+      return {
+        accepted: false,
+        error: "Alert client capability requires userId and deviceId.",
+        alerts: security,
+      };
+    }
+    const now = Math.floor(Date.now() / 1000);
+    const payload = {
+      scope: ALERT_CAPABILITY_SCOPE,
+      userId: safeUserId,
+      deviceId: safeDeviceId,
+      iat: now,
+      exp: now + ALERT_CAPABILITY_TTL_SECONDS,
+    };
+    return {
+      accepted: true,
+      token: signAlertClientCapability(payload),
+      expiresAt: new Date(payload.exp * 1000).toISOString(),
+      scope: ALERT_CAPABILITY_SCOPE,
+      alerts: security,
+    };
+  }
+
+  function verifyAlertClientCapability(token = "") {
+    if (!token || !alertClientCapabilitySecret()) return false;
+    const [encodedPayload, suppliedSignature] = String(token).split(".");
+    if (!encodedPayload || !suppliedSignature) return false;
+    const expectedSignature = signCapabilityPart(encodedPayload);
+    if (!timingSafeEqualText(suppliedSignature, expectedSignature)) return false;
+    let payload;
+    try {
+      payload = JSON.parse(Buffer.from(encodedPayload, "base64url").toString("utf8"));
+    } catch {
+      return false;
+    }
+    const now = Math.floor(Date.now() / 1000);
+    return (
+      payload?.scope === ALERT_CAPABILITY_SCOPE &&
+      typeof payload.userId === "string" &&
+      typeof payload.deviceId === "string" &&
+      Number.isFinite(payload.exp) &&
+      payload.exp > now
     );
   }
 
@@ -509,6 +572,7 @@ function createAlertOrchestration({ buildRoute, capabilitiesForPoints, loadStati
     cronAuthorised,
     deleteBackendSavedRoute,
     evaluateSavedRouteAlert,
+    issueAlertClientCapability,
     listBackendAlertEvaluations,
     listBackendPushDevices,
     listBackendSavedRoutes,
@@ -517,6 +581,32 @@ function createAlertOrchestration({ buildRoute, capabilitiesForPoints, loadStati
     saveBackendSavedRoute,
     setAlertRouteScorerForTests,
   };
+}
+
+function alertClientCapabilitySecret() {
+  return process.env.ALERTS_CLIENT_CAPABILITY_SECRET || process.env.ALERTS_CLIENT_WRITE_TOKEN || "";
+}
+
+function cleanCapabilityText(value) {
+  return String(value || "").trim().slice(0, 160);
+}
+
+function signAlertClientCapability(payload) {
+  const encodedPayload = Buffer.from(JSON.stringify(payload)).toString("base64url");
+  return `${encodedPayload}.${signCapabilityPart(encodedPayload)}`;
+}
+
+function signCapabilityPart(encodedPayload) {
+  return createHmac("sha256", alertClientCapabilitySecret())
+    .update(encodedPayload)
+    .digest("base64url");
+}
+
+function timingSafeEqualText(left, right) {
+  const leftBuffer = Buffer.from(String(left));
+  const rightBuffer = Buffer.from(String(right));
+  if (leftBuffer.length !== rightBuffer.length) return false;
+  return timingSafeEqual(leftBuffer, rightBuffer);
 }
 
 module.exports = {

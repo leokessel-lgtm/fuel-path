@@ -1,7 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
 
-import { ALERTS_SYNC_TOKEN, API_BASE_URL, EAS_PROJECT_ID } from "../config";
+import { API_BASE_URL, EAS_PROJECT_ID } from "../config";
 import { AppPreferences, SavedCommute, VehicleProfile } from "../types";
 import { eligibleDiscountIds } from "../utils/discountRedemptions";
 
@@ -17,6 +17,8 @@ type SyncResult = {
 };
 
 const ALERT_IDENTITY_KEY = "fuel-path:alert-identity:v1";
+const ALERT_CAPABILITY_KEY = "fuel-path:alert-capability:v1";
+const ALERT_CAPABILITY_REFRESH_BUFFER_MS = 60 * 60 * 1000;
 
 export async function syncSavedRouteAlert({
   commute,
@@ -29,17 +31,17 @@ export async function syncSavedRouteAlert({
   expoPushToken?: string;
   preferences: AppPreferences;
 }): Promise<SyncResult> {
-  if (!ALERTS_SYNC_TOKEN) {
-    return {
-      status: "skipped",
-      message: "Smart route checks need a validation build.",
-    };
-  }
-
   try {
     const identity = await getAlertIdentity();
+    const capability = await getAlertCapability(identity);
+    if (!capability) {
+      return {
+        status: "skipped",
+        message: "Smart route checks need backend capability issuing.",
+      };
+    }
     if (enabled && expoPushToken) {
-      await postAlertJson("/api/push/register", {
+      await postAlertJson("/api/push/register", capability.token, {
         userId: identity.userId,
         deviceId: identity.deviceId,
         platform: Platform.OS,
@@ -48,7 +50,7 @@ export async function syncSavedRouteAlert({
       });
     }
 
-    await postAlertJson("/api/saved-routes", backendSavedRoutePayload({
+    await postAlertJson("/api/saved-routes", capability.token, backendSavedRoutePayload({
       commute,
       enabled,
       identity,
@@ -75,16 +77,16 @@ export async function deleteBackendSavedRoute({
 }: {
   commute: SavedCommute;
 }): Promise<SyncResult> {
-  if (!ALERTS_SYNC_TOKEN) {
-    return {
-      status: "skipped",
-      message: "Smart route checks need a validation build.",
-    };
-  }
-
   try {
     const identity = await getAlertIdentity();
-    await deleteAlertJson("/api/saved-routes", {
+    const capability = await getAlertCapability(identity);
+    if (!capability) {
+      return {
+        status: "skipped",
+        message: "Smart route checks need backend capability issuing.",
+      };
+    }
+    await deleteAlertJson("/api/saved-routes", capability.token, {
       routeId: commute.id,
       userId: identity.userId,
     });
@@ -101,7 +103,7 @@ export async function deleteBackendSavedRoute({
   }
 }
 
-export async function getAlertIdentity(): Promise<AlertIdentity> {
+async function getAlertIdentity(): Promise<AlertIdentity> {
   try {
     const raw = await AsyncStorage.getItem(ALERT_IDENTITY_KEY);
     if (raw) {
@@ -122,8 +124,8 @@ export async function getAlertIdentity(): Promise<AlertIdentity> {
   return identity;
 }
 
-export function backendAlertsConfigured() {
-  return Boolean(ALERTS_SYNC_TOKEN);
+function backendAlertsConfigured() {
+  return true;
 }
 
 export function configuredEasProjectId() {
@@ -196,12 +198,51 @@ function estimatedEconomy(vehicle: VehicleProfile) {
   return 8.2;
 }
 
-async function postAlertJson(path: string, body: unknown) {
+async function getAlertCapability(identity: AlertIdentity): Promise<{ token: string; expiresAt: string } | null> {
+  try {
+    const raw = await AsyncStorage.getItem(ALERT_CAPABILITY_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as Partial<{ token: string; expiresAt: string }>;
+      if (
+        parsed.token &&
+        parsed.expiresAt &&
+        new Date(parsed.expiresAt).getTime() - ALERT_CAPABILITY_REFRESH_BUFFER_MS > Date.now()
+      ) {
+        return { token: parsed.token, expiresAt: parsed.expiresAt };
+      }
+    }
+  } catch {
+    // Fall through to requesting a fresh scoped capability.
+  }
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/alerts?action=client-capability`, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(identity),
+    });
+    const payload = await response.json();
+    if (!response.ok || !payload?.token || !payload?.expiresAt) return null;
+    const capability = {
+      token: String(payload.token),
+      expiresAt: String(payload.expiresAt),
+    };
+    await AsyncStorage.setItem(ALERT_CAPABILITY_KEY, JSON.stringify(capability));
+    return capability;
+  } catch {
+    return null;
+  }
+}
+
+async function postAlertJson(path: string, token: string, body: unknown) {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method: "POST",
     headers: {
       Accept: "application/json",
-      Authorization: `Bearer ${ALERTS_SYNC_TOKEN}`,
+      Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify(body),
@@ -213,13 +254,13 @@ async function postAlertJson(path: string, body: unknown) {
   return payload;
 }
 
-async function deleteAlertJson(path: string, params: Record<string, string>) {
+async function deleteAlertJson(path: string, token: string, params: Record<string, string>) {
   const query = new URLSearchParams(params).toString();
   const response = await fetch(`${API_BASE_URL}${path}?${query}`, {
     method: "DELETE",
     headers: {
       Accept: "application/json",
-      Authorization: `Bearer ${ALERTS_SYNC_TOKEN}`,
+      Authorization: `Bearer ${token}`,
     },
   });
   const payload = await response.json();

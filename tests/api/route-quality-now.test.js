@@ -258,6 +258,9 @@ test("actual detour mode route-checks a same-price final recommendation before r
   assert.equal(score.recommendations[0].actualDetour.source, "route_engine_via_station");
   assert.equal(score.recommendations[0].detourMinutes, 2);
   assert.equal(calls.some((call) => call.from === "Start" && call.to === "Same Price 4"), true);
+  const longerActualDetour = score.recommendations.find((candidate) => candidate.station.stationCode === "SAME-1");
+  assert.equal(longerActualDetour.matchesDecisionRule, false);
+  assert.match(longerActualDetour.warnings.join(" "), /above 8 min detour rule/);
 });
 
 test("actual detour refinement falls back when provider route exceeds timeout", async () => {

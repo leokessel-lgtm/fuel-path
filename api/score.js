@@ -14,6 +14,10 @@ const {
   stringParam,
 } = require("./_backend");
 
+const ACTUAL_DETOUR_MAX_MINUTES = 30;
+const ACTUAL_DETOUR_MIN_SAVING_DOLLARS = 1.5;
+const ACTUAL_DETOUR_TIME_COST_DOLLARS_PER_MINUTE = 0.15;
+
 module.exports = async function handler(req, res) {
   if (req.query?.__endpoint === "route") {
     return routeEndpoint(req, res);
@@ -57,18 +61,25 @@ module.exports = async function handler(req, res) {
     const stations = brandFilter
       ? data.stations.filter((station) => stationMatchesBrandFilter(station, brands))
       : data.stations;
+    const tankLitres = Number(req.method === "POST" ? body.tankLitres || 55 : numberParam(query.tankLitres, 55));
+    const tankPercent = Number(req.method === "POST" ? body.tankPercent || 45 : numberParam(query.tankPercent, 45));
+    const economy = Number(req.method === "POST" ? body.economy || 8.2 : numberParam(query.economy, 8.2));
+    const reserveKm = Number(req.method === "POST" ? body.reserveKm || 35 : numberParam(query.reserveKm, 35));
+    const corridorKm = Number(req.method === "POST" ? body.corridorKm || 2.5 : numberParam(query.corridorKm, 2.5));
+    const minSavingDollars = Number(req.method === "POST" ? body.minSavingDollars || 5 : numberParam(query.minSavingDollars, 5));
+    const maxDetourMinutes = Number(req.method === "POST" ? body.maxDetourMinutes || 8 : numberParam(query.maxDetourMinutes, 8));
     const scored = scoreRoute({
       source: data.source,
       route,
       stations,
       fuel,
-      tankLitres: Number(req.method === "POST" ? body.tankLitres || 55 : numberParam(query.tankLitres, 55)),
-      tankPercent: Number(req.method === "POST" ? body.tankPercent || 45 : numberParam(query.tankPercent, 45)),
-      economy: Number(req.method === "POST" ? body.economy || 8.2 : numberParam(query.economy, 8.2)),
-      reserveKm: Number(req.method === "POST" ? body.reserveKm || 35 : numberParam(query.reserveKm, 35)),
-      corridorKm: Number(req.method === "POST" ? body.corridorKm || 2.5 : numberParam(query.corridorKm, 2.5)),
-      minSavingDollars: Number(req.method === "POST" ? body.minSavingDollars || 5 : numberParam(query.minSavingDollars, 5)),
-      maxDetourMinutes: Number(req.method === "POST" ? body.maxDetourMinutes || 8 : numberParam(query.maxDetourMinutes, 8)),
+      tankLitres,
+      tankPercent,
+      economy,
+      reserveKm,
+      corridorKm,
+      minSavingDollars,
+      maxDetourMinutes,
       eligibleDiscounts,
       includeMemberPrices,
       includeClosed,
@@ -78,6 +89,9 @@ module.exports = async function handler(req, res) {
       baseRoute: routePlan.builtRoute || route,
       buildRoute,
       candidates: scored.candidates,
+      economy,
+      maxDetourMinutes,
+      minSavingDollars,
       trafficPreference,
       tollPreference,
     });
@@ -230,7 +244,7 @@ function normaliseTrafficPreference(value) {
   return ["aware", "unaware"].includes(normalised) ? normalised : "unaware";
 }
 
-async function refineActualDetours({ actualDetours, baseRoute, buildRoute, candidates = [], trafficPreference, tollPreference }) {
+async function refineActualDetours({ actualDetours, baseRoute, buildRoute, candidates = [], economy, maxDetourMinutes, minSavingDollars, trafficPreference, tollPreference }) {
   if (!actualDetours && process.env.FUEL_PATH_EXPERIMENTAL_ACTUAL_DETOURS !== "1") return candidates;
   if (typeof buildRoute !== "function" || !baseRoute?.points?.length) return candidates;
   const limit = Math.max(1, Math.min(3, Number(process.env.FUEL_PATH_ACTUAL_DETOUR_LIMIT || 3)));
@@ -241,6 +255,9 @@ async function refineActualDetours({ actualDetours, baseRoute, buildRoute, candi
       baseRoute,
       buildRoute,
       candidate,
+      economy,
+      maxDetourMinutes,
+      minSavingDollars,
       timeoutMs,
       trafficPreference,
       tollPreference,
@@ -257,6 +274,9 @@ async function refineActualDetours({ actualDetours, baseRoute, buildRoute, candi
         baseRoute,
         buildRoute,
         candidate,
+        economy,
+        maxDetourMinutes,
+        minSavingDollars,
         timeoutMs,
         trafficPreference,
         tollPreference,
@@ -289,7 +309,7 @@ function hasRouteEngineDetour(candidate) {
   return candidate?.actualDetour?.source === "route_engine_via_station";
 }
 
-async function refineCandidateActualDetour({ baseRoute, buildRoute, candidate, timeoutMs, trafficPreference, tollPreference }) {
+async function refineCandidateActualDetour({ baseRoute, buildRoute, candidate, economy, maxDetourMinutes, minSavingDollars, timeoutMs, trafficPreference, tollPreference }) {
   const start = baseRoute.points[0];
   const destination = baseRoute.points[baseRoute.points.length - 1];
   const station = candidate.station || {};
@@ -318,10 +338,15 @@ async function refineCandidateActualDetour({ baseRoute, buildRoute, candidate, t
       : undefined;
     const detourKm = round(Math.max(0, actualDistanceKm - baseDistanceKm), 2);
     const detourMinutes = round(Math.max(0, actualDurationMin - baseDurationMin), 1);
-    return {
-      ...candidate,
+    const recalculatedCandidate = recalculateActualDetourCandidate(candidate, {
       detourKm,
       detourMinutes,
+      economy,
+      maxDetourMinutes,
+      minSavingDollars,
+    });
+    return {
+      ...recalculatedCandidate,
       actualDetour: {
         source: "route_engine_via_station",
         provider: toStation.provider === fromStation.provider ? toStation.provider : "mixed",
@@ -347,6 +372,80 @@ async function refineCandidateActualDetour({ baseRoute, buildRoute, candidate, t
       },
     };
   }
+}
+
+function recalculateActualDetourCandidate(candidate, { detourKm, detourMinutes, economy, maxDetourMinutes, minSavingDollars }) {
+  const adjustedCpl = Number(candidate.adjustedCpl || 0);
+  const previousDetourCost = Number(candidate.detourCost || 0);
+  const grossFuelSaving = Number(candidate.netSaving || 0) + (Number.isFinite(previousDetourCost) ? previousDetourCost : 0);
+  const effectiveEconomy = Number.isFinite(Number(economy)) && Number(economy) > 0 ? Number(economy) : inferredEconomy(candidate);
+  const detourFuelLitres = (Number(detourKm || 0) * effectiveEconomy) / 100;
+  const detourCost = detourFuelLitres * (adjustedCpl / 100);
+  const netSaving = grossFuelSaving - detourCost;
+  const timeCost = Number(detourMinutes || 0) * ACTUAL_DETOUR_TIME_COST_DOLLARS_PER_MINUTE;
+  const smartDetourLimitMinutes = smartDetourLimitMinutesForSaving(netSaving);
+  const configuredMaxDetourMinutes = Number.isFinite(Number(maxDetourMinutes))
+    ? Number(maxDetourMinutes)
+    : ACTUAL_DETOUR_MAX_MINUTES;
+  const effectiveDetourLimitMinutes = Math.min(configuredMaxDetourMinutes, smartDetourLimitMinutes);
+  const configuredMinSavingDollars = Number.isFinite(Number(minSavingDollars))
+    ? Number(minSavingDollars)
+    : ACTUAL_DETOUR_MIN_SAVING_DOLLARS;
+  const matchesSavingRule = netSaving > configuredMinSavingDollars;
+  const matchesDetourRule = Number(detourMinutes || 0) <= effectiveDetourLimitMinutes;
+  const matchesDecisionRule =
+    matchesSavingRule &&
+    matchesDetourRule &&
+    candidate.reachable !== false &&
+    candidate.station?.openNow !== false;
+  const preferencePenalty = (matchesSavingRule ? 0 : 15) + (matchesDetourRule ? 0 : 15);
+  const score = netSaving - timeCost - preferencePenalty - (candidate.station?.openNow === false ? 100 : 0);
+  return {
+    ...candidate,
+    detourKm: round(detourKm, 2),
+    detourMinutes: round(detourMinutes, 1),
+    detourFuelLitres: round(detourFuelLitres, 2),
+    detourCost: round(detourCost, 2),
+    smartDetourLimitMinutes,
+    timeCost: round(timeCost, 2),
+    netAfterDetourAndTimeCost: round(netSaving - timeCost, 2),
+    netSaving: round(netSaving, 2),
+    matchesDecisionRule,
+    score: round(score, 2),
+    warnings: actualDetourWarnings(candidate.warnings, {
+      effectiveDetourLimitMinutes,
+      matchesDetourRule,
+      matchesSavingRule,
+    }),
+  };
+}
+
+function inferredEconomy(candidate) {
+  const detourFuelLitres = Number(candidate.detourFuelLitres);
+  const detourKm = Number(candidate.detourKm);
+  if (Number.isFinite(detourFuelLitres) && Number.isFinite(detourKm) && detourKm > 0) {
+    return (detourFuelLitres / detourKm) * 100;
+  }
+  return 8.2;
+}
+
+function actualDetourWarnings(warnings = [], { effectiveDetourLimitMinutes, matchesDetourRule, matchesSavingRule }) {
+  const next = warnings.filter((warning) => (
+    !/^small saving after detour fuel$/i.test(String(warning)) &&
+    !/^above .* min detour rule$/i.test(String(warning))
+  ));
+  if (!matchesSavingRule) next.push("small saving after detour fuel");
+  if (!matchesDetourRule) next.push(`above ${effectiveDetourLimitMinutes} min detour rule`);
+  return next;
+}
+
+function smartDetourLimitMinutesForSaving(saving) {
+  const value = Number(saving || 0);
+  if (value <= ACTUAL_DETOUR_MIN_SAVING_DOLLARS) return 3;
+  if (value < 5) return 5;
+  if (value < 10) return 10;
+  if (value < 20) return 18;
+  return ACTUAL_DETOUR_MAX_MINUTES;
 }
 
 function actualDetoursEnabled({ body = {}, combinedPlanRoute, query = {}, req = {} } = {}) {

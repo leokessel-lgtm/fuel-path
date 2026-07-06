@@ -380,6 +380,7 @@ Rules:
 - cap route-engine detour checks to a small top-candidate set plus the final same-price recommendation check
 - use a strict timeout and fall back to smart detour estimates when route-engine refinement is slow or unavailable
 - record actual detour source, provider, base distance/time and via-station distance/time
+- when actual detour routing succeeds, recalculate detour fuel, detour cost, net saving, time cost, decision-rule pass/fail and backend score from the route-engine detour before final ordering
 - include route-position metadata for candidates, including near-origin, mid-route, near-destination and endpoint-adjacent/backtracking-risk hints
 - include approximate same-side-road and turn-friction metadata only as route-geometry hints, not as proven navigation truth
 - do not claim live traffic or toll-aware optimisation unless the route provider actually supplied that signal

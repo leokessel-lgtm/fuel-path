@@ -431,8 +431,10 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   releaseButton: {
+    alignItems: "center",
     backgroundColor: colors.green,
     borderRadius: radii.pill,
+    justifyContent: "center",
     minHeight: 34,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,

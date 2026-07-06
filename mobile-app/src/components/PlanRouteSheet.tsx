@@ -351,6 +351,9 @@ function RouteResultsPanel({
 }) {
   const recommendationSavingCpl = best ? routeSavingCpl(best, decisionSummary) : 0;
   const recommendationFuel = best?.fuel || "fuel";
+  const recommendationSummary = best
+    ? routeRecommendationSummary(best, recommendationCopy, recommendationSavingCpl, decisionSummary)
+    : null;
   const showStatusChip = statusCapability && statusCapability !== "live";
   const [evidenceExpanded, setEvidenceExpanded] = useState(false);
   const eligibility = best ? discountEligibilitySummary(best, policyActive) : null;
@@ -383,80 +386,81 @@ function RouteResultsPanel({
             onPress={() => onSelectStation(best.station.stationCode)}
             style={styles.compactRecommendation}
           >
-            <View style={styles.recommendationPriceTile}>
-              <Text style={styles.recommendationPriceValue}>{best.adjustedCpl.toFixed(1)}</Text>
-              <Text style={styles.recommendationFuelLabel}>{recommendationFuel}</Text>
-            </View>
-            <View style={styles.recommendationCopy}>
-              <View style={styles.recommendationStationRow}>
-                <BrandBadge station={best.station} size={28} />
-                <Text numberOfLines={1} style={styles.recommendationStationName}>
-                  {best.station.name}
+            {recommendationSummary ? (
+              <View style={styles.recommendationSummary}>
+                <Text numberOfLines={1} style={styles.recommendationSummaryTitle}>
+                  {recommendationSummary.title}
+                </Text>
+                <Text numberOfLines={2} style={styles.recommendationSummaryText}>
+                  {recommendationSummary.body}
                 </Text>
               </View>
-              <Text numberOfLines={2} style={styles.compactDecisionTitle}>
-                {recommendationTitle(recommendationCopy?.title, recommendationSavingCpl)}
-              </Text>
-              <Text numberOfLines={1} style={styles.compactSavingLine}>
-                {recommendationSavingCpl > 0.05
-                  ? `Saves ${recommendationSavingCpl.toFixed(1)} c/L on this trip`
-                  : "Best route value found"}
-              </Text>
-              <Text numberOfLines={1} style={styles.compactDetourLine}>
-                {routeDetourEvidenceLine(best, decisionSummary?.economics?.detourMinutes)}
-              </Text>
-              <View style={styles.compactChipRow}>
-                {eligibility?.chips.slice(0, 2).map((chip) => (
+            ) : null}
+            <View style={styles.recommendationBodyRow}>
+              <View style={styles.recommendationPriceTile}>
+                <Text style={styles.recommendationPriceValue}>{best.adjustedCpl.toFixed(1)}</Text>
+                <Text style={styles.recommendationFuelLabel}>{recommendationFuel}</Text>
+              </View>
+              <View style={styles.recommendationCopy}>
+                <View style={styles.recommendationStationRow}>
+                  <BrandBadge station={best.station} size={28} />
+                  <Text numberOfLines={1} style={styles.recommendationStationName}>
+                    {best.station.name}
+                  </Text>
+                </View>
+                <View style={styles.compactChipRow}>
+                  {eligibility?.chips.slice(0, 2).map((chip) => (
+                    <Text
+                      key={chip.label}
+                      numberOfLines={1}
+                      style={[
+                        styles.compactChip,
+                        chip.tone === "caution" ? styles.compactChipCaution : null,
+                      ]}
+                    >
+                      {chip.label}
+                    </Text>
+                  ))}
+                  {showStatusChip ? (
+                    <Text
+                      numberOfLines={1}
+                      style={[styles.compactChip, styles.compactChipCaution]}
+                    >
+                      {capabilityLabelForPlan(statusCapability)}
+                    </Text>
+                  ) : null}
+                </View>
+              </View>
+              <View style={styles.recommendationRouteValue}>
+                <Pressable
+                  accessibilityLabel={
+                    routeEndpoints
+                      ? `Navigate via ${best.station.name} to ${routeEndpoints.to.label}`
+                      : `Navigate to ${best.station.name}`
+                  }
+                  accessibilityRole="button"
+                  onPress={(event) => {
+                    event.stopPropagation();
+                    onNavigationOpened?.(best);
+                    openPlanStationDirections(best, routeEndpoints);
+                  }}
+                  style={styles.recommendationNavigateButton}
+                >
+                  <Text style={styles.recommendationNavigateText}>↗</Text>
+                </Pressable>
+                {bestTomorrow ? (
                   <Text
-                    key={chip.label}
                     numberOfLines={1}
                     style={[
-                      styles.compactChip,
-                      chip.tone === "caution" ? styles.compactChipCaution : null,
+                      styles.recommendationTomorrowPrice,
+                      bestTomorrow.direction === "down" && styles.tomorrowPriceDown,
+                      bestTomorrow.direction === "up" && styles.tomorrowPriceUp,
                     ]}
                   >
-                    {chip.label}
-                  </Text>
-                ))}
-                {showStatusChip ? (
-                  <Text
-                    numberOfLines={1}
-                    style={[styles.compactChip, styles.compactChipCaution]}
-                  >
-                    {capabilityLabelForPlan(statusCapability)}
+                    {bestTomorrow.shortLabel}
                   </Text>
                 ) : null}
               </View>
-            </View>
-            <View style={styles.recommendationRouteValue}>
-              <Pressable
-                accessibilityLabel={
-                  routeEndpoints
-                    ? `Navigate via ${best.station.name} to ${routeEndpoints.to.label}`
-                    : `Navigate to ${best.station.name}`
-                }
-                accessibilityRole="button"
-                onPress={(event) => {
-                  event.stopPropagation();
-                  onNavigationOpened?.(best);
-                  openPlanStationDirections(best, routeEndpoints);
-                }}
-                style={styles.recommendationNavigateButton}
-              >
-                <Text style={styles.recommendationNavigateText}>↗</Text>
-              </Pressable>
-              {bestTomorrow ? (
-                <Text
-                  numberOfLines={1}
-                  style={[
-                    styles.recommendationTomorrowPrice,
-                    bestTomorrow.direction === "down" && styles.tomorrowPriceDown,
-                    bestTomorrow.direction === "up" && styles.tomorrowPriceUp,
-                  ]}
-                >
-                  {bestTomorrow.shortLabel}
-                </Text>
-              ) : null}
             </View>
           </Pressable>
           {routeFuelMismatch ? (
@@ -759,6 +763,36 @@ function recommendationTitle(fallback: string | undefined, savingCpl: number) {
   return "Best stop for this trip";
 }
 
+function routeRecommendationSummary(
+  item: StationViewModel,
+  copy: { title: string; reason: string } | null,
+  recommendationSavingCpl: number,
+  decisionSummary?: ScoreResponse["context"]["decisionSummary"],
+) {
+  const title = recommendationTitle(copy?.title, recommendationSavingCpl);
+  const detourPhrase = routeDetourSummaryPhrase(
+    routeDetourEvidenceLine(item, decisionSummary?.economics?.detourMinutes),
+  );
+  if (recommendationSavingCpl > 0.05) {
+    return {
+      title,
+      body: `Saves ${recommendationSavingCpl.toFixed(1)} c/L on this trip with a ${detourPhrase}.`,
+    };
+  }
+  return {
+    title,
+    body: `Best route value found with a ${detourPhrase}.`,
+  };
+}
+
+function routeDetourSummaryPhrase(detourLine: string) {
+  const checked = detourLine.match(/^Detour checked:\s*(.+)$/i);
+  if (checked) return `${checked[1].toLowerCase()} checked detour`;
+  const estimated = detourLine.match(/^Estimated detour:\s*(.+)$/i);
+  if (estimated) return `${estimated[1].toLowerCase()} estimated detour`;
+  return `${detourLine.toLowerCase()} detour`;
+}
+
 function capabilityLabelForPlan(capability: string) {
   if (capability === "live") return "Live data";
   if (capability === "limited") return "Limited data";
@@ -992,13 +1026,35 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   compactRecommendation: {
-    alignItems: "center",
+    alignItems: "stretch",
     ...surfaces.softPanel,
     borderRadius: radii.lg,
+    gap: spacing.sm,
+    minHeight: 132,
+    padding: spacing.sm,
+  },
+  recommendationSummary: {
+    borderBottomColor: colors.line,
+    borderBottomWidth: 1,
+    gap: 2,
+    paddingBottom: spacing.xs,
+  },
+  recommendationSummaryTitle: {
+    color: colors.ink,
+    fontSize: typeScale.body,
+    fontWeight: "800",
+    lineHeight: 20,
+  },
+  recommendationSummaryText: {
+    color: colors.muted,
+    fontSize: typeScale.caption,
+    fontWeight: "600",
+    lineHeight: 17,
+  },
+  recommendationBodyRow: {
+    alignItems: "center",
     flexDirection: "row",
     gap: spacing.sm,
-    minHeight: 106,
-    padding: spacing.sm,
   },
   noticeCard: {
     backgroundColor: "#fff7ed",

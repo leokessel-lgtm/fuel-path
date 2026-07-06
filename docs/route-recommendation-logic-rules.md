@@ -33,6 +33,7 @@ It should not feel like:
 The Plan result should show:
 
 - recommended station card
+- compact recommendation rationale summary inside the station card, capped to a short heading plus at most two text lines
 - price
 - station name
 - trip-oriented label, usually `Best stop for this trip`
@@ -254,7 +255,7 @@ Recommendation labels should stay simple:
 
 Do not add a separate `Detour` eyebrow above these labels.
 
-For the Plan recommendation card, the default headline should stay trip-oriented: `Best stop for this trip`. Savings-detour labels may still appear in supporting evidence, but the compact card should prioritise the chosen stop, the route c/L lead and the detour evidence over internal label thresholds.
+For the Plan recommendation card, the default headline should stay trip-oriented: `Best stop for this trip`. A compact rationale summary may sit inside the station card when it only restates verified route-saving and detour evidence, for example `Saves 20.0 c/L on this trip with a 4.0 min checked detour.` Savings-detour labels may still appear in supporting evidence, but the compact card should prioritise the chosen stop, the route c/L lead and the detour evidence over internal label thresholds.
 
 ### Result context metrics
 

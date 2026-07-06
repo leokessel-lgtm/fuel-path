@@ -85,7 +85,7 @@ export function NearbyCombinedPanel({
   const showEvControls = mode === "ev" || preferences.vehicleEnergyType === "electric";
   const isPeek = sheetSnap === "peek";
   const isFull = sheetSnap === "full";
-  const fuelNotice = fuelMismatchContextLine(stationContext) || stationNotice || "";
+  const fuelNotice = fuelMismatchContextLine(stationContext) || (!combinedRows.length ? stationNotice : "");
   const requestSnap = (snap: NearbySheetSnap) => {
     if (onSnapChange) {
       onSnapChange(snap);

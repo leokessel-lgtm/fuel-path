@@ -328,6 +328,8 @@ const checks = [
       nearbyScreen.includes("NearbyStationSheet") &&
       nearbyStationSheet.includes("const visibleStationNotice = fuelMismatchContextLine(stationContext);") &&
       !nearbyStationSheet.includes("fuelMismatchContextLine(stationContext) || stationNotice") &&
+      nearbyCombinedPanel.includes('const fuelNotice = fuelMismatchContextLine(stationContext) || (!combinedRows.length ? stationNotice : "");') &&
+      !nearbyCombinedPanel.includes("fuelMismatchContextLine(stationContext) || stationNotice ||") &&
       !nearbyStationSheet.includes("Check price freshness") &&
       !nearbyStationSheet.includes("stationNotice && stations.length") &&
       !nearbyStationSheet.includes("styles.noticeCard") &&

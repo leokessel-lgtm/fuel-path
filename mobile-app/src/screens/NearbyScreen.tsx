@@ -9,6 +9,7 @@ import { NearbySortMode } from "../components/NearbyStationSheet";
 import { StationBrandFilterPill } from "../components/StationBrandFilterPill";
 import { StationMap } from "../components/StationMap";
 import { useNearbyLocationSearch } from "../hooks/useNearbyLocationSearch";
+import { useMeasuredControlBoundary } from "../hooks/useMeasuredControlBoundary";
 import { useNearbyResults } from "../hooks/useNearbyResults";
 import { useStationBrandFilterOverride } from "../hooks/useStationBrandFilterOverride";
 import { useVisibleStationCodes } from "../hooks/useVisibleStationCodes";
@@ -34,7 +35,6 @@ const defaultNearbyRadiusKm = 16;
 const minMapSearchRadiusKm = 16;
 const emptyMapRetryRadiusKm = 32;
 const maxMapSearchRadiusKm = 90;
-const nearbyCameraInsets = { top: 240, right: 18, bottom: 330, left: 18 };
 
 type MapSearchArea = {
   centre: MapPoint;
@@ -63,11 +63,10 @@ export function NearbyScreen({
   const [evConnectors, setEvConnectors] = useState<EvConnector[]>(preferences.evConnectors || []);
   const [evPowerMode, setEvPowerMode] = useState<EvPowerMode>("");
   const [energySelectorOpen, setEnergySelectorOpen] = useState(false);
+  const { expandedSheetTop, nearbyCameraInsets, onTopControlsLayout } = useMeasuredControlBoundary();
   const { handleViewportStationsChange, visibleStationCodes } = useVisibleStationCodes();
   const sheetExpanded = sheetSnap === "full";
-  const setSheetExpanded = (expanded: boolean) => {
-    setSheetSnap(expanded ? "full" : "browse");
-  };
+  const setSheetExpanded = (expanded: boolean) => setSheetSnap(expanded ? "full" : "browse");
   const setNearbyModeAndBrowse = (mode: NearbyMode) => {
     setNearbyMode(mode);
     setSheetSnap("browse");
@@ -335,7 +334,7 @@ export function NearbyScreen({
         />
       </View>
 
-      <View style={styles.topControls}>
+      <View onLayout={onTopControlsLayout} style={styles.topControls}>
         <NearbyLocationSearch
           locationError={locationError}
           locationQuery={locationQuery}
@@ -372,6 +371,7 @@ export function NearbyScreen({
           selectedCode={selectedCode}
           sheetSnap={sheetSnap}
           sheetExpanded={sheetExpanded}
+          expandedSheetTop={expandedSheetTop}
           sortedStations={sortedStations}
           sortMode={sortMode}
           stationContext={stationContext}
@@ -413,6 +413,7 @@ export function NearbyScreen({
           selectedStation={selectedForPanel}
           sheetSnap={sheetSnap}
           sheetExpanded={sheetExpanded}
+          expandedSheetTop={expandedSheetTop}
           sortedStations={sortedStations}
           stationContext={stationContext}
           stationNotice={stationNotice}
@@ -436,6 +437,7 @@ export function NearbyScreen({
           selectedChargerId={selectedCode}
           sheetSnap={sheetSnap}
           sheetExpanded={sheetExpanded}
+          expandedSheetTop={expandedSheetTop}
           onPowerModeChange={setEvPowerMode}
           onToggleConnector={(connector) => setEvConnectors((current) => toggleConnectorFilter(current, connector))}
           powerMode={evPowerMode}

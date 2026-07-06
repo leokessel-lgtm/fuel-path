@@ -20,6 +20,7 @@ const nearbyLocationSearch = read("src/components/NearbyLocationSearch.tsx");
 const nearbyStationSheet = read("src/components/NearbyStationSheet.tsx");
 const nearbyCombinedPanel = read("src/components/NearbyCombinedPanel.tsx");
 const nearbyEvControls = read("src/components/NearbyEvControls.tsx");
+const measuredControlBoundary = read("src/hooks/useMeasuredControlBoundary.ts");
 const savedPlaceEditor = read("src/components/SavedPlaceEditor.tsx");
 const savedPlacesCard = read("src/components/SavedPlacesCard.tsx");
 const savedRouteAlertsCard = read("src/components/SavedRouteAlertsCard.tsx");
@@ -90,7 +91,11 @@ const checks = [
   },
   {
     label: "nearby map keeps cluster pills clear of top controls",
-    ok: nearbyScreen.includes("const nearbyCameraInsets = { top: 240, right: 18, bottom: 330, left: 18 };"),
+    ok:
+      nearbyScreen.includes("const { expandedSheetTop, nearbyCameraInsets, onTopControlsLayout } = useMeasuredControlBoundary();") &&
+      nearbyScreen.includes("onLayout={onTopControlsLayout}") &&
+      measuredControlBoundary.includes("topControlsBottom + spacing.xl") &&
+      measuredControlBoundary.includes("bottom: 330"),
   },
   {
     label: "nearby screen keeps current location as a separate map pin",
@@ -377,13 +382,14 @@ const checks = [
   {
     label: "nearby expanded station list removes duplicate selected card and grows upward",
     ok:
-      nearbyStationSheet.includes("const nearbySheetExpandedTop = 180;") &&
-      nearbyStationSheet.includes("const nearbySheetExpandedTopCompact = 149;") &&
-      nearbyCombinedPanel.includes("const nearbySheetExpandedTop = 180;") &&
-      nearbyEvControls.includes("top: 180") &&
+      measuredControlBoundary.includes("export function useMeasuredControlBoundary()") &&
+      measuredControlBoundary.includes("topControlsBottom + spacing.lg") &&
+      nearbyScreen.includes("expandedSheetTop={expandedSheetTop}") &&
+      nearbyStationSheet.includes("{ top: expandedSheetTop }") &&
+      nearbyCombinedPanel.includes("{ top: expandedSheetTop }") &&
+      nearbyEvControls.includes("{ top: expandedSheetTop }") &&
       nearbyStationSheet.includes("{selected && !sheetExpanded ? (") &&
       nearbyStationSheet.includes("sheetExpanded: {") &&
-      nearbyStationSheet.includes("top: nearbySheetExpandedTop") &&
       nearbyStationSheet.includes("bottom: 8") &&
       !nearbyStationSheet.includes("selected,\n  sheetExpanded,"),
   },

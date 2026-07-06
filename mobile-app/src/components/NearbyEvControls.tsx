@@ -179,6 +179,7 @@ export function EvChargerPanel({
   selectedChargerId,
   sheetSnap,
   sheetExpanded,
+  expandedSheetTop,
   powerMode,
   chargingPreference = "balanced",
   controls,
@@ -202,6 +203,7 @@ export function EvChargerPanel({
   selectedChargerId?: string;
   sheetSnap: NearbySheetSnap;
   sheetExpanded: boolean;
+  expandedSheetTop: number;
   powerMode: EvPowerMode;
   chargingPreference?: EvChargingPreference;
   controls?: React.ReactNode;
@@ -217,7 +219,7 @@ export function EvChargerPanel({
   };
 
   return (
-    <View style={[styles.evPanel, isFull ? styles.evPanelExpanded : isPeek ? styles.evPanelPeek : styles.evPanelCollapsed]}>
+    <View style={[styles.evPanel, isFull ? [styles.evPanelExpanded, { top: expandedSheetTop }] : isPeek ? styles.evPanelPeek : styles.evPanelCollapsed]}>
       <View style={styles.evSheetHeader}>
         <Pressable
           accessibilityLabel={sheetExpanded ? "Collapse charger list" : "Expand charger list"}
@@ -757,7 +759,6 @@ const styles = StyleSheet.create({
   },
   evPanelExpanded: {
     bottom: 8,
-    top: 180,
   },
   evSheetHeader: {
     alignItems: "center",

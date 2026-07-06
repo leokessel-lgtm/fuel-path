@@ -15,6 +15,7 @@ export function NearbyFuelPanel({
   selectedCode,
   sheetSnap,
   sheetExpanded,
+  expandedSheetTop,
   sortedStations,
   sortMode,
   stationContext,
@@ -34,6 +35,7 @@ export function NearbyFuelPanel({
   selectedCode?: string;
   sheetSnap: NearbySheetSnap;
   sheetExpanded: boolean;
+  expandedSheetTop: number;
   sortedStations: StationViewModel[];
   sortMode?: NearbySortMode;
   stationContext?: NearbyResponse["context"];
@@ -55,6 +57,7 @@ export function NearbyFuelPanel({
       selectedCode={selectedCode}
       sheetSnap={sheetSnap}
       sheetExpanded={sheetExpanded}
+      expandedSheetTop={expandedSheetTop}
       sortedStations={sortedStations}
       sortMode={sortMode}
       stationContext={stationContext}

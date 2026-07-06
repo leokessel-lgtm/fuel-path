@@ -8,7 +8,6 @@ import {
   Text,
   View,
   type GestureResponderEvent,
-  useWindowDimensions,
 } from "react-native";
 
 import { colors, radii, shadow, spacing, surfaces, typeScale, typography } from "../theme";
@@ -22,8 +21,6 @@ export type NearbySortMode = "distance" | "price" | "value";
 
 export const defaultNearbySortMode: NearbySortMode = "value";
 const nearbySheetBottomOffset = 8;
-const nearbySheetExpandedTop = 180;
-const nearbySheetExpandedTopCompact = 149;
 const sheetDragActivatePx = 8;
 const sheetExpandDragPx = -60;
 const sheetCollapseDragPx = 70;
@@ -52,6 +49,7 @@ export function NearbyStationSheet({
   selectedCode,
   sheetSnap,
   sheetExpanded,
+  expandedSheetTop,
   sortedStations,
   sortMode,
   stationContext,
@@ -71,6 +69,7 @@ export function NearbyStationSheet({
   selectedCode?: string;
   sheetSnap?: NearbySheetSnap;
   sheetExpanded: boolean;
+  expandedSheetTop: number;
   sortedStations: StationViewModel[];
   sortMode?: NearbySortMode;
   stationContext?: NearbyResponse["context"];
@@ -78,7 +77,6 @@ export function NearbyStationSheet({
   stations: StationViewModel[];
   topControls?: ReactNode;
 }) {
-  const { height } = useWindowDimensions();
   const [dragOffsetY, setDragOffsetY] = useState(0);
   const dragStartYRef = useRef(0);
   const dragMovedRef = useRef(false);
@@ -171,7 +169,7 @@ export function NearbyStationSheet({
     <View
       style={[
         styles.sheet,
-        isFull ? [styles.sheetExpanded, { top: height <= 780 ? nearbySheetExpandedTopCompact : nearbySheetExpandedTop }] : isPeek ? styles.sheetPeek : styles.sheetCollapsed,
+        isFull ? [styles.sheetExpanded, { top: expandedSheetTop }] : isPeek ? styles.sheetPeek : styles.sheetCollapsed,
         selected && !isFull && !isPeek ? styles.sheetCollapsedWithSelection : null,
         dragOffsetY !== 0 && { transform: [{ translateY: dragOffsetY }] },
       ]}
@@ -422,7 +420,6 @@ const styles = StyleSheet.create({
   },
   sheetExpanded: {
     bottom: 8,
-    top: nearbySheetExpandedTop,
   },
   sheetHeader: {
     alignItems: "center",

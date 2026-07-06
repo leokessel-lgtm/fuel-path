@@ -13,7 +13,6 @@ import { AppPreferences, EvCharger, EvConnector, EvPowerMode, FuelCode, NearbyRe
 import { fuelMismatchContextLine } from "../utils/fuelMismatch";
 
 const nearbySheetBottomOffset = 8;
-const nearbySheetExpandedTop = 180;
 
 export function NearbyCombinedPanel({
   chargers,
@@ -40,6 +39,7 @@ export function NearbyCombinedPanel({
   selectedStation,
   sheetSnap,
   sheetExpanded,
+  expandedSheetTop,
   sortedStations,
   stationContext,
   stationNotice,
@@ -68,6 +68,7 @@ export function NearbyCombinedPanel({
   selectedStation?: StationViewModel;
   sheetSnap: NearbySheetSnap;
   sheetExpanded: boolean;
+  expandedSheetTop: number;
   sortedStations: StationViewModel[];
   stationContext?: NearbyResponse["context"];
   stationNotice?: string;
@@ -94,7 +95,7 @@ export function NearbyCombinedPanel({
   };
 
   return (
-    <View style={[styles.sheet, isFull ? styles.sheetExpanded : isPeek ? styles.sheetPeek : styles.sheetCollapsed]}>
+    <View style={[styles.sheet, isFull ? [styles.sheetExpanded, { top: expandedSheetTop }] : isPeek ? styles.sheetPeek : styles.sheetCollapsed]}>
       <View style={styles.sheetHeader}>
         <Pressable
           accessibilityLabel={sheetExpanded ? "Collapse combined fuel and charger list" : "Expand combined fuel and charger list"}
@@ -365,7 +366,6 @@ const styles = StyleSheet.create({
   },
   sheetExpanded: {
     bottom: 8,
-    top: nearbySheetExpandedTop,
   },
   sheetHeader: {
     alignItems: "center",

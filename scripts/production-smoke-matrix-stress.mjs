@@ -134,10 +134,11 @@ async function smokePlanRoute(page, row) {
   const state = await uiState(page);
   row.metrics = state;
   row.failures.push(...checks([
-    [/savings detour/i.test(state.text), "detour recommendation label missing"],
-    [state.text.includes("BEST PRICE BY") || state.text.includes("Best price by") || state.text.includes("Best route price"), "best-price evidence missing"],
+    [state.text.includes("Best stop for this trip"), "current best-stop summary missing"],
+    [/saves\s+\d+(?:\.\d+)?\s+c\/L on this trip/i.test(state.text), "current trip savings summary missing"],
     [state.text.includes("Why this stop"), "expanded evidence title missing after Why action"],
     [state.stationMarkers >= 3, `expected route station markers, got ${state.stationMarkers}`],
+    [state.viaBadges === 0 && !/\bVIA\b/.test(state.text), "confusing VIA badge returned"],
     [!state.text.includes("Suggested fuel stops"), "retired Suggested fuel stops copy returned"],
     [!state.text.includes("Navigate to this stop"), "large navigate button returned"],
     [!state.text.includes("FUEL USED"), "retired Fuel used evidence returned"],
@@ -206,9 +207,7 @@ async function clickBottomTab(page, label) {
 
 async function waitForPlanRecommendation(page) {
   await page.getByText("Why?", { exact: true }).first().waitFor({ state: "visible", timeout: 12000 });
-  await page.getByText("BEST PRICE BY", { exact: false }).first().waitFor({ state: "visible", timeout: 12000 }).catch(async () => {
-    await page.getByText("Best route price", { exact: false }).first().waitFor({ state: "visible", timeout: 12000 });
-  });
+  await page.getByText("Best stop for this trip", { exact: false }).first().waitFor({ state: "visible", timeout: 12000 });
 }
 
 async function uiState(page) {
@@ -217,6 +216,7 @@ async function uiState(page) {
     stationMarkers: document.querySelectorAll("[data-station-code]").length,
     evMarkers: document.querySelectorAll(".fuel-path-ev-marker").length,
     clusters: document.querySelectorAll(".fuel-path-marker-cluster").length,
+    viaBadges: document.querySelectorAll(".fuel-path-marker-stop").length,
     hasZoomControls: Boolean(document.querySelector(".leaflet-control-zoom-in")) && Boolean(document.querySelector(".leaflet-control-zoom-out")),
   }));
 }

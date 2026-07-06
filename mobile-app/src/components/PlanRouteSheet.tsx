@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View, type LayoutChangeEvent } from "react-native";
 
 import { colors, radii, shadow, spacing, surfaces, typeScale, typography } from "../theme";
-import { EvCharger, EvChargerResponse, ScoreResponse, StationViewModel, VehicleEnergyType } from "../types";
+import { EvCharger, EvChargerResponse, MapPoint, ScoreResponse, StationViewModel, VehicleEnergyType } from "../types";
 import { stationTimestampLine } from "../utils/decisionEvidence";
 import { fuelMismatchContextLine, fuelMismatchLine } from "../utils/fuelMismatch";
 import { tomorrowPriceView } from "../utils/pricing";
@@ -14,7 +14,7 @@ import {
 import { BrandBadge } from "./BrandBadge";
 import { DecisionEvidencePanel } from "./DecisionEvidencePanel";
 import { StationRow } from "./StationRow";
-import { openDirections } from "../screens/NearbyScreen.utils";
+import { openDirections, openRouteDirectionsViaStop } from "../screens/NearbyScreen.utils";
 
 export function PlanRouteSheet({
   best,
@@ -29,6 +29,7 @@ export function PlanRouteSheet({
   evFallbackLoading,
   loading,
   loadingLabel,
+  onLayout,
   onMinimise,
   onNavigationOpened,
   onSaveCommute,
@@ -41,6 +42,7 @@ export function PlanRouteSheet({
   policyNotice,
   recommendationCopy,
   routeEndpointsPresent,
+  routeEndpoints,
   routeNotice,
   resultContext,
   routeSheetMinimised,
@@ -68,6 +70,7 @@ export function PlanRouteSheet({
   evFallbackLoading?: boolean;
   loading: boolean;
   loadingLabel?: string;
+  onLayout?: (event: LayoutChangeEvent) => void;
   onMinimise: () => void;
   onNavigationOpened?: (station: StationViewModel) => void;
   onRestore: () => void;
@@ -80,6 +83,7 @@ export function PlanRouteSheet({
   policyNotice: string;
   recommendationCopy: { title: string; reason: string } | null;
   routeEndpointsPresent: boolean;
+  routeEndpoints?: { from: MapPoint; to: MapPoint };
   routeNotice: string;
   resultContext?: ScoreResponse["context"];
   routeSheetMinimised: boolean;
@@ -106,6 +110,7 @@ export function PlanRouteSheet({
 
   return (
     <View
+      onLayout={onLayout}
       style={[
         styles.sheet,
         routeSheetMinimised
@@ -147,7 +152,7 @@ export function PlanRouteSheet({
             <StationDetailPanel
               onNavigate={() => {
                 onNavigationOpened?.(selected);
-                openDirections(selected.station.lat, selected.station.lon, selected.station.address || selected.station.name);
+                openPlanStationDirections(selected, routeEndpoints);
               }}
               onShowStops={onShowStops}
               selected={selected}
@@ -176,6 +181,7 @@ export function PlanRouteSheet({
               policyNotice={policyNotice}
               recommendationCopy={recommendationCopy}
               routeEndpointsPresent={routeEndpointsPresent}
+              routeEndpoints={routeEndpoints}
               routeNotice={routeNotice}
               resultContext={resultContext}
               selectedCode={selectedCode}
@@ -297,6 +303,7 @@ function RouteResultsPanel({
   policyNotice,
   recommendationCopy,
   routeEndpointsPresent,
+  routeEndpoints,
   routeNotice,
   resultContext,
   selectedCode,
@@ -330,6 +337,7 @@ function RouteResultsPanel({
   policyNotice: string;
   recommendationCopy: { title: string; reason: string } | null;
   routeEndpointsPresent: boolean;
+  routeEndpoints?: { from: MapPoint; to: MapPoint };
   routeNotice: string;
   resultContext?: ScoreResponse["context"];
   selectedCode?: string;
@@ -391,7 +399,7 @@ function RouteResultsPanel({
               </Text>
               {recommendationSavingCpl > 0.05 ? (
                 <Text numberOfLines={1} style={styles.compactSavingLine}>
-                  Best price by {recommendationSavingCpl.toFixed(1)} c/L
+                  Saves {recommendationSavingCpl.toFixed(1)} c/L on this trip
                 </Text>
               ) : null}
               <Text numberOfLines={1} style={styles.compactDetourLine}>
@@ -422,12 +430,16 @@ function RouteResultsPanel({
             </View>
             <View style={styles.recommendationRouteValue}>
               <Pressable
-                accessibilityLabel={`Navigate to ${best.station.name}`}
+                accessibilityLabel={
+                  routeEndpoints
+                    ? `Navigate via ${best.station.name} to ${routeEndpoints.to.label}`
+                    : `Navigate to ${best.station.name}`
+                }
                 accessibilityRole="button"
                 onPress={(event) => {
                   event.stopPropagation();
                   onNavigationOpened?.(best);
-                  openDirections(best.station.lat, best.station.lon, best.station.address || best.station.name);
+                  openPlanStationDirections(best, routeEndpoints);
                 }}
                 style={styles.recommendationNavigateButton}
               >
@@ -598,6 +610,24 @@ function RouteResultsPanel({
   );
 }
 
+function openPlanStationDirections(
+  station: StationViewModel,
+  routeEndpoints?: { from: MapPoint; to: MapPoint },
+) {
+  if (routeEndpoints) {
+    return openRouteDirectionsViaStop({
+      destination: routeEndpoints.to,
+      origin: routeEndpoints.from,
+      stop: {
+        lat: station.station.lat,
+        lon: station.station.lon,
+        label: station.station.address || station.station.name,
+      },
+    });
+  }
+  return openDirections(station.station.lat, station.station.lon, station.station.address || station.station.name);
+}
+
 function RouteFollowUpPrompt({
   currentRouteSaved,
   onSaveCommute,
@@ -724,12 +754,9 @@ function routeSavingCpl(item: StationViewModel, decisionSummary?: ScoreResponse[
 }
 
 function recommendationTitle(fallback: string | undefined, savingCpl: number) {
-  if (!Number.isFinite(savingCpl) || savingCpl <= 0) return "Best route price";
-  if (savingCpl < 2) return "Small savings detour";
-  if (savingCpl < 5) return "Medium savings detour";
-  if (savingCpl < 10) return "Good savings detour";
-  if (savingCpl < 20) return "Great savings detour";
-  return fallback || "Strong savings detour";
+  void savingCpl;
+  if (fallback && /wait|range|skip/i.test(fallback)) return fallback;
+  return "Best stop for this trip";
 }
 
 function capabilityLabelForPlan(capability: string) {

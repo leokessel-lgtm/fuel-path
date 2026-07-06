@@ -14,6 +14,7 @@ import { QuickPlace } from "../components/QuickPlaceShortcuts";
 import { routeInputPrecisionHint } from "../components/RouteAddressSuggestions";
 import { StationMap } from "../components/StationMap";
 import { usePlanSheetState } from "../hooks/usePlanSheetState";
+import { usePlanCameraInsets } from "../hooks/usePlanCameraInsets";
 import { useRouteAddressSuggestions } from "../hooks/useRouteAddressSuggestions";
 import { getCurrentMapPoint } from "../services/currentLocation";
 import {
@@ -34,7 +35,6 @@ import {
   StationViewModel,
 } from "../types";
 import { eligibleDiscountIds } from "../utils/discountRedemptions";
-import { routeCameraInsets as resolveRouteCameraInsets } from "../utils/routeCameraInsets";
 import { activePreferredStationBrands } from "../utils/stationBrandPreferences";
 import {
   commuteName,
@@ -522,7 +522,11 @@ export function PlanScreen({
   const currentRouteWatchDisabled = Boolean(
     currentSavedCommute && alertSyncingCommuteId === currentSavedCommute.id,
   );
-  const routeCameraInsets = resolveRouteCameraInsets({
+  const {
+    cameraInsets: routeCameraInsets,
+    onRouteSheetLayout,
+    onTopControlsLayout,
+  } = usePlanCameraInsets({
     routeControlsCollapsed,
     routeSheetMinimised,
     stationPanelOpen,
@@ -598,7 +602,7 @@ export function PlanScreen({
         />
       </View>
 
-      <View style={[styles.topControls, !routeStarted && styles.topControlsOnly]}>
+      <View onLayout={onTopControlsLayout} style={[styles.topControls, !routeStarted && styles.topControlsOnly]}>
         {routeControlsCollapsed && routeData.endpoints && !error ? (
           <PlanRouteSummaryCard
             policyActive={preferences.fuelPolicyEnabled}
@@ -662,10 +666,11 @@ export function PlanScreen({
           loadingLabel={preferences.vehicleEnergyType === "electric" ? "Finding route chargers..." : undefined}
           onMinimise={() => setRouteSheetMinimised(true)}
           onRestore={() => setRouteSheetMinimised(false)}
+          onLayout={onRouteSheetLayout}
           onSaveCommute={handleSaveCurrentCommute}
           onNavigationOpened={handleNavigationOpened}
           onSelectStation={handleStationSelect}
-          onShowStops={() => setStationPanelOpen(false)}
+          onShowStops={() => { setStationPanelOpen(false); if (best) setSelectedCode(best.station.stationCode); }}
           onWatchRoute={
             currentSavedCommute && onToggleCommuteAlert
               ? handleWatchCurrentRoute
@@ -675,6 +680,7 @@ export function PlanScreen({
           policyNotice={policyNotice}
           recommendationCopy={recommendationCopy}
           routeEndpointsPresent={Boolean(routeData.endpoints)}
+          routeEndpoints={routeData.endpoints}
           routeNotice={routeNotice}
           resultContext={result?.context}
           routeSheetMinimised={routeSheetMinimised}

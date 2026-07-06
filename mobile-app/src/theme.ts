@@ -24,6 +24,7 @@ export const colors = {
 
 export const mapSkin = {
   route: colors.route,
+  routeCasing: "rgba(17, 20, 18, 0.82)",
   routeDark: colors.routeDark,
   routeShadow: "rgba(255, 106, 61, 0.22)",
   baseTileUrl: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",

@@ -1,6 +1,6 @@
 # Route recommendation logic rules
 
-Last updated: 2026-07-03
+Last updated: 2026-07-06
 
 This document records the current Fuel Path route recommendation rules across backend scoring, frontend display and product wording. It is the working source of truth for the Plan route recommendation card.
 
@@ -35,8 +35,8 @@ The Plan result should show:
 - recommended station card
 - price
 - station name
-- savings-detour label
-- best-price-by comparison in c/L
+- trip-oriented label, usually `Best stop for this trip`
+- route saving comparison in c/L when positive
 - compact detour evidence in the recommendation card
 - compact eligibility chip, such as `Pump price only`, `Selected discount`, `Membership needed` or `Policy limited`
 - compact data confidence chip, such as `Live data`, `Limited data` or `Fallback data`
@@ -104,7 +104,7 @@ Route pricing must apply only eligible selected direct c/L discounts. If a disco
 
 Plan recommendation and station-detail sheets should size to their content. Do not use fixed tall sheet heights that leave empty white space below the evidence or detail content.
 
-Navigation actions inside Plan recommendation and station-detail cards should use the same arrow treatment as station list rows. Do not add a second large `Navigate to this stop` button below a station card.
+Navigation actions inside Plan recommendation and station-detail cards should use the same arrow treatment as station list rows. Do not add a second large `Navigate to this stop` button below a station card. When the planned route endpoints are available, the arrow must open directions for the full trip via the selected fuel stop: route origin -> selected station waypoint -> final destination. A Plan route arrow must not silently open station-only directions unless route endpoints are unavailable.
 
 Selected station-detail sheets opened from the Plan route map should stay minimal:
 
@@ -179,7 +179,7 @@ bestPriceByCpl = nextBestViableAdjustedCpl - adjustedCpl
 Rules:
 
 - Show as c/L, not dollars.
-- Suppress the metric when the value is zero. Use `Best route price` as the recommendation label instead.
+- Suppress the metric when the value is zero. Use `Best stop for this trip` as the recommendation label instead.
 - Never show as a guaranteed total saving.
 - Do not compare against the most expensive station.
 - Do not compare against the cheapest station.
@@ -254,7 +254,7 @@ Recommendation labels should stay simple:
 
 Do not add a separate `Detour` eyebrow above these labels.
 
-For the Plan recommendation card, these labels should be based on the displayed `Best price by` c/L lead, not the backend internal dollar scoring estimate. If the c/L lead is zero or unavailable, show `Best route price` rather than a savings-detour label.
+For the Plan recommendation card, the default headline should stay trip-oriented: `Best stop for this trip`. Savings-detour labels may still appear in supporting evidence, but the compact card should prioritise the chosen stop, the route c/L lead and the detour evidence over internal label thresholds.
 
 ### Result context metrics
 
@@ -524,7 +524,7 @@ The browser click stress should remain capable of proving that the recommended s
 
 The visual/browser stress should assert stable user-visible contracts:
 
-- Plan result sheet renders with `Why this stop` and either `Best price by` or `Best route price`.
+- Plan result sheet renders with `Why this stop`, `Best stop for this trip` and route saving/detour evidence when available.
 - Selected station sheets opened from map markers render the clicked station name, price, arrow CTA and compact facts.
 - Tests should not require one hard-coded provider/station name for the first recommendation, because provider ordering and naming can legitimately vary while the user-visible contract remains correct.
 
@@ -595,7 +595,8 @@ tmp/poi-route-journey-stress-2026-06-30T11-48-48-041Z.md
 Allowed:
 
 ```text
-Best price by 20.0 c/L
+Best stop for this trip
+Saves 20.0 c/L on this trip
 Compared with the next-best route option at 176.9 c/L. Your price includes eligible discounts.
 Suggested stop adds a 0.1 min detour and is best by 20.0 c/L.
 ```

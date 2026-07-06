@@ -21,6 +21,7 @@ const nearbyStationSheet = read("src/components/NearbyStationSheet.tsx");
 const nearbyCombinedPanel = read("src/components/NearbyCombinedPanel.tsx");
 const nearbyEvControls = read("src/components/NearbyEvControls.tsx");
 const measuredControlBoundary = read("src/hooks/useMeasuredControlBoundary.ts");
+const planCameraInsets = read("src/hooks/usePlanCameraInsets.ts");
 const savedPlaceEditor = read("src/components/SavedPlaceEditor.tsx");
 const savedPlacesCard = read("src/components/SavedPlacesCard.tsx");
 const savedRouteAlertsCard = read("src/components/SavedRouteAlertsCard.tsx");
@@ -30,6 +31,7 @@ const weeklyReportCard = read("src/components/WeeklyReportCard.tsx");
 const routeAddressSuggestionHook = read("src/hooks/useRouteAddressSuggestions.ts");
 const theme = read("src/theme.ts");
 const nearbyScreen = read("src/screens/NearbyScreen.tsx");
+const nearbyScreenUtils = read("src/screens/NearbyScreen.utils.ts");
 const nearbyResults = read("src/hooks/useNearbyResults.ts");
 const stationBrandFilterPill = read("src/components/StationBrandFilterPill.tsx");
 const stationBrandFilterOverride = read("src/hooks/useStationBrandFilterOverride.ts");
@@ -427,6 +429,48 @@ const checks = [
       planRouteSheet.includes("styles.sheetMinimised"),
   },
   {
+    label: "plan route map uses measured chrome insets",
+    ok:
+      planCameraInsets.includes("export function usePlanCameraInsets") &&
+      planCameraInsets.includes("setTopControlsBottom(Math.ceil(y + height + spacing.sm));") &&
+      planCameraInsets.includes("setRouteSheetHeight(Math.ceil(event.nativeEvent.layout.height + spacing.lg));") &&
+      routeCameraInsets.includes("topControlsBottom = 0") &&
+      routeCameraInsets.includes("routeSheetHeight = 0") &&
+      planScreen.includes("usePlanCameraInsets({") &&
+      planScreen.includes("onLayout={onTopControlsLayout}") &&
+      planScreen.includes("onLayout={onRouteSheetLayout}"),
+  },
+  {
+    label: "plan route line uses contrast casing and visible via stop",
+    ok:
+      theme.includes('routeCasing: "rgba(17, 20, 18, 0.82)"') &&
+      webMap.includes('className: "fuel-path-route-line-casing"') &&
+      webMap.includes("color: mapSkin.routeCasing") &&
+      webMap.includes("weight: 10") &&
+      nativeMap.includes("strokeColor={mapSkin.routeCasing}") &&
+      nativeMap.includes("strokeWidth={10}") &&
+      webMap.includes("fuel-path-marker-stop") &&
+      nativeMap.includes("styles.routeStopBadge"),
+  },
+  {
+    label: "plan navigation arrow carries route waypoint to final destination",
+    ok:
+      planRouteSheet.includes("openRouteDirectionsViaStop") &&
+      planRouteSheet.includes("openPlanStationDirections(best, routeEndpoints)") &&
+      planRouteSheet.includes("openPlanStationDirections(selected, routeEndpoints)") &&
+      planRouteSheet.includes("Navigate via ${best.station.name} to ${routeEndpoints.to.label}") &&
+      planScreen.includes("routeEndpoints={routeData.endpoints}") &&
+      nearbyScreenUtils.includes('waypoints: stopValue') &&
+      nearbyScreenUtils.includes('destination: destinationValue'),
+  },
+  {
+    label: "plan returns to recommended stop after alternative detail",
+    ok:
+      planScreen.includes("if (best) setSelectedCode(best.station.stationCode);") &&
+      planRouteSheet.includes('accessibilityLabel="Show route options"') &&
+      planRouteSheet.includes("<Text style={styles.textButtonLabel}>Stops</Text>"),
+  },
+  {
     label: "plan keeps map visible while route sheet stays hidden until route starts",
     ok:
       planScreen.includes("const [routeStarted, setRouteStarted] = useState(false);") &&
@@ -436,7 +480,7 @@ const checks = [
       planScreen.includes("setRouteStarted(true);") &&
       planScreen.includes("setRouteStarted(false);") &&
       planScreen.includes("const showPlanningShortcuts = routeStarted;") &&
-      planScreen.includes("resolveRouteCameraInsets") &&
+      planScreen.includes("cameraInsets: routeCameraInsets") &&
       routeCameraInsets.includes("const routeHorizontalInset = 26;") &&
       routeCameraInsets.includes("const routeMapGap = 12;") &&
       routeCameraInsets.includes("const routeStationMarkerHeight = 64;") &&

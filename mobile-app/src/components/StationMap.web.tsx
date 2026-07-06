@@ -194,12 +194,19 @@ export function StationMap({
 
     if (routeEndpoints) {
       if (routeLatLngs.length >= 2) {
+        const routeCasingLine = L.polyline(routeLatLngs, {
+          className: "fuel-path-route-line-casing",
+          color: mapSkin.routeCasing,
+          opacity: 0.82,
+          weight: 10,
+        });
         const routeLine = L.polyline(routeLatLngs, {
           className: "fuel-path-route-line",
           color: mapSkin.route,
           opacity: 0.85,
           weight: 6,
         });
+        markerLayer.addLayer(routeCasingLine);
         markerLayer.addLayer(routeLine);
         fitPoints.push(...routeLatLngs);
       }
@@ -275,7 +282,7 @@ export function StationMap({
       const marker = L.marker([item.station.lat, item.station.lon], {
         icon: L.divIcon({
           className: "",
-          html: markerHtml(item, selected, subdued),
+          html: markerHtml(item, selected, subdued, Boolean(routeEndpoints && selected)),
           iconAnchor: [27, 56],
           iconSize: [54, 56],
           tooltipAnchor: [0, -58],
@@ -507,7 +514,7 @@ function addDestinationMarker(
   markerLayer.addLayer(marker);
 }
 
-function markerHtml(item: StationViewModel, selected: boolean, subdued: boolean) {
+function markerHtml(item: StationViewModel, selected: boolean, subdued: boolean, routeStop = false) {
   const style = brandStyleForStation(item.station);
   const iconUri = imageUri(style.icon);
   const logo = iconUri
@@ -518,10 +525,12 @@ function markerHtml(item: StationViewModel, selected: boolean, subdued: boolean)
   const className = [
     "fuel-path-marker",
     selected ? "is-selected" : "",
+    routeStop ? "is-route-stop" : "",
     subdued ? "is-subdued" : "",
   ].filter(Boolean).join(" ");
   return `
     <div class="${className}" data-station-code="${escapeHtml(item.station.stationCode)}" aria-hidden="true">
+      ${routeStop ? '<span class="fuel-path-marker-stop">VIA</span>' : ""}
       <span class="fuel-path-marker-price">${item.adjustedCpl.toFixed(1)}</span>
       <span class="fuel-path-marker-brand">${logo}</span>
     </div>
@@ -912,6 +921,29 @@ function ensureLeafletStyles() {
       }
       .fuel-path-marker.is-selected::after {
         border-top-color: ${colors.white};
+      }
+      .fuel-path-marker.is-route-stop {
+        box-shadow:
+          0 0 0 4px rgba(255, 255, 255, 0.96),
+          0 0 0 8px rgba(17, 20, 18, 0.72),
+          0 12px 26px rgba(17, 20, 18, 0.32);
+      }
+      .fuel-path-marker-stop {
+        background: ${colors.black};
+        border: 2px solid ${colors.white};
+        border-radius: 999px;
+        color: ${colors.white};
+        font-size: 9px;
+        font-weight: 900;
+        left: 50%;
+        line-height: 15px;
+        min-width: 32px;
+        padding: 0 5px;
+        position: absolute;
+        text-align: center;
+        top: -18px;
+        transform: translateX(-50%);
+        z-index: 2;
       }
       .fuel-path-marker.is-subdued {
         opacity: 0.66;

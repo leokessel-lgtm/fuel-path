@@ -57,6 +57,33 @@ export async function openDirections(lat: number, lon: number, labelText = "Dest
   await Linking.openURL(url);
 }
 
+export async function openRouteDirectionsViaStop({
+  destination,
+  origin,
+  stop,
+}: {
+  destination: MapPoint;
+  origin: MapPoint;
+  stop: { lat: number; lon: number; label: string };
+}) {
+  const originValue = coordinateParam(origin.lat, origin.lon);
+  const stopValue = coordinateParam(stop.lat, stop.lon);
+  const destinationValue = coordinateParam(destination.lat, destination.lon);
+  const params = new URLSearchParams({
+    api: "1",
+    origin: originValue,
+    destination: destinationValue,
+    travelmode: "driving",
+    waypoints: stopValue,
+  });
+  const url = `https://www.google.com/maps/dir/?${params.toString()}`;
+  await Linking.openURL(url);
+}
+
+function coordinateParam(lat: number, lon: number) {
+  return `${Number(lat)},${Number(lon)}`;
+}
+
 function toRad(value: number) {
   return (value * Math.PI) / 180;
 }

@@ -23,6 +23,8 @@ const required = [
   ["helper", "Route-checked"],
   ["helper", "Estimated"],
   ["sheet", "routeDetourEvidenceLine"],
+  ["sheet", "Best stop for this trip"],
+  ["sheet", "Saves {recommendationSavingCpl.toFixed(1)} c/L on this trip"],
   ["sheet", "compactChipRow"],
   ["sheet", "Why?"],
   ["sheet", "Save route"],
@@ -33,6 +35,8 @@ const required = [
   ["doc", "`Estimated detour`"],
   ["doc", "`Why?` action"],
   ["doc", "compact eligibility chip"],
+  ["doc", "`Best stop for this trip`"],
+  ["doc", "Saves 20.0 c/L on this trip"],
 ];
 
 const failures = [];

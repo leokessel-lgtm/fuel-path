@@ -349,9 +349,14 @@ const checks = [
       !nearbyResults.includes("Price feed is degraded or stale."),
   },
   {
-    label: "nearby map selection clears sort highlight and uses row-style selected card",
+    label: "nearby map and dismissed list states clear sort highlight",
     ok:
       nearbyScreen.includes("const [sortMode, setSortMode] = useState<NearbySortMode | undefined>(undefined);") &&
+      nearbyScreen.includes("const setNearbySheetSnap = (snap: NearbySheetSnap) => {") &&
+      nearbyScreen.includes('if (snap !== "full") setSortMode(undefined);') &&
+      nearbyScreen.includes('const setSheetExpanded = (expanded: boolean) => setNearbySheetSnap(expanded ? "full" : "browse");') &&
+      nearbyScreen.includes('setNearbySheetSnap("full");') &&
+      countOccurrences(nearbyScreen, "onSnapChange={setNearbySheetSnap}") >= 3 &&
       nearbyScreen.includes("setSortMode(undefined);") &&
       nearbyStationSheet.includes("sortMode?: NearbySortMode;") &&
       nearbyStationSheet.includes("styles.selectedPriceTile") &&
@@ -924,4 +929,8 @@ if (failed.length) {
 
 function read(relativePath) {
   return fs.readFileSync(path.join(root, relativePath), "utf8");
+}
+
+function countOccurrences(value, pattern) {
+  return value.split(pattern).length - 1;
 }

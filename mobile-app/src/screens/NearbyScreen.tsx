@@ -66,17 +66,21 @@ export function NearbyScreen({
   const { expandedSheetTop, nearbyCameraInsets, onTopControlsLayout } = useMeasuredControlBoundary();
   const { handleViewportStationsChange, visibleStationCodes } = useVisibleStationCodes();
   const sheetExpanded = sheetSnap === "full";
-  const setSheetExpanded = (expanded: boolean) => setSheetSnap(expanded ? "full" : "browse");
+  const setNearbySheetSnap = (snap: NearbySheetSnap) => {
+    setSheetSnap(snap);
+    if (snap !== "full") setSortMode(undefined);
+  };
+  const setSheetExpanded = (expanded: boolean) => setNearbySheetSnap(expanded ? "full" : "browse");
   const setNearbyModeAndBrowse = (mode: NearbyMode) => {
     setNearbyMode(mode);
-    setSheetSnap("browse");
+    setNearbySheetSnap("browse");
   };
   const selectedEnergy: NearbyEnergyChoice = nearbyMode === "ev" ? "EV" : preferences.fuel;
   const changeSelectedEnergy = (value: NearbyEnergyChoice) => {
     setEnergySelectorOpen(false);
     setSelectedCode(undefined);
     setSelectionDismissed(false);
-    setSheetSnap("browse");
+    setNearbySheetSnap("browse");
     if (value === "EV") {
       setNearbyMode("ev");
       return;
@@ -149,8 +153,7 @@ export function NearbyScreen({
       addRecentLocation(nextCentre);
       clearLocationSearch();
       resetAddressSessionToken();
-      setSheetSnap("browse");
-      setSortMode(undefined);
+      setNearbySheetSnap("browse");
     } catch (err) {
       setLocationError(err instanceof Error ? err.message : "Could not find that location");
     } finally {
@@ -170,8 +173,7 @@ export function NearbyScreen({
       setLocationQuery("");
       clearLocationSearch();
       resetAddressSessionToken();
-      setSheetSnap("browse");
-      setSortMode(undefined);
+      setNearbySheetSnap("browse");
     } catch (err) {
       setLocationError(err instanceof Error ? err.message : "Current location is not available.");
     } finally {
@@ -205,8 +207,7 @@ export function NearbyScreen({
     setCameraFocusVersion((current) => current + 1);
     setLocationQuery(location.label);
     clearLocationSearch();
-    setSheetSnap("browse");
-    setSortMode(undefined);
+    setNearbySheetSnap("browse");
   };
 
   const selectLocationSuggestion = (location: MapPoint) => {
@@ -222,8 +223,7 @@ export function NearbyScreen({
     addRecentLocation(nextCentre);
     clearLocationSearch();
     resetAddressSessionToken();
-    setSheetSnap("browse");
-    setSortMode(undefined);
+    setNearbySheetSnap("browse");
   };
 
   const visibleStationSet = useMemo(() => new Set(visibleStationCodes), [visibleStationCodes]);
@@ -245,7 +245,7 @@ export function NearbyScreen({
 
   const handleSortPress = (nextSortMode: NearbySortMode) => {
     setSortMode(nextSortMode);
-    setSheetSnap("full");
+    setNearbySheetSnap("full");
     setSelectionDismissed(false);
   };
 
@@ -365,7 +365,7 @@ export function NearbyScreen({
           onNavigateToStation={handleNavigateToStation}
           onSelectStation={handleListStationSelect}
           onSortPress={handleSortPress}
-          onSnapChange={setSheetSnap}
+          onSnapChange={setNearbySheetSnap}
           onToggleExpanded={setSheetExpanded}
           selected={selectedForPanel}
           selectedCode={selectedCode}
@@ -405,7 +405,7 @@ export function NearbyScreen({
           onSelectStation={handleListStationSelect}
           onToggleConnector={(connector) => setEvConnectors((current) => toggleConnectorFilter(current, connector))}
           onToggleExpanded={setSheetExpanded}
-          onSnapChange={setSheetSnap}
+          onSnapChange={setNearbySheetSnap}
           powerMode={evPowerMode}
           preferences={preferences}
           selectedCharger={selectedCharger}
@@ -432,7 +432,7 @@ export function NearbyScreen({
           onNavigate={(charger) => openDirections(charger.lat, charger.lon)}
           onSelectCharger={handleMapChargerSelect}
           onToggleExpanded={setSheetExpanded}
-          onSnapChange={setSheetSnap}
+          onSnapChange={setNearbySheetSnap}
           selectedCharger={selectedCharger}
           selectedChargerId={selectedCode}
           sheetSnap={sheetSnap}

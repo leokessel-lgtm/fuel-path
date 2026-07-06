@@ -241,7 +241,6 @@ export function StationMap({
       <MapView
         ref={mapRef}
         initialRegion={initialRegion}
-        mapPadding={activeInsets}
         onMapReady={() => setMapReady(true)}
         onPanDrag={() => {
           if (!programmaticMoveRef.current) {

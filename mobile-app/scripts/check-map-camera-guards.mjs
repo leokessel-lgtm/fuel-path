@@ -464,6 +464,12 @@ const checks = [
       !nativeMap.includes("sampleRoutePoints(routePoints, 180)"),
   },
   {
+    label: "native map avoids startup-crashing mapPadding prop",
+    ok:
+      !nativeMap.includes("mapPadding={activeInsets}") &&
+      nativeMap.includes("edgePadding: activeInsets"),
+  },
+  {
     label: "plan navigation arrow carries route waypoint to final destination",
     ok:
       planRouteSheet.includes("openRouteDirectionsViaStop") &&

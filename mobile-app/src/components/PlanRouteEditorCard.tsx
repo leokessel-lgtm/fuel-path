@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { colors, radii, shadow, spacing, surfaces, typeScale } from "../theme";
 import { FuelCode, MapPoint, SavedCommute, VehicleEnergyType } from "../types";
@@ -12,6 +12,7 @@ import { SavedCommuteShortcuts } from "./SavedCommuteShortcuts";
 export function PlanRouteEditorCard({
   activeAddressField,
   canPlanRoute,
+  maxHeight,
   fuel,
   from,
   fromSuggestions,
@@ -46,6 +47,7 @@ export function PlanRouteEditorCard({
 }: {
   activeAddressField: "from" | "to" | null;
   canPlanRoute: boolean;
+  maxHeight?: number;
   fuel: FuelCode;
   from: string;
   fromSuggestions: MapPoint[];
@@ -99,93 +101,100 @@ export function PlanRouteEditorCard({
         : "Plan route";
 
   return (
-    <View style={styles.searchCard}>
-      {vehicleRouteNotice ? (
-        <View style={styles.routeNoticeCard}>
-          <Text style={styles.routeNoticeText}>{vehicleRouteNotice}</Text>
-        </View>
-      ) : null}
-      <View style={styles.inputRow}>
-        <View style={styles.inputShell}>
+    <View style={[styles.searchCard, maxHeight ? { maxHeight } : null]}>
+      <ScrollView
+        contentContainerStyle={styles.searchCardContent}
+        keyboardShouldPersistTaps="handled"
+        nestedScrollEnabled
+        showsVerticalScrollIndicator={false}
+      >
+        {vehicleRouteNotice ? (
+          <View style={styles.routeNoticeCard}>
+            <Text style={styles.routeNoticeText}>{vehicleRouteNotice}</Text>
+          </View>
+        ) : null}
+        <View style={styles.inputRow}>
+          <View style={styles.inputShell}>
+            <TextInput
+              accessibilityLabel="From"
+              value={from}
+              onChangeText={onFromChange}
+              onFocus={onFromFocus}
+              onPressIn={onFromFocus}
+              onSubmitEditing={onPlanRoute}
+              placeholder="Start address, suburb or place"
+              placeholderTextColor={colors.muted}
+              returnKeyType="search"
+              style={[styles.input, styles.inputWithIcon]}
+            />
+            <CurrentLocationFieldButton
+              accessibilityLabel="Use current location as start"
+              disabled={locatingFrom}
+              onPress={onUseCurrentFromLocation}
+            />
+          </View>
+          {activeAddressField === "from" ? (
+            <AddressSuggestions
+              error={suggestionsError}
+              loading={suggestionsLoading === "from"}
+              onSelect={(point) => onSelectAddressSuggestion("from", point)}
+              query={from}
+              suggestions={fromSuggestions}
+            />
+          ) : null}
           <TextInput
-            accessibilityLabel="From"
-            value={from}
-            onChangeText={onFromChange}
-            onFocus={onFromFocus}
-            onPressIn={onFromFocus}
+            accessibilityLabel="To"
+            value={to}
+            onChangeText={onToChange}
+            onFocus={onToFocus}
+            onPressIn={onToFocus}
             onSubmitEditing={onPlanRoute}
-            placeholder="Start address, suburb or place"
+            placeholder="Destination address, suburb or place"
             placeholderTextColor={colors.muted}
             returnKeyType="search"
-            style={[styles.input, styles.inputWithIcon]}
+            style={styles.input}
           />
-          <CurrentLocationFieldButton
-            accessibilityLabel="Use current location as start"
-            disabled={locatingFrom}
-            onPress={onUseCurrentFromLocation}
-          />
+          {activeAddressField === "to" ? (
+            <AddressSuggestions
+              error={suggestionsError}
+              loading={suggestionsLoading === "to"}
+              onSelect={(point) => onSelectAddressSuggestion("to", point)}
+              query={to}
+              suggestions={toSuggestions}
+            />
+          ) : null}
         </View>
-        {activeAddressField === "from" ? (
-          <AddressSuggestions
-            error={suggestionsError}
-            loading={suggestionsLoading === "from"}
-            onSelect={(point) => onSelectAddressSuggestion("from", point)}
-            query={from}
-            suggestions={fromSuggestions}
+        {showFuelSelector ? (
+          <NearbyEnergySelector
+            eyebrow="Plan with"
+            includeEv
+            onChange={handleEnergyChange}
+            onToggleOpen={() => setFuelSelectorOpen((current) => !current)}
+            open={fuelSelectorOpen}
+            value={vehicleEnergyType === "electric" ? "EV" : fuel}
           />
         ) : null}
-        <TextInput
-          accessibilityLabel="To"
-          value={to}
-          onChangeText={onToChange}
-          onFocus={onToFocus}
-          onPressIn={onToFocus}
-          onSubmitEditing={onPlanRoute}
-          placeholder="Destination address, suburb or place"
-          placeholderTextColor={colors.muted}
-          returnKeyType="search"
-          style={styles.input}
-        />
-        {activeAddressField === "to" ? (
-          <AddressSuggestions
-            error={suggestionsError}
-            loading={suggestionsLoading === "to"}
-            onSelect={(point) => onSelectAddressSuggestion("to", point)}
-            query={to}
-            suggestions={toSuggestions}
-          />
+        {routePrecisionHint ? (
+          <Text style={styles.routePrecisionHint}>{routePrecisionHint}</Text>
         ) : null}
-      </View>
-      {showFuelSelector ? (
-        <NearbyEnergySelector
-          eyebrow="Plan with"
-          includeEv
-          onChange={handleEnergyChange}
-          onToggleOpen={() => setFuelSelectorOpen((current) => !current)}
-          open={fuelSelectorOpen}
-          value={vehicleEnergyType === "electric" ? "EV" : fuel}
-        />
-      ) : null}
-      {routePrecisionHint ? (
-        <Text style={styles.routePrecisionHint}>{routePrecisionHint}</Text>
-      ) : null}
-      {routeError ? (
-        <Text accessibilityRole="alert" style={styles.routeError}>
-          {routeError}
-        </Text>
-      ) : null}
-      <Pressable
-        accessibilityLabel="Plan route"
-        accessibilityRole="button"
-        disabled={!canPlanRoute || loading || routePlanningBlocked}
-        onPress={onPlanRoute}
-        style={[
-          styles.primaryButton,
-          (!canPlanRoute || loading || routePlanningBlocked) && styles.primaryButtonDisabled,
-        ]}
-      >
-        <Text style={styles.primaryButtonText}>{routePlanningBlocked ? "Route charging coming soon" : primaryLabel}</Text>
-      </Pressable>
+        {routeError ? (
+          <Text accessibilityRole="alert" style={styles.routeError}>
+            {routeError}
+          </Text>
+        ) : null}
+        <Pressable
+          accessibilityLabel="Plan route"
+          accessibilityRole="button"
+          disabled={!canPlanRoute || loading || routePlanningBlocked}
+          onPress={onPlanRoute}
+          style={[
+            styles.primaryButton,
+            (!canPlanRoute || loading || routePlanningBlocked) && styles.primaryButtonDisabled,
+          ]}
+        >
+          <Text style={styles.primaryButtonText}>{routePlanningBlocked ? "Route charging coming soon" : primaryLabel}</Text>
+        </Pressable>
+      </ScrollView>
     </View>
   );
 }
@@ -195,8 +204,12 @@ const styles = StyleSheet.create({
     ...shadow.float,
     ...surfaces.floating,
     borderRadius: radii.xxl,
+    overflow: "hidden",
     gap: spacing.sm,
     padding: spacing.sm,
+  },
+  searchCardContent: {
+    gap: spacing.sm,
   },
   routeNoticeCard: {
     backgroundColor: colors.panel,

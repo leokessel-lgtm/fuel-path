@@ -3,6 +3,7 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from "react-native";
 
@@ -12,6 +13,7 @@ import { PlanRouteSummaryCard } from "../components/PlanRouteSummaryCard";
 import { PlanRouteSheet } from "../components/PlanRouteSheet";
 import { QuickPlace } from "../components/QuickPlaceShortcuts";
 import { StationMap } from "../components/StationMap";
+import { useKeyboardHeight } from "../hooks/useKeyboardHeight";
 import { usePlanSheetState } from "../hooks/usePlanSheetState";
 import { usePlanCameraInsets } from "../hooks/usePlanCameraInsets";
 import { useRouteAddressSuggestions } from "../hooks/useRouteAddressSuggestions";
@@ -112,6 +114,8 @@ export function PlanScreen({
   const [toPoint, setToPoint] = useState<MapPoint>();
   const [routeState, dispatchRoute] = useReducer(planRouteReducer, initialPlanRouteState);
   const [locatingFrom, setLocatingFrom] = useState(false);
+  const keyboardHeight = useKeyboardHeight();
+  const { height: windowHeight } = useWindowDimensions();
   const {
     error,
     evFallback,
@@ -467,6 +471,9 @@ export function PlanScreen({
       !routePrecisionHint,
   );
   const showPlanningShortcuts = routeStarted;
+  const planEditorMaxHeight = keyboardHeight
+    ? Math.max(260, windowHeight - keyboardHeight - spacing.xl)
+    : undefined;
   const quickPlaces = [
     preferences.homeLocation ? { key: "home", kind: "home", label: "Home", point: preferences.homeLocation } : null,
     preferences.workLocation ? { key: "work", kind: "work", label: "Work", point: preferences.workLocation } : null,
@@ -588,6 +595,7 @@ export function PlanScreen({
           <PlanRouteEditorCard
             activeAddressField={activeAddressField}
             canPlanRoute={canPlanRoute}
+            maxHeight={planEditorMaxHeight}
             fuel={preferences.fuel}
             from={from}
             fromSuggestions={fromSuggestions}

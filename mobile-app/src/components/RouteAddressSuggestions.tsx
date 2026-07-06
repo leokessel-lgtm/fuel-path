@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { colors, radii, spacing, typeScale } from "../theme";
 import { MapPoint } from "../types";
@@ -27,35 +27,44 @@ export function AddressSuggestions({
       {!loading && error ? <Text style={styles.suggestionError}>{error}</Text> : null}
       {localityHint ? <Text style={styles.suggestionStatus}>{localityHint}</Text> : null}
       {!loading
-        ? suggestions.map((point) => {
-            const display = locationSuggestionDisplay(point);
-            return (
-              <Pressable
-                accessibilityLabel={`Use ${point.label}`}
-                accessibilityRole="button"
-                key={`${point.lat}:${point.lon}:${point.label}`}
-                onPress={() => onSelect(point)}
-                style={({ pressed }) => [
-                  styles.suggestionItem,
-                  pressed && styles.suggestionItemPressed,
-                ]}
-              >
-                <View style={styles.suggestionTitleRow}>
-                  <Text numberOfLines={1} style={styles.suggestionTitle}>
-                    {display.title}
-                  </Text>
-                  {display.badge ? (
-                    <Text numberOfLines={1} style={styles.suggestionBadge}>
-                      {display.badge}
+        ? (
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            nestedScrollEnabled
+            showsVerticalScrollIndicator={suggestions.length > 3}
+            style={styles.suggestionScroll}
+          >
+            {suggestions.map((point) => {
+              const display = locationSuggestionDisplay(point);
+              return (
+                <Pressable
+                  accessibilityLabel={`Use ${point.label}`}
+                  accessibilityRole="button"
+                  key={`${point.lat}:${point.lon}:${point.label}`}
+                  onPress={() => onSelect(point)}
+                  style={({ pressed }) => [
+                    styles.suggestionItem,
+                    pressed && styles.suggestionItemPressed,
+                  ]}
+                >
+                  <View style={styles.suggestionTitleRow}>
+                    <Text numberOfLines={1} style={styles.suggestionTitle}>
+                      {display.title}
                     </Text>
-                  ) : null}
-                </View>
-                <Text numberOfLines={1} style={styles.suggestionMeta}>
-                  {display.subtitle}
-                </Text>
-              </Pressable>
-            );
-          })
+                    {display.badge ? (
+                      <Text numberOfLines={1} style={styles.suggestionBadge}>
+                        {display.badge}
+                      </Text>
+                    ) : null}
+                  </View>
+                  <Text numberOfLines={1} style={styles.suggestionMeta}>
+                    {display.subtitle}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        )
         : null}
     </View>
   );
@@ -69,6 +78,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     gap: 1,
     overflow: "hidden",
+  },
+  suggestionScroll: {
+    maxHeight: 204,
   },
   suggestionItem: {
     backgroundColor: colors.white,

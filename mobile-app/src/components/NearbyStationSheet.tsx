@@ -84,7 +84,7 @@ export function NearbyStationSheet({
   const activeSnap = sheetSnap || (sheetExpanded ? "full" : "browse");
   const isPeek = activeSnap === "peek";
   const isFull = activeSnap === "full";
-  const visibleStationNotice = fuelMismatchContextLine(stationContext) || stationNotice;
+  const visibleStationNotice = fuelMismatchContextLine(stationContext);
 
   const requestSnap = (snap: NearbySheetSnap) => {
     if (onSnapChange) {

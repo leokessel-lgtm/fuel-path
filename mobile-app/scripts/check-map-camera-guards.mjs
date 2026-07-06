@@ -326,6 +326,8 @@ const checks = [
     label: "nearby station sheet removes non-actionable notice cards",
     ok:
       nearbyScreen.includes("NearbyStationSheet") &&
+      nearbyStationSheet.includes("const visibleStationNotice = fuelMismatchContextLine(stationContext);") &&
+      !nearbyStationSheet.includes("fuelMismatchContextLine(stationContext) || stationNotice") &&
       !nearbyStationSheet.includes("Check price freshness") &&
       !nearbyStationSheet.includes("stationNotice && stations.length") &&
       !nearbyStationSheet.includes("styles.noticeCard") &&

@@ -330,14 +330,15 @@ const checks = [
       !nearbyStationSheet.includes("noticeText"),
   },
   {
-    label: "nearby station sheet keeps an explicit map escape control before full expansion",
+    label: "nearby station sheet shows map escape only when the list is exposed",
     ok:
       nearbyStationSheet.includes("const requestMap = () => {") &&
-      nearbyStationSheet.includes('requestSnap(isFull ? "browse" : "peek");') &&
-      nearbyStationSheet.includes("!isPeek ? (") &&
-      nearbyStationSheet.includes('accessibilityLabel={isFull ? "Show map" : "Dismiss station list and show map"}') &&
+      nearbyStationSheet.includes('requestSnap("browse");') &&
+      nearbyStationSheet.includes("isFull ? (") &&
+      nearbyStationSheet.includes('accessibilityLabel="Show map"') &&
       nearbyStationSheet.includes("styles.headerActions") &&
-      nearbyStationSheet.includes("<Text style={styles.mapButtonText}>Map</Text>"),
+      nearbyStationSheet.includes("<Text style={styles.mapButtonText}>Map</Text>") &&
+      !nearbyStationSheet.includes("Dismiss station list and show map"),
   },
   {
     label: "fresh degraded provider warnings do not masquerade as stale cache",

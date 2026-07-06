@@ -94,8 +94,7 @@ export function NearbyStationSheet({
     onToggleExpanded(snap === "full");
   };
   const requestMap = () => {
-    if (selected && !isFull) onCloseSelectedStation();
-    requestSnap(isFull ? "browse" : "peek");
+    requestSnap("browse");
   };
 
   const settleSheetDrag = (dy: number, toggleOnTap = true) => {
@@ -205,9 +204,9 @@ export function NearbyStationSheet({
           <View style={styles.grabber} />
         </Pressable>
         <View style={styles.headerActions}>
-          {!isPeek ? (
+          {isFull ? (
             <Pressable
-              accessibilityLabel={isFull ? "Show map" : "Dismiss station list and show map"}
+              accessibilityLabel="Show map"
               accessibilityRole="button"
               hitSlop={10}
               onPress={requestMap}

@@ -573,6 +573,8 @@ Plan route scoring may need live fuel data from more than one provider region. I
 
 Fuel Plan routes should use the combined `/api/score` mode from the app by sending `from` and `to` points instead of a pre-built `route`. This returns both route geometry and route scoring in one response, and it may preload endpoint fuel providers while route geometry is being built. The old `/api/route` then `/api/score` sequence should be kept only for legacy/testing paths or non-fuel route flows such as EV fallback.
 
+Plan route geometry must remain dense enough for native and web maps to read as a road-following route, not straight-line legs. Combined `/api/score` responses and mobile route payload compaction should preserve up to 1,200 route points before display sampling. Do not reduce this budget without replacing it with a geometry-aware simplifier and rerunning long-route native map evidence.
+
 Production monitoring runs a 12-case Plan route latency budget against live `/api/score` route mode. Current guardrails are total p90 <= 5500 ms, p95 <= 8000 ms, max <= 12000 ms, and at least 10 recommendations returned. This is a regression guard for speed and obvious route coverage loss, not proof that every route ranking is optimal.
 
 Broad POI-to-POI Plan journey stress uses the app's current route shape: geocode each selected endpoint, then call combined `/api/score` with `from` and `to`. Legacy `/api/route` plus `/api/score` mode is retained only behind an explicit stress-script flag. Live provider loads for Plan scoring share in-flight provider requests where possible, so concurrent route scoring does not stampede the same state fuel provider.

@@ -546,7 +546,7 @@ function normalisePlanRouteResponse(payload: PlanRouteResponse | ScoreResponse, 
   };
 }
 
-function compactPoints(points: MapPoint[], maxPoints = 180) {
+function compactPoints(points: MapPoint[], maxPoints = 1200) {
   if (points.length <= maxPoints) return points;
   const compacted: MapPoint[] = [];
   let previousIndex = -1;

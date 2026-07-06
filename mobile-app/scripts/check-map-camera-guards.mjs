@@ -457,6 +457,13 @@ const checks = [
       !nativeMap.includes(">VIA<"),
   },
   {
+    label: "native Plan route keeps enough geometry to follow roads",
+    ok:
+      fuelPathApi.includes("function compactPoints(points: MapPoint[], maxPoints = 1200)") &&
+      nativeMap.includes("sampleRoutePoints(routePoints, 1200)") &&
+      !nativeMap.includes("sampleRoutePoints(routePoints, 180)"),
+  },
+  {
     label: "plan navigation arrow carries route waypoint to final destination",
     ok:
       planRouteSheet.includes("openRouteDirectionsViaStop") &&

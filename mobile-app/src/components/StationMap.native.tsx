@@ -87,7 +87,7 @@ export function StationMap({
   const [currentRegion, setCurrentRegion] = useState<Region>(() => regionForPoint(centre));
 
   const visibleRoutePoints = useMemo(
-    () => (routePoints.length >= 2 ? sampleRoutePoints(routePoints, 180) : []),
+    () => (routePoints.length >= 2 ? sampleRoutePoints(routePoints, 1200) : []),
     [routePoints],
   );
   const markerDensity = useMemo(() => nativeMarkerDensity(width), [width]);

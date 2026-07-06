@@ -431,7 +431,7 @@ function pointFromBody(point, fallbackLabel) {
   };
 }
 
-function compactPoints(points, maxPoints = 180) {
+function compactPoints(points, maxPoints = 1200) {
   if (points.length <= maxPoints) return points;
   const compacted = [];
   let previousIndex = -1;

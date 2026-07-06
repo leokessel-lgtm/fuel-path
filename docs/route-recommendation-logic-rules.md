@@ -376,7 +376,8 @@ Rules:
 
 - keep actual detour routing off by default for score-only calls unless explicitly requested or feature-flagged
 - for combined Plan route scoring, run actual detour routing for the top 3 candidates by default unless explicitly disabled
-- cap route-engine detour checks to a small top-candidate set
+- after the top-candidate pass, route-check any same-price candidate group that can become the final recommendation, capped by `FUEL_PATH_ACTUAL_DETOUR_FINAL_LIMIT` with a default of 4 and a hard cap of 6
+- cap route-engine detour checks to a small top-candidate set plus the final same-price recommendation check
 - use a strict timeout and fall back to smart detour estimates when route-engine refinement is slow or unavailable
 - record actual detour source, provider, base distance/time and via-station distance/time
 - include route-position metadata for candidates, including near-origin, mid-route, near-destination and endpoint-adjacent/backtracking-risk hints

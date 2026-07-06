@@ -222,6 +222,44 @@ test("actual detour mode uses provider toll delta to break equal-price ties only
   assert.equal(score.recommendations[1].actualDetour.tollRankingApplied, true);
 });
 
+test("actual detour mode route-checks a same-price final recommendation before returning it", async () => {
+  const calls = [];
+  const payload = await withMockedScoreBackend(calls, async (handler) =>
+    callScore(handler, {
+      from: { lat: 0, lon: 0, label: "Start" },
+      to: { lat: 0, lon: 1, label: "End" },
+      fuel: "U91",
+      source: "sample",
+      actualDetours: true,
+    }),
+    {
+      stations: [
+        station("SAME-1", "Same Price 1", "Metro", 150, 0.001, 0.2),
+        station("SAME-2", "Same Price 2", "Metro", 150, 0.002, 0.3),
+        station("SAME-3", "Same Price 3", "Metro", 150, 0.003, 0.4),
+        station("SAME-4", "Same Price 4", "Metro", 150, 0.004, 0.5),
+        station("HIGH-1", "Higher 1", "Metro", 170, 0.005, 0.55),
+        station("HIGH-2", "Higher 2", "Metro", 170, 0.006, 0.6),
+        station("HIGH-3", "Higher 3", "Metro", 170, 0.007, 0.65),
+        station("HIGH-4", "Higher 4", "Metro", 170, 0.008, 0.7),
+        station("HIGH-5", "Higher 5", "Metro", 170, 0.009, 0.75),
+      ],
+      routeFor: ({ from, to, trafficPreference, tollPreference }) => {
+        if (from.label === "Start" && to.label === "End") return route(100, 60, 0, trafficPreference, tollPreference);
+        const stationName = from.label === "Start" ? to.label : from.label;
+        const detourMinutes = stationName === "Same Price 4" ? 2 : 10;
+        return route(50, 30 + detourMinutes / 2, 0, trafficPreference, tollPreference);
+      },
+    },
+  );
+
+  const score = payload.score;
+  assert.equal(score.recommendations[0].station.stationCode, "SAME-4");
+  assert.equal(score.recommendations[0].actualDetour.source, "route_engine_via_station");
+  assert.equal(score.recommendations[0].detourMinutes, 2);
+  assert.equal(calls.some((call) => call.from === "Start" && call.to === "Same Price 4"), true);
+});
+
 test("actual detour refinement falls back when provider route exceeds timeout", async () => {
   const originalTimeout = process.env.FUEL_PATH_ACTUAL_DETOUR_TIMEOUT_MS;
   process.env.FUEL_PATH_ACTUAL_DETOUR_TIMEOUT_MS = "400";

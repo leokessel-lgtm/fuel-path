@@ -247,10 +247,46 @@ async function refineActualDetours({ actualDetours, baseRoute, buildRoute, candi
     })),
   );
   const byCode = new Map(refined.map((candidate) => [String(candidate.station?.stationCode || ""), candidate]));
-  const sorted = candidates
+  let sorted = candidates
     .map((candidate) => byCode.get(String(candidate.station?.stationCode || "")) || candidate)
     .sort(actualDetourRecommendationOrder);
+  const finalCandidates = finalRecommendationActualDetourCandidates(sorted, byCode);
+  if (finalCandidates.length) {
+    const finalRefined = await Promise.all(
+      finalCandidates.map((candidate) => refineCandidateActualDetour({
+        baseRoute,
+        buildRoute,
+        candidate,
+        timeoutMs,
+        trafficPreference,
+        tollPreference,
+      })),
+    );
+    for (const candidate of finalRefined) {
+      byCode.set(String(candidate.station?.stationCode || ""), candidate);
+    }
+    sorted = candidates
+      .map((candidate) => byCode.get(String(candidate.station?.stationCode || "")) || candidate)
+      .sort(actualDetourRecommendationOrder);
+  }
   return sorted.map((candidate) => applyActualDetourTollCost(candidate));
+}
+
+function finalRecommendationActualDetourCandidates(sortedCandidates = [], refinedByCode = new Map()) {
+  const best = sortedCandidates[0];
+  if (!best || hasRouteEngineDetour(best)) return [];
+  const bestPrice = Number(best.adjustedCpl);
+  if (!Number.isFinite(bestPrice)) return [best];
+  const limit = Math.max(1, Math.min(6, Number(process.env.FUEL_PATH_ACTUAL_DETOUR_FINAL_LIMIT || 4)));
+  return sortedCandidates
+    .filter((candidate) => routeRecommendationPriority(candidate) === 0)
+    .filter((candidate) => Number(candidate.adjustedCpl) === bestPrice)
+    .filter((candidate) => !refinedByCode.has(String(candidate.station?.stationCode || "")))
+    .slice(0, limit);
+}
+
+function hasRouteEngineDetour(candidate) {
+  return candidate?.actualDetour?.source === "route_engine_via_station";
 }
 
 async function refineCandidateActualDetour({ baseRoute, buildRoute, candidate, timeoutMs, trafficPreference, tollPreference }) {
@@ -384,8 +420,9 @@ function actualDetourContext({ actualDetours, recommendations = [] }) {
   const routeEstimatedCount = recommendations.filter((candidate) => candidate.actualDetour?.source === "route_engine_via_station").length;
   return {
     enabled: Boolean(actualDetours || process.env.FUEL_PATH_EXPERIMENTAL_ACTUAL_DETOURS === "1"),
-    mode: "top_candidates_only",
+    mode: "top_candidates_plus_final_same_price_check",
     candidateLimit: Math.max(1, Math.min(3, Number(process.env.FUEL_PATH_ACTUAL_DETOUR_LIMIT || 3))),
+    finalCandidateLimit: Math.max(1, Math.min(6, Number(process.env.FUEL_PATH_ACTUAL_DETOUR_FINAL_LIMIT || 4))),
     timeoutMs: Math.max(400, Math.min(2500, Number(process.env.FUEL_PATH_ACTUAL_DETOUR_TIMEOUT_MS || 1800))),
     routeEstimatedCount,
     warning: routeEstimatedCount

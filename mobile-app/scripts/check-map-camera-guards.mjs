@@ -459,10 +459,10 @@ const checks = [
   {
     label: "plan route maps show broad route price coverage",
     ok:
-      webMap.includes("const routeMaxPriceMarkers = 24;") &&
+      webMap.includes("const routeMaxPriceMarkers = 18;") &&
       webMap.includes("markerStations.slice(0, routeMaxPriceMarkers)") &&
-      nativeMap.includes("const routeMaxPriceMarkers = 24;") &&
-      nativeMap.includes("const compactRouteMaxPriceMarkers = 18;") &&
+      nativeMap.includes("const routeMaxPriceMarkers = 18;") &&
+      nativeMap.includes("const compactRouteMaxPriceMarkers = 14;") &&
       nativeMap.includes("nativeRoutePriceMarkerLimit(width)") &&
       planScreen.includes("const candidates = useMemo(() => routeRecommendations.slice(0, 10), [routeRecommendations]);") &&
       planScreen.includes("routeMapStations(uniqueStations([...routeRecommendations, ...contextStations]), selectedCode)") &&

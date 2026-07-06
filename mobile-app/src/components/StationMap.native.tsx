@@ -367,9 +367,6 @@ export function StationMap({
             >
               <View style={styles.pinAnchor}>
                 <View style={[styles.pin, subdued && styles.pinSubdued, selected && styles.pinSelected]}>
-                  {routeEndpoints && selected ? (
-                    <Text style={styles.routeStopBadge}>VIA</Text>
-                  ) : null}
                   <Text style={[styles.pinPrice, selected && styles.pinPriceSelected]}>
                     {item.adjustedCpl.toFixed(1)}
                   </Text>
@@ -786,23 +783,6 @@ const styles = StyleSheet.create({
   pinSelected: {
     borderColor: colors.black,
     boxShadow: "0 0 0 4px rgba(255, 106, 61, 0.35)",
-  },
-  routeStopBadge: {
-    backgroundColor: colors.black,
-    borderColor: colors.white,
-    borderRadius: radii.pill,
-    borderWidth: 2,
-    color: colors.white,
-    fontSize: 9,
-    fontWeight: "900",
-    left: 10,
-    lineHeight: 15,
-    minWidth: 32,
-    paddingHorizontal: 5,
-    position: "absolute",
-    textAlign: "center",
-    top: -20,
-    zIndex: 2,
   },
   pinSubdued: {
     opacity: 0.68,

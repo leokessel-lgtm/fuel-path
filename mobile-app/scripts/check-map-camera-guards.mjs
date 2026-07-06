@@ -441,7 +441,7 @@ const checks = [
       planScreen.includes("onLayout={onRouteSheetLayout}"),
   },
   {
-    label: "plan route line uses contrast casing and visible via stop",
+    label: "plan route line uses contrast casing and selected stop treatment",
     ok:
       theme.includes('routeCasing: "rgba(17, 20, 18, 0.82)"') &&
       webMap.includes('className: "fuel-path-route-line-casing"') &&
@@ -449,8 +449,12 @@ const checks = [
       webMap.includes("weight: 10") &&
       nativeMap.includes("strokeColor={mapSkin.routeCasing}") &&
       nativeMap.includes("strokeWidth={10}") &&
-      webMap.includes("fuel-path-marker-stop") &&
-      nativeMap.includes("styles.routeStopBadge"),
+      webMap.includes("fuel-path-marker.is-selected") &&
+      nativeMap.includes("styles.pinSelected") &&
+      !webMap.includes("fuel-path-marker-stop") &&
+      !webMap.includes(">VIA<") &&
+      !nativeMap.includes("routeStopBadge") &&
+      !nativeMap.includes(">VIA<"),
   },
   {
     label: "plan navigation arrow carries route waypoint to final destination",

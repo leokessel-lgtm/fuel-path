@@ -393,57 +393,64 @@ function RouteResultsPanel({
               <Text style={styles.noticeText}>{policyNotice}</Text>
             </View>
           ) : null}
-          <Pressable
-            accessibilityLabel={`Open ${best.station.name} recommendation detail`}
-            accessibilityRole="button"
-            onPress={() => onSelectStation(best.station.stationCode)}
-            style={styles.compactRecommendation}
-          >
+          <View style={styles.compactRecommendation}>
             {recommendationSummary ? (
-              <View style={styles.recommendationSummary}>
+              <Pressable
+                accessibilityLabel={`Open ${best.station.name} recommendation detail`}
+                accessibilityRole="button"
+                onPress={() => onSelectStation(best.station.stationCode)}
+                style={styles.recommendationSummary}
+              >
                 <Text numberOfLines={1} style={styles.recommendationSummaryTitle}>
                   {recommendationSummary.title}
                 </Text>
                 <Text numberOfLines={2} style={styles.recommendationSummaryText}>
                   {recommendationSummary.body}
                 </Text>
-              </View>
+              </Pressable>
             ) : null}
             <View style={styles.recommendationBodyRow}>
-              <View style={styles.recommendationPriceTile}>
-                <Text style={styles.recommendationPriceValue}>{best.adjustedCpl.toFixed(1)}</Text>
-                <Text style={styles.recommendationFuelLabel}>{recommendationFuel}</Text>
-              </View>
-              <View style={styles.recommendationCopy}>
-                <View style={styles.recommendationStationRow}>
-                  <BrandBadge station={best.station} size={28} />
-                  <Text numberOfLines={1} style={styles.recommendationStationName}>
-                    {best.station.name}
-                  </Text>
+              <Pressable
+                accessibilityLabel={`Open ${best.station.name} recommendation detail`}
+                accessibilityRole="button"
+                onPress={() => onSelectStation(best.station.stationCode)}
+                style={styles.recommendationMainButton}
+              >
+                <View style={styles.recommendationPriceTile}>
+                  <Text style={styles.recommendationPriceValue}>{best.adjustedCpl.toFixed(1)}</Text>
+                  <Text style={styles.recommendationFuelLabel}>{recommendationFuel}</Text>
                 </View>
-                <View style={styles.compactChipRow}>
-                  {eligibility?.chips.slice(0, 2).map((chip) => (
-                    <Text
-                      key={chip.label}
-                      numberOfLines={1}
-                      style={[
-                        styles.compactChip,
-                        chip.tone === "caution" ? styles.compactChipCaution : null,
-                      ]}
-                    >
-                      {chip.label}
+                <View style={styles.recommendationCopy}>
+                  <View style={styles.recommendationStationRow}>
+                    <BrandBadge station={best.station} size={28} />
+                    <Text numberOfLines={1} style={styles.recommendationStationName}>
+                      {best.station.name}
                     </Text>
-                  ))}
-                  {showStatusChip ? (
-                    <Text
-                      numberOfLines={1}
-                      style={[styles.compactChip, styles.compactChipCaution]}
-                    >
-                      {capabilityLabelForPlan(statusCapability)}
-                    </Text>
-                  ) : null}
+                  </View>
+                  <View style={styles.compactChipRow}>
+                    {eligibility?.chips.slice(0, 2).map((chip) => (
+                      <Text
+                        key={chip.label}
+                        numberOfLines={1}
+                        style={[
+                          styles.compactChip,
+                          chip.tone === "caution" ? styles.compactChipCaution : null,
+                        ]}
+                      >
+                        {chip.label}
+                      </Text>
+                    ))}
+                    {showStatusChip ? (
+                      <Text
+                        numberOfLines={1}
+                        style={[styles.compactChip, styles.compactChipCaution]}
+                      >
+                        {capabilityLabelForPlan(statusCapability)}
+                      </Text>
+                    ) : null}
+                  </View>
                 </View>
-              </View>
+              </Pressable>
               <View style={styles.recommendationRouteValue}>
                 <Pressable
                   accessibilityLabel={
@@ -475,7 +482,7 @@ function RouteResultsPanel({
                 ) : null}
               </View>
             </View>
-          </Pressable>
+          </View>
           {routeFuelMismatch ? (
             <View style={styles.noticeCard}>
               <Text style={styles.noticeText}>{routeFuelMismatch}</Text>
@@ -1077,6 +1084,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flexDirection: "row",
     gap: spacing.sm,
+  },
+  recommendationMainButton: {
+    alignItems: "center",
+    flex: 1,
+    flexDirection: "row",
+    gap: spacing.sm,
+    minWidth: 0,
   },
   noticeCard: {
     backgroundColor: "#fff7ed",

@@ -79,6 +79,7 @@ export function StationMap({
   const programmaticMoveRef = useRef(false);
   const userMovedMapRef = useRef(false);
   const zoomingRef = useRef(false);
+  const scheduledWorkRef = useRef<number[]>([]);
   const [mapReady, setMapReady] = useState(false);
   const [mapRenderVersion, setMapRenderVersion] = useState(0);
 
@@ -93,12 +94,12 @@ export function StationMap({
 
       const map = L.map(mapElementRef.current, {
         attributionControl: true,
-        fadeAnimation: true,
-        markerZoomAnimation: true,
+        fadeAnimation: false,
+        markerZoomAnimation: false,
         preferCanvas: true,
         wheelDebounceTime: 36,
         wheelPxPerZoomLevel: 88,
-        zoomAnimation: true,
+        zoomAnimation: false,
         zoomAnimationThreshold: 4,
         zoomControl: false,
         zoomDelta: 0.5,
@@ -127,15 +128,28 @@ export function StationMap({
 
       mapRef.current = map;
       markerLayerRef.current = L.layerGroup().addTo(map);
-      window.setTimeout(() => map.invalidateSize(), 0);
+      scheduleMapWork(scheduledWorkRef, () => {
+        if (active && mapRef.current === map && isLeafletMapUsable(map)) {
+          map.invalidateSize();
+        }
+      });
       setMapReady(true);
     });
 
     return () => {
       active = false;
       setMapReady(false);
+      clearScheduledMapWork(scheduledWorkRef);
+      const markerLayer = markerLayerRef.current;
+      const map = mapRef.current;
       markerLayerRef.current = null;
-      mapRef.current?.remove();
+      if (map) {
+        map.stop();
+        map.off();
+        markerLayer?.clearLayers();
+        markerLayer?.remove();
+        map.remove();
+      }
       mapRef.current = null;
       leafletRef.current = null;
       lastFitKeyRef.current = "";
@@ -153,6 +167,8 @@ export function StationMap({
     const markerLayer = markerLayerRef.current;
     if (!mapReady || !L || !map || !markerLayer) return;
     if (zoomingRef.current) return;
+    const isCurrentMap = () => mapRef.current === map && isLeafletMapUsable(map);
+    if (!isCurrentMap()) return;
 
     markerLayer.clearLayers();
 
@@ -226,6 +242,8 @@ export function StationMap({
       addUserLocationMarker(L, markerLayer, userLocation);
     }
 
+    if (!isLeafletMapUsable(map)) return;
+
     const currentMapBounds = map.getBounds();
     const groupingBounds =
       !routeEndpoints && !userMovedMapRef.current && cameraPoints.length >= 2
@@ -261,12 +279,12 @@ export function StationMap({
         zIndexOffset: 680,
       });
       marker.on("click", () => {
-        runProgrammaticMapMove(programmaticMoveRef, map, () => {
+        runProgrammaticMapMove(programmaticMoveRef, map, isCurrentMap, () => {
           map.fitBounds(
             L.latLngBounds(cluster.items.map((item) => [item.station.lat, item.station.lon] as [number, number])),
             {
               ...leafletPadding(activeInsets),
-              animate: true,
+              animate: false,
               maxZoom: 17,
             },
           );
@@ -298,15 +316,15 @@ export function StationMap({
       });
       marker.on("click", () => {
         onSelect(item.station.stationCode);
-        runProgrammaticMapMove(programmaticMoveRef, map, () => {
+        runProgrammaticMapMove(programmaticMoveRef, map, isCurrentMap, () => {
           if (routeEndpoints) {
             map.panInside([item.station.lat, item.station.lon], {
-              animate: true,
+              animate: false,
               ...leafletPadding(activeInsets),
             });
           } else {
             map.panInside([item.station.lat, item.station.lon], {
-              animate: true,
+              animate: false,
               ...leafletPadding(activeInsets),
             });
           }
@@ -338,9 +356,9 @@ export function StationMap({
       });
       marker.on("click", () => {
         onSelectCharger?.(charger.id);
-        runProgrammaticMapMove(programmaticMoveRef, map, () => {
+        runProgrammaticMapMove(programmaticMoveRef, map, isCurrentMap, () => {
           map.panInside([charger.lat, charger.lon], {
-            animate: true,
+            animate: false,
             ...leafletPadding(activeInsets),
           });
         });
@@ -357,13 +375,14 @@ export function StationMap({
     const fitCameraPoints = routeEndpoints ? [...fitPoints, ...routeStationCameraPoints] : cameraPoints;
     const fitKey = `${fitKeyForPoints(fitCameraPoints)}|${cameraInsetsKey(activeInsets)}`;
     if (fitKey !== lastFitKeyRef.current && (!userMovedMapRef.current || cameraContextChanged)) {
-      runProgrammaticMapMove(programmaticMoveRef, map, () => {
+      runProgrammaticMapMove(programmaticMoveRef, map, isCurrentMap, () => {
         map.invalidateSize();
         if (!routeEndpoints) {
-          map.setView([centre.lat, centre.lon], nearbyInitialCameraZoom, { animate: true });
+          map.setView([centre.lat, centre.lon], nearbyInitialCameraZoom, { animate: false });
           return;
         }
         map.fitBounds(L.latLngBounds(fitCameraPoints), {
+          animate: false,
           ...leafletPadding(activeInsets),
           maxZoom: routeEndpoints ? 15 : 14,
         });
@@ -373,20 +392,20 @@ export function StationMap({
       const selected = stations.find((item) => item.station.stationCode === selectedStationCode);
       const selectedCharger = chargers.find((charger) => charger.id === selectedChargerId);
       if ((selected || selectedCharger) && !userMovedMapRef.current) {
-        runProgrammaticMapMove(programmaticMoveRef, map, () => {
+        runProgrammaticMapMove(programmaticMoveRef, map, isCurrentMap, () => {
           if (selected && routeEndpoints) {
             map.panInside([selected.station.lat, selected.station.lon], {
-              animate: true,
+              animate: false,
               ...leafletPadding(activeInsets),
             });
           } else if (selected) {
             map.panInside([selected.station.lat, selected.station.lon], {
-              animate: true,
+              animate: false,
               ...leafletPadding(activeInsets),
             });
           } else if (selectedCharger) {
             map.panInside([selectedCharger.lat, selectedCharger.lon], {
-              animate: true,
+              animate: false,
               ...leafletPadding(activeInsets),
             });
           }
@@ -396,6 +415,7 @@ export function StationMap({
 
     const notifyVisibleStations = () => {
       if (!onViewportStationsChange) return;
+      if (mapRef.current !== map || !isLeafletMapUsable(map)) return;
       const bounds = map.getBounds();
       const visibleCodes = stations
         .filter((item) => bounds.contains([item.station.lat, item.station.lon]))
@@ -403,7 +423,7 @@ export function StationMap({
       onViewportStationsChange(visibleCodes);
       if (!routeEndpoints && userMovedMapRef.current && !programmaticMoveRef.current) {
         const nextCentre = map.getCenter();
-        const radiusKm = radiusKmForBounds(map.getBounds(), nextCentre);
+        const radiusKm = radiusKmForBounds(bounds, nextCentre);
         const centreKey = `${nextCentre.lat.toFixed(4)}:${nextCentre.lng.toFixed(
           4,
         )}:${Math.round(radiusKm)}`;
@@ -422,7 +442,7 @@ export function StationMap({
     };
 
     map.on("moveend zoomend", notifyVisibleStations);
-    window.setTimeout(notifyVisibleStations, 0);
+    scheduleMapWork(scheduledWorkRef, notifyVisibleStations);
 
     return () => {
       map.off("moveend", notifyVisibleStations);
@@ -553,6 +573,7 @@ function clusterFitsInteractiveMapArea(
   cluster: ClusterMarker,
   insets: Required<CameraInsets>,
 ) {
+  if (!isLeafletMapUsable(map)) return false;
   const point = map.latLngToContainerPoint([cluster.lat, cluster.lon]);
   const size = map.getSize();
   const horizontalPadding = 58;
@@ -563,6 +584,15 @@ function clusterFitsInteractiveMapArea(
     point.y >= insets.top + verticalPadding &&
     point.y <= size.y - insets.bottom - verticalPadding
   );
+}
+
+function isLeafletMapUsable(map: Leaflet.Map) {
+  const candidate = map as Leaflet.Map & {
+    _container?: HTMLElement;
+    _loaded?: boolean;
+    _mapPane?: HTMLElement;
+  };
+  return Boolean(candidate._loaded && candidate._container && candidate._mapPane);
 }
 
 function evChargerMarkerHtml(charger: EvCharger, selected: boolean) {
@@ -831,8 +861,10 @@ function toRad(value: number) {
 function runProgrammaticMapMove(
   programmaticMoveRef: { current: boolean },
   map: Leaflet.Map,
+  isMapLive: () => boolean,
   move: () => void,
 ) {
+  if (!isMapLive()) return;
   programmaticMoveRef.current = true;
   let settled = false;
   let fallbackTimer: ReturnType<typeof window.setTimeout> | undefined;
@@ -841,8 +873,10 @@ function runProgrammaticMapMove(
     settled = true;
     programmaticMoveRef.current = false;
     if (fallbackTimer) window.clearTimeout(fallbackTimer);
-    map.off("moveend", finishProgrammaticMove);
-    map.off("zoomend", finishProgrammaticMove);
+    if (isMapLive()) {
+      map.off("moveend", finishProgrammaticMove);
+      map.off("zoomend", finishProgrammaticMove);
+    }
   };
 
   map.once("moveend", finishProgrammaticMove);
@@ -850,11 +884,32 @@ function runProgrammaticMapMove(
   fallbackTimer = window.setTimeout(finishProgrammaticMove, 1_200);
 
   try {
+    if (!isMapLive()) {
+      finishProgrammaticMove();
+      return;
+    }
     move();
   } catch (error) {
     finishProgrammaticMove();
     throw error;
   }
+}
+
+function scheduleMapWork(
+  scheduledWorkRef: { current: number[] },
+  callback: () => void,
+  delayMs = 0,
+) {
+  const timeoutId = window.setTimeout(() => {
+    scheduledWorkRef.current = scheduledWorkRef.current.filter((item) => item !== timeoutId);
+    callback();
+  }, delayMs);
+  scheduledWorkRef.current = [...scheduledWorkRef.current, timeoutId];
+}
+
+function clearScheduledMapWork(scheduledWorkRef: { current: number[] }) {
+  scheduledWorkRef.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
+  scheduledWorkRef.current = [];
 }
 
 function ensureLeafletStyles() {

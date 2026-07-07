@@ -39,7 +39,9 @@ assert(
   "Source/update/provider details must be hidden behind a deeper details toggle by default.",
 );
 assert(
-  /recommendationSavingCpl > 0\.05 \?/.test(source.planSheet),
+  /recommendationSavingCpl > 0\.05/.test(source.planSheet) &&
+    /Saves \$\{recommendationSavingCpl\.toFixed\(1\)\} c\/L on this trip/.test(source.planSheet) &&
+    /Best route value found with a/.test(source.planSheet),
   "Collapsed Plan card must suppress Best price by 0.0 c/L.",
 );
 assert(

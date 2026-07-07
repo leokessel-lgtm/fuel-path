@@ -205,11 +205,11 @@ const styles = StyleSheet.create({
     ...surfaces.floating,
     borderRadius: radii.xxl,
     overflow: "hidden",
-    gap: spacing.sm,
-    padding: spacing.sm,
+    gap: spacing.xs,
+    padding: spacing.xs,
   },
   searchCardContent: {
-    gap: spacing.sm,
+    gap: spacing.xs,
   },
   routeNoticeCard: {
     backgroundColor: colors.panel,
@@ -242,7 +242,7 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     minHeight: 44,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingVertical: spacing.xs,
   },
   inputWithIcon: {
     paddingRight: currentLocationFieldInset,

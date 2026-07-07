@@ -475,7 +475,12 @@ const checks = [
     ok:
       planScreen.includes("routeSheetMinimised") &&
       planScreen.includes("PlanRouteSheet") &&
-      planRouteSheet.includes("styles.sheetMinimised"),
+      planRouteSheet.includes("styles.sheetMinimised") &&
+      planRouteSheet.includes("height: 62") &&
+      planRouteSheet.includes("paddingVertical: spacing.xs") &&
+      planRouteEditorCard.includes("padding: spacing.xs") &&
+      planRouteEditorCard.includes("paddingVertical: spacing.xs") &&
+      planScreen.includes("topControlsOnly: {\n    top: spacing.sm"),
   },
   {
     label: "plan route map uses measured chrome insets",

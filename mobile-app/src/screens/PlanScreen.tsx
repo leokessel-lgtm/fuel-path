@@ -703,7 +703,7 @@ const styles = StyleSheet.create({
     zIndex: 5,
   },
   topControlsOnly: {
-    top: spacing.md,
+    top: spacing.sm,
   },
 });
 

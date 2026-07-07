@@ -1024,7 +1024,10 @@ const styles = StyleSheet.create({
     maxHeight: 430,
   },
   sheetMinimised: {
-    height: 74,
+    gap: 0,
+    height: 62,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
   },
   sheetTopBar: {
     alignItems: "center",

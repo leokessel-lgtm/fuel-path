@@ -41,7 +41,7 @@ function normaliseSavedCommute(commute: SavedCommute): SavedCommute {
     alertEnabled: Boolean(commute.alertEnabled),
     alertTime: normaliseAlertTime(commute.alertTime),
     alertDays: normaliseAlertDays(commute.alertDays, migratedCommuteAlertDays),
-    localReminderEnabled: commute.localReminderEnabled ?? true,
+    localReminderEnabled: commute.localReminderEnabled ?? false,
     minSavingDollars: boundedNumber(commute.minSavingDollars, 1, 25, 5),
     maxDetourMinutes: boundedNumber(commute.maxDetourMinutes, 1, 30, 8),
     tankThresholdPercent: boundedNumber(commute.tankThresholdPercent, 5, 95, 45),

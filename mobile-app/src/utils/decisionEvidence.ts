@@ -242,7 +242,7 @@ function predictionDisciplineCue(item: StationViewModel) {
 
 export function alertGateSummary(notificationPermission: NotificationPermissionState) {
   if (notificationPermission === "granted") {
-    return "Fuel Path checks watched routes for useful savings, fresh prices and sensible detours before interrupting you.";
+    return "Fuel Path checks watched routes for useful savings, fresh prices and sensible detours. Local reminders stay off unless you choose them.";
   }
   if (notificationPermission === "unavailable") {
     return "Notifications need a supported iOS or Android build. You can still save routes here.";
@@ -254,10 +254,12 @@ export function commuteAlertRuleLine(commute: SavedCommute) {
   if (!commute.alertEnabled) return "No notifications while this route is off.";
   const routeRule = "Only alerts when the saving clears your rule, the price is fresh and the detour is sensible.";
   if (commute.alertStatus === "backend_synced") {
-    return routeRule;
+    return commute.localReminderEnabled
+      ? `${routeRule} Local reminder also uses selected days and time.`
+      : routeRule;
   }
   if (commute.alertStatus === "scheduled") {
-    return `${routeRule} Reminder is scheduled for selected days.`;
+    return "Local reminder is scheduled for selected days and time.";
   }
   if (commute.alertStatus === "needs_permission") {
     return "Blocked until notification permission is granted.";

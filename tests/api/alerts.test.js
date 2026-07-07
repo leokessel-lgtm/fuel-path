@@ -44,6 +44,9 @@ test("alerts status exposes backend foundation without enabling push delivery", 
   assert.equal(response.payload.alerts.evaluatorEnabled, true);
   assert.equal(response.payload.alerts.schedulerEnabled, false);
   assert.equal(response.payload.alerts.pushDeliveryEnabled, false);
+  assert.equal(response.payload.alerts.cycleSignals.mode, "background_measurement_only");
+  assert.equal(response.payload.alerts.cycleSignals.cycleAlertsEnabled, false);
+  assert.equal(response.payload.alerts.cycleSignals.userFacingPredictionEnabled, false);
   assert.equal(response.payload.alerts.degraded, false);
   assert.equal(response.payload.alerts.providerHealth.alerts.status, "ok");
   assert.equal(response.payload.alerts.providerHealth.alerts.cacheMode, "none");
@@ -218,6 +221,42 @@ test("alert evaluator blocks noisy or unsafe unhappy paths", async () => {
       assert.equal(typeof response.payload.evaluation.outcomeSummary, "string", item.name);
       assert.equal(response.payload.evaluation.outcomeSummary.length > 12, true, item.name);
     }
+  } finally {
+    setAlertStorageForTests(null);
+    if (originalToken === undefined) delete process.env.ALERTS_WRITE_TOKEN;
+    else process.env.ALERTS_WRITE_TOKEN = originalToken;
+  }
+});
+
+test("fuel-cycle alert candidates stay blocked until prediction guidance is approved", async () => {
+  const originalToken = process.env.ALERTS_WRITE_TOKEN;
+  process.env.ALERTS_WRITE_TOKEN = "alert-token";
+  const store = memoryDurableStore();
+  setAlertStorageForTests(store);
+
+  try {
+    const evaluated = await callAlerts("POST", { action: "evaluate" }, {
+      route,
+      devices: [device],
+      notificationPermission: "granted",
+      regionCapabilities: [{ region: "NSW", capability: "live" }],
+      candidate: {
+        ...freshCandidate({ estimatedSavingDollars: 12, freshnessMinutes: 10 }),
+        alertBasis: "fuel_cycle",
+        cycleSignalMode: "background_measurement_only",
+        cycleReadinessStatus: "measurement_only",
+        cycleAlertsEnabled: false,
+      },
+    }, { authorization: "Bearer alert-token" });
+
+    assert.equal(evaluated.status, 202);
+    assert.equal(evaluated.payload.evaluation.status, "cycle_guidance_not_ready");
+    assert.equal(evaluated.payload.evaluation.reason, "cycle_guidance_gate_closed");
+    assert.equal(evaluated.payload.evaluation.outcome, "skip_alert");
+    assert.equal(evaluated.payload.evaluation.alertBasis, "fuel_cycle");
+    assert.equal(evaluated.payload.evaluation.cycleSignalMode, "background_measurement_only");
+    assert.equal(evaluated.payload.evaluation.cycleReadinessStatus, "measurement_only");
+    assert.equal(evaluated.payload.deliveryStatus, "not_applicable");
   } finally {
     setAlertStorageForTests(null);
     if (originalToken === undefined) delete process.env.ALERTS_WRITE_TOKEN;
@@ -540,6 +579,60 @@ test("scheduled evaluator caps sendable alerts to one per user per run", async (
     assert.equal(scoreCount, 1);
     assert.equal(store.evaluations.filter((item) => item.status === "send_alert").length, 1);
     assert.equal(store.evaluations.filter((item) => item.reason === "user_alert_cap").length, 1);
+  } finally {
+    setAlertRouteScorerForTests(null);
+    setAlertStorageForTests(null);
+    if (originalCron === undefined) delete process.env.CRON_SECRET;
+    else process.env.CRON_SECRET = originalCron;
+  }
+});
+
+test("scheduled evaluator keeps a saved route quiet for 72 hours after an alert", async () => {
+  const originalCron = process.env.CRON_SECRET;
+  process.env.CRON_SECRET = "cron-token";
+  const store = memoryDurableStore();
+  setAlertStorageForTests(store);
+  setAlertRouteScorerForTests(async () => ({
+    status: "scored",
+    regionCapabilities: [{ region: "NSW", capability: "live" }],
+    candidate: freshCandidate({ estimatedSavingDollars: 9, detourMinutes: 3, freshnessMinutes: 15 }),
+  }));
+
+  try {
+    await store.upsertPushDevice(device);
+    await store.upsertSavedRoute({
+      ...route,
+      id: "recent-alert-route",
+      lastAlertSentAt: "2026-06-17T07:00:00.000+10:00",
+    });
+    await store.upsertSavedRoute({
+      ...route,
+      id: "cooled-alert-route",
+      lastAlertSentAt: "2026-06-16T06:00:00.000+10:00",
+    });
+
+    const accepted = await callHandler(cronEvaluateHandler, {
+      method: "GET",
+      query: { ignoreWindow: "1", now: "2026-06-19T07:00:00.000+10:00" },
+      headers: { authorization: "Bearer cron-token" },
+    });
+
+    assert.equal(accepted.status, 202);
+    assert.equal(
+      accepted.payload.results.some((item) =>
+        item.routeId === "recent-alert-route" &&
+        item.status === "quiet_today" &&
+        item.reason === "duplicate_cooldown"
+      ),
+      true,
+    );
+    assert.equal(
+      accepted.payload.results.some((item) =>
+        item.routeId === "cooled-alert-route" &&
+        item.status === "send_alert"
+      ),
+      true,
+    );
   } finally {
     setAlertRouteScorerForTests(null);
     setAlertStorageForTests(null);

@@ -1,7 +1,7 @@
 const { capabilitiesForPoints } = require("./_capabilities");
 
 const ALERT_FRESHNESS_MAX_MINUTES = 120;
-const ALERT_DUPLICATE_COOLDOWN_HOURS = 12;
+const ALERT_DUPLICATE_COOLDOWN_HOURS = 72;
 
 function buildSavedRouteAlertEvaluation({
   route,
@@ -30,6 +30,7 @@ function buildSavedRouteAlertEvaluation({
   else if (!activeDevices.length) [status, reason] = ["missing_push_token", "no_active_push_device"];
   else if (capabilities.some((item) => item.capability === "unsupported")) [status, reason] = ["region_unsupported", "route_region_unsupported"];
   else if (capabilities.some((item) => item.capability === "pending_access")) [status, reason] = ["provider_access_pending", "route_provider_access_pending"];
+  else if (candidate.alertBasis === "fuel_cycle" && candidate.cycleAlertsEnabled !== true) [status, reason] = ["cycle_guidance_not_ready", "cycle_guidance_gate_closed"];
   else if (!candidate.stationCode) [status, reason] = ["not_evaluated", "route_scoring_not_available"];
   else if (candidate.reachable === false) [status, reason] = ["range_first", "candidate_range_risk"];
   else if (candidate.openNow === false) [status, reason] = ["station_closed", "candidate_station_closed"];
@@ -50,6 +51,10 @@ function buildSavedRouteAlertEvaluation({
     outcomeSummary: outcomeDetail.summary,
     stationCode: cleanString(candidate.stationCode),
     stationName: cleanString(candidate.stationName),
+    alertBasis: cleanString(candidate.alertBasis || "route_price_opportunity"),
+    cycleSignalMode: cleanString(candidate.cycleSignalMode),
+    cycleReadinessStatus: cleanString(candidate.cycleReadinessStatus),
+    cycleAlertsEnabled: candidate.cycleAlertsEnabled === true,
     estimatedSavingDollars: optionalNumber(candidate.estimatedSavingDollars),
     detourMinutes: optionalNumber(candidate.detourMinutes),
     freshnessMinutes: optionalNumber(candidate.freshnessMinutes),
@@ -77,6 +82,7 @@ function alertOutcome(status) {
     "region_unsupported",
     "provider_access_pending",
     "alert_disabled",
+    "cycle_guidance_not_ready",
   ].includes(status)) return "skip_alert";
   return "watch_only";
 }
@@ -147,6 +153,7 @@ function skipAlertSummary(status, { route = {}, candidate = {} } = {}) {
   if (status === "region_unsupported") return "This route is outside supported live provider coverage.";
   if (status === "provider_access_pending") return "Provider access is pending for this route.";
   if (status === "alert_disabled") return "Alerts are turned off for this saved route.";
+  if (status === "cycle_guidance_not_ready") return "Fuel-cycle alerts are still in background measurement mode.";
   return "This route should not send an alert right now.";
 }
 

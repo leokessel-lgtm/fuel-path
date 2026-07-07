@@ -128,7 +128,7 @@ The smart alert platform should only be enabled after:
 - a scheduled backend evaluator exists
 - provider and notification costs are understood
 
-Until then, native local daily reminders remain the only alert feature.
+Until then, native local reminders must remain explicitly user-enabled. The default alert path is a smart saved-route watch, and daily local reminders must not be created silently. Fuel-cycle alert intelligence should run only in backend scheduled jobs and prediction collection, not phone-side background polling. Cycle-specific push delivery must stay disabled until measured prediction readiness, product copy review and the explicit cycle-alert environment gate are all clear.
 
 ## Open Production Checks
 

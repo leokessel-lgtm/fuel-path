@@ -80,36 +80,42 @@ try {
     console.log(`${result.status === "passed" ? "OK" : "FAIL"} ${result.index}/${pairs.length} ${result.id}`);
   }
 } finally {
+  if (results.length) writeRunReport({ preClose: true });
   await browser.close();
 }
 
-const failed = results.filter((item) => item.status === "failed");
-const summary = {
-  runId,
-  appUrl,
-  routePairs: pairs.length,
-  passed: results.length - failed.length,
-  failed: failed.length,
-  stationClicksRequested: pairs.length * clickCount,
-  stationClicksPassed: results.reduce((sum, item) => sum + item.stationClicks.filter((click) => click.ok).length, 0),
-  stationClicksFailed: results.reduce((sum, item) => sum + item.stationClicks.filter((click) => !click.ok).length, 0),
-  screenshots: results.reduce((sum, item) => sum + (item.screenshots || []).length, 0),
-  screenshotDir: undefined,
-  stateCoverage: countBy(results.flatMap((item) => [item.from.state, item.to.state])),
-  typeCoverage: countBy(results.flatMap((item) => [item.from.type, item.to.type])),
-  apiCalls: countBy(apiCalls),
-};
-summary.screenshotDir = summary.screenshots > 0 ? screenshotDir : undefined;
-
-fs.mkdirSync(outputDir, { recursive: true });
-const jsonPath = path.join(outputDir, `plan-route-browser-click-stress-${runId}.json`);
-const reportPath = path.join(outputDir, `plan-route-browser-click-stress-${runId}.md`);
-fs.writeFileSync(jsonPath, `${JSON.stringify({ summary, results }, null, 2)}\n`);
-fs.writeFileSync(reportPath, renderReport(summary, results));
-console.log(JSON.stringify({ ...summary, jsonPath, reportPath }, null, 2));
+const { failed, summary } = writeRunReport();
 
 if (failed.length) throw new Error(`${failed.length}/${results.length} browser route cases failed`);
 if (summary.stationClicksFailed) throw new Error(`${summary.stationClicksFailed}/${summary.stationClicksRequested} station clicks failed`);
+
+function writeRunReport({ preClose = false } = {}) {
+  const failed = results.filter((item) => item.status === "failed");
+  const summary = {
+    runId,
+    appUrl,
+    routePairs: pairs.length,
+    passed: results.length - failed.length,
+    failed: failed.length,
+    stationClicksRequested: pairs.length * clickCount,
+    stationClicksPassed: results.reduce((sum, item) => sum + item.stationClicks.filter((click) => click.ok).length, 0),
+    stationClicksFailed: results.reduce((sum, item) => sum + item.stationClicks.filter((click) => !click.ok).length, 0),
+    screenshots: results.reduce((sum, item) => sum + (item.screenshots || []).length, 0),
+    screenshotDir: undefined,
+    stateCoverage: countBy(results.flatMap((item) => [item.from.state, item.to.state])),
+    typeCoverage: countBy(results.flatMap((item) => [item.from.type, item.to.type])),
+    apiCalls: countBy(apiCalls),
+  };
+  summary.screenshotDir = summary.screenshots > 0 ? screenshotDir : undefined;
+
+  fs.mkdirSync(outputDir, { recursive: true });
+  const jsonPath = path.join(outputDir, `plan-route-browser-click-stress-${runId}.json`);
+  const reportPath = path.join(outputDir, `plan-route-browser-click-stress-${runId}.md`);
+  fs.writeFileSync(jsonPath, `${JSON.stringify({ summary, results }, null, 2)}\n`);
+  fs.writeFileSync(reportPath, renderReport(summary, results));
+  console.log(JSON.stringify({ ...summary, jsonPath, reportPath, preClose }, null, 2));
+  return { failed, summary, jsonPath, reportPath };
+}
 
 async function runBrowserCase(activePage, pair, index) {
   const row = {
@@ -138,6 +144,7 @@ async function runBrowserCase(activePage, pair, index) {
     }
 
     const recommendationState = await extractVisibleState(activePage);
+    if (!recommendationState.hasBestStopSummary) row.failures.push("Plan best-stop summary missing");
     if (recommendationState.hasBadZeroSavingsDetour) row.failures.push("visible recommendation shows zero best-price lead with savings-detour label");
     if (!recommendationState.hasWhyAction) row.failures.push("Plan evidence action missing");
     if (recommendationState.hasSuggestedFuelStops) row.failures.push("suggested fuel stops visible in Plan result");
@@ -249,9 +256,7 @@ async function waitForText(activePage, text) {
 
 async function waitForPlanResult(activePage) {
   await activePage.getByText("Why?", { exact: true }).first().waitFor({ state: "visible", timeout: resultTimeoutMs });
-  await activePage.getByText("BEST PRICE BY", { exact: false }).first().waitFor({ state: "visible", timeout: resultTimeoutMs }).catch(async () => {
-    await activePage.getByText("Best route price", { exact: false }).first().waitFor({ state: "visible", timeout: resultTimeoutMs });
-  });
+  await activePage.getByText("Best stop for this trip", { exact: false }).first().waitFor({ state: "visible", timeout: resultTimeoutMs });
 }
 
 async function clickMarkerByStationCode(activePage, stationCode) {
@@ -272,6 +277,7 @@ async function extractVisibleState(activePage) {
     const text = document.body?.innerText || "";
     return {
       text,
+      hasBestStopSummary: text.includes("Best stop for this trip"),
       hasBadZeroSavingsDetour: text.includes("Best price by 0.0 c/L") && /savings detour/i.test(text),
       hasWhyAction: text.includes("Why?"),
       hasSuggestedFuelStops: text.includes("Suggested fuel stops"),

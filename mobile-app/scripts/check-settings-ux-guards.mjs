@@ -104,6 +104,8 @@ const checks = [
       files.savedRouteAlertsCard.includes("Watch saved routes") &&
       files.savedRouteAlertsCard.includes("Only alert when worth it") &&
       files.savedRouteAlertsCard.includes("Route notification settings") &&
+      files.savedRouteAlertsCard.includes("Local reminder") &&
+      files.savedRouteAlertsCard.includes("localReminderEnabled") &&
       files.savedRouteAlertsCard.includes("Commute days") &&
       files.savedRouteAlertsCard.includes("Minimum saving") &&
       files.savedRouteAlertsCard.includes("Save a route from Plan to watch it for useful fuel alerts.") &&
@@ -115,6 +117,7 @@ const checks = [
     ok:
       files.savedCommutesHook.includes("vehicleId") &&
       files.savedCommutesHook.includes("defaultCommuteAlertDays") &&
+      files.savedCommutesHook.includes("localReminderEnabled: false") &&
       files.app.includes("onSaveCommute={saveCommute}"),
   },
   {

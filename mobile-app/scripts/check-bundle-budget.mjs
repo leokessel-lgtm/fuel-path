@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
+const scope = budgetScope();
 
 const budgets = {
   webDistTotalBytes: 2_500_000,
@@ -17,16 +18,19 @@ const budgets = {
   nativeIosIpaBytes: 120_000_000,
 };
 
-const checks = [
+const webChecks = [
   checkDirectoryBudget("web export total", path.join(root, "dist"), budgets.webDistTotalBytes),
   checkLargestFile("web largest file", path.join(root, "dist"), budgets.webLargestFileBytes),
   checkExtensionTotal("web JavaScript total", path.join(root, "dist"), ".js", budgets.webJsTotalBytes),
+];
+const assetChecks = [
   checkDirectoryBudget("source assets total", path.join(root, "assets"), budgets.sourceAssetsTotalBytes),
   checkLargestFile("source largest asset", path.join(root, "assets"), budgets.sourceLargestAssetBytes),
   checkDirectoryBudget("brand icons total", path.join(root, "assets", "brand-icons"), budgets.brandIconsTotalBytes),
   checkLargestFile("brand largest icon", path.join(root, "assets", "brand-icons"), budgets.brandIconLargestBytes),
-  ...checkNativeArtifactBudgets(),
 ];
+const nativeChecks = checkNativeArtifactBudgets();
+const checks = scopedChecks(scope, { webChecks, assetChecks, nativeChecks });
 
 const failed = checks.filter((check) => !check.ok);
 
@@ -37,8 +41,31 @@ for (const check of checks) {
 }
 
 if (failed.length) {
-  console.error(`Bundle/asset budget failed: ${failed.map((check) => check.label).join(", ")}`);
+  console.error(`${budgetLabel(scope)} failed: ${failed.map((check) => check.label).join(", ")}`);
   process.exit(1);
+}
+
+function budgetScope() {
+  const rawScope = process.argv.find((argument) => argument.startsWith("--scope="))?.slice("--scope=".length)
+    || process.argv[2]
+    || "all";
+  if (["all", "web", "assets", "native"].includes(rawScope)) return rawScope;
+  console.error(`Unknown budget scope ${JSON.stringify(rawScope)}. Use all, web, assets or native.`);
+  process.exit(1);
+}
+
+function scopedChecks(activeScope, groups) {
+  if (activeScope === "web") return groups.webChecks;
+  if (activeScope === "assets") return groups.assetChecks;
+  if (activeScope === "native") return groups.nativeChecks;
+  return [...groups.webChecks, ...groups.assetChecks, ...groups.nativeChecks];
+}
+
+function budgetLabel(activeScope) {
+  if (activeScope === "web") return "Web bundle budget";
+  if (activeScope === "assets") return "Asset budget";
+  if (activeScope === "native") return "Native artifact budget";
+  return "Bundle/asset budget";
 }
 
 function checkDirectoryBudget(label, directory, budget) {

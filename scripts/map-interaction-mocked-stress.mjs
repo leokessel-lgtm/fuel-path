@@ -21,18 +21,24 @@ const results = [];
 try {
   for (const viewport of viewports) results.push(await runViewport(viewport));
 } finally {
+  if (results.length) writeRunReport({ preClose: true });
   await browser.close();
 }
 
-const failed = results.filter((item) => item.status === "failed");
-const summary = { runId, appUrl, viewports: results.length, passed: results.length - failed.length, failed: failed.length, failures: failed.map((item) => item.viewport.id), screenshotDir };
-fs.mkdirSync(outputDir, { recursive: true });
-const jsonPath = path.join(outputDir, `map-interaction-mocked-stress-${runId}.json`);
-const reportPath = path.join(outputDir, `map-interaction-mocked-stress-${runId}.md`);
-fs.writeFileSync(jsonPath, `${JSON.stringify({ summary, results }, null, 2)}\n`);
-fs.writeFileSync(reportPath, renderReport(summary, results));
-console.log(JSON.stringify({ ...summary, jsonPath, reportPath }, null, 2));
+const { failed } = writeRunReport();
 if (failed.length) throw new Error(`${failed.length}/${results.length} mocked map interaction viewport(s) failed`);
+
+function writeRunReport({ preClose = false } = {}) {
+  const failed = results.filter((item) => item.status === "failed");
+  const summary = { runId, appUrl, viewports: results.length, passed: results.length - failed.length, failed: failed.length, failures: failed.map((item) => item.viewport.id), screenshotDir };
+  fs.mkdirSync(outputDir, { recursive: true });
+  const jsonPath = path.join(outputDir, `map-interaction-mocked-stress-${runId}.json`);
+  const reportPath = path.join(outputDir, `map-interaction-mocked-stress-${runId}.md`);
+  fs.writeFileSync(jsonPath, `${JSON.stringify({ summary, results }, null, 2)}\n`);
+  fs.writeFileSync(reportPath, renderReport(summary, results));
+  console.log(JSON.stringify({ ...summary, jsonPath, reportPath, preClose }, null, 2));
+  return { failed, summary, jsonPath, reportPath };
+}
 
 async function runViewport(viewport) {
   const context = await browser.newContext({ viewport });
@@ -97,7 +103,8 @@ async function runViewport(viewport) {
     row.metrics.plan = await mapState(page);
     row.failures.push(...checks([
       [row.metrics.plan.stationMarkers >= 3, `expected Plan route markers, got ${row.metrics.plan.stationMarkers}`],
-      [row.metrics.plan.text.includes("BEST PRICE BY") || row.metrics.plan.text.includes("Best price by") || row.metrics.plan.text.includes("Best route price"), "Plan best-price evidence missing"],
+      [row.metrics.plan.text.includes("Best stop for this trip"), "Plan best-stop summary missing"],
+      [/saves\s+\d+(?:\.\d+)?\s+c\/L on this trip/i.test(row.metrics.plan.text), "Plan trip savings summary missing"],
       [row.metrics.plan.text.includes("Why?"), "Plan evidence action missing"],
       [!row.metrics.plan.text.includes("Suggested fuel stops"), "Suggested fuel stops copy returned in Plan"],
       [!row.metrics.plan.text.includes("Navigate to this stop"), "large navigate button returned in Plan recommendation"],
@@ -122,9 +129,7 @@ async function launchBrowser() { try { return await chromium.launch({ channel: "
 
 async function waitForPlanRecommendation(page) {
   await page.getByText("Why?", { exact: true }).first().waitFor({ state: "visible", timeout: 12000 });
-  await page.getByText("BEST PRICE BY", { exact: false }).first().waitFor({ state: "visible", timeout: 12000 }).catch(async () => {
-    await page.getByText("Best route price", { exact: false }).first().waitFor({ state: "visible", timeout: 12000 });
-  });
+  await page.getByText("Best stop for this trip", { exact: false }).first().waitFor({ state: "visible", timeout: 12000 });
 }
 function attachConsole(page) { const messages = []; page.on("console", (message) => { if (["error", "warning"].includes(message.type())) messages.push(`${message.type()}: ${message.text()}`); }); page.on("pageerror", (error) => messages.push(`pageerror: ${error.message}`)); return messages; }
 function consoleFailures(messages) { const actionable = messages.filter((entry) => !/favicon|ResizeObserver|tile.openstreetmap.org|Cannot record touch end without a touch start/i.test(entry)); return actionable.length ? [`console/page errors: ${actionable.slice(0, 3).join(" | ")}`] : []; }

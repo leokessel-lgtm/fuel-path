@@ -105,15 +105,16 @@ await installApiMocks(page);
 
 try {
   for (const [index, pair] of pairs.entries()) {
+    const shouldSubmit = submitEvery > 0 && index % submitEvery === 0;
     await recordCase(`${index + 1}. ${pair.from.id} to ${pair.to.id}`, async () => {
       await resetApp();
       await selectEndpoint("From", pair.from);
       await selectEndpoint("To", pair.to);
       await assertButtonEnabled("Plan route");
-      if (submitEvery > 0 && index % submitEvery === 0) {
+      if (shouldSubmit) {
         await submitRouteAndAssertResults();
       }
-    }, pair);
+    }, pair, shouldSubmit);
   }
 } finally {
   await page.close();
@@ -234,12 +235,12 @@ async function assertAppReachable(url) {
 
 async function resetApp() {
   await page.goto(appUrl, { waitUntil: "domcontentloaded" });
-  await page.getByText("Plan", { exact: true }).first().click({ timeout: timeoutMs }).catch(() => {});
+  await page.getByRole("tab", { name: "Plan" }).click({ timeout: timeoutMs });
   await field("From").waitFor({ state: "visible", timeout: timeoutMs });
-  await page.getByText("Plan trip").first().waitFor({ state: "visible", timeout: timeoutMs });
+  await page.getByRole("button", { name: "Plan route" }).waitFor({ state: "visible", timeout: timeoutMs });
 }
 
-async function recordCase(name, callback, pair) {
+async function recordCase(name, callback, pair, submitted) {
   const started = Date.now();
   const row = {
     name,
@@ -249,7 +250,7 @@ async function recordCase(name, callback, pair) {
     toId: pair.to.id,
     toState: pair.to.state,
     toType: pair.to.type,
-    submitted: submitEvery > 0 && results.length % submitEvery === 0,
+    submitted,
   };
   try {
     await callback();
@@ -283,6 +284,7 @@ async function fillField(label, value) {
 async function submitRouteAndAssertResults() {
   await page.getByRole("button", { name: "Plan route" }).click();
   await page.getByText("Metro Bexley", { exact: true }).first().waitFor({ state: "visible", timeout: timeoutMs });
+  await page.getByRole("button", { name: "Show route evidence" }).click();
   await page.getByText("Why this stop", { exact: true }).first().waitFor({ state: "visible", timeout: timeoutMs });
 }
 

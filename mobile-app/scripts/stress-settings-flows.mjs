@@ -103,6 +103,7 @@ const seededCommute = {
 const browser = await chromium.launch({ headless: true });
 try {
   const page = await browser.newPage({ viewport });
+  await installApiMocks(page);
   await installSeedState(page);
   await seedState(page);
 
@@ -118,6 +119,52 @@ try {
   }, null, 2));
 } finally {
   await browser.close();
+}
+
+async function installApiMocks(page) {
+  await page.route("**/api/stations?**", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        context: {
+          capability: "live",
+          fuel: "P98",
+          provider: "settings_flow_mock",
+          source: "settings_flow_mock",
+          warning: "",
+        },
+        stations: [
+          station("settings-bp", "BP Perth", "BP", -31.9521, 115.8611, 181.9),
+          station("settings-shell", "Shell Perth", "Shell", -31.9531, 115.8621, 182.9),
+          station("settings-ampol", "Ampol Perth", "Ampol", -31.9541, 115.8631, 183.9),
+          station("settings-caltex", "Caltex Perth", "Caltex", -31.9551, 115.8641, 184.9),
+          station("settings-7-eleven", "7-Eleven Perth", "7-Eleven", -31.9561, 115.8651, 185.9),
+          station("settings-metro", "Metro Perth", "Metro Fuel", -31.9571, 115.8661, 179.9),
+        ],
+      }),
+    });
+  });
+}
+
+function station(stationCode, name, brand, lat, lon, p98) {
+  return {
+    stationCode,
+    name,
+    brand,
+    suburb: "Perth",
+    address: `${name}, Perth WA`,
+    lat,
+    lon,
+    openNow: true,
+    updatedAt: "2026-07-07T00:00:00.000Z",
+    source: "settings_flow_mock",
+    prices: {
+      U91: p98 - 22,
+      P95: p98 - 8,
+      P98: p98,
+      DL: p98 + 4,
+    },
+  };
 }
 
 async function seedState(page) {
@@ -303,12 +350,14 @@ async function clickVisible(page, text, minY = 0) {
 }
 
 async function waitForStorage(page, key, predicate) {
-  await page.waitForFunction(({ key, predicateSource }) => {
-    const raw = localStorage.getItem(key);
-    if (!raw) return false;
-    const value = JSON.parse(raw);
-    return Function("value", `return (${predicateSource})(value);`)(value);
-  }, { key, predicateSource: predicate.toString() }, { timeout: 5_000 });
+  const deadline = Date.now() + 5_000;
+  let lastValue = null;
+  while (Date.now() < deadline) {
+    lastValue = await storageJson(page, key);
+    if (lastValue && predicate(lastValue)) return;
+    await page.waitForTimeout(100);
+  }
+  throw new Error(`Timed out waiting for ${key} storage condition. Last value: ${JSON.stringify(lastValue)}`);
 }
 
 async function storageJson(page, key) {
@@ -326,11 +375,14 @@ async function assertText(page, text) {
 }
 
 async function waitForVisibleText(page, text) {
-  await page.waitForFunction(
-    (expected) => (document.body.innerText || "").includes(expected),
-    text,
-    { timeout: 15_000 },
-  );
+  const deadline = Date.now() + 15_000;
+  let body = "";
+  while (Date.now() < deadline) {
+    body = await visibleText(page);
+    if (body.includes(text)) return;
+    await page.waitForTimeout(150);
+  }
+  throw new Error(`Timed out waiting for visible text ${JSON.stringify(text)}. Visible text:\n${body.slice(0, 2_000)}`);
 }
 
 function assertIncludes(value, expected) {

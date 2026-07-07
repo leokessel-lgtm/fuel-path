@@ -50,7 +50,7 @@ export function useSavedCommutes() {
           alertEnabled: false,
           alertTime: "07:30",
           alertDays: defaultCommuteAlertDays,
-          localReminderEnabled: true,
+          localReminderEnabled: false,
           minSavingDollars: 5,
           maxDetourMinutes: 8,
           tankThresholdPercent: 45,

@@ -272,9 +272,9 @@ async function assertAppReachable(url) {
 
 async function resetApp() {
   await page.goto(appUrl, { waitUntil: "domcontentloaded" });
-  await page.getByText("Plan", { exact: true }).first().click({ timeout: timeoutMs }).catch(() => {});
+  await page.getByRole("tab", { name: "Plan" }).click({ timeout: timeoutMs });
   await field("From").waitFor({ state: "visible", timeout: timeoutMs });
-  await page.getByText("Plan trip").first().waitFor({ state: "visible", timeout: timeoutMs });
+  await page.getByRole("button", { name: "Plan route" }).waitFor({ state: "visible", timeout: timeoutMs });
 }
 
 async function recordCase(name, callback) {
@@ -312,6 +312,7 @@ async function submitRouteAndAssertResults() {
   await assertButtonEnabled("Plan route");
   await page.getByRole("button", { name: "Plan route" }).click();
   await assertText("Metro Bexley");
+  await page.getByRole("button", { name: "Show route evidence" }).click();
   await assertText("Why this stop");
 }
 

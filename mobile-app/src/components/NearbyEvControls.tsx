@@ -10,6 +10,7 @@ export type NearbyEnergyChoice = FuelCode | "EV";
 
 const evConnectorOptions: EvConnector[] = ["CCS2", "CHADEMO", "TYPE2", "TESLA"];
 const nearbySheetBottomOffset = 8;
+const energySelectorMinWidth = 214;
 const evChargerKeyExtractor = (charger: EvCharger) => charger.id;
 const energyOptions: Array<{ label: string; shortLabel: string; value: NearbyEnergyChoice }> = [
   { label: "E10", shortLabel: "E10", value: "E10" },
@@ -573,6 +574,8 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   energySelector: {
+    alignSelf: "flex-start",
+    minWidth: energySelectorMinWidth,
     zIndex: 10,
   },
   energyButton: {
@@ -581,6 +584,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.black,
     borderRadius: radii.xl,
     flexDirection: "row",
+    gap: spacing.lg,
     justifyContent: "space-between",
     minHeight: 48,
     paddingHorizontal: spacing.md,
@@ -611,6 +615,7 @@ const styles = StyleSheet.create({
     borderRadius: radii.xl,
     borderWidth: 1,
     gap: spacing.xs,
+    minWidth: energySelectorMinWidth,
     marginTop: spacing.xs,
     padding: spacing.xs,
   },

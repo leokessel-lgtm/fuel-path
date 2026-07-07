@@ -159,7 +159,8 @@ const checks = [
       files.app.includes('<View role="navigation">') &&
       files.app.includes('<View accessibilityRole="tablist" style={styles.tabBar}>') &&
       files.app.includes('accessibilityRole="tab"') &&
-      files.app.includes("accessibilityState={{ selected }}"),
+      files.app.includes("accessibilityState={{ selected }}") &&
+      files.app.includes("aria-selected={selected}"),
   },
   {
     label: "labelled app chrome pressables expose button semantics",

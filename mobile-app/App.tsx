@@ -50,42 +50,6 @@ function initialTab(): TabKey {
   return "nearby";
 }
 
-function TabIcon({ tab, selected }: { tab: TabKey; selected: boolean }) {
-  const iconTint = selected ? colors.white : "#9eaaa4";
-
-  if (tab === "plan") {
-    return (
-      <View style={styles.planIcon}>
-        <View style={[styles.planIconLine, { backgroundColor: iconTint }]} />
-        <View style={[styles.planIconStart, { borderColor: iconTint }]} />
-        <View style={[styles.planIconEnd, { backgroundColor: iconTint }]} />
-      </View>
-    );
-  }
-
-  if (tab === "nearby") {
-    return (
-      <View style={styles.nearbyIcon}>
-        <View style={[styles.nearbyPin, { backgroundColor: iconTint }]}>
-          <View
-            style={[
-              styles.nearbyPinCentre,
-              { backgroundColor: selected ? colors.green : colors.ink },
-            ]}
-          />
-        </View>
-      </View>
-    );
-  }
-
-  return (
-    <View style={styles.accountIcon}>
-      <View style={[styles.accountHead, { backgroundColor: iconTint }]} />
-      <View style={[styles.accountShoulders, { borderColor: iconTint }]} />
-    </View>
-  );
-}
-
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabKey>(() => initialTab());
   const [releaseUpdateAvailable, setReleaseUpdateAvailable] = useState(false);
@@ -275,16 +239,15 @@ export default function App() {
               const selected = activeTab === tab.key;
               return (
                 <Pressable
+                  accessibilityLabel={tab.label}
                   accessibilityRole="tab"
                   accessibilityState={{ selected }}
-                  hitSlop={8}
+                  aria-selected={selected}
+                  hitSlop={10}
                   key={tab.key}
                   onPress={() => setActiveTab(tab.key)}
                   style={[styles.tabButton, selected && styles.tabButtonSelected]}
                 >
-                  <View style={[styles.tabIconShell, selected && styles.tabIconShellSelected]}>
-                    <TabIcon tab={tab.key} selected={selected} />
-                  </View>
                   <Text maxFontSizeMultiplier={chromeTextScale} numberOfLines={1} style={[styles.tabLabel, selected && styles.tabLabelSelected]}>{tab.label}</Text>
                 </Pressable>
               );
@@ -442,12 +405,12 @@ const styles = StyleSheet.create({
     backgroundColor: colors.black,
     borderRadius: radii.pill,
     flexDirection: "row",
-    gap: spacing.xs,
-    marginBottom: spacing.md,
-    marginHorizontal: spacing.lg,
-    marginTop: spacing.sm,
+    gap: 4,
+    marginBottom: spacing.sm,
+    marginHorizontal: spacing.md,
+    marginTop: spacing.xs,
     maxWidth: 440,
-    padding: 6,
+    padding: 5,
     elevation: 12,
     width: "92%",
     zIndex: 20,
@@ -457,105 +420,22 @@ const styles = StyleSheet.create({
     borderRadius: radii.pill,
     flex: 1,
     justifyContent: "center",
-    minHeight: 54,
-    paddingVertical: 7,
+    minHeight: 44,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
   },
   tabButtonSelected: {
     backgroundColor: colors.green,
+    paddingHorizontal: spacing.lg,
   },
   tabLabel: {
     color: "#c4cdc8",
     fontSize: typeScale.caption,
-    fontWeight: "500",
-    marginTop: 4,
+    fontWeight: "600",
   },
   tabLabelSelected: {
     color: colors.white,
+    fontSize: typeScale.body,
     fontWeight: "700",
-  },
-  tabIconShell: {
-    alignItems: "center",
-    height: 24,
-    justifyContent: "center",
-    width: 32,
-  },
-  tabIconShellSelected: {
-    transform: [{ scale: 1.04 }],
-  },
-  planIcon: {
-    height: 22,
-    position: "relative",
-    width: 28,
-  },
-  planIconLine: {
-    borderRadius: radii.pill,
-    height: 4,
-    left: 5,
-    position: "absolute",
-    top: 10,
-    transform: [{ rotate: "-28deg" }],
-    width: 19,
-  },
-  planIconStart: {
-    borderRadius: radii.pill,
-    borderWidth: 3,
-    height: 9,
-    left: 2,
-    position: "absolute",
-    top: 11,
-    width: 9,
-  },
-  planIconEnd: {
-    borderRadius: radii.pill,
-    height: 9,
-    position: "absolute",
-    right: 2,
-    top: 3,
-    width: 9,
-  },
-  nearbyIcon: {
-    height: 22,
-    position: "relative",
-    width: 22,
-  },
-  nearbyPin: {
-    borderRadius: 9,
-    borderBottomLeftRadius: 3,
-    height: 18,
-    left: 2,
-    position: "absolute",
-    top: 1,
-    transform: [{ rotate: "-45deg" }],
-    width: 18,
-  },
-  nearbyPinCentre: {
-    borderRadius: radii.pill,
-    height: 7,
-    left: 5.5,
-    position: "absolute",
-    top: 5.5,
-    width: 7,
-  },
-  accountIcon: {
-    alignItems: "center",
-    height: 22,
-    justifyContent: "center",
-    position: "relative",
-    width: 26,
-  },
-  accountHead: {
-    borderRadius: radii.pill,
-    height: 8,
-    position: "absolute",
-    top: 2,
-    width: 8,
-  },
-  accountShoulders: {
-    borderRadius: radii.pill,
-    borderTopWidth: 3,
-    height: 12,
-    position: "absolute",
-    top: 12,
-    width: 22,
   },
 });

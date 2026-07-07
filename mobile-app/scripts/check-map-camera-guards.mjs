@@ -100,6 +100,10 @@ const checks = [
     ok:
       nearbyScreen.includes("const { expandedSheetTop, nearbyCameraInsets, onTopControlsLayout } = useMeasuredControlBoundary();") &&
       nearbyScreen.includes("onLayout={onTopControlsLayout}") &&
+      nearbyEvControls.includes("const energySelectorMinWidth = 214;") &&
+      nearbyEvControls.includes('alignSelf: "flex-start"') &&
+      nearbyEvControls.includes("minWidth: energySelectorMinWidth") &&
+      nearbyEvControls.includes("gap: spacing.lg") &&
       measuredControlBoundary.includes("topControlsBottom + spacing.xl") &&
       measuredControlBoundary.includes("bottom: 330"),
   },
@@ -309,12 +313,15 @@ const checks = [
       fuelPathLogo.includes("styles.pinDot"),
   },
   {
-    label: "app shell uses dark icon-first bottom navigation",
+    label: "app shell uses compact labelled bottom navigation",
     ok:
-      appShell.includes("function TabIcon") &&
       appShell.includes("backgroundColor: colors.black") &&
-      appShell.includes("styles.tabIconShell") &&
-      appShell.includes("styles.nearbyPin") &&
+      appShell.includes('width: "92%"') &&
+      appShell.includes("maxWidth: 440") &&
+      appShell.includes("minHeight: 44") &&
+      appShell.includes("tabLabelSelected") &&
+      !appShell.includes("function TabIcon") &&
+      !appShell.includes("styles.tabIconShell") &&
       !appShell.includes("styles.tabHint"),
   },
   {
@@ -326,6 +333,8 @@ const checks = [
       appShell.includes("<Text maxFontSizeMultiplier={chromeTextScale} style={styles.vehicleIconText}>{vehicleInitials}</Text>") &&
       appShell.includes("<Text maxFontSizeMultiplier={chromeTextScale} numberOfLines={1} style={styles.vehiclePrimary}>") &&
       appShell.includes("<Text maxFontSizeMultiplier={chromeTextScale} numberOfLines={1} style={styles.vehicleSecondary}>") &&
+      appShell.includes("accessibilityLabel={tab.label}") &&
+      appShell.includes("aria-selected={selected}") &&
       appShell.includes("<Text maxFontSizeMultiplier={chromeTextScale} numberOfLines={1} style={[styles.tabLabel, selected && styles.tabLabelSelected]}>{tab.label}</Text>"),
   },
   {
@@ -334,8 +343,9 @@ const checks = [
       theme.includes('fontWeight: "400" as const') &&
       theme.includes('fontWeight: "600" as const') &&
       theme.includes('fontWeight: "700" as const') &&
-      appShell.includes('fontWeight: "500"') &&
       appShell.includes('fontWeight: "700"') &&
+      appShell.includes("fontSize: typeScale.caption") &&
+      appShell.includes("fontSize: typeScale.body") &&
       !appShell.includes('fontWeight: "900"'),
   },
   {

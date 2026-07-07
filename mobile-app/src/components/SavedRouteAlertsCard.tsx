@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Switch, Text, View } from "react-native";
 
 import { colors, radii, shadow, spacing, surfaces, typeScale, typography } from "../theme";
 import {
@@ -44,7 +44,7 @@ export function SavedRouteAlertsCard({
   onToggleCommuteAlert: (commuteId: string) => void;
   onUpdateCommuteAlertSettings: (
     commuteId: string,
-    updates: Partial<Pick<SavedCommute, "alertDays" | "alertTime" | "minSavingDollars" | "vehicleId">>,
+    updates: Partial<Pick<SavedCommute, "alertDays" | "alertTime" | "localReminderEnabled" | "minSavingDollars" | "vehicleId">>,
   ) => void;
 }) {
   const [editingCommuteId, setEditingCommuteId] = useState<string | null>(null);
@@ -188,12 +188,27 @@ function RouteAlertEditPanel({
 }: {
   commute: SavedCommute;
   preferences: AppPreferences;
-  onUpdate: (updates: Partial<Pick<SavedCommute, "alertDays" | "alertTime" | "minSavingDollars" | "vehicleId">>) => void;
+  onUpdate: (updates: Partial<Pick<SavedCommute, "alertDays" | "alertTime" | "localReminderEnabled" | "minSavingDollars" | "vehicleId">>) => void;
 }) {
   const selectedDays = commute.alertDays?.length ? commute.alertDays : weekdays;
   return (
     <View style={styles.editPanel}>
       <Text style={styles.editTitle}>Route notification settings</Text>
+      <View style={styles.switchRow}>
+        <View style={styles.switchCopy}>
+          <Text style={styles.switchTitle}>Local reminder</Text>
+          <Text style={styles.switchMeta}>
+            {commute.localReminderEnabled ? "Selected days and time" : "Off"}
+          </Text>
+        </View>
+        <Switch
+          accessibilityLabel={`${commute.localReminderEnabled ? "Turn off" : "Turn on"} local reminder for ${commute.name}`}
+          onValueChange={(localReminderEnabled) => onUpdate({ localReminderEnabled })}
+          thumbColor={commute.localReminderEnabled ? colors.green : colors.white}
+          trackColor={{ false: colors.line, true: colors.greenSoft }}
+          value={Boolean(commute.localReminderEnabled)}
+        />
+      </View>
       <Text style={styles.editLabel}>Vehicle</Text>
       <View style={styles.chipRow}>
         {preferences.vehicles.map((vehicle) => {
@@ -492,6 +507,26 @@ const styles = StyleSheet.create({
     color: colors.ink,
     fontSize: typeScale.caption,
     fontWeight: "700",
+  },
+  switchRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: spacing.md,
+    justifyContent: "space-between",
+  },
+  switchCopy: {
+    flex: 1,
+    gap: 2,
+  },
+  switchTitle: {
+    color: colors.ink,
+    fontSize: typeScale.caption,
+    fontWeight: "700",
+  },
+  switchMeta: {
+    color: colors.muted,
+    fontSize: typeScale.caption,
+    fontWeight: "600",
   },
   editLabel: {
     color: colors.muted,

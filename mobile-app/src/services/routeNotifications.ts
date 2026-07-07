@@ -125,8 +125,8 @@ export async function scheduleSavedCommuteAlert(commute: SavedCommute): Promise<
 
     if (commute.localReminderEnabled === false) {
       return {
-        status: "scheduled",
-        message: "Route watch is on. Local reminders are off.",
+        status: "off",
+        message: "Local reminders are off.",
       };
     }
 

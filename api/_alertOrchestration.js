@@ -32,7 +32,7 @@ const ALERT_MAX_RECORDS = 500;
 const ALERT_CAPABILITY_SCOPE = "alerts-client-write-v1";
 const ALERT_CAPABILITY_TTL_SECONDS = 60 * 60 * 24 * 30;
 
-function createAlertOrchestration({ buildRoute, capabilitiesForPoints, loadStationData, scoreRoute }) {
+function createAlertOrchestration({ buildRoute, capabilitiesForPoints, loadStationData, predictionStatus, scoreRoute }) {
   let alertRouteScorerForTests;
 
   async function alertsStatus() {
@@ -47,6 +47,7 @@ function createAlertOrchestration({ buildRoute, capabilitiesForPoints, loadStati
       storageError = error instanceof Error ? error.message : "Alert storage is unavailable";
     }
     const degraded = Boolean(storageError);
+    const cycleSignals = await alertCycleSignalStatus();
     return {
       mode: "backend_foundation",
       degraded,
@@ -69,6 +70,7 @@ function createAlertOrchestration({ buildRoute, capabilitiesForPoints, loadStati
         error: storageError,
         warning: pushDeliveryEnabled ? "" : "Expo push delivery is disabled by environment gate.",
       }),
+      cycleSignals,
       writeSecurity: alertsWriteSecurity(),
       pushProviderConfigured: pushDeliveryEnabled,
       cronConfigured,
@@ -85,6 +87,7 @@ function createAlertOrchestration({ buildRoute, capabilitiesForPoints, loadStati
         "provider_access_pending",
         "missing_push_token",
         "permission_missing",
+        "cycle_guidance_not_ready",
         "not_evaluated",
         "failed",
       ],
@@ -103,6 +106,40 @@ function createAlertOrchestration({ buildRoute, capabilitiesForPoints, loadStati
 
   function alertPushDeliveryEnabled() {
     return process.env.EXPO_PUSH_DELIVERY_ENABLED === "1";
+  }
+
+  async function alertCycleSignalStatus() {
+    const fallback = {
+      mode: "background_measurement_only",
+      cycleAlertsEnabled: false,
+      userFacingPredictionEnabled: false,
+      accuracyClaimsAllowed: false,
+      readinessStatus: "measurement_only",
+      blockers: ["prediction_status_unavailable"],
+    };
+    if (typeof predictionStatus !== "function") return fallback;
+    try {
+      const predictions = await predictionStatus();
+      const readiness = predictions.readiness || {};
+      const cycleAlertsEnabled =
+        process.env.FUEL_PATH_CYCLE_ALERTS_ENABLED === "1" &&
+        predictions.userFacingPredictionEnabled === true &&
+        predictions.accuracyClaimsAllowed === true &&
+        readiness.status === "ready_for_limited_cycle_guidance";
+      return {
+        mode: cycleAlertsEnabled ? "cycle_alerts_enabled" : "background_measurement_only",
+        cycleAlertsEnabled,
+        userFacingPredictionEnabled: predictions.userFacingPredictionEnabled === true,
+        accuracyClaimsAllowed: predictions.accuracyClaimsAllowed === true,
+        readinessStatus: readiness.status || "measurement_only",
+        blockers: Array.isArray(readiness.blockers) ? readiness.blockers : [],
+      };
+    } catch (error) {
+      return {
+        ...fallback,
+        lastError: error instanceof Error ? error.message : "Prediction status unavailable",
+      };
+    }
   }
 
   function alertsWriteSecurity() {
@@ -475,10 +512,11 @@ function createAlertOrchestration({ buildRoute, capabilitiesForPoints, loadStati
         includeClosed: false,
       });
       const recommendation = scored.candidates[0];
+      const cycleSignals = await alertCycleSignalStatus();
       return {
         status: recommendation ? "scored" : "no_candidate",
-        candidate: recommendation ? alertCandidateFromScore(recommendation, evaluatedAt) : {},
-        context: scored.context,
+        candidate: recommendation ? alertCandidateFromScore(recommendation, evaluatedAt, cycleSignals) : {},
+        context: { ...scored.context, cycleSignals },
         regionCapabilities: data.regionCapabilities || fallbackCapabilities,
       };
     } catch (error) {
@@ -491,11 +529,15 @@ function createAlertOrchestration({ buildRoute, capabilitiesForPoints, loadStati
     }
   }
 
-  function alertCandidateFromScore(recommendation, evaluatedAt) {
+  function alertCandidateFromScore(recommendation, evaluatedAt, cycleSignals = {}) {
     const station = recommendation.station || {};
     return {
       stationCode: station.stationCode,
       stationName: station.name,
+      alertBasis: "route_price_opportunity",
+      cycleSignalMode: cycleSignals.mode || "background_measurement_only",
+      cycleReadinessStatus: cycleSignals.readinessStatus || "measurement_only",
+      cycleAlertsEnabled: cycleSignals.cycleAlertsEnabled === true,
       estimatedSavingDollars: recommendation.netSaving,
       detourMinutes: recommendation.detourMinutes,
       freshnessMinutes: minutesSince(station.updatedAt, evaluatedAt),

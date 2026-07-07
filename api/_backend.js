@@ -121,6 +121,7 @@ const {
   buildRoute,
   capabilitiesForPoints,
   loadStationData,
+  predictionStatus,
   scoreRoute,
 });
 

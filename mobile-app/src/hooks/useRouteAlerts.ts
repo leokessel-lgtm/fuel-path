@@ -9,6 +9,7 @@ import {
   requestRouteNotificationPermission,
   scheduleSavedCommuteAlert,
 } from "../services/routeNotifications";
+import { scheduledRouteNotificationIds } from "../services/routeNotificationSchedule";
 import {
   AppPreferences,
   CommuteAlertStatus,
@@ -50,6 +51,50 @@ export function useRouteAlerts({
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    const staleLocalReminderCommutes = savedCommutes.filter((commute) =>
+      commute.localReminderEnabled === false &&
+      scheduledRouteNotificationIds(commute).length > 0
+    );
+    if (!staleLocalReminderCommutes.length) return;
+
+    let active = true;
+    Promise.all(staleLocalReminderCommutes.map((commute) => cancelSavedCommuteAlert(commute)))
+      .then(() => {
+        if (!active) return;
+        setSavedCommutes((current) =>
+          current.map((commute) => {
+            if (
+              commute.localReminderEnabled !== false ||
+              scheduledRouteNotificationIds(commute).length === 0
+            ) {
+              return commute;
+            }
+            return {
+              ...commute,
+              alertStatus: commute.backendSyncedAt
+                ? "backend_synced"
+                : commute.alertStatus === "scheduled"
+                  ? "off"
+                  : commute.alertStatus,
+              alertStatusMessage: commute.backendSyncedAt
+                ? "Route watch is on. Smart alerts only when worth checking."
+                : "Local reminders are off.",
+              nextAlertAt: undefined,
+              scheduledNotificationId: undefined,
+              scheduledNotificationIds: undefined,
+              updatedAt: new Date().toISOString(),
+            };
+          }),
+        );
+      })
+      .catch(() => {});
+
+    return () => {
+      active = false;
+    };
+  }, [savedCommutes, setSavedCommutes]);
 
   const requestNotifications = useCallback(async () => {
     const result = await requestRouteNotificationPermission();
@@ -128,15 +173,20 @@ export function useRouteAlerts({
               syncedAt: undefined,
             };
       const backendSynced = backendSync.status === "synced";
+      const localReminderScheduled = result.status === "scheduled";
       setSavedCommutes((current) =>
         current.map((commute) =>
           commute.id === commuteId
             ? alertStateUpdate(commute, {
-                alertEnabled: result.status === "scheduled" || backendSynced,
-                alertStatus: backendSynced ? "backend_synced" : result.status,
-                  alertStatusMessage: alertStatusMessage(
+                alertEnabled: localReminderScheduled || backendSynced,
+                alertStatus: backendSynced
+                  ? "backend_synced"
+                  : backendSync.status === "failed"
+                    ? "failed"
+                    : result.status,
+                alertStatusMessage: alertStatusMessage(
                   backendSynced
-                    ? "Route watch is on."
+                    ? "Route watch is on. Smart alerts only when worth checking."
                     : result.message,
                   backendSynced && result.status === "scheduled"
                     ? "Reminder scheduled for selected days."
@@ -264,14 +314,21 @@ export function useRouteAlerts({
         preferences,
       });
       const backendSynced = backendSync.status === "synced";
+      const localReminderScheduled = localSchedule.status === "scheduled";
       setSavedCommutes((current) =>
         current.map((commute) =>
           commute.id === commuteId
             ? alertStateUpdate(commute, {
-                alertEnabled: commute.alertEnabled,
-                alertStatus: backendSynced ? "backend_synced" : localSchedule.status,
+                alertEnabled: localReminderScheduled || backendSynced,
+                alertStatus: backendSynced
+                  ? "backend_synced"
+                  : backendSync.status === "failed"
+                    ? "failed"
+                    : localSchedule.status,
                 alertStatusMessage: alertStatusMessage(
-                  backendSynced ? "Route watch updated." : localSchedule.message,
+                  backendSynced
+                    ? "Route watch updated. Smart alerts only when worth checking."
+                    : localSchedule.message,
                   backendSynced && localSchedule.status === "scheduled"
                     ? "Reminder updated for selected days."
                     : backendSync.message,

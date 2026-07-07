@@ -25,6 +25,7 @@ import {
   shortLocationLabel,
   toggleConnectorFilter,
 } from "./NearbyScreen.utils";
+import { userVisibleErrorMessage } from "../utils/userVisibleErrors";
 
 const defaultNearbyCentre: MapPoint = {
   lat: -31.9523123,
@@ -153,7 +154,7 @@ export function NearbyScreen({
       resetAddressSessionToken();
       setNearbySheetSnap("browse");
     } catch (err) {
-      setLocationError(err instanceof Error ? err.message : "Could not find that location");
+      setLocationError(userVisibleErrorMessage(err, "address"));
     } finally {
       setResolvingLocation(false);
     }
@@ -173,7 +174,7 @@ export function NearbyScreen({
       resetAddressSessionToken();
       setNearbySheetSnap("browse");
     } catch (err) {
-      setLocationError(err instanceof Error ? err.message : "Current location is not available.");
+      setLocationError(userVisibleErrorMessage(err, "current_location"));
     } finally {
       setResolvingLocation(false);
     }
@@ -271,7 +272,7 @@ export function NearbyScreen({
     try {
       await openDirections(station.lat, station.lon, station.address || station.name);
     } catch {
-      setLocationError("Could not open maps for this station.");
+      setLocationError(userVisibleErrorMessage(null, "maps"));
     }
   }, []);
 

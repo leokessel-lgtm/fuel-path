@@ -109,7 +109,7 @@ function capabilityLabelFor(capability: string) {
   if (capability === "limited") return "Limited";
   if (capability === "pending_access") return "Pending access";
   if (capability === "fallback") return "Fallback";
-  if (capability === "unsupported") return "Unsupported";
+  if (capability === "unsupported") return "Not covered yet";
   return "Data check";
 }
 
@@ -128,7 +128,7 @@ function priceSourceDetails(
   ];
   const providerState = providerStateLine(context, capability);
   if (shouldShowProviderState(context, capability, providerState)) {
-    details.splice(2, 0, { label: "Provider state", value: providerState });
+    details.splice(2, 0, { label: "Data state", value: providerState });
   }
   return details.filter((item) => item.value);
 }
@@ -149,7 +149,7 @@ function shouldShowProviderState(
 function providerStateLine(context?: ScoreResponse["context"], capability?: string) {
   const capabilityText = capabilityLabelFor(capability || context?.capability || "live");
   const cacheText = providerCacheLine(context);
-  const degradedText = context?.degraded ? "Provider degraded" : "";
+  const degradedText = context?.degraded ? "Data source limited" : "";
   return [capabilityText, degradedText, cacheText].filter(Boolean).join(" | ");
 }
 
@@ -164,9 +164,9 @@ function providerCacheLine(context?: ScoreResponse["context"]) {
 function cacheModeLabel(cacheMode: string) {
   if (cacheMode === "fresh") return "Fresh cache";
   if (cacheMode === "stale") return "Stale cache";
-  if (cacheMode === "provider_error") return "Provider error cache";
+  if (cacheMode === "provider_error") return "Saved price data";
   if (cacheMode === "none") return "";
-  return cacheMode.replace(/_/g, " ");
+  return "Data source limited";
 }
 
 function priceMatchLine(candidate: StationViewModel, context?: ScoreResponse["context"]) {

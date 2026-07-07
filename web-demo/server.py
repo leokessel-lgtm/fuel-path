@@ -1735,14 +1735,28 @@ def geocode_provider_warning(error: Exception, provider: str) -> str:
         r"cooling down|rate limit", message, flags=re.IGNORECASE
     ):
         return (
-            f"{provider} lookup is temporarily rate-limited. Try a fuller address, suburb "
-            "or postcode, or enable a production autocomplete provider."
+            "Address lookup is temporarily busy. Try a fuller address, suburb or postcode."
         )
     if re.search(r"abort|timeout|timed out", message, flags=re.IGNORECASE):
-        return f"{provider} lookup timed out. Try a fuller address, suburb or postcode."
+        return "Address lookup took too long. Try a fuller address, suburb or postcode."
     if re.search(r"No location found", message, flags=re.IGNORECASE):
         return "No strong location match found. Try a fuller address, suburb or postcode."
-    return f"{provider} lookup is temporarily unavailable. Try a fuller address, suburb or postcode."
+    return "Address lookup is temporarily unavailable. Try a fuller address, suburb or postcode."
+
+
+def public_api_error(exc: Exception, surface: str) -> str:
+    message = str(exc)
+    if surface == "geocode":
+        if re.search(r"No location found|q is required", message, flags=re.IGNORECASE):
+            return "No strong location match found. Try a fuller address, suburb or postcode."
+        return "Address lookup is temporarily unavailable. Try a fuller address, suburb or postcode."
+    if surface == "route":
+        return "Route planning is temporarily unavailable. Check the addresses or choose a saved route."
+    if surface == "score":
+        return "Fuel stop recommendations are temporarily unavailable. Try again or use sample mode."
+    if surface == "stations":
+        return "Nearby prices are temporarily unavailable. Try again or search another area."
+    return "Fuel Path could not finish that request. Try again shortly."
 
 
 def looks_like_station_query(query: str) -> bool:
@@ -2266,28 +2280,28 @@ class FuelPathHandler(SimpleHTTPRequestHandler):
             try:
                 self.send_json(build_score_response(parse_qs(parsed.query)))
             except Exception as exc:
-                self.send_json({"error": str(exc)}, status=HTTPStatus.BAD_GATEWAY)
+                self.send_json({"error": public_api_error(exc, "score")}, status=HTTPStatus.BAD_GATEWAY)
             return
 
         if parsed.path == "/api/stations":
             try:
                 self.send_json(build_stations_response(parse_qs(parsed.query)))
             except Exception as exc:
-                self.send_json({"error": str(exc)}, status=HTTPStatus.BAD_GATEWAY)
+                self.send_json({"error": public_api_error(exc, "stations")}, status=HTTPStatus.BAD_GATEWAY)
             return
 
         if parsed.path == "/api/geocode":
             try:
                 self.send_json(build_geocode_response(parse_qs(parsed.query)))
             except Exception as exc:
-                self.send_json({"error": str(exc)}, status=HTTPStatus.BAD_GATEWAY)
+                self.send_json({"error": public_api_error(exc, "geocode")}, status=HTTPStatus.BAD_GATEWAY)
             return
 
         if parsed.path == "/api/route":
             try:
                 self.send_json(build_route_response(parse_qs(parsed.query)))
             except Exception as exc:
-                self.send_json({"error": str(exc)}, status=HTTPStatus.BAD_GATEWAY)
+                self.send_json({"error": public_api_error(exc, "route")}, status=HTTPStatus.BAD_GATEWAY)
             return
 
         super().do_GET()
@@ -2306,7 +2320,7 @@ class FuelPathHandler(SimpleHTTPRequestHandler):
                 raise ValueError("Request body must be a JSON object.")
             self.send_json(build_score_response_from_json(payload))
         except Exception as exc:
-            self.send_json({"error": str(exc)}, status=HTTPStatus.BAD_GATEWAY)
+            self.send_json({"error": public_api_error(exc, "score")}, status=HTTPStatus.BAD_GATEWAY)
 
     def send_json(self, payload: dict[str, Any], status: HTTPStatus = HTTPStatus.OK) -> None:
         body = json.dumps(payload).encode("utf-8")

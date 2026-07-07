@@ -43,6 +43,7 @@ import {
 import { eligibleDiscountIds } from "../utils/discountRedemptions";
 import { routeInputPrecisionHint } from "../utils/routeInputPrecision";
 import { activePreferredStationBrands } from "../utils/stationBrandPreferences";
+import { userVisibleErrorMessage } from "../utils/userVisibleErrors";
 import {
   commuteName,
   displayLocationLabel,
@@ -228,9 +229,7 @@ export function PlanScreen({
           fallbackChargers = fallbackResponse.chargers;
           fallbackContext = fallbackResponse.context;
         } catch (fallbackErr) {
-          fallbackError = fallbackErr instanceof Error
-            ? fallbackErr.message
-            : "Could not load EV fallback chargers.";
+          fallbackError = userVisibleErrorMessage(fallbackErr, "ev_chargers");
         } finally {
           dispatchRoute({ type: "ev-fallback-loading", loading: false });
         }
@@ -375,7 +374,7 @@ export function PlanScreen({
       setActiveAddressField(null);
       resetAddressSessionToken("from");
     } catch (err) {
-      dispatchRoute({ type: "transient-error", error: err instanceof Error ? err.message : "Current location is not available." });
+      dispatchRoute({ type: "transient-error", error: userVisibleErrorMessage(err, "current_location") });
     } finally {
       setLocatingFrom(false);
     }
@@ -708,15 +707,5 @@ const styles = StyleSheet.create({
 });
 
 function routePlanningErrorMessage(err: unknown) {
-  const message = err instanceof Error ? err.message : String(err || "");
-  if (/route engine temporarily unavailable|provider failure|503/i.test(message)) {
-    return "Route engine temporarily unavailable. Try again shortly, or check Nearby fuel.";
-  }
-  if (/no eligible stations|no recommendations|empty results|no fuel stops/i.test(message)) {
-    return "No suitable fuel stop was found on this route. Try a different fuel, expand the route, or check Nearby fuel.";
-  }
-  if (/cannot read|undefined|null|points|typeerror|referenceerror/i.test(message)) {
-    return "Route planning needs attention. Try again, edit the route, or check Nearby fuel.";
-  }
-  return message || "Could not plan this route right now. Try again or edit the route.";
+  return userVisibleErrorMessage(err, "route");
 }

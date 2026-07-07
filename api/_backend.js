@@ -390,7 +390,7 @@ async function loadLiveStationsForArea({ forceRefresh = false, points = [], radi
       degraded = true;
     }
   }
-  if (!stations.length && !loadedProviders.length) throw new Error(errors.join("; ") || "No live fuel providers are configured");
+  if (!stations.length && !loadedProviders.length) throw new Error(errors.join("; ") || "Live prices are not available for this area yet.");
   const byCode = new Map();
   for (const station of stations) byCode.set(String(station.stationCode), station);
   const cacheMode = cacheModes.has("stale") ? "stale" : cacheModes.has("refreshed") ? "refreshed" : cacheModes.has("fresh") ? "fresh" : "none";
@@ -405,7 +405,7 @@ async function loadLiveStationsForArea({ forceRefresh = false, points = [], radi
     cacheMode,
     degraded,
     providerHealth: providerHealthMap,
-    warning: [...warnings, ...(errors.length ? [`Some live fuel providers unavailable: ${errors.join("; ")}`] : [])].join(" "),
+    warning: [...warnings, ...(errors.length ? ["Some live price sources are temporarily unavailable. Confirm prices before driving."] : [])].join(" "),
   };
 }
 

@@ -247,7 +247,7 @@ export function routeContextNotice(context: ScoreResponse["context"]) {
   if (limited.capability === "fallback") {
     return `Using fallback data for ${limited.region}. Do not treat it as a live price recommendation.`;
   }
-  return "No live fuel provider covers this route yet.";
+  return "Live prices are not available for this route yet.";
 }
 
 export function displayLocationLabel(point: MapPoint, fallback: string) {

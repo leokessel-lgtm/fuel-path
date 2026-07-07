@@ -13,6 +13,7 @@ const {
   sendJson,
   stringParam,
 } = require("./_backend");
+const { publicErrorMessage } = require("./_publicErrors");
 
 module.exports = async function handler(req, res) {
   if (!methodAllowed(req, res, ["GET", "POST"])) return;
@@ -23,8 +24,8 @@ module.exports = async function handler(req, res) {
         const writeSecurity = predictionWriteSecurity();
         sendJson(res, 401, {
           error: writeSecurity.tokenConfigured
-            ? "Prediction back-test writes require a valid token."
-            : "Prediction back-test writes require PREDICTION_BACKTEST_WRITE_TOKEN before durable storage is enabled.",
+            ? "Fuel-cycle measurement is not available from this session."
+            : "Fuel-cycle measurement is not available yet.",
           predictions: await predictionStatus(),
         });
         return;
@@ -39,8 +40,8 @@ module.exports = async function handler(req, res) {
         const writeSecurity = predictionWriteSecurity();
         sendJson(res, 401, {
           error: writeSecurity.tokenConfigured
-            ? "Prediction back-test collection requires CRON_SECRET or a valid prediction write token."
-            : "Prediction back-test collection requires CRON_SECRET or PREDICTION_BACKTEST_WRITE_TOKEN.",
+            ? "Fuel-cycle measurement cannot run from this session."
+            : "Fuel-cycle measurement is not available yet.",
           predictions: await predictionStatus(),
         });
         return;
@@ -90,7 +91,7 @@ module.exports = async function handler(req, res) {
     sendJson(res, 200, await predictionStatus());
   } catch (error) {
     sendJson(res, error.statusCode || 400, {
-      error: error instanceof Error ? error.message : "Invalid prediction back-test request",
+      error: publicErrorMessage(error, "predictions"),
       predictions: await predictionStatus(),
     });
   }

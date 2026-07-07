@@ -249,7 +249,7 @@ async function postAlertJson(path: string, token: string, body: unknown) {
   });
   const payload = await response.json();
   if (!response.ok) {
-    throw new Error(payload?.error || `Fuel Path alerts returned ${response.status}`);
+    throw new Error("Route watch could not update. Your saved route is still on this device, so you can try again.");
   }
   return payload;
 }
@@ -265,7 +265,7 @@ async function deleteAlertJson(path: string, token: string, params: Record<strin
   });
   const payload = await response.json();
   if (!response.ok) {
-    throw new Error(payload?.error || `Fuel Path alerts returned ${response.status}`);
+    throw new Error("Route watch could not update. Your saved route is still on this device, so you can try again.");
   }
   return payload;
 }

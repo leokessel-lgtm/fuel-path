@@ -12,6 +12,7 @@ import { searchLocations } from "../api/fuelPathApi";
 import { getCurrentMapPoint } from "../services/currentLocation";
 import { colors, radii, spacing, surfaces, typeScale } from "../theme";
 import { MapPoint } from "../types";
+import { userVisibleErrorMessage } from "../utils/userVisibleErrors";
 import { CurrentLocationFieldButton, currentLocationFieldInset } from "./CurrentLocationFieldButton";
 import { LocationEvidenceChip } from "./LocationEvidenceChip";
 import { StationMap } from "./StationMap";
@@ -93,7 +94,7 @@ function SavedPlaceEditorFields({
         })
         .catch((err: Error) => {
           if (searchRequestRef.current !== requestId) return;
-          dispatchEditor({ type: "search-error", message: err.message });
+          dispatchEditor({ type: "search-error", message: userVisibleErrorMessage(err, "address") });
         })
         .finally(() => {
           if (searchRequestRef.current === requestId) dispatchEditor({ type: "search-idle" });
@@ -118,7 +119,7 @@ function SavedPlaceEditorFields({
     } catch (err) {
       dispatchEditor({
         type: "search-error",
-        message: err instanceof Error ? err.message : "Current location is not available.",
+        message: userVisibleErrorMessage(err, "current_location"),
       });
     } finally {
       setLocating(false);

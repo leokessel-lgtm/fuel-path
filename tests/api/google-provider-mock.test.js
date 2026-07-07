@@ -342,7 +342,7 @@ test("Plan autocomplete falls back to HERE when Google predictions are empty", a
 
       assert.equal(payload.provider, "google");
       assert.equal(payload.lookupStatus, "local_fallback");
-      assert.match(payload.warning, /HERE fallback/i);
+      assert.match(payload.warning, /backup match/i);
       assert.equal(payload.location.label, "Sylvania Heights Public School");
       assert.equal(payload.location.provider, "here");
       assert.equal(mockFetch.calls.length, 2);
@@ -400,7 +400,7 @@ test("Google Places fallback is fail-closed when daily cap is exhausted", async 
       assert.equal(payload.provider, "google");
       assert.equal(payload.lookupStatus, "degraded");
       assert.equal(payload.location, null);
-      assert.match(payload.warning, /cap has been reached/i);
+      assert.match(payload.warning, /Address lookup is paused for now/i);
       assert.equal(mockFetch.calls.length, 0);
 
       mockFetch.restore();
@@ -433,7 +433,7 @@ test("Google Places fallback uses durable quota storage before provider calls", 
 
       assert.equal(first.lookupStatus, "ok");
       assert.equal(second.lookupStatus, "degraded");
-      assert.match(second.warning, /cap has been reached/i);
+      assert.match(second.warning, /Address lookup is paused for now/i);
       assert.equal(quotaStore.calls, 1);
       assert.equal(quotaStore.denied, 1);
       assert.equal(mockFetch.calls.length, 2);
@@ -463,7 +463,7 @@ test("production Google Places fallback fails closed without durable quota stora
 
       assert.equal(payload.lookupStatus, "degraded");
       assert.equal(payload.location, null);
-      assert.match(payload.warning, /durable quota storage/i);
+      assert.match(payload.warning, /Address lookup is limited right now/i);
       assert.equal(mockFetch.calls.length, 0);
 
       mockFetch.restore();
@@ -489,7 +489,7 @@ test("Google Places fallback requires a session token before any paid request", 
 
       assert.equal(payload.provider, "google");
       assert.equal(payload.lookupStatus, "degraded");
-      assert.match(payload.warning, /session token/i);
+      assert.match(payload.warning, /Address lookup needs a new search session/i);
       assert.equal(mockFetch.calls.length, 0);
 
       mockFetch.restore();

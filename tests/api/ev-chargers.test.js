@@ -770,7 +770,7 @@ test("EV provider cascade labels an exhausted Open Charge Map empty result as no
     assert.equal(payload.statusCode, 200);
     assert.equal(payload.body.context.provider.includes("open_charge_map"), true);
     assert.equal(payload.body.chargers.length, 0);
-    assert.match(payload.body.context.warning, /No usable charger rows returned from open_charge_map/);
+    assert.match(payload.body.context.warning, /Some charger directories did not return usable rows/);
   } finally {
     global.fetch = previousFetch;
     delete require.cache[handlerPath];
@@ -880,7 +880,7 @@ test("EV default provider cascade keeps usable rows healthy when optional enrich
     assert.equal(payload.statusCode, 200);
     assert.equal(payload.body.context.provider, "api_ninjas+openweb_ninja");
     assert.equal(payload.body.context.degraded, false);
-    assert.match(payload.body.context.warning, /openweb_ninja is temporarily rate-limited/);
+    assert.match(payload.body.context.warning, /Some charger data is temporarily busy/);
     assert.equal(payload.body.chargers.some((charger) => charger.source === "api_ninjas"), true);
     assert.equal(calls.some((url) => url.startsWith("https://api-ninjas.test/")), true);
     assert.equal(calls.some((url) => url.startsWith("https://openweb.test/")), true);

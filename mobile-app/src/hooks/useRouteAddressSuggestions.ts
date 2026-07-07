@@ -104,7 +104,7 @@ export function useRouteAddressSuggestions({
         .catch(() => {
           if (searchRequestRef.current !== requestId) return;
           setAddressSuggestions(field, []);
-          setSuggestionsError("Location suggestions are unavailable. Check the local API and try again.");
+          setSuggestionsError("Location suggestions are not available right now. Type a fuller address, suburb or postcode.");
         })
         .finally(() => {
           if (searchRequestRef.current === requestId) setSuggestionsLoading(null);

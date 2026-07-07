@@ -9,6 +9,7 @@ import {
   ScoreResponse,
   Station,
 } from "../types";
+import { addressLookupErrorMessage, nearbyFuelErrorMessage, routePlanningErrorMessage } from "../utils/userVisibleErrors";
 
 type GeocodeResponse = {
   provider?: string;
@@ -51,7 +52,7 @@ async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
   });
   const payload = await response.json();
   if (!response.ok) {
-    throw new Error(payload?.error || `Fuel Path API returned ${response.status}`);
+    throw new Error(apiErrorMessage(path, response.status, payload));
   }
   return payload as T;
 }
@@ -239,10 +240,18 @@ function locationSearchContextKey(context?: LocationSearchContext) {
 
 function locationLookupErrorMessage(error: unknown) {
   const message = error instanceof Error ? error.message : "";
-  if (/rate.?limited|cooling down|temporarily unavailable|provider|nominatim|google|mapbox|here|geoapify|addressr/i.test(message)) {
-    return "We couldn't check that address right now. Add suburb or postcode, or try again shortly.";
+  return addressLookupErrorMessage(message);
+}
+
+function apiErrorMessage(path: string, status: number, payload: { error?: string } | null) {
+  const raw = payload?.error || `HTTP ${status}`;
+  if (path.includes("/api/geocode")) return addressLookupErrorMessage(raw);
+  if (path.includes("/api/stations")) return nearbyFuelErrorMessage(raw);
+  if (path.includes("/api/ev-chargers")) {
+    return "We could not load charger options right now. Check Nearby EV charging or your charging app before driving.";
   }
-  return "We couldn't find that address. Try a fuller address, suburb or postcode.";
+  if (path.includes("/api/route") || path.includes("/api/score")) return routePlanningErrorMessage(raw);
+  return "Fuel Path could not finish that request. Check your connection and try again.";
 }
 
 function rankLocationSuggestions(suggestions: MapPoint[], queryText: string) {
@@ -300,9 +309,7 @@ function lookupSourceLabel(provider?: string, matchType?: string, lookupStatus?:
     return "Suburb/area";
   }
   if (provider === "fuel_path") return "Fuel station";
-  if (provider === "google") return "Google Places";
-  if (provider === "here") return "HERE Places";
-  if (provider === "addressr") return "External lookup";
+  if (provider === "google" || provider === "here" || provider === "addressr") return "Location lookup";
   if (provider === "nominatim") {
     if (addressLikeQuery(queryText)) return "Needs confirmation";
     return "Validation lookup";

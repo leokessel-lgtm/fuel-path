@@ -10,6 +10,7 @@ import {
   filterStationsByPreferredBrands,
   stationBrandFilterNotice,
 } from "../utils/stationBrandPreferences";
+import { userVisibleErrorMessage } from "../utils/userVisibleErrors";
 
 const emptyMapRetryRadiusKm = 32;
 
@@ -123,7 +124,7 @@ export function useNearbyResults({
         setEvNotice(nearbyMode === "ev" || nearbyMode === "both" ? evNotice : "");
       })
       .catch((err: Error) => {
-        if (active) setError(err.message);
+        if (active) setError(userVisibleErrorMessage(err, nearbyMode === "ev" ? "ev_chargers" : "nearby"));
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -199,7 +200,7 @@ function stationContextNotice(context: {
   );
   if (!limited) return uniqueNotices(notices).join(" ");
   if (limited.capability === "pending_access") {
-    notices.push(`${limited.region} live prices are not enabled yet. ${limited.blocker || ""}`.trim());
+    notices.push(`${limited.region} live prices are not enabled yet. Check prices before driving.`);
     return uniqueNotices(notices).join(" ");
   }
   if (limited.capability === "limited") {
@@ -210,7 +211,7 @@ function stationContextNotice(context: {
     notices.push(`Using fallback data for ${limited.region}. Do not treat it as a live price recommendation.`);
     return uniqueNotices(notices).join(" ");
   }
-  notices.push("No live fuel provider covers this area yet.");
+  notices.push("Live prices are not available for this area yet.");
   return uniqueNotices(notices).join(" ");
 }
 

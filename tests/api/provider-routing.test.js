@@ -816,7 +816,7 @@ test("unsupported station loads return explicit empty unsupported context", asyn
   assert.equal(data.source, "unsupported_region");
   assert.equal(data.provider, "unsupported_region");
   assert.equal(data.stations.length, 0);
-  assert.match(data.warning, /No live fuel provider covers this area yet/);
+  assert.match(data.warning, /Live prices are not available for this area yet/);
 });
 
 test("pending national regions return explicit capability context", async () => {
@@ -829,7 +829,7 @@ test("pending national regions return explicit capability context", async () => 
   assert.equal(data.source, "unsupported_region");
   assert.equal(data.capability, "pending_access");
   assert.equal(data.regionCapabilities[0].region, "SA");
-  assert.match(data.warning, /SA in the national provider matrix/);
+  assert.match(data.warning, /Live prices for SA are not enabled in this area yet/);
 });
 
 test("forced NT source returns explicit unavailable context when MyFuel credentials are absent", async () => {
@@ -1020,7 +1020,7 @@ test("unsupported station handler response stays explicit", async () => {
   assert.equal(response.payload.context.provenance.degraded, false);
   assert.deepEqual(response.payload.context.provenance.providerStatuses, {});
   assert.equal(JSON.stringify(response.payload.context.provenance).includes("Null Island"), false);
-  assert.match(response.payload.context.warning, /No live fuel provider covers this area yet/);
+  assert.match(response.payload.context.warning, /Live prices are not available for this area yet/);
 });
 
 test("forced provider outside coverage returns explicit JSON instead of throwing", async () => {

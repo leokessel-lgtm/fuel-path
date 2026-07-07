@@ -1025,7 +1025,7 @@ function createGeocoder({ fetchJson, loadStationData }) {
               retries: 1,
               isRetriableError: (fallbackError) => isRetriableGeocodeError(fallbackError, "here"),
             });
-            providerWarning = "Google Places autocomplete unavailable; using HERE fallback.";
+            providerWarning = "Address lookup is using a backup match. Confirm the address before planning.";
           } catch (fallbackError) {
             providerWarning = `${providerWarning} ${geocodeProviderWarning(fallbackError, "here")}`.trim();
           }
@@ -1502,30 +1502,30 @@ function createGeocoder({ fetchJson, loadStationData }) {
   function geocodeProviderWarning(error, provider) {
     const message = String(error?.message || error || "");
     if (isRateLimitError(error) || /cooling down|rate limit/i.test(message)) {
-      return `${provider} lookup is temporarily rate-limited. Try a fuller address, suburb or postcode, or enable a production autocomplete provider.`;
+      return "Address lookup is temporarily busy. Try a fuller address, suburb or postcode.";
     }
     if (/abort|timeout/i.test(message)) {
-      return `${provider} lookup timed out. Try a fuller address, suburb or postcode.`;
+      return "Address lookup took too long. Try a fuller address, suburb or postcode.";
     }
     if (/No location found/i.test(message)) {
       return `No strong location match found. Try a fuller address, suburb or postcode.`;
     }
     if (/disabled by cost controls/i.test(message)) {
-      return "Google Places fallback is disabled. Try a fuller address, suburb or exact street address.";
+      return "Address lookup is limited right now. Try a fuller address, suburb or exact street address.";
     }
     if (/session token/i.test(message)) {
-      return "Google Places fallback is blocked until the app supplies a session token. Try a fuller address, suburb or exact street address.";
+      return "Address lookup needs a new search session. Edit the address and try again.";
     }
     if (/too short/i.test(message)) {
-      return "Google Places fallback needs more characters before it can search.";
+      return "Type more of the address before searching.";
     }
     if (/daily fallback cap/i.test(message)) {
-      return "Google Places fallback is paused because today's lookup cap has been reached.";
+      return "Address lookup is paused for now. Try a fuller address, suburb or postcode.";
     }
     if (/durable quota storage/i.test(message)) {
-      return "Google Places fallback is paused until durable quota storage is configured.";
+      return "Address lookup is limited right now. Try a fuller address, suburb or postcode.";
     }
-    return `${provider} lookup is temporarily unavailable. Try a fuller address, suburb or postcode.`;
+    return "Address lookup is temporarily unavailable. Try a fuller address, suburb or postcode.";
   }
 
   function productionRuntime() {

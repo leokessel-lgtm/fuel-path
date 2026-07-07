@@ -10,6 +10,7 @@ const {
   stationPayload,
   stringParam,
 } = require("./_backend");
+const { publicErrorMessage } = require("./_publicErrors");
 
 module.exports = async function handler(req, res) {
   if (!methodAllowed(req, res)) return;
@@ -142,7 +143,7 @@ module.exports = async function handler(req, res) {
     });
   } catch (error) {
     sendJson(res, 400, {
-      error: error instanceof Error ? error.message : "Invalid station query",
+      error: publicErrorMessage(error, "nearby"),
     });
   }
 };

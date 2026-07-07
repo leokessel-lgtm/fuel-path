@@ -15,6 +15,7 @@ const {
   sendJson,
   stringParam,
 } = require("./_backend");
+const { publicErrorMessage } = require("./_publicErrors");
 
 module.exports = async function handler(req, res) {
   if (req.query?.__endpoint === "saved-routes") {
@@ -76,8 +77,8 @@ module.exports = async function handler(req, res) {
       const writeSecurity = alertsWriteSecurity();
       sendJson(res, 401, {
         error: writeSecurity.tokenConfigured
-          ? "Saved-route alert writes require a valid token."
-          : "Saved-route alert writes require ALERTS_WRITE_TOKEN before durable storage is enabled.",
+          ? "Route watch sync is not available in this session."
+          : "Route watch sync is not available yet.",
         alerts: await alertsStatus(),
       });
       return;
@@ -101,13 +102,13 @@ module.exports = async function handler(req, res) {
     }
 
     sendJson(res, 400, {
-      error: "Unsupported alert action.",
+      error: "That route watch action is not available.",
       supportedActions: ["register-device", "save-route", "delete-route", "evaluate"],
       alerts: await alertsStatus(),
     });
   } catch (error) {
     sendJson(res, 400, {
-      error: error instanceof Error ? error.message : "Invalid saved-route alert request",
+      error: publicErrorMessage(error, "alerts"),
       alerts: await alertsStatus(),
     });
   }
@@ -134,8 +135,8 @@ async function savedRoutesEndpoint(req, res) {
       const writeSecurity = alertsWriteSecurity();
       sendJson(res, 401, {
         error: writeSecurity.tokenConfigured
-          ? "Saved route sync requires a valid token."
-          : "Saved route sync requires ALERTS_WRITE_TOKEN before durable storage is enabled.",
+          ? "Saved route sync is not available in this session."
+          : "Saved route sync is not available yet.",
         alerts: await alertsStatus(),
       });
       return;
@@ -156,7 +157,7 @@ async function savedRoutesEndpoint(req, res) {
     sendJson(res, 202, await saveBackendSavedRoute(req.body || {}));
   } catch (error) {
     sendJson(res, 400, {
-      error: error instanceof Error ? error.message : "Invalid saved route request",
+      error: publicErrorMessage(error, "alerts"),
       alerts: await alertsStatus(),
     });
   }

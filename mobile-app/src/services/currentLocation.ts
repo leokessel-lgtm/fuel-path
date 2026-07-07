@@ -96,7 +96,7 @@ function resolveBrowserMapPoint(label: string, requestPermission: boolean): Prom
 
 function browserLocationError(error: GeolocationPositionError) {
   if (error.code === error.PERMISSION_DENIED) {
-    return "Location permission was blocked. Allow location for localhost, or type a start address.";
+    return "Location permission is off. Allow location for Fuel Path, or type a start address.";
   }
   if (error.code === error.POSITION_UNAVAILABLE) {
     return "Current location is unavailable. Try again, or type a start address.";

@@ -826,9 +826,9 @@ function routeDetourSummaryPhrase(detourLine: string) {
 function capabilityLabelForPlan(capability: string) {
   if (capability === "live") return "Live data";
   if (capability === "limited") return "Limited data";
-  if (capability === "pending_access") return "Pending data";
+  if (capability === "pending_access") return "Prices not enabled";
   if (capability === "fallback") return "Fallback data";
-  if (capability === "unsupported") return "Unsupported";
+  if (capability === "unsupported") return "Not covered yet";
   return "Data check";
 }
 

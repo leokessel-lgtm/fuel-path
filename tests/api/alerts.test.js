@@ -68,9 +68,9 @@ test("backend alert sync rejects ephemeral memory storage", async () => {
   const registered = await callPushRegister(device);
 
   assert.equal(saved.status, 400);
-  assert.match(saved.payload.error, /durable alert storage/i);
+  assert.match(saved.payload.error, /Route watch could not update/i);
   assert.equal(registered.status, 400);
-  assert.match(registered.payload.error, /durable alert storage/i);
+  assert.match(registered.payload.error, /Route watch could not update/i);
 });
 
 test("saved-route alert foundation stores route, device and sendable evaluation", async () => {
@@ -276,7 +276,7 @@ test("durable alert storage requires write token and keeps push disabled", async
     const status = await callStatus();
 
     assert.equal(rejected.status, 401);
-    assert.match(rejected.payload.error, /valid token/);
+    assert.match(rejected.payload.error, /Saved route sync is not available in this session/);
     assert.equal(accepted.status, 202);
     assert.equal(status.payload.alerts.storage.mode, "postgres_neon");
     assert.equal(status.payload.alerts.storage.durable, true);

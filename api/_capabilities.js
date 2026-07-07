@@ -476,11 +476,11 @@ function primaryCapability(capabilities = []) {
 }
 
 function capabilityWarning(capabilities = []) {
-  if (!capabilities.length) return "No live fuel provider covers this area yet.";
+  if (!capabilities.length) return "Live prices are not available for this area yet.";
   const names = capabilities.map((item) => item.region).join("/");
   const capability = primaryCapability(capabilities);
   if (capability === "pending_access") {
-    return `Fuel Path has ${names} in the national provider matrix, but live prices are not enabled for this area yet.`;
+    return `Live prices for ${names} are not enabled in this area yet.`;
   }
   if (capability === "limited") {
     return `Fuel Path has limited live coverage for ${names}; confirm freshness before driving.`;
@@ -489,7 +489,7 @@ function capabilityWarning(capabilities = []) {
     return `Fuel Path is using fallback data for ${names}; do not treat this as a live price recommendation.`;
   }
   if (capability === "unsupported") {
-    return "No live fuel provider covers this area yet.";
+    return "Live prices are not available for this area yet.";
   }
   return "";
 }

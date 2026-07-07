@@ -46,6 +46,7 @@ const betaPrivacyCard = read("src/components/BetaPrivacyCard.tsx");
 const discountPrograms = read("src/data/discountPrograms.ts");
 const discountRegistry = read("src/data/discountRegistry.generated.json");
 const fuelPathApi = read("src/api/fuelPathApi.ts");
+const userVisibleErrors = read("src/utils/userVisibleErrors.ts");
 const types = read("src/types.ts");
 const locationEvidence = read("src/utils/locationEvidence.ts");
 const routeCameraInsets = read("src/utils/routeCameraInsets.ts");
@@ -740,8 +741,8 @@ const checks = [
     ok:
       !fuelPathApi.includes("Address lookup is busy right now") &&
       fuelPathApi.includes("locationLookupErrorMessage") &&
-      fuelPathApi.includes("We couldn't check that address right now. Add suburb or postcode, or try again shortly.") &&
-      fuelPathApi.includes("We couldn't find that address. Try a fuller address, suburb or postcode.") &&
+      fuelPathApi.includes("addressLookupErrorMessage") &&
+      userVisibleErrors.includes("We could not check that address right now. Add suburb or postcode, or try again shortly.") &&
       routeAddressSuggestionHook.includes('setSuggestionsError("");') &&
       planScreen.includes("clearAddressSuggestionError();") &&
       nearbyScreen.includes('setLocationError("");'),
@@ -811,7 +812,7 @@ const checks = [
       locationEvidence.includes("Exact address") &&
       locationEvidence.includes("Near address match") &&
       locationEvidence.includes("Suburb/area") &&
-      locationEvidence.includes("External lookup") &&
+      locationEvidence.includes("Location lookup") &&
       locationEvidence.includes("Lookup limited") &&
       locationEvidence.includes("Needs confirmation") &&
       locationEvidence.includes("Street/road") &&

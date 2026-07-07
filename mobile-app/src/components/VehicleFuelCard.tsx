@@ -350,9 +350,7 @@ const styles = StyleSheet.create({
     ...typography.title,
   },
   muted: {
-    color: colors.muted,
-    fontSize: typeScale.caption,
-    fontWeight: "400",
+    ...typography.metadata,
     lineHeight: 18,
   },
   activeBadge: {
@@ -362,9 +360,8 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs,
   },
   activeBadgeText: {
+    ...typography.badgeLabel,
     color: colors.greenDark,
-    fontSize: typeScale.micro,
-    fontWeight: "900",
     textTransform: "uppercase",
   },
   vehicleList: {
@@ -398,9 +395,8 @@ const styles = StyleSheet.create({
     borderColor: colors.green,
   },
   vehicleAvatarText: {
+    ...typography.compactButtonLabel,
     color: colors.ink,
-    fontSize: typeScale.caption,
-    fontWeight: "900",
   },
   vehicleAvatarTextSelected: {
     color: colors.white,
@@ -410,17 +406,13 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   vehicleRowTitle: {
-    color: colors.ink,
-    fontSize: typeScale.body,
-    fontWeight: "900",
+    ...typography.bodyStrong,
   },
   vehicleRowTitleSelected: {
     color: colors.white,
   },
   vehicleRowMeta: {
-    color: colors.muted,
-    fontSize: typeScale.caption,
-    fontWeight: "500",
+    ...typography.metadataStrong,
     marginTop: 2,
   },
   vehicleRowMetaSelected: {
@@ -440,9 +432,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
   },
   addButtonText: {
+    ...typography.compactButtonLabel,
     color: colors.greenDark,
-    fontSize: typeScale.caption,
-    fontWeight: "900",
   },
   addButtonDisabled: {
     backgroundColor: colors.panelStrong,
@@ -452,9 +443,7 @@ const styles = StyleSheet.create({
     color: colors.mutedSoft,
   },
   limitText: {
-    color: colors.muted,
-    fontSize: typeScale.caption,
-    fontWeight: "600",
+    ...typography.metadataStrong,
   },
   divider: {
     backgroundColor: colors.line,
@@ -469,23 +458,16 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   sectionLabel: {
-    color: colors.greenDark,
-    fontSize: typeScale.micro,
-    fontWeight: "900",
-    letterSpacing: 0.4,
+    ...typography.sectionLabel,
     textTransform: "uppercase",
   },
   sectionHint: {
-    color: colors.muted,
-    fontSize: typeScale.caption,
-    fontWeight: "700",
+    ...typography.metadataStrong,
   },
   input: {
     ...surfaces.field,
+    ...typography.fieldText,
     borderRadius: radii.control,
-    color: colors.ink,
-    fontSize: typeScale.body,
-    fontWeight: "700",
     minHeight: 44,
     paddingHorizontal: spacing.md,
   },
@@ -508,9 +490,8 @@ const styles = StyleSheet.create({
     borderColor: colors.black,
   },
   chipText: {
+    ...typography.compactButtonLabel,
     color: colors.ink,
-    fontSize: typeScale.caption,
-    fontWeight: "700",
   },
   chipTextSelected: {
     color: colors.white,
@@ -525,14 +506,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
   },
   advancedButtonText: {
+    ...typography.buttonLabel,
     color: colors.ink,
-    fontSize: typeScale.body,
-    fontWeight: "900",
   },
   advancedButtonMeta: {
-    color: colors.muted,
-    fontSize: typeScale.caption,
-    fontWeight: "700",
+    ...typography.metadataStrong,
   },
   advancedSection: {
     gap: spacing.sm,
@@ -544,7 +522,7 @@ const styles = StyleSheet.create({
   },
   removeButtonText: {
     color: colors.red,
-    fontSize: typeScale.caption,
-    fontWeight: "800",
+    fontSize: typography.compactButtonLabel.fontSize,
+    fontWeight: typography.compactButtonLabel.fontWeight,
   },
 });

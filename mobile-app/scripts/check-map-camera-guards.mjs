@@ -31,6 +31,7 @@ const accountDetailScreen = read("src/components/settings/AccountDetailScreen.ts
 const weeklyReportCard = read("src/components/WeeklyReportCard.tsx");
 const routeAddressSuggestionHook = read("src/hooks/useRouteAddressSuggestions.ts");
 const theme = read("src/theme.ts");
+const typographyDoc = read("../docs/typography-hierarchy.md");
 const nearbyScreen = read("src/screens/NearbyScreen.tsx");
 const nearbyScreenUtils = read("src/screens/NearbyScreen.utils.ts");
 const nearbyResults = read("src/hooks/useNearbyResults.ts");
@@ -121,6 +122,24 @@ const checks = [
       nearbyCombinedPanel.includes("borderRadius: radii.control") &&
       nearbyEvControls.includes("borderRadius: radii.control") &&
       planRouteSheet.includes("borderRadius: radii.control"),
+  },
+  {
+    label: "typography hierarchy is tokenised and documented",
+    ok:
+      theme.includes("fieldText: {") &&
+      theme.includes("buttonLabel: {") &&
+      theme.includes("compactButtonLabel: {") &&
+      theme.includes("sectionLabel: {") &&
+      theme.includes("metric: {") &&
+      theme.includes("metadataStrong: {") &&
+      typographyDoc.includes("# Fuel Path Typography Hierarchy") &&
+      typographyDoc.includes("typography.fieldText") &&
+      typographyDoc.includes("typography.metric") &&
+      nearbyLocationSearch.includes("...typography.fieldText") &&
+      planRouteEditorCard.includes("...typography.fieldText") &&
+      nearbyEvControls.includes("...typography.buttonLabel") &&
+      stationRow.includes("...typography.metric") &&
+      nearbyStationSheet.includes("...typography.metric"),
   },
   {
     label: "nearby screen keeps current location as a separate map pin",

@@ -591,22 +591,20 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
   },
   energyEyebrow: {
+    ...typography.badgeLabel,
     color: colors.white,
-    fontSize: typeScale.micro,
-    fontWeight: "800",
     letterSpacing: 0.4,
     opacity: 0.72,
     textTransform: "uppercase",
   },
   energyButtonText: {
+    ...typography.buttonLabel,
     color: colors.white,
-    fontSize: typeScale.body,
-    fontWeight: "900",
   },
   energyChevron: {
     color: colors.white,
     fontSize: 11,
-    fontWeight: "900",
+    fontWeight: typography.compactButtonLabel.fontWeight,
   },
   energyMenu: {
     ...shadow.float,
@@ -628,23 +626,18 @@ const styles = StyleSheet.create({
     backgroundColor: colors.greenSoft,
   },
   energyOptionText: {
+    ...typography.buttonLabel,
     color: colors.ink,
-    fontSize: typeScale.body,
-    fontWeight: "800",
   },
   energyOptionTextSelected: {
     color: colors.greenDark,
   },
   controlContext: {
-    color: colors.muted,
-    fontSize: typeScale.caption,
-    fontWeight: "800",
+    ...typography.metadataStrong,
     lineHeight: 16,
   },
   controlHint: {
-    color: colors.muted,
-    fontSize: typeScale.caption,
-    fontWeight: "700",
+    ...typography.metadataStrong,
     lineHeight: 18,
   },
   modeToggle: {
@@ -668,9 +661,8 @@ const styles = StyleSheet.create({
     borderColor: colors.greenDark,
   },
   modeChipText: {
+    ...typography.buttonLabel,
     color: colors.ink,
-    fontSize: typeScale.body,
-    fontWeight: "900",
   },
   modeChipTextSelected: {
     color: colors.white,
@@ -807,7 +799,7 @@ const styles = StyleSheet.create({
   evMapButtonText: {
     color: colors.greenDark,
     fontSize: 11,
-    fontWeight: "600",
+    fontWeight: typography.metadataStrong.fontWeight,
   },
   evPanelTitleRow: {
     alignItems: "center",
@@ -820,14 +812,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   evPanelNotice: {
-    color: colors.muted,
-    fontSize: typeScale.caption,
+    ...typography.metadata,
     lineHeight: 17,
   },
   evPeekHint: {
-    color: colors.muted,
-    fontSize: typeScale.caption,
-    fontWeight: "700",
+    ...typography.metadataStrong,
     lineHeight: 18,
   },
   evListToggle: {
@@ -837,9 +826,8 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs,
   },
   evListToggleText: {
+    ...typography.compactButtonLabel,
     color: colors.white,
-    fontSize: typeScale.caption,
-    fontWeight: "800",
   },
   evList: {
     flex: 1,
@@ -883,9 +871,8 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
   },
   emptyActionText: {
+    ...typography.compactButtonLabel,
     color: colors.white,
-    fontSize: typeScale.caption,
-    fontWeight: "800",
   },
   evPowerTile: {
     alignItems: "center",
@@ -896,14 +883,13 @@ const styles = StyleSheet.create({
     width: 66,
   },
   evPowerValue: {
+    ...typography.metric,
     color: colors.blue,
-    fontSize: typeScale.title,
-    fontWeight: "900",
   },
   evPowerUnknownValue: {
     color: colors.blue,
     fontSize: 12,
-    fontWeight: "900",
+    fontWeight: typography.compactButtonLabel.fontWeight,
     lineHeight: 15,
     textAlign: "center",
     textTransform: "uppercase",

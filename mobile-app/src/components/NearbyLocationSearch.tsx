@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
-import { colors, radii, shadow, spacing, surfaces, typeScale } from "../theme";
+import { colors, radii, shadow, spacing, surfaces, typeScale, typography } from "../theme";
 import { MapPoint } from "../types";
 import { locationSuggestionDisplay } from "../utils/locationSuggestionDisplay";
 import { CurrentLocationFieldButton, currentLocationFieldInset } from "./CurrentLocationFieldButton";
@@ -153,11 +153,9 @@ const styles = StyleSheet.create({
   },
   locationInput: {
     ...surfaces.field,
+    ...typography.fieldText,
     borderRadius: radii.control,
-    color: colors.ink,
     flex: 1,
-    fontSize: typeScale.body,
-    fontWeight: "500",
     minHeight: 44,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
@@ -177,9 +175,8 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   locationButtonText: {
+    ...typography.compactButtonLabel,
     color: colors.greenDark,
-    fontSize: typeScale.caption,
-    fontWeight: "700",
   },
   lookupResults: {
     borderTopColor: colors.line,
@@ -188,9 +185,7 @@ const styles = StyleSheet.create({
     paddingTop: spacing.sm,
   },
   lookupLoading: {
-    color: colors.muted,
-    fontSize: typeScale.caption,
-    fontWeight: "400",
+    ...typography.metadata,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
   },
@@ -226,18 +221,15 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   lookupResultTitle: {
-    color: colors.ink,
+    ...typography.bodyStrong,
     flex: 1,
-    fontSize: typeScale.caption,
-    fontWeight: "600",
   },
   lookupResultBadge: {
+    ...typography.badgeLabel,
     alignSelf: "flex-start",
     backgroundColor: colors.greenSoft,
     borderRadius: radii.sm,
     color: colors.greenDark,
-    fontSize: typeScale.micro,
-    fontWeight: "700",
     marginTop: 2,
     maxWidth: 112,
     overflow: "hidden",
@@ -245,14 +237,13 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   lookupResultMeta: {
-    color: colors.muted,
+    ...typography.metadata,
     fontSize: 11,
-    fontWeight: "400",
     marginTop: 1,
   },
   locationError: {
     color: colors.red,
     fontSize: 11,
-    fontWeight: "500",
+    fontWeight: typography.metadataStrong.fontWeight,
   },
 });

@@ -593,15 +593,12 @@ const styles = StyleSheet.create({
     width: 76,
   },
   selectedPriceValue: {
-    color: colors.greenDark,
-    fontSize: typeScale.title,
-    fontWeight: "900",
+    ...typography.metric,
     lineHeight: 26,
   },
   selectedFuelLabel: {
+    ...typography.compactButtonLabel,
     color: colors.muted,
-    fontSize: typeScale.caption,
-    fontWeight: "800",
     lineHeight: 16,
     textTransform: "uppercase",
   },
@@ -689,9 +686,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
   },
   distanceBadgeText: {
+    ...typography.compactButtonLabel,
     color: colors.white,
     fontSize: 11,
-    fontWeight: "800",
     lineHeight: 16,
   },
   navigateButton: {

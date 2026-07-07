@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
-import { colors, radii, shadow, spacing, surfaces, typeScale } from "../theme";
+import { colors, radii, shadow, spacing, surfaces, typeScale, typography } from "../theme";
 import { FuelCode, MapPoint, SavedCommute, VehicleEnergyType } from "../types";
 import { CurrentLocationFieldButton, currentLocationFieldInset } from "./CurrentLocationFieldButton";
 import { NearbyEnergyChoice, NearbyEnergySelector } from "./NearbyEvControls";
@@ -218,9 +218,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
   },
   routeNoticeText: {
-    color: colors.muted,
-    fontSize: typeScale.caption,
-    fontWeight: "600",
+    ...typography.metadataStrong,
     lineHeight: 18,
   },
   inputRow: {
@@ -232,10 +230,8 @@ const styles = StyleSheet.create({
   },
   input: {
     ...surfaces.field,
+    ...typography.fieldText,
     borderRadius: radii.control,
-    color: colors.ink,
-    fontSize: typeScale.body,
-    fontWeight: "500",
     minHeight: 44,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
@@ -244,15 +240,13 @@ const styles = StyleSheet.create({
     paddingRight: currentLocationFieldInset,
   },
   routePrecisionHint: {
-    color: colors.muted,
-    fontSize: typeScale.caption,
-    fontWeight: "400",
+    ...typography.metadata,
     paddingHorizontal: spacing.sm,
   },
   routeError: {
     color: colors.red,
-    fontSize: typeScale.caption,
-    fontWeight: "600",
+    fontSize: typography.metadataStrong.fontSize,
+    fontWeight: typography.metadataStrong.fontWeight,
     paddingHorizontal: spacing.sm,
   },
   primaryButton: {
@@ -267,8 +261,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#aeb8b2",
   },
   primaryButtonText: {
+    ...typography.buttonLabel,
     color: colors.white,
-    fontSize: typeScale.body,
-    fontWeight: "700",
   },
 });

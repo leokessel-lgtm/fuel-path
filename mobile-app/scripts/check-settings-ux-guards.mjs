@@ -83,6 +83,8 @@ const checks = [
       files.stationBrandsCard.includes("...surfaces.secondaryAction") &&
       files.vehicleFuelCard.includes("...surfaces.field") &&
       files.vehicleFuelCard.includes("...surfaces.secondaryAction") &&
+      files.vehicleFuelCard.includes("...typography.fieldText") &&
+      files.vehicleFuelCard.includes("...typography.sectionLabel") &&
       files.nearbyStationSheet.includes("...surfaces.secondaryAction"),
   },
   {

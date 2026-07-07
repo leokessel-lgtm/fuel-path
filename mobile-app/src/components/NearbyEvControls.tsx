@@ -648,7 +648,7 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   modeToggle: {
-    backgroundColor: colors.panelStrong,
+    ...surfaces.secondaryAction,
     borderRadius: radii.lg,
     flexDirection: "row",
     gap: spacing.xs,
@@ -696,8 +696,8 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
   evQuickFilterChip: {
+    ...surfaces.secondaryAction,
     alignItems: "center",
-    backgroundColor: colors.panelStrong,
     borderRadius: radii.pill,
     flex: 1,
     paddingHorizontal: spacing.sm,

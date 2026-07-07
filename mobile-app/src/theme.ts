@@ -83,6 +83,16 @@ export const typography = {
 };
 
 export const surfaces = {
+  field: {
+    backgroundColor: colors.white,
+    borderColor: colors.line,
+    borderWidth: 1,
+  },
+  secondaryAction: {
+    backgroundColor: colors.white,
+    borderColor: colors.line,
+    borderWidth: 1,
+  },
   floating: {
     backgroundColor: "rgba(255, 255, 255, 0.96)",
     borderColor: colors.line,

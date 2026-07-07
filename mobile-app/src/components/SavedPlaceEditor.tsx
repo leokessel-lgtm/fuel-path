@@ -377,10 +377,8 @@ const styles = StyleSheet.create({
     position: "relative",
   },
   input: {
-    backgroundColor: colors.white,
-    borderColor: colors.line,
+    ...surfaces.field,
     borderRadius: radii.lg,
-    borderWidth: 1,
     color: colors.ink,
     fontSize: typeScale.body,
     fontWeight: "500",

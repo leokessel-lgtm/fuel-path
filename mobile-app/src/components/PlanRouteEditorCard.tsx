@@ -212,10 +212,8 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   routeNoticeCard: {
-    backgroundColor: colors.panel,
-    borderColor: colors.line,
+    ...surfaces.field,
     borderRadius: radii.control,
-    borderWidth: 1,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
   },
@@ -233,10 +231,8 @@ const styles = StyleSheet.create({
     position: "relative",
   },
   input: {
-    backgroundColor: colors.white,
-    borderColor: colors.line,
+    ...surfaces.field,
     borderRadius: radii.control,
-    borderWidth: 1,
     color: colors.ink,
     fontSize: typeScale.body,
     fontWeight: "500",

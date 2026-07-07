@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, View } from "react-native";
 
-import { colors, radii, spacing } from "../theme";
+import { colors, radii, spacing, surfaces } from "../theme";
 
 export const currentLocationFieldInset = 52;
 
@@ -41,11 +41,9 @@ export function CurrentLocationFieldButton({
 
 const styles = StyleSheet.create({
   button: {
+    ...surfaces.secondaryAction,
     alignItems: "center",
-    backgroundColor: colors.white,
-    borderColor: colors.line,
     borderRadius: radii.control,
-    borderWidth: 1,
     bottom: 0,
     height: 44,
     justifyContent: "center",

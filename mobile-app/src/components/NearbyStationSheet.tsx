@@ -509,11 +509,9 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   sortButton: {
+    ...surfaces.secondaryAction,
     alignItems: "center",
-    backgroundColor: colors.panelStrong,
-    borderColor: colors.line,
     borderRadius: radii.pill,
-    borderWidth: 1,
     flex: 1,
     justifyContent: "center",
     minHeight: 44,

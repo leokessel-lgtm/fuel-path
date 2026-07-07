@@ -152,10 +152,8 @@ const styles = StyleSheet.create({
     position: "relative",
   },
   locationInput: {
-    backgroundColor: colors.white,
-    borderColor: colors.line,
+    ...surfaces.field,
     borderRadius: radii.control,
-    borderWidth: 1,
     color: colors.ink,
     flex: 1,
     fontSize: typeScale.body,
@@ -168,8 +166,8 @@ const styles = StyleSheet.create({
     paddingRight: currentLocationFieldInset,
   },
   locationButton: {
+    ...surfaces.secondaryAction,
     alignItems: "center",
-    backgroundColor: colors.green,
     borderRadius: radii.control,
     justifyContent: "center",
     minHeight: 44,
@@ -179,7 +177,7 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   locationButtonText: {
-    color: colors.white,
+    color: colors.greenDark,
     fontSize: typeScale.caption,
     fontWeight: "700",
   },

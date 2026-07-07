@@ -12,6 +12,7 @@ const files = {
   savedPlacesCard: read("src/components/SavedPlacesCard.tsx"),
   savedRouteAlertsCard: read("src/components/SavedRouteAlertsCard.tsx"),
   stationBrandsCard: read("src/components/StationBrandsCard.tsx"),
+  vehicleFuelCard: read("src/components/VehicleFuelCard.tsx"),
   savedCommutesHook: read("src/hooks/useSavedCommutes.ts"),
   preferencesHook: read("src/hooks/useAppPreferences.ts"),
   preferencesStore: read("src/services/preferencesStore.ts"),
@@ -66,6 +67,23 @@ const checks = [
       files.savedPlaceEditor.includes('accessibilityLabel={`Use current location for ${label.toLowerCase()}`}') &&
       !files.savedPlaceEditor.includes("Current location</Text>") &&
       !files.savedPlaceEditor.includes('{locating ? "Locating" : "Current location"}'),
+  },
+  {
+    label: "neutral fields and secondary buttons use shared white surfaces",
+    ok:
+      files.theme.includes("field: {") &&
+      files.theme.includes("secondaryAction: {") &&
+      files.theme.includes("backgroundColor: colors.white") &&
+      files.planEditor.includes("...surfaces.field") &&
+      files.nearbySearch.includes("...surfaces.field") &&
+      files.nearbySearch.includes("...surfaces.secondaryAction") &&
+      files.currentLocationButton.includes("...surfaces.secondaryAction") &&
+      files.savedPlaceEditor.includes("...surfaces.field") &&
+      files.stationBrandsCard.includes("...surfaces.field") &&
+      files.stationBrandsCard.includes("...surfaces.secondaryAction") &&
+      files.vehicleFuelCard.includes("...surfaces.field") &&
+      files.vehicleFuelCard.includes("...surfaces.secondaryAction") &&
+      files.nearbyStationSheet.includes("...surfaces.secondaryAction"),
   },
   {
     label: "saved route rename and remove are wired through Settings",

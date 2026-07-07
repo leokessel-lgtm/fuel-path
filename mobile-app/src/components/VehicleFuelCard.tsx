@@ -431,7 +431,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   addButton: {
-    ...surfaces.floating,
+    ...surfaces.secondaryAction,
     alignItems: "center",
     borderRadius: radii.pill,
     flex: 1,
@@ -481,8 +481,8 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   input: {
-    ...surfaces.softPanel,
-    borderRadius: radii.md,
+    ...surfaces.field,
+    borderRadius: radii.control,
     color: colors.ink,
     fontSize: typeScale.body,
     fontWeight: "700",

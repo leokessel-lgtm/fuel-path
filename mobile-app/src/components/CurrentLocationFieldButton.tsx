@@ -44,7 +44,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: colors.white,
     borderColor: colors.line,
-    borderRadius: radii.pill,
+    borderRadius: radii.control,
     borderWidth: 1,
     bottom: 0,
     height: 44,

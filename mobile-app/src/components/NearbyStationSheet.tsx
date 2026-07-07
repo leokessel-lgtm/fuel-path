@@ -419,7 +419,7 @@ const styles = StyleSheet.create({
   sheet: {
     ...shadow.float,
     ...surfaces.floating,
-    borderRadius: radii.xxl,
+    borderRadius: radii.control,
     gap: spacing.sm,
     bottom: nearbySheetBottomOffset,
     left: spacing.md,
@@ -539,14 +539,14 @@ const styles = StyleSheet.create({
   },
   emptyState: {
     ...surfaces.softPanel,
-    borderRadius: radii.xl,
+    borderRadius: radii.control,
     gap: spacing.xs,
     padding: spacing.md,
   },
   noticeState: {
     backgroundColor: colors.amberSoft,
     borderColor: "rgba(152, 99, 26, 0.26)",
-    borderRadius: radii.xl,
+    borderRadius: radii.control,
     borderWidth: 1,
     gap: spacing.xs,
     padding: spacing.md,

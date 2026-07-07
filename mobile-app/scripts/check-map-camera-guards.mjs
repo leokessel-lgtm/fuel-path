@@ -112,6 +112,17 @@ const checks = [
       measuredControlBoundary.includes("bottom: 330"),
   },
   {
+    label: "map chrome uses the shared control corner radius",
+    ok:
+      theme.includes("control: 22") &&
+      nearbyLocationSearch.includes("borderRadius: radii.control") &&
+      planRouteEditorCard.includes("borderRadius: radii.control") &&
+      nearbyStationSheet.includes("borderRadius: radii.control") &&
+      nearbyCombinedPanel.includes("borderRadius: radii.control") &&
+      nearbyEvControls.includes("borderRadius: radii.control") &&
+      planRouteSheet.includes("borderRadius: radii.control"),
+  },
+  {
     label: "nearby screen keeps current location as a separate map pin",
     ok:
       nearbyScreen.includes("const [currentLocation, setCurrentLocation] = useState<MapPoint>();") &&

@@ -203,7 +203,7 @@ const styles = StyleSheet.create({
   searchCard: {
     ...shadow.float,
     ...surfaces.floating,
-    borderRadius: radii.xxl,
+    borderRadius: radii.control,
     overflow: "hidden",
     gap: spacing.xs,
     padding: spacing.xs,
@@ -214,7 +214,7 @@ const styles = StyleSheet.create({
   routeNoticeCard: {
     backgroundColor: colors.panel,
     borderColor: colors.line,
-    borderRadius: radii.lg,
+    borderRadius: radii.control,
     borderWidth: 1,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
@@ -235,7 +235,7 @@ const styles = StyleSheet.create({
   input: {
     backgroundColor: colors.white,
     borderColor: colors.line,
-    borderRadius: radii.lg,
+    borderRadius: radii.control,
     borderWidth: 1,
     color: colors.ink,
     fontSize: typeScale.body,
@@ -262,7 +262,7 @@ const styles = StyleSheet.create({
   primaryButton: {
     ...surfaces.darkAction,
     alignItems: "center",
-    borderRadius: radii.pill,
+    borderRadius: radii.control,
     justifyContent: "center",
     minHeight: 52,
     paddingVertical: spacing.md,

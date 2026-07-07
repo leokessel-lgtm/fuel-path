@@ -386,7 +386,7 @@ const styles = StyleSheet.create({
   sheet: {
     ...shadow.float,
     ...surfaces.floating,
-    borderRadius: radii.xxl,
+    borderRadius: radii.control,
     bottom: nearbySheetBottomOffset,
     gap: spacing.sm,
     left: spacing.md,
@@ -516,7 +516,7 @@ const styles = StyleSheet.create({
   emptyCard: {
     backgroundColor: "#fff7ed",
     borderColor: "#fed7aa",
-    borderRadius: radii.md,
+    borderRadius: radii.control,
     borderWidth: 1,
     gap: spacing.sm,
     padding: spacing.md,

@@ -136,7 +136,7 @@ const styles = StyleSheet.create({
   locationCard: {
     ...shadow.float,
     ...surfaces.floating,
-    borderRadius: radii.xxl,
+    borderRadius: radii.control,
     gap: spacing.xs,
     padding: spacing.xs,
   },
@@ -154,7 +154,7 @@ const styles = StyleSheet.create({
   locationInput: {
     backgroundColor: colors.white,
     borderColor: colors.line,
-    borderRadius: radii.lg,
+    borderRadius: radii.control,
     borderWidth: 1,
     color: colors.ink,
     flex: 1,
@@ -170,7 +170,7 @@ const styles = StyleSheet.create({
   locationButton: {
     alignItems: "center",
     backgroundColor: colors.green,
-    borderRadius: radii.md,
+    borderRadius: radii.control,
     justifyContent: "center",
     minHeight: 44,
     paddingHorizontal: spacing.md,

@@ -1008,7 +1008,7 @@ const styles = StyleSheet.create({
   sheet: {
     ...shadow.float,
     ...surfaces.floating,
-    borderRadius: radii.xxl,
+    borderRadius: radii.control,
     bottom: spacing.sm,
     gap: spacing.sm,
     left: spacing.md,

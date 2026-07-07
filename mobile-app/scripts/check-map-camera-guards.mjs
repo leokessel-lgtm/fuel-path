@@ -437,6 +437,12 @@ const checks = [
       nearbyStationSheet.includes("sheetDismissDragPx") &&
       nearbyStationSheet.includes("dy > sheetDismissDragPx") &&
       nearbyStationSheet.includes("if (selected && !sheetExpanded) onCloseSelectedStation();") &&
+      nearbyStationSheet.includes("paddingTop: spacing.xs") &&
+      nearbyStationSheet.includes("minHeight: 24") &&
+      nearbyStationSheet.includes("paddingVertical: 2") &&
+      nearbyCombinedPanel.includes("paddingTop: spacing.xs") &&
+      nearbyCombinedPanel.includes("minHeight: 24") &&
+      nearbyCombinedPanel.includes("paddingVertical: 2") &&
       nearbyStationSheet.includes('accessibilityRole="button"') &&
       nearbyStationSheet.includes("hitSlop={10}") &&
       nearbyStationSheet.includes('accessibilityLabel={sheetExpanded ? "Collapse station list" : "Expand station list"}'),

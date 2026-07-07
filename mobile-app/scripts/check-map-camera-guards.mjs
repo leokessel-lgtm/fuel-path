@@ -100,6 +100,10 @@ const checks = [
     ok:
       nearbyScreen.includes("const { expandedSheetTop, nearbyCameraInsets, onTopControlsLayout } = useMeasuredControlBoundary();") &&
       nearbyScreen.includes("onLayout={onTopControlsLayout}") &&
+      nearbyScreen.includes("gap: spacing.xs") &&
+      nearbyScreen.includes("top: spacing.sm") &&
+      nearbyLocationSearch.includes("padding: spacing.xs") &&
+      nearbyLocationSearch.includes("paddingVertical: spacing.xs") &&
       nearbyEvControls.includes("const energySelectorMinWidth = 214;") &&
       nearbyEvControls.includes('alignSelf: "flex-start"') &&
       nearbyEvControls.includes("minWidth: energySelectorMinWidth") &&
@@ -429,6 +433,12 @@ const checks = [
       nearbyStationSheet.includes("{selected && !sheetExpanded ? (") &&
       nearbyStationSheet.includes("sheetExpanded: {") &&
       nearbyStationSheet.includes("bottom: 8") &&
+      nearbyStationSheet.includes("maxHeight: 235") &&
+      nearbyStationSheet.includes("maxHeight: 172") &&
+      nearbyCombinedPanel.includes("maxHeight: 285") &&
+      nearbyCombinedPanel.includes("maxHeight: 180") &&
+      nearbyEvControls.includes("maxHeight: 275") &&
+      nearbyEvControls.includes("maxHeight: 180") &&
       !nearbyStationSheet.includes("selected,\n  sheetExpanded,"),
   },
   {
@@ -453,6 +463,9 @@ const checks = [
       nearbyCombinedPanel.includes("paddingTop: spacing.xs") &&
       nearbyCombinedPanel.includes("minHeight: 24") &&
       nearbyCombinedPanel.includes("paddingVertical: 2") &&
+      nearbyEvControls.includes("paddingTop: spacing.xs") &&
+      nearbyEvControls.includes("minHeight: 24") &&
+      nearbyEvControls.includes("paddingVertical: 2") &&
       nearbyStationSheet.includes('accessibilityRole="button"') &&
       nearbyStationSheet.includes("hitSlop={10}") &&
       nearbyStationSheet.includes('accessibilityLabel={sheetExpanded ? "Collapse station list" : "Expand station list"}'),

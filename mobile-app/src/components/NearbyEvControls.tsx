@@ -757,18 +757,20 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     bottom: nearbySheetBottomOffset,
     left: spacing.md,
-    padding: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.xs,
+    paddingBottom: spacing.md,
     position: "absolute",
     right: spacing.md,
     zIndex: 6,
   },
   evPanelCollapsed: {
-    maxHeight: 315,
+    maxHeight: 275,
     overflow: "hidden",
   },
   evPanelPeek: {
     bottom: 18,
-    maxHeight: 220,
+    maxHeight: 180,
     overflow: "hidden",
   },
   evPanelExpanded: {
@@ -783,7 +785,9 @@ const styles = StyleSheet.create({
   evGrabberTouch: {
     alignItems: "center",
     flex: 1,
-    paddingVertical: spacing.xs,
+    justifyContent: "center",
+    minHeight: 24,
+    paddingVertical: 2,
   },
   evGrabber: {
     alignSelf: "center",

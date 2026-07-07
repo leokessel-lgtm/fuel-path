@@ -431,15 +431,15 @@ const styles = StyleSheet.create({
     zIndex: 6,
   },
   sheetCollapsed: {
-    maxHeight: 275,
+    maxHeight: 235,
     overflow: "hidden",
   },
   sheetCollapsedWithSelection: {
-    maxHeight: 340,
+    maxHeight: 320,
   },
   sheetPeek: {
     bottom: 18,
-    maxHeight: 205,
+    maxHeight: 172,
     overflow: "hidden",
   },
   sheetExpanded: {

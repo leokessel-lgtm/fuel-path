@@ -398,12 +398,12 @@ const styles = StyleSheet.create({
     zIndex: 6,
   },
   sheetCollapsed: {
-    maxHeight: 330,
+    maxHeight: 285,
     overflow: "hidden",
   },
   sheetPeek: {
     bottom: 18,
-    maxHeight: 215,
+    maxHeight: 180,
     overflow: "hidden",
   },
   sheetExpanded: {

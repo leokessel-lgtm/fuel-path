@@ -437,11 +437,11 @@ const styles = StyleSheet.create({
     left: 0, position: "absolute", right: 0, top: 0,
   },
   topControls: {
-    gap: spacing.sm,
+    gap: spacing.xs,
     left: spacing.md,
     position: "absolute",
     right: spacing.md,
-    top: spacing.md,
+    top: spacing.sm,
     zIndex: 20,
   },
 });

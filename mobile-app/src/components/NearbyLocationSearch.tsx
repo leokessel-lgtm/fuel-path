@@ -137,8 +137,8 @@ const styles = StyleSheet.create({
     ...shadow.float,
     ...surfaces.floating,
     borderRadius: radii.xxl,
-    gap: spacing.sm,
-    padding: spacing.sm,
+    gap: spacing.xs,
+    padding: spacing.xs,
   },
   locationInputRow: {
     alignItems: "center",
@@ -162,7 +162,7 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     minHeight: 44,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingVertical: spacing.xs,
   },
   locationInputWithIcon: {
     paddingRight: currentLocationFieldInset,

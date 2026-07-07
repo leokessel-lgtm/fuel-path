@@ -17,13 +17,16 @@ const routeMaxPriceMarkers = 18;
 const compactRouteMaxPriceMarkers = 14;
 const defaultMarkerDensity = {
   maxPriceMarkers: 8,
-  maxDotMarkers: 18,
   markerGridSize: 240,
   compactMarkerGridSize: 128,
 };
+const tabletMarkerDensity = {
+  maxPriceMarkers: 20,
+  markerGridSize: 150,
+  compactMarkerGridSize: 110,
+};
 const compactMarkerDensity = {
   maxPriceMarkers: 3,
-  maxDotMarkers: 8,
   markerGridSize: 390,
   compactMarkerGridSize: 230,
 };
@@ -94,7 +97,10 @@ export function StationMap({
     () => (routePoints.length >= 2 ? sampleRoutePoints(routePoints, 1200) : []),
     [routePoints],
   );
-  const markerDensity = useMemo(() => nativeMarkerDensity(width), [width]);
+  const markerDensity = useMemo(
+    () => nativeMarkerDensity(width, Platform.OS === "ios" && Platform.isPad),
+    [width],
+  );
   const routePriceMarkerLimit = useMemo(() => nativeRoutePriceMarkerLimit(width), [width]);
   const activeInsets = useMemo(
     () => resolveCameraInsets(routeEndpoints ? "route" : "nearby", cameraInsets),
@@ -127,7 +133,6 @@ export function StationMap({
       if (routeEndpoints) {
         return {
           priceMarkers: prioritiseSelectedStations(stations, selectedStationCode).slice(0, routePriceMarkerLimit),
-          dotMarkers: [],
           clusterMarkers: [],
         };
       }
@@ -237,16 +242,7 @@ export function StationMap({
 
   const handleClusterPress = (cluster: ClusterMarker) => {
     runProgrammaticMapMove(programmaticMoveRef, () => {
-      mapRef.current?.fitToCoordinates(
-        cluster.items.map((item) => ({
-          latitude: item.station.lat,
-          longitude: item.station.lon,
-        })),
-        {
-          animated: true,
-          edgePadding: activeInsets,
-        },
-      );
+      mapRef.current?.animateToRegion(regionForClusterZoom(cluster, currentRegion), 260);
     });
   };
 
@@ -332,19 +328,6 @@ export function StationMap({
             </View>
           </Marker>
         ) : null}
-
-        {markerGroups.dotMarkers.map((item) => (
-          <Marker
-            {...decorativeStationMarkerAccessibility}
-            coordinate={{ latitude: item.station.lat, longitude: item.station.lon }}
-            key={`dot-${item.station.stationCode}`}
-            onPress={() => handleMarkerPress(item.station.stationCode)}
-            tracksViewChanges={false}
-            zIndex={100}
-          >
-            <View style={styles.compactPin} />
-          </Marker>
-        ))}
 
         {interactiveClusterMarkers.map((cluster) => (
           <Marker
@@ -447,7 +430,6 @@ function visibleMarkerGroups(
   const compactCells = new Set<string>();
   const clusterGroups = new Map<string, StationViewModel[]>();
   const priceMarkers: StationViewModel[] = [];
-  const dotMarkers: StationViewModel[] = [];
   const visibleStations = stations.filter((item) => stationInRegion(item, region));
 
   const ranked = [...visibleStations].sort((left, right) => {
@@ -475,12 +457,6 @@ function visibleMarkerGroups(
       continue;
     }
 
-    if (dotMarkers.length < density.maxDotMarkers && !compactCells.has(compactCell)) {
-      dotMarkers.push(item);
-      compactCells.add(compactCell);
-      continue;
-    }
-
     const grouped = clusterGroups.get(compactCell) || [];
     grouped.push(item);
     clusterGroups.set(compactCell, grouped);
@@ -501,7 +477,7 @@ function visibleMarkerGroups(
     .map(clusterMarkerForItems)
     .sort((left, right) => right.count - left.count);
 
-  return { priceMarkers, dotMarkers, clusterMarkers };
+  return { priceMarkers, clusterMarkers };
 }
 
 function stationInRegion(item: StationViewModel, region: Region) {
@@ -554,7 +530,40 @@ function clusterFitsInteractiveRegion(
   );
 }
 
-function nativeMarkerDensity(width: number) {
+function regionForClusterZoom(cluster: ClusterMarker, currentRegion: Region): Region {
+  const bounds = boundsForCluster(cluster);
+  const contentLatDelta = Math.max((bounds.maxLat - bounds.minLat) * 2.4, 0.006);
+  const contentLonDelta = Math.max((bounds.maxLon - bounds.minLon) * 2.4, 0.006);
+  const zoomedLatDelta = Math.max(Math.min(currentRegion.latitudeDelta * 0.55, contentLatDelta), 0.004);
+  const zoomedLonDelta = Math.max(Math.min(currentRegion.longitudeDelta * 0.55, contentLonDelta), 0.004);
+
+  return {
+    latitude: cluster.lat,
+    longitude: cluster.lon,
+    latitudeDelta: Math.min(zoomedLatDelta, currentRegion.latitudeDelta * 0.72),
+    longitudeDelta: Math.min(zoomedLonDelta, currentRegion.longitudeDelta * 0.72),
+  };
+}
+
+function boundsForCluster(cluster: ClusterMarker) {
+  return cluster.items.reduce(
+    (bounds, item) => ({
+      minLat: Math.min(bounds.minLat, item.station.lat),
+      maxLat: Math.max(bounds.maxLat, item.station.lat),
+      minLon: Math.min(bounds.minLon, item.station.lon),
+      maxLon: Math.max(bounds.maxLon, item.station.lon),
+    }),
+    {
+      minLat: Number.POSITIVE_INFINITY,
+      maxLat: Number.NEGATIVE_INFINITY,
+      minLon: Number.POSITIVE_INFINITY,
+      maxLon: Number.NEGATIVE_INFINITY,
+    },
+  );
+}
+
+function nativeMarkerDensity(width: number, isPad = false) {
+  if (isPad || width >= 700) return tabletMarkerDensity;
   return width <= 430 ? compactMarkerDensity : defaultMarkerDensity;
 }
 
@@ -843,15 +852,6 @@ const styles = StyleSheet.create({
   },
   pinPointerSelected: {
     borderTopColor: colors.white,
-  },
-  compactPin: {
-    ...shadow.soft,
-    backgroundColor: colors.white,
-    borderColor: colors.green,
-    borderRadius: radii.pill,
-    borderWidth: 3,
-    height: 18,
-    width: 18,
   },
   clusterPin: {
     ...shadow.soft,

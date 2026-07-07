@@ -646,6 +646,7 @@ export function PlanScreen({
           error={error}
           loading={loading}
           loadingLabel={preferences.vehicleEnergyType === "electric" ? "Finding route chargers..." : undefined}
+          navigationApp={preferences.navigationApp}
           onMinimise={() => setRouteSheetMinimised(true)}
           onRestore={() => setRouteSheetMinimised(false)}
           onLayout={onRouteSheetLayout}

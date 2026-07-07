@@ -1,6 +1,6 @@
-import { Linking, Platform } from "react-native";
+import { ActionSheetIOS, Alert, Linking, Platform } from "react-native";
 
-import { AppPreferences, EvConnector, MapPoint } from "../types";
+import { AppPreferences, EvConnector, MapPoint, NavigationAppPreference } from "../types";
 import { NearbyMode } from "../components/NearbyEvControls";
 
 export function sameStationCodes(left: string[], right: string[]) {
@@ -44,25 +44,58 @@ export function shortLocationLabel(query: string, resolvedLabel: string) {
   return query.length <= 42 ? query : resolvedLabel.split(",").slice(0, 3).join(",").trim() || query;
 }
 
-export async function openDirections(lat: number, lon: number, labelText = "Destination") {
+export async function openDirections(
+  lat: number,
+  lon: number,
+  labelText = "Destination",
+  navigationApp: NavigationAppPreference = "device_maps",
+) {
   const label = encodeURIComponent(labelText);
   const safeLat = Number(lat);
   const safeLon = Number(lon);
+  const appleMapsUrl = `http://maps.apple.com/?daddr=${safeLat},${safeLon}&q=${label}&dirflg=d`;
+  const wazeUrl = `https://waze.com/ul?ll=${safeLat},${safeLon}&navigate=yes&utm_source=fuelpath`;
+  if (Platform.OS === "ios") {
+    const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${safeLat},${safeLon}&travelmode=driving`;
+    const nativeGoogleMapsUrl = nativeGoogleMapsUrlFor(googleMapsUrl);
+    const url = await chooseNavigationUrl({
+      navigationApp,
+      title: "Navigate to destination",
+      options: [
+        { label: "Apple Maps", provider: "apple_maps", url: appleMapsUrl },
+        ...(await canOpenWaze() ? [{ label: "Waze", provider: "waze" as const, url: wazeUrl }] : []),
+        ...(await canOpenGoogleMaps() ? [{ label: "Google Maps", provider: "google_maps" as const, url: nativeGoogleMapsUrl }] : []),
+      ],
+    });
+    if (url) await Linking.openURL(url);
+    return;
+  }
+  if (Platform.OS === "android") {
+    const geoUrl = `geo:0,0?q=${safeLat},${safeLon}(${label})`;
+    const url = await chooseNavigationUrl({
+      navigationApp,
+      title: "Navigate to destination",
+      options: [
+        { label: "Waze", provider: "waze", url: wazeUrl },
+        { label: "Maps", provider: "device_maps", url: geoUrl },
+      ],
+    });
+    if (url) await Linking.openURL(url);
+    return;
+  }
   const url =
-    Platform.OS === "ios"
-      ? `http://maps.apple.com/?daddr=${safeLat},${safeLon}&q=${label}`
-      : Platform.OS === "android"
-        ? `geo:0,0?q=${safeLat},${safeLon}(${label})`
-        : `https://www.google.com/maps/dir/?api=1&destination=${safeLat},${safeLon}&travelmode=driving`;
+    `https://www.google.com/maps/dir/?api=1&destination=${safeLat},${safeLon}&travelmode=driving`;
   await Linking.openURL(url);
 }
 
 export async function openRouteDirectionsViaStop({
   destination,
+  navigationApp = "device_maps",
   origin,
   stop,
 }: {
   destination: MapPoint;
+  navigationApp?: NavigationAppPreference;
   origin: MapPoint;
   stop: { lat: number; lon: number; label: string };
 }) {
@@ -76,12 +109,128 @@ export async function openRouteDirectionsViaStop({
     travelmode: "driving",
     waypoints: stopValue,
   });
-  const url = `https://www.google.com/maps/dir/?${params.toString()}`;
-  await Linking.openURL(url);
+  const googleMapsUrl = `https://www.google.com/maps/dir/?${params.toString()}`;
+  if (Platform.OS === "ios") {
+    const appleMapsUrl = appleMapsRouteViaStopUrl(origin, stop, destination);
+    const nativeGoogleMapsUrl = nativeGoogleMapsUrlFor(googleMapsUrl);
+    const wazeStopUrl = `https://waze.com/ul?ll=${coordinateParam(stop.lat, stop.lon)}&navigate=yes&utm_source=fuelpath`;
+    const url = await chooseNavigationUrl({
+      navigationApp,
+      title: "Navigate via fuel stop",
+      options: [
+        { label: "Apple Maps", provider: "apple_maps", url: appleMapsUrl },
+        ...(await canOpenWaze() ? [{ label: "Waze to stop", provider: "waze" as const, url: wazeStopUrl }] : []),
+        ...(await canOpenGoogleMaps() ? [{ label: "Google Maps", provider: "google_maps" as const, url: nativeGoogleMapsUrl }] : []),
+      ],
+    });
+    if (url) await Linking.openURL(url);
+    return;
+  }
+  if (Platform.OS === "android") {
+    const wazeStopUrl = `https://waze.com/ul?ll=${coordinateParam(stop.lat, stop.lon)}&navigate=yes&utm_source=fuelpath`;
+    const url = await chooseNavigationUrl({
+      navigationApp,
+      title: "Navigate via fuel stop",
+      options: [
+        { label: "Waze to stop", provider: "waze", url: wazeStopUrl },
+        { label: "Google Maps", provider: "google_maps", url: googleMapsUrl },
+      ],
+    });
+    if (url) await Linking.openURL(url);
+    return;
+  }
+  await Linking.openURL(googleMapsUrl);
 }
 
 function coordinateParam(lat: number, lon: number) {
   return `${Number(lat)},${Number(lon)}`;
+}
+
+function appleMapsRouteViaStopUrl(
+  origin: MapPoint,
+  stop: { lat: number; lon: number },
+  destination: MapPoint,
+) {
+  const params = new URLSearchParams({
+    dirflg: "d",
+    saddr: coordinateParam(origin.lat, origin.lon),
+  });
+  params.append("daddr", coordinateParam(stop.lat, stop.lon));
+  params.append("daddr", coordinateParam(destination.lat, destination.lon));
+  return `http://maps.apple.com/?${params.toString()}`;
+}
+
+function nativeGoogleMapsUrlFor(googleMapsUrl: string) {
+  return `comgooglemapsurl://${googleMapsUrl.replace(/^https?:\/\//, "")}`;
+}
+
+async function canOpenWaze() {
+  return Linking.canOpenURL("waze://");
+}
+
+async function canOpenGoogleMaps() {
+  return Linking.canOpenURL("comgooglemapsurl://");
+}
+
+type NavigationOption = {
+  label: string;
+  provider: NavigationAppPreference;
+  url: string;
+};
+
+function chooseNavigationUrl({
+  navigationApp,
+  options,
+  title,
+}: {
+  navigationApp: NavigationAppPreference;
+  options: NavigationOption[];
+  title: string;
+}) {
+  if (navigationApp !== "ask") {
+    const preferred = options.find((option) => option.provider === navigationApp)
+      || options.find((option) => option.provider === "device_maps")
+      || options.find((option) => option.provider === "apple_maps")
+      || options.find((option) => option.provider === "google_maps")
+      || options[0];
+    return Promise.resolve(preferred?.url);
+  }
+  if (options.length <= 1) return Promise.resolve(options[0]?.url);
+  if (Platform.OS === "android") {
+    return new Promise<string | undefined>((resolve) => {
+      Alert.alert(
+        title,
+        undefined,
+        [
+          ...options.map((option) => ({
+            text: option.label,
+            onPress: () => resolve(option.url),
+          })),
+          {
+            style: "cancel" as const,
+            text: "Cancel",
+            onPress: () => resolve(undefined),
+          },
+        ],
+        {
+          cancelable: true,
+          onDismiss: () => resolve(undefined),
+        },
+      );
+    });
+  }
+  return new Promise<string | undefined>((resolve) => {
+    ActionSheetIOS.showActionSheetWithOptions(
+      {
+        cancelButtonIndex: options.length,
+        options: [...options.map((option) => option.label), "Cancel"],
+        title,
+      },
+      (buttonIndex) => {
+        resolve(buttonIndex < options.length ? options[buttonIndex]?.url : undefined);
+      },
+    );
+  });
 }
 
 function toRad(value: number) {

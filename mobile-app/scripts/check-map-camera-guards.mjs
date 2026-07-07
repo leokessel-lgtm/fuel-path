@@ -63,6 +63,7 @@ const androidMapSmoke = read("scripts/native-android-map-smoke.mjs");
 const androidPreviewSmoke = read("scripts/native-android-preview-smoke.mjs");
 const androidPerformanceSummary = read("scripts/native-android-performance-summary.mjs");
 const androidMapsKeyFix = read("scripts/android-maps-key-fix-packet.mjs");
+const iosInfoPlist = read("ios/FuelPath/Info.plist");
 const routeScoring = read("../api/_routeScoring.js");
 
 const checks = [
@@ -223,15 +224,22 @@ const checks = [
     ok:
       nativeMap.includes("const defaultMarkerDensity = {") &&
       nativeMap.includes("maxPriceMarkers: 8,") &&
-      nativeMap.includes("maxDotMarkers: 18,") &&
       nativeMap.includes("markerGridSize: 240,") &&
       nativeMap.includes("compactMarkerGridSize: 128,") &&
+      nativeMap.includes("const tabletMarkerDensity = {") &&
+      nativeMap.includes("maxPriceMarkers: 20,") &&
+      nativeMap.includes("markerGridSize: 150,") &&
+      nativeMap.includes("compactMarkerGridSize: 110,") &&
       nativeMap.includes("const compactMarkerDensity = {") &&
       nativeMap.includes("maxPriceMarkers: 3,") &&
-      nativeMap.includes("maxDotMarkers: 8,") &&
       nativeMap.includes("markerGridSize: 390,") &&
       nativeMap.includes("compactMarkerGridSize: 230,") &&
-      nativeMap.includes("function nativeMarkerDensity(width: number)") &&
+      !nativeMap.includes("dotMarkers") &&
+      !nativeMap.includes("compactPin") &&
+      !nativeMap.includes("maxDotMarkers") &&
+      nativeMap.includes("nativeMarkerDensity(width, Platform.OS === \"ios\" && Platform.isPad)") &&
+      nativeMap.includes("function nativeMarkerDensity(width: number, isPad = false)") &&
+      nativeMap.includes("if (isPad || width >= 700) return tabletMarkerDensity;") &&
       nativeMap.includes("return width <= 430 ? compactMarkerDensity : defaultMarkerDensity;") &&
       nativeMap.includes("type ClusterMarker = {") &&
       nativeMap.includes("items: StationViewModel[];") &&
@@ -242,6 +250,11 @@ const checks = [
       nativeMap.includes("stationInRegion(item, region)") &&
       nativeMap.includes("clusterMarkerForItems") &&
       nativeMap.includes("clusterFitsInteractiveRegion(cluster, currentRegion, activeInsets)") &&
+      nativeMap.includes("animateToRegion(regionForClusterZoom(cluster, currentRegion), 260)") &&
+      nativeMap.includes("function regionForClusterZoom(cluster: ClusterMarker, currentRegion: Region): Region") &&
+      nativeMap.includes("currentRegion.latitudeDelta * 0.55") &&
+      nativeMap.includes("currentRegion.longitudeDelta * 0.55") &&
+      nativeMap.includes("function boundsForCluster(cluster: ClusterMarker)") &&
       nativeMap.includes("styles.clusterPin") &&
       nativeMap.includes("styles.clusterCount") &&
       nativeMap.includes("styles.pinBrand") &&
@@ -494,12 +507,33 @@ const checks = [
     label: "plan navigation arrow carries route waypoint to final destination",
     ok:
       planRouteSheet.includes("openRouteDirectionsViaStop") &&
-      planRouteSheet.includes("openPlanStationDirections(best, routeEndpoints)") &&
-      planRouteSheet.includes("openPlanStationDirections(selected, routeEndpoints)") &&
+      planRouteSheet.includes("openPlanStationDirections(best, navigationApp, routeEndpoints)") &&
+      planRouteSheet.includes("openPlanStationDirections(selected, navigationApp, routeEndpoints)") &&
       planRouteSheet.includes("Navigate via ${best.station.name} to ${routeEndpoints.to.label}") &&
       planScreen.includes("routeEndpoints={routeData.endpoints}") &&
       nearbyScreenUtils.includes('waypoints: stopValue') &&
-      nearbyScreenUtils.includes('destination: destinationValue'),
+      nearbyScreenUtils.includes('destination: destinationValue') &&
+      nearbyScreenUtils.includes("Alert.alert(") &&
+      nearbyScreenUtils.includes("ActionSheetIOS.showActionSheetWithOptions") &&
+      nearbyScreenUtils.includes('title: "Navigate via fuel stop"') &&
+      nearbyScreenUtils.includes('{ label: "Apple Maps", provider: "apple_maps", url: appleMapsUrl }') &&
+      nearbyScreenUtils.includes('{ label: "Waze to stop", provider: "waze"') &&
+      nearbyScreenUtils.includes('{ label: "Google Maps", provider: "google_maps"') &&
+      nearbyScreenUtils.includes('{ label: "Waze", provider: "waze"') &&
+      nearbyScreenUtils.includes('{ label: "Maps", provider: "device_maps", url: geoUrl }') &&
+      nearbyScreenUtils.includes("navigationApp !== \"ask\"") &&
+      nearbyScreenUtils.includes("provider === navigationApp") &&
+      nearbyScreenUtils.includes("if (Platform.OS === \"android\")") &&
+      nearbyScreenUtils.includes("function appleMapsRouteViaStopUrl") &&
+      nearbyScreenUtils.includes('params.append("daddr", coordinateParam(stop.lat, stop.lon))') &&
+      nearbyScreenUtils.includes('params.append("daddr", coordinateParam(destination.lat, destination.lon))') &&
+      nearbyScreenUtils.includes('Linking.canOpenURL("comgooglemapsurl://")') &&
+      nearbyScreenUtils.includes("comgooglemapsurl://${googleMapsUrl.replace") &&
+      nearbyScreenUtils.includes('Linking.canOpenURL("waze://")') &&
+      nearbyScreenUtils.includes("https://waze.com/ul?ll=${safeLat},${safeLon}&navigate=yes&utm_source=fuelpath") &&
+      iosInfoPlist.includes("<key>LSApplicationQueriesSchemes</key>") &&
+      iosInfoPlist.includes("<string>comgooglemapsurl</string>") &&
+      iosInfoPlist.includes("<string>waze</string>"),
   },
   {
     label: "plan returns to recommended stop after alternative detail",

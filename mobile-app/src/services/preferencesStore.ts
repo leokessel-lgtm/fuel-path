@@ -9,6 +9,7 @@ import {
   FuelCode,
   HomeChargingAccess,
   MapPoint,
+  NavigationAppPreference,
   StationBrandMode,
   VehicleProfile,
   VehicleEnergyType,
@@ -23,6 +24,7 @@ const vehicleEnergyTypes: VehicleEnergyType[] = ["petrol", "diesel", "electric"]
 const homeChargingAccessValues: HomeChargingAccess[] = ["unknown", "yes", "no"];
 const evChargingPreferences: EvChargingPreference[] = ["balanced", "cheap", "fast", "reliable", "nearby"];
 const stationBrandModes: StationBrandMode[] = ["all", "preferred_only"];
+const navigationAppPreferences: NavigationAppPreference[] = ["device_maps", "ask", "apple_maps", "google_maps", "waze"];
 const discountIds = new Set(activeDirectDiscountPrograms.map((program) => program.id));
 
 export const defaultPreferences: AppPreferences = {
@@ -42,6 +44,7 @@ export const defaultPreferences: AppPreferences = {
   approvedPolicyBrands: ["Ampol", "BP", "Shell"],
   stationBrandMode: "all",
   preferredStationBrands: [],
+  navigationApp: "device_maps",
   activeVehicleId: DEFAULT_VEHICLE_ID,
   vehicles: [
     {
@@ -146,6 +149,9 @@ function normalisePreferences(preferences: Partial<AppPreferences>): AppPreferen
       ? (preferences.stationBrandMode as StationBrandMode)
       : defaultPreferences.stationBrandMode,
     preferredStationBrands: normalisePreferredStationBrands(preferences.preferredStationBrands),
+    navigationApp: navigationAppPreferences.includes(preferences.navigationApp as NavigationAppPreference)
+      ? (preferences.navigationApp as NavigationAppPreference)
+      : defaultPreferences.navigationApp,
     activeVehicleId: activeVehicle.id,
     vehicles,
     selectedDiscounts: normaliseSelectedDiscounts(preferences.selectedDiscounts),

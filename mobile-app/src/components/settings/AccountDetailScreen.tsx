@@ -5,6 +5,7 @@ import { SavedPlacesCard } from "../SavedPlacesCard";
 import { SavedRouteAlertsCard } from "../SavedRouteAlertsCard";
 import { StationBrandsCard } from "../StationBrandsCard";
 import { VehicleFuelCard } from "../VehicleFuelCard";
+import { NavigationAppPreference } from "../../types";
 import { AccountScreenProps } from "../../screens/AccountScreen.types";
 import { SettingsSection, settingsSectionTitle } from "./settingsSections";
 import { styles } from "./settingsStyles";
@@ -22,6 +23,7 @@ export function AccountDetailScreen({
   onRequestNotifications,
   onRenameCommute,
   onSaveNamedPlace,
+  onNavigationAppChange,
   onSetPreferredStationBrands,
   onSetStationBrandMode,
   onToggleCommuteAlert,
@@ -119,8 +121,75 @@ export function AccountDetailScreen({
           <Text style={styles.muted}>
             Fuel Path stores your preferences locally and may use aggregate product signals like saved routes, route watches and navigation opens. Provider diagnostics and beta evidence stay out of the main settings flow unless they need action.
           </Text>
+          <NavigationPreference
+            value={preferences.navigationApp}
+            onChange={onNavigationAppChange}
+          />
         </View>
       ) : null}
     </ScrollView>
+  );
+}
+
+const navigationOptions: Array<{ label: string; summary: string; value: NavigationAppPreference }> = [
+  {
+    label: "Device maps",
+    summary: "Apple Maps on iPhone/iPad, Maps on Android.",
+    value: "device_maps",
+  },
+  {
+    label: "Ask every time",
+    summary: "Show available apps before opening navigation.",
+    value: "ask",
+  },
+  {
+    label: "Apple Maps",
+    summary: "Apple devices only. Falls back to device maps elsewhere.",
+    value: "apple_maps",
+  },
+  {
+    label: "Google Maps",
+    summary: "Best full route handoff with the fuel stop included.",
+    value: "google_maps",
+  },
+  {
+    label: "Waze",
+    summary: "Great for driving alerts. Route plans open to the fuel stop.",
+    value: "waze",
+  },
+];
+
+function NavigationPreference({
+  onChange,
+  value,
+}: {
+  onChange: (value: NavigationAppPreference) => void;
+  value: NavigationAppPreference;
+}) {
+  return (
+    <View style={styles.preferenceGroup}>
+      <Text style={styles.sectionLabel}>Navigation app</Text>
+      {navigationOptions.map((option) => {
+        const selected = value === option.value;
+        return (
+          <Pressable
+            accessibilityLabel={`${option.label}. ${option.summary}`}
+            accessibilityRole="radio"
+            accessibilityState={{ checked: selected }}
+            key={option.value}
+            onPress={() => onChange(option.value)}
+            style={[styles.preferenceRow, selected && styles.preferenceRowSelected]}
+          >
+            <View style={styles.preferenceCopy}>
+              <Text style={styles.preferenceTitle}>{option.label}</Text>
+              <Text style={styles.preferenceSummary}>{option.summary}</Text>
+            </View>
+            <Text style={[styles.preferenceState, selected && styles.preferenceStateSelected]}>
+              {selected ? "Selected" : ""}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
   );
 }

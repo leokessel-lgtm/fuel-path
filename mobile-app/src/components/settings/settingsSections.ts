@@ -54,3 +54,11 @@ export function alertSettingsSummary(
   if (notificationPermission === "unavailable") return "Needs native app support";
   return "Alerts off";
 }
+
+export function navigationPreferenceSummary(preferences: AppPreferences) {
+  if (preferences.navigationApp === "ask") return "Ask every time";
+  if (preferences.navigationApp === "apple_maps") return "Apple Maps";
+  if (preferences.navigationApp === "google_maps") return "Google Maps";
+  if (preferences.navigationApp === "waze") return "Waze";
+  return "Device maps";
+}

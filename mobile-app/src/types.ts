@@ -18,6 +18,8 @@ export type Weekday = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
 
 export type StationBrandMode = "all" | "preferred_only";
 
+export type NavigationAppPreference = "device_maps" | "ask" | "apple_maps" | "google_maps" | "waze";
+
 export type VehicleProfile = {
   id: string;
   name: string;
@@ -49,6 +51,7 @@ export type AppPreferences = {
   approvedPolicyBrands: string[];
   stationBrandMode: StationBrandMode;
   preferredStationBrands: string[];
+  navigationApp: NavigationAppPreference;
   activeVehicleId: string;
   vehicles: VehicleProfile[];
   selectedDiscounts: string[];

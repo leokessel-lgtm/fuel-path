@@ -4,6 +4,7 @@ import {
   FuelCode,
   HomeChargingAccess,
   MapPoint,
+  NavigationAppPreference,
   NotificationPermissionState,
   SavedCommute,
   StationBrandMode,
@@ -38,6 +39,7 @@ export type AccountScreenProps = {
   ) => void;
   onToggleDiscount: (discountId: string) => void;
   onToggleDiscountRedemption: (discountId: string) => void;
+  onNavigationAppChange: (navigationApp: NavigationAppPreference) => void;
   onSetStationBrandMode: (mode: StationBrandMode) => void;
   onSetPreferredStationBrands: (brands: string[]) => void;
   onTogglePreferredStationBrand: (brand: string) => void;

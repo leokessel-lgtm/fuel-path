@@ -105,6 +105,7 @@ export default function App() {
     updateDecisionRule,
     updateFuel,
     updateHomeChargingAccess,
+    updateNavigationApp,
     updateVehicleProfile,
     updateVehicleEnergyType,
   } = useAppPreferences();
@@ -259,6 +260,7 @@ export default function App() {
               onSetStationBrandMode={setStationBrandMode}
               onSetPreferredStationBrands={setPreferredStationBrands}
               onTogglePreferredStationBrand={togglePreferredStationBrand}
+              onNavigationAppChange={updateNavigationApp}
               onToggleCommuteAlert={toggleCommuteAlert}
               onUpdateCommuteAlertSettings={updateCommuteAlertSettings}
               onRemoveCommute={removeCommute}

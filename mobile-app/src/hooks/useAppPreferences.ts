@@ -11,6 +11,7 @@ import {
   FuelCode,
   HomeChargingAccess,
   MapPoint,
+  NavigationAppPreference,
   StationBrandMode,
   VehicleProfile,
   VehicleEnergyType,
@@ -212,6 +213,10 @@ export function useAppPreferences() {
     }));
   }, []);
 
+  const updateNavigationApp = useCallback((navigationApp: NavigationAppPreference) => {
+    setPreferences((current) => ({ ...current, navigationApp }));
+  }, []);
+
   return {
     clearNamedPlace,
     loaded,
@@ -229,6 +234,7 @@ export function useAppPreferences() {
     updateDecisionRule,
     updateFuel,
     updateHomeChargingAccess,
+    updateNavigationApp,
     updateVehicleProfile,
     updateVehicleEnergyType,
   };

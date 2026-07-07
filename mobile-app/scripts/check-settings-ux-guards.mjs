@@ -13,7 +13,15 @@ const files = {
   savedRouteAlertsCard: read("src/components/SavedRouteAlertsCard.tsx"),
   stationBrandsCard: read("src/components/StationBrandsCard.tsx"),
   savedCommutesHook: read("src/hooks/useSavedCommutes.ts"),
+  preferencesHook: read("src/hooks/useAppPreferences.ts"),
+  preferencesStore: read("src/services/preferencesStore.ts"),
+  types: read("src/types.ts"),
+  nearbyScreenUtils: read("src/screens/NearbyScreen.utils.ts"),
+  nearbyScreen: read("src/screens/NearbyScreen.tsx"),
+  planRouteSheet: read("src/components/PlanRouteSheet.tsx"),
+  planScreen: read("src/screens/PlanScreen.tsx"),
   settingsSections: read("src/components/settings/settingsSections.ts"),
+  accountRoot: read("src/components/settings/AccountRootScreen.tsx"),
   accountDetail: read("src/components/settings/AccountDetailScreen.tsx"),
   app: read("App.tsx"),
   packageJson: read("package.json"),
@@ -111,6 +119,29 @@ const checks = [
       files.savedRouteAlertsCard.includes("Save a route from Plan to watch it for useful fuel alerts.") &&
       files.accountDetail.includes("onUpdateCommuteAlertSettings={onUpdateCommuteAlertSettings}") &&
       files.app.includes("onUpdateCommuteAlertSettings={updateCommuteAlertSettings}"),
+  },
+  {
+    label: "Navigation app preference is saved and used before opening maps",
+    ok:
+      files.types.includes('export type NavigationAppPreference = "device_maps" | "ask" | "apple_maps" | "google_maps" | "waze";') &&
+      files.types.includes("navigationApp: NavigationAppPreference;") &&
+      files.preferencesStore.includes('navigationApp: "device_maps"') &&
+      files.preferencesStore.includes("navigationAppPreferences.includes") &&
+      files.preferencesHook.includes("const updateNavigationApp = useCallback") &&
+      files.preferencesHook.includes("updateNavigationApp,") &&
+      files.app.includes("onNavigationAppChange={updateNavigationApp}") &&
+      files.accountDetail.includes("NavigationPreference") &&
+      files.accountDetail.includes("onChange={onNavigationAppChange}") &&
+      files.accountDetail.includes("Ask every time") &&
+      files.accountDetail.includes("Apple Maps") &&
+      files.accountDetail.includes("Google Maps") &&
+      files.accountDetail.includes("Waze") &&
+      files.accountRoot.includes("navigationPreferenceSummary(preferences)") &&
+      files.nearbyScreenUtils.includes("navigationApp !== \"ask\"") &&
+      files.nearbyScreenUtils.includes("provider === navigationApp") &&
+      files.nearbyScreen.includes("preferences.navigationApp") &&
+      files.planRouteSheet.includes("navigationApp: NavigationAppPreference") &&
+      files.planScreen.includes("navigationApp={preferences.navigationApp}"),
   },
   {
     label: "new saved routes default to active vehicle and weekday route watches",

@@ -111,4 +111,53 @@ export const styles = StyleSheet.create({
     fontWeight: "400",
     lineHeight: 18,
   },
+  preferenceGroup: {
+    gap: spacing.xs,
+  },
+  sectionLabel: {
+    color: colors.ink,
+    fontSize: typeScale.caption,
+    fontWeight: "800",
+  },
+  preferenceRow: {
+    alignItems: "center",
+    borderColor: colors.line,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: spacing.sm,
+    justifyContent: "space-between",
+    minHeight: 58,
+    padding: spacing.sm,
+  },
+  preferenceRowSelected: {
+    backgroundColor: colors.greenSoft,
+    borderColor: colors.green,
+  },
+  preferenceCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  preferenceTitle: {
+    color: colors.ink,
+    fontSize: typeScale.body,
+    fontWeight: "800",
+  },
+  preferenceSummary: {
+    color: colors.muted,
+    fontSize: typeScale.caption,
+    fontWeight: "400",
+    lineHeight: 17,
+    marginTop: 2,
+  },
+  preferenceState: {
+    color: colors.muted,
+    fontSize: typeScale.caption,
+    fontWeight: "800",
+    minWidth: 58,
+    textAlign: "right",
+  },
+  preferenceStateSelected: {
+    color: colors.greenDark,
+  },
 });

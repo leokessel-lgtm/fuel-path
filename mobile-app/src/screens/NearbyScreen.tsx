@@ -270,11 +270,11 @@ export function NearbyScreen({
   const handleNavigateToStation = useCallback(async (item: StationViewModel) => {
     const { station } = item;
     try {
-      await openDirections(station.lat, station.lon, station.address || station.name);
+      await openDirections(station.lat, station.lon, station.address || station.name, preferences.navigationApp);
     } catch {
       setLocationError(userVisibleErrorMessage(null, "maps"));
     }
-  }, []);
+  }, [preferences.navigationApp]);
 
   if (nearbyMode === "fuel") {
     if (!sortedStations.length) {
@@ -379,7 +379,7 @@ export function NearbyScreen({
           onExpandSearch={() => setNearbyRadiusKm((current) => Math.min(maxMapSearchRadiusKm, Math.max(current * 2, emptyMapRetryRadiusKm)))}
           onFuelChange={onFuelChange}
           onModeChange={setNearbyModeAndBrowse}
-          onNavigateToCharger={(charger) => openDirections(charger.lat, charger.lon, charger.name)}
+          onNavigateToCharger={(charger) => openDirections(charger.lat, charger.lon, charger.name, preferences.navigationApp)}
           onPowerModeChange={setEvPowerMode}
           onSelectCharger={handleMapChargerSelect}
           onSelectStation={handleListStationSelect}
@@ -409,7 +409,7 @@ export function NearbyScreen({
           onClearPowerMode={() => setEvPowerMode("")}
           onCloseSelectedCharger={handleCloseSelectedStation}
           onExpandSearch={() => setNearbyRadiusKm((current) => Math.min(maxMapSearchRadiusKm, Math.max(current * 2, emptyMapRetryRadiusKm)))}
-          onNavigate={(charger) => openDirections(charger.lat, charger.lon)}
+          onNavigate={(charger) => openDirections(charger.lat, charger.lon, charger.name, preferences.navigationApp)}
           onSelectCharger={handleMapChargerSelect}
           onToggleExpanded={setSheetExpanded}
           onSnapChange={setNearbySheetSnap}

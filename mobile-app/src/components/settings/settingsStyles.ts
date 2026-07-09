@@ -17,9 +17,7 @@ export const styles = StyleSheet.create({
     paddingTop: spacing.xs,
   },
   rootTitle: {
-    color: colors.ink,
-    fontSize: typeScale.title,
-    fontWeight: "900",
+    ...typography.title,
   },
   rootSubtitle: {
     color: colors.muted,
@@ -59,9 +57,7 @@ export const styles = StyleSheet.create({
     textTransform: "uppercase",
   },
   rowTitle: {
-    color: colors.ink,
-    fontSize: typeScale.lead,
-    fontWeight: "800",
+    ...typography.listTitle,
     marginTop: 2,
   },
   rowSummary: {
@@ -90,13 +86,11 @@ export const styles = StyleSheet.create({
   },
   headerBackText: {
     color: colors.green,
-    fontSize: typeScale.body,
-    fontWeight: "800",
+    fontSize: typography.buttonLabel.fontSize,
+    fontWeight: typography.buttonLabel.fontWeight,
   },
   detailTitle: {
-    color: colors.ink,
-    fontSize: typeScale.title,
-    fontWeight: "900",
+    ...typography.title,
   },
   eyebrow: {
     ...typography.eyebrow,
@@ -115,9 +109,8 @@ export const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   sectionLabel: {
-    color: colors.ink,
-    fontSize: typeScale.caption,
-    fontWeight: "800",
+    ...typography.sectionLabel,
+    textTransform: "uppercase",
   },
   preferenceRow: {
     alignItems: "center",
@@ -139,9 +132,7 @@ export const styles = StyleSheet.create({
     minWidth: 0,
   },
   preferenceTitle: {
-    color: colors.ink,
-    fontSize: typeScale.body,
-    fontWeight: "800",
+    ...typography.bodyStrong,
   },
   preferenceSummary: {
     color: colors.muted,

@@ -172,7 +172,7 @@ export function useRouteAlerts({
               message: tokenResult.message,
               syncedAt: undefined,
             };
-      const backendSynced = backendSync.status === "synced";
+      const backendSynced = smartRouteDeliveryReady(backendSync);
       const localReminderScheduled = result.status === "scheduled";
       setSavedCommutes((current) =>
         current.map((commute) =>
@@ -271,7 +271,7 @@ export function useRouteAlerts({
             ? alertStateUpdate(commute, {
                 alertEnabled: commute.alertEnabled,
                 alertStatus:
-                  backendSync.status === "synced"
+                  smartRouteDeliveryReady(backendSync)
                     ? "backend_synced"
                     : commute.alertStatus || "scheduled",
                 alertStatusMessage: backendSync.message,
@@ -313,7 +313,7 @@ export function useRouteAlerts({
         enabled: true,
         preferences,
       });
-      const backendSynced = backendSync.status === "synced";
+      const backendSynced = smartRouteDeliveryReady(backendSync);
       const localReminderScheduled = localSchedule.status === "scheduled";
       setSavedCommutes((current) =>
         current.map((commute) =>
@@ -379,6 +379,10 @@ function alertStateUpdate(
 
 function alertStatusMessage(primary: string, secondary?: string) {
   return [primary, secondary].filter(Boolean).join(" ");
+}
+
+function smartRouteDeliveryReady(result: { remoteDeliveryEnabled?: boolean; status: string }) {
+  return result.status === "synced" && result.remoteDeliveryEnabled !== false;
 }
 
 const weekdays: Weekday[] = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];

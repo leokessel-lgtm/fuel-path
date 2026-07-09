@@ -10,6 +10,7 @@ import {
   StationBrandMode,
   VehicleEnergyType,
 } from "../types";
+import { SettingsSection } from "../components/settings/settingsSections";
 
 export type AccountScreenProps = {
   alertSyncingCommuteId: string | null;
@@ -23,6 +24,7 @@ export type AccountScreenProps = {
   onVehicleProfileChange: (
     updates: Partial<Pick<AppPreferences, "evBatteryKwh" | "evRangeKm" | "fuelTankLitres" | "homeChargingAccess" | "evChargingPreference" | "vehicleName" | "vehicleRego">>,
   ) => void;
+  onClearVehicleProfile: () => void;
   onVehicleEnergyTypeChange: (vehicleEnergyType: VehicleEnergyType) => void;
   onAddVehicle: (vehicleEnergyType?: VehicleEnergyType) => void;
   onRemoveVehicle: (vehicleId: string) => void;
@@ -43,4 +45,6 @@ export type AccountScreenProps = {
   onSetStationBrandMode: (mode: StationBrandMode) => void;
   onSetPreferredStationBrands: (brands: string[]) => void;
   onTogglePreferredStationBrand: (brand: string) => void;
+  initialSection?: SettingsSection | null;
+  onSectionStateReset?: () => void;
 };

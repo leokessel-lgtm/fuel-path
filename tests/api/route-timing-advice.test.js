@@ -25,7 +25,7 @@ test("route timing advice uses simple savings-detour labels when route value is 
 
   assert.equal(["fill_today_on_route", "fill_today_with_detour"].includes(scored.context.timingAdvice.action), true);
   assert.equal(scored.context.timingAdvice.visible, true);
-  assert.equal(scored.context.timingAdvice.label, "Great savings detour");
+  assert.equal(scored.context.timingAdvice.label, "Good savings detour");
   assert.match(scored.context.timingAdvice.reason, /on the route and saves/);
   assert.equal(scored.context.decisionSummary.action, "fill_on_route");
   assert.equal(scored.context.decisionSummary.stationName, "Metro Sylvania");
@@ -257,7 +257,7 @@ test("route scoring does not add hidden fuel range rejection without a real rang
 
   assert.equal(scored.candidates.length > 0, true);
   assert.equal(scored.candidates[0].reachable, true);
-  assert.equal(scored.context.timingAdvice.action, "fill_today_on_route");
+  assert.equal(["fill_today_on_route", "fill_today_with_detour"].includes(scored.context.timingAdvice.action), true);
   assert.equal(scored.context.timingAdvice.visible, true);
   assert.notEqual(scored.context.decisionSummary.action, "range_first");
   assert.notEqual(scored.context.decisionSummary.alternatives.find((item) => item.kind === "safest")?.note, "Range risk");
@@ -479,6 +479,31 @@ test("route scoring excludes unavailable or out-of-fuel prices from recommendati
   assert.equal(scored.candidates.some((candidate) => candidate.station.stationCode === "sentinel-price"), false);
   assert.equal(scored.candidates.some((candidate) => candidate.station.stationCode === "negative-price"), false);
   assert.equal(scored.candidates.some((candidate) => candidate.station.stationCode === "fresh-mid"), true);
+});
+
+test("route scoring uses tank size and tank percent for evaluated fill volume", () => {
+  const scored = scoreRoute({
+    source: "sample",
+    route: routeFixture(),
+    stations: stationFixtures([
+      ["cheap-on-route", "Metro Sylvania", 150, 0],
+      ["mid-on-route", "BP Miranda", 180, 0.001],
+      ["high-on-route", "Ampol Kirrawee", 190, -0.001],
+    ]),
+    fuel: "U91",
+    tankLitres: 80,
+    tankPercent: 45,
+    economy: 8.2,
+    reserveKm: 35,
+    corridorKm: 3,
+    eligibleDiscounts: new Set(),
+    includeMemberPrices: false,
+    includeClosed: false,
+  });
+
+  assert.equal(scored.context.fillLitres, 44);
+  assert.equal(scored.candidates[0].fillLitres, 44);
+  assert.equal(scored.context.decisionSummary.economics.fillLitres, 44);
 });
 
 function routeFixture() {

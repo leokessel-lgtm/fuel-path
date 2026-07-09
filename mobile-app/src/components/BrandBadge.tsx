@@ -9,6 +9,7 @@ export function BrandBadge({ station, size = 34 }: { station: Station; size?: nu
   const style = brandStyleForStation(station);
   return (
     <View
+      renderToHardwareTextureAndroid
       style={[
         styles.badge,
         {

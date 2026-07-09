@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { activeDirectDiscountPrograms } from "../data/discountPrograms";
 import { colors, radii, shadow, spacing, surfaces, typeScale, typography } from "../theme";
 import { AppPreferences } from "../types";
+import { DiscountProgramBadge } from "./DiscountProgramBadge";
 
 export function DiscountWalletCard({
   preferences,
@@ -13,6 +14,8 @@ export function DiscountWalletCard({
   onToggleDiscount: (discountId: string) => void;
   onToggleDiscountRedemption: (discountId: string) => void;
 }) {
+  const programs = activeDirectDiscountPrograms;
+
   return (
     <View style={styles.card}>
       <Text style={styles.eyebrow}>Discount wallet</Text>
@@ -20,34 +23,40 @@ export function DiscountWalletCard({
       <Text style={styles.muted}>
         Turn on the offers you can actually use. Fuel Path applies them only at matching station brands.
       </Text>
-      <View style={styles.discountList}>
-        {activeDirectDiscountPrograms.map((program) => {
-          const selected = preferences.selectedDiscounts.includes(program.id);
-          return (
-            <Pressable
-              accessibilityLabel={`${selected ? "Disable" : "Enable"} ${program.shortLabel}. Applies at ${discountBrandSummary(program.stationBrands)}.`}
-              accessibilityRole="switch"
-              accessibilityState={{ checked: selected }}
-              key={program.id}
-              onPress={() => onToggleDiscount(program.id)}
-              style={[styles.discountRow, selected && styles.discountRowSelected]}
-            >
-              <View style={styles.discountMain}>
-                <View style={styles.discountTitleRow}>
-                  <Text style={styles.discountName}>{program.shortLabel}</Text>
-                  <Text style={styles.discountValue}>{program.centsPerLitre.toFixed(0)} c/L</Text>
+
+      {!programs.length ? (
+        <Text style={styles.muted}>No discounts available right now.</Text>
+      ) : (
+        <View style={styles.discountList}>
+          {programs.map((program) => {
+            const selected = preferences.selectedDiscounts.includes(program.id);
+            return (
+              <Pressable
+                accessibilityLabel={`${selected ? "Disable" : "Enable"} ${program.shortLabel}. Applies at ${discountBrandSummary(program.stationBrands)}.`}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: selected }}
+                key={program.id}
+                onPress={() => onToggleDiscount(program.id)}
+                style={[styles.discountRow, selected && styles.discountRowSelected]}
+              >
+                <DiscountProgramBadge program={program} size={28} />
+                <View style={styles.discountMain}>
+                  <View style={styles.discountTitleRow}>
+                    <Text style={styles.discountName}>{program.shortLabel}</Text>
+                    <Text style={styles.discountValue}>{program.centsPerLitre.toFixed(0)} c/L</Text>
+                  </View>
+                  <Text numberOfLines={2} style={styles.discountBrands}>
+                    {discountBrandSummary(program.stationBrands)}
+                  </Text>
                 </View>
-                <Text numberOfLines={2} style={styles.discountBrands}>
-                  {discountBrandSummary(program.stationBrands)}
+                <Text style={[styles.discountState, selected && styles.discountStateActive]}>
+                  {selected ? "On" : "Off"}
                 </Text>
-              </View>
-              <View style={[styles.switchTrack, selected && styles.switchTrackOn]}>
-                <View style={[styles.switchKnob, selected && styles.switchKnobOn]} />
-              </View>
-            </Pressable>
-          );
-        })}
-      </View>
+              </Pressable>
+            );
+          })}
+        </View>
+      )}
     </View>
   );
 }
@@ -83,12 +92,15 @@ const styles = StyleSheet.create({
   },
   discountRow: {
     alignItems: "center",
-    ...surfaces.softPanel,
-    borderRadius: radii.xl,
+    ...surfaces.field,
+    borderColor: colors.line,
+    borderRadius: radii.lg,
+    borderWidth: 1,
     flexDirection: "row",
     gap: spacing.md,
     justifyContent: "space-between",
-    padding: spacing.md,
+    minHeight: 52,
+    padding: spacing.sm,
   },
   discountRowSelected: {
     backgroundColor: colors.greenSoft,
@@ -121,24 +133,12 @@ const styles = StyleSheet.create({
     lineHeight: 17,
     marginTop: 2,
   },
-  switchTrack: {
-    backgroundColor: colors.line,
-    borderRadius: radii.pill,
-    height: 30,
-    justifyContent: "center",
-    paddingHorizontal: 3,
-    width: 52,
+  discountState: {
+    color: colors.muted,
+    fontSize: typeScale.caption,
+    fontWeight: "800",
   },
-  switchTrackOn: {
-    backgroundColor: colors.green,
-  },
-  switchKnob: {
-    backgroundColor: colors.white,
-    borderRadius: radii.pill,
-    height: 24,
-    width: 24,
-  },
-  switchKnobOn: {
-    transform: [{ translateX: 22 }],
+  discountStateActive: {
+    color: colors.green,
   },
 });

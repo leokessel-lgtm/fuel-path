@@ -4,14 +4,18 @@ import { useSettingsSection } from "../hooks/useSettingsSection";
 import { AccountScreenProps } from "./AccountScreen.types";
 
 export function AccountScreen(props: AccountScreenProps) {
-  const { activeSection, clearActiveSection, setActiveSection } = useSettingsSection();
+  const { activeSection, clearActiveSection, setActiveSection } = useSettingsSection(props.initialSection ?? null);
+  const handleBackToRoot = () => {
+    clearActiveSection();
+    props.onSectionStateReset?.();
+  };
 
   if (activeSection) {
     return (
       <AccountDetailScreen
         {...props}
         activeSection={activeSection}
-        onBack={clearActiveSection}
+        onBack={handleBackToRoot}
       />
     );
   }

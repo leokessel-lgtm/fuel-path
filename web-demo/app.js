@@ -25,7 +25,7 @@ const DEFAULT_TRIP = {
   tankPercent: 45,
   reserveKm: 35,
 };
-const FUELS = ["E10", "U91", "P95", "P98", "DL", "PDL"];
+const FUELS = ["E10", "U91", "P95", "P98", "DL", "PDL", "LPG"];
 const BRAND_ICON_BASE_URL = "./assets/brand-icons/";
 const BRAND_STYLES = {
   "eg ampol": {

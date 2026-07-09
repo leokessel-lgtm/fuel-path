@@ -21,18 +21,15 @@ export function useRouteAddressSuggestions({
   const [toSuggestions, setToSuggestions] = useState<MapPoint[]>([]);
   const [suggestionsLoading, setSuggestionsLoading] = useState<RouteAddressField | null>(null);
   const [suggestionsError, setSuggestionsError] = useState("");
-  const addressSessionTokensRef = useRef<{ from: string; to: string } | null>(null);
+  const addressSessionTokensRef = useRef({
+    from: makeLocationSessionToken(),
+    to: makeLocationSessionToken(),
+  });
   const activeAddressFieldRef = useRef<RouteAddressField | null>(null);
   const latestInputsRef = useRef({ from, fromContext, to, toContext });
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchRequestRef = useRef(0);
 
-  if (!addressSessionTokensRef.current) {
-    addressSessionTokensRef.current = {
-      from: makeLocationSessionToken(),
-      to: makeLocationSessionToken(),
-    };
-  }
   latestInputsRef.current = { from, fromContext, to, toContext };
 
   useEffect(() => {
@@ -50,21 +47,17 @@ export function useRouteAddressSuggestions({
     setSuggestionsLoading(null);
   };
 
-  const getAddressSessionToken = (field: RouteAddressField) =>
-    addressSessionTokensRef.current?.[field] || "";
-
   const resetAddressSessionToken = (field: RouteAddressField) => {
-    if (!addressSessionTokensRef.current) return;
     addressSessionTokensRef.current[field] = makeLocationSessionToken();
   };
 
-  const setAddressSessionField = (field: RouteAddressField | null) => {
+  const setAddressSessionField = (field: RouteAddressField | null, options?: { search?: boolean }) => {
     if (field && activeAddressFieldRef.current !== field) {
       resetAddressSessionToken(field);
     }
     activeAddressFieldRef.current = field;
     setActiveAddressField(field);
-    if (field) {
+    if (field && options?.search !== false) {
       if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
       searchTimerRef.current = setTimeout(() => {
         queueAddressSearch(field);
@@ -76,6 +69,8 @@ export function useRouteAddressSuggestions({
       setSuggestionsLoading(null);
     }
   };
+
+  const getAddressSessionToken = (field: RouteAddressField) => addressSessionTokensRef.current[field] || "";
 
   function queueAddressSearch(field: RouteAddressField, queryOverride?: string) {
     const { from: latestFrom, fromContext: latestFromContext, to: latestTo, toContext: latestToContext } = latestInputsRef.current;
@@ -95,7 +90,7 @@ export function useRouteAddressSuggestions({
       searchLocations(
         query,
         5,
-        getAddressSessionToken(field),
+        addressSessionTokensRef.current[field] || "",
         { ...(field === "from" ? latestFromContext : latestToContext), purpose: "plan_autocomplete" },
       )
         .then((suggestions) => {

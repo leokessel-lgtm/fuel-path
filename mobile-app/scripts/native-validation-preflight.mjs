@@ -6,6 +6,7 @@ const strict = args.has("--strict");
 const appJson = readJson("app.json").expo;
 const packageJson = readJson("package.json");
 const appConfigSource = readFileSync(resolve("src/config.ts"), "utf8");
+const gradleWrapperSource = readFileSync(resolve("android/gradle/wrapper/gradle-wrapper.properties"), "utf8");
 const env = process.env;
 
 const checks = [];
@@ -37,6 +38,11 @@ check("iOS launch target is iPhone-only until tablet UX is optimised", appJson.i
 check("Android package configured", appJson.android?.package === "com.fuelpath.app", {
   fail: true,
   detail: appJson.android?.package || "missing",
+});
+
+check("Android Gradle wrapper stays on Expo-compatible Gradle 8", androidGradleWrapperIsCompatible(), {
+  fail: true,
+  detail: "Use Gradle 8.x; Gradle 9 currently breaks the React Native toolchain resolver.",
 });
 
 check("Route alert notification channel configured", notificationsPlugin()?.defaultChannel === "route-alerts", {
@@ -112,7 +118,7 @@ function alertCapabilityConfigured() {
 }
 
 function validDeviceApiBaseUrl() {
-  const value = env.EXPO_PUBLIC_FUEL_PATH_API_BASE_URL || "";
+  const value = env.EXPO_PUBLIC_FUEL_PATH_API_BASE_URL || "https://fuel-path.vercel.app";
   if (!value || value === "__SAME_ORIGIN__") return false;
 
   try {
@@ -136,8 +142,13 @@ function installedNativeFallbackIsHttps() {
   return (
     appConfigSource.includes('const PRODUCTION_API_BASE_URL = "https://fuel-path.vercel.app";') &&
     !appConfigSource.includes('if (Platform.OS === "android") {') &&
-    appConfigSource.includes("if (__DEV__ && Platform.OS === \"android\")")
+    !appConfigSource.includes("10.0.2.2:4174") &&
+    !appConfigSource.includes("127.0.0.1:4174")
   );
+}
+
+function androidGradleWrapperIsCompatible() {
+  return /distributionUrl=.*gradle-8\.\d+(?:\.\d+)?-bin\.zip/.test(gradleWrapperSource);
 }
 
 function notificationsPlugin() {

@@ -14,6 +14,19 @@ const appUrl = String(args["app-url"] || process.env.FUEL_PATH_UI_UX_STRESS_URL 
 const runId = String(args["run-id"] || new Date().toISOString().replace(/[:.]/g, "-"));
 const outDir = path.resolve(String(args["out-dir"] || process.env.FUEL_PATH_UI_UX_STRESS_OUT_DIR || "tmp"));
 const maxTailChars = Number(args["tail-chars"] || process.env.FUEL_PATH_UI_UX_STRESS_TAIL_CHARS || 7000);
+const requestedPlanFieldPairs = Number(
+  args["plan-field-pairs"] || process.env.FUEL_PATH_PLAN_STRESS_ROUTE_PAIRS || Number.NaN,
+);
+const defaultPlanFieldPairs = profile === "quick" ? 12 : profile === "broad" ? 100 : 300;
+const planFieldPairs = Number.isFinite(requestedPlanFieldPairs) && requestedPlanFieldPairs > 0
+  ? requestedPlanFieldPairs
+  : defaultPlanFieldPairs;
+const planFieldStressTimeoutMs =
+  planFieldPairs >= 250
+    ? 900_000
+    : profile === "quick"
+      ? 90_000
+      : 420_000;
 
 const profileOrder = ["quick", "broad", "full", "native"];
 if (!profileOrder.includes(profile)) {
@@ -53,12 +66,12 @@ const checks = [
     command: ["npm", "run", "stress:plan-fields"],
     env: {
       FUEL_PATH_PLAN_STRESS_URL: appUrl,
-      FUEL_PATH_PLAN_STRESS_ROUTE_PAIRS: profile === "quick" ? "12" : profile === "broad" ? "100" : "300",
+      FUEL_PATH_PLAN_STRESS_ROUTE_PAIRS: String(planFieldPairs),
     },
     skipIf: () => !isLocalAppUrl(appUrl),
     skipReason:
       "This field-level stress uses local Expo/web mocks and current editable-field oracles. Run against a local Expo web URL, for example --app-url http://127.0.0.1:8081/.",
-    timeoutMs: profile === "quick" ? 90_000 : 420_000,
+    timeoutMs: planFieldStressTimeoutMs,
   }),
   check({
     id: "settings-preferences-stress",

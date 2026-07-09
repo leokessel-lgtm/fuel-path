@@ -14,16 +14,20 @@ const files = {
   stationBrandsCard: read("src/components/StationBrandsCard.tsx"),
   vehicleFuelCard: read("src/components/VehicleFuelCard.tsx"),
   savedCommutesHook: read("src/hooks/useSavedCommutes.ts"),
+  savedCommutesStore: read("src/services/savedCommutesStore.ts"),
   preferencesHook: read("src/hooks/useAppPreferences.ts"),
   preferencesStore: read("src/services/preferencesStore.ts"),
+  recentLocationsStore: read("src/services/recentLocationsStore.ts"),
   types: read("src/types.ts"),
   nearbyScreenUtils: read("src/screens/NearbyScreen.utils.ts"),
-  nearbyScreen: read("src/screens/NearbyScreen.tsx"),
+  nearbyScreen: readScreenSource("src/screens/NearbyScreen.tsx", "src/screens/NearbyScreen.viewmodel.tsx"),
   planRouteSheet: read("src/components/PlanRouteSheet.tsx"),
-  planScreen: read("src/screens/PlanScreen.tsx"),
+  planScreen: readScreenSource("src/screens/PlanScreen.tsx", "src/screens/PlanScreen.viewmodel.tsx"),
+  planScreenUtils: read("src/screens/PlanScreen.utils.ts"),
   settingsSections: read("src/components/settings/settingsSections.ts"),
   accountRoot: read("src/components/settings/AccountRootScreen.tsx"),
   accountDetail: read("src/components/settings/AccountDetailScreen.tsx"),
+  settingsSectionHook: read("src/hooks/useSettingsSection.ts"),
   app: read("App.tsx"),
   packageJson: read("package.json"),
   brandAssets: read("src/data/brandAssets.ts"),
@@ -152,6 +156,12 @@ const checks = [
       files.app.includes("onNavigationAppChange={updateNavigationApp}") &&
       files.accountDetail.includes("NavigationPreference") &&
       files.accountDetail.includes("onChange={onNavigationAppChange}") &&
+      files.accountDetail.includes("Opens Apple Maps in the browser on Android.") &&
+      !files.accountDetail.includes("platforms?: Array<typeof Platform.OS>;") &&
+      !files.accountDetail.includes('platforms: ["ios"]') &&
+      !files.accountDetail.includes("const options = navigationOptions.filter((option) => !option.platforms || option.platforms.includes(Platform.OS));") &&
+      !files.settingsSections.includes('import { Platform } from "react-native";') &&
+      files.settingsSections.includes('if (preferences.navigationApp === "apple_maps") return "Apple Maps";') &&
       files.accountDetail.includes("Ask every time") &&
       files.accountDetail.includes("Apple Maps") &&
       files.accountDetail.includes("Google Maps") &&
@@ -159,6 +169,9 @@ const checks = [
       files.accountRoot.includes("navigationPreferenceSummary(preferences)") &&
       files.nearbyScreenUtils.includes("navigationApp !== \"ask\"") &&
       files.nearbyScreenUtils.includes("provider === navigationApp") &&
+      files.nearbyScreenUtils.includes("function androidDeviceMapsIntent") &&
+      files.nearbyScreenUtils.includes("androidIntent: androidDeviceMapsIntent(geoUrl)") &&
+      files.nearbyScreenUtils.includes("androidIntent: androidGoogleMapsIntent(googleMapsUrl)") &&
       files.nearbyScreen.includes("preferences.navigationApp") &&
       files.planRouteSheet.includes("navigationApp: NavigationAppPreference") &&
       files.planScreen.includes("navigationApp={preferences.navigationApp}"),
@@ -167,13 +180,54 @@ const checks = [
     label: "new saved routes default to active vehicle and weekday route watches",
     ok:
       files.savedCommutesHook.includes("vehicleId") &&
+      files.savedCommutesHook.includes("id: makeCommuteId(from, to, fuel, vehicleId)") &&
+      files.savedCommutesHook.includes("function makeCommuteId(from: MapPoint, to: MapPoint, fuel: FuelCode, vehicleId?: string)") &&
+      files.savedCommutesHook.includes("safeCommuteIdPart(vehicleId)") &&
+      files.savedCommutesHook.includes("sameCommute(commute, { from, fuel, to, vehicleId })") &&
+      files.savedCommutesHook.includes("function sameCommuteVehicle") &&
+      files.savedCommutesHook.includes("sameCommuteVehicle(left.vehicleId, right.vehicleId)") &&
+      files.planScreen.includes(
+        "sameSavedCommuteRoute(commute, currentRouteEndpoints, preferences.fuel, preferences.activeVehicleId)",
+      ) &&
+      files.planScreenUtils.includes("vehicleId?: string") &&
+      files.planScreenUtils.includes("sameSavedCommuteVehicle(commute.vehicleId, vehicleId)") &&
+      files.planScreenUtils.includes("function sameSavedCommuteVehicle") &&
       files.savedCommutesHook.includes("defaultCommuteAlertDays") &&
       files.savedCommutesHook.includes("localReminderEnabled: false") &&
       files.app.includes("onSaveCommute={saveCommute}"),
   },
   {
+    label: "native storage keeps recoverable saved routes, recent locations and saved places",
+    ok:
+      files.preferencesStore.includes("const lat = Number(point.lat);") &&
+      files.preferencesStore.includes("const lon = Number(point.lon);") &&
+      files.preferencesStore.includes("Number.isFinite(lat)") &&
+      files.preferencesStore.includes("Number.isFinite(lon)") &&
+      files.preferencesStore.includes("lat: Number(point.lat)") &&
+      files.preferencesStore.includes("lon: Number(point.lon)") &&
+      files.savedCommutesStore.includes("const lat = Number(point.lat);") &&
+      files.savedCommutesStore.includes("const lon = Number(point.lon);") &&
+      files.savedCommutesStore.includes("Number.isFinite(lat)") &&
+      files.savedCommutesStore.includes("Number.isFinite(lon)") &&
+      files.savedCommutesStore.includes("lat: Number(point.lat)") &&
+      files.savedCommutesStore.includes("lon: Number(point.lon)") &&
+      files.recentLocationsStore.includes("const lat = Number(point.lat);") &&
+      files.recentLocationsStore.includes("const lon = Number(point.lon);") &&
+      files.recentLocationsStore.includes("Number.isFinite(lat)") &&
+      files.recentLocationsStore.includes("Number.isFinite(lon)") &&
+      files.recentLocationsStore.includes("lat: Number(point.lat)") &&
+      files.recentLocationsStore.includes("lon: Number(point.lon)"),
+  },
+  {
     label: "bottom navigation exposes valid tablist semantics",
     ok:
+      files.app.includes("BackHandler") &&
+      files.app.includes('if (Platform.OS === "web" || activeTab === "nearby") return undefined;') &&
+      files.app.includes('BackHandler.addEventListener("hardwareBackPress", () => {') &&
+      files.app.includes('setActiveTab("nearby");') &&
+      files.settingsSectionHook.includes("BackHandler") &&
+      files.settingsSectionHook.includes('BackHandler.addEventListener("hardwareBackPress", () => {') &&
+      files.settingsSectionHook.includes("setActiveSection(null);") &&
       files.app.includes('<View role="banner" style={styles.header}>') &&
       files.app.includes('<View role="main" style={styles.content}>') &&
       files.app.includes('<View role="navigation">') &&
@@ -185,7 +239,10 @@ const checks = [
   {
     label: "labelled app chrome pressables expose button semantics",
     ok:
-      files.app.includes('accessibilityLabel={hasNamedVehicle ? "View vehicle profile" : "View fuel profile"}') &&
+      files.app.includes('accessibilityLabel={canSwitchVehicles ? "Switch vehicle profile" : "View vehicle profile"}') &&
+      files.app.includes('accessibilityState={{ expanded: vehicleSwitcherOpen }}') &&
+      files.app.includes('"Fuel only"') &&
+      files.app.includes("handleSelectHeaderVehicle") &&
       files.app.includes('accessibilityRole="button"') &&
       files.nearbyStationSheet.includes("accessibilityLabel={option.accessibilityLabel}") &&
       files.nearbyStationSheet.includes('accessibilityRole="button"') &&
@@ -237,6 +294,14 @@ if (failed.length) {
 
 function read(relativePath) {
   return fs.readFileSync(path.join(root, relativePath), "utf8");
+}
+
+function readScreenSource(defaultPath, viewModelPath) {
+  const viewModelSource = path.join(root, viewModelPath);
+  if (fs.existsSync(viewModelSource)) {
+    return fs.readFileSync(viewModelSource, "utf8");
+  }
+  return read(defaultPath);
 }
 
 function stationBrandIconCoverage(source) {

@@ -9,12 +9,14 @@ Fuel Path is a dense map utility. Typography should help people scan, compare, a
 - Reserve high visual weight for decision signals, not labels.
 - Use uppercase sparingly for short section labels and control eyebrows only.
 - Prefer 400, 500, 600 and 700 for everyday UI. Use 800 only for numeric decision metrics or tiny constrained labels. Avoid 900 in ordinary controls.
+- In Settings, use one page title, then `listTitle` for navigable rows or card titles. Avoid stacking multiple 22px bold headings in the same viewport.
 
 ## Roles
 
 | Role | Use | Size | Weight |
 | --- | --- | ---: | ---: |
 | `typography.title` | Screen titles and major card titles | 22 | 700 |
+| `typography.listTitle` | Settings rows and card titles inside settings detail screens | 16 | 700 |
 | `typography.bodyStrong` | Station names, vehicle names, compact panel titles | 14 | 600 |
 | `typography.fieldText` | Text inputs and selected form values | 14 | 500 |
 | `typography.buttonLabel` | Primary buttons and prominent dropdown values | 14 | 700 |

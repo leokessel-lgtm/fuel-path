@@ -83,40 +83,6 @@
     ]
   },
   {
-    "id": "reddy_express_instore",
-    "label": "Reddy Express in-store",
-    "shortLabel": "Reddy Express in-store",
-    "discountType": "direct_cpl",
-    "centsPerLitre": 10,
-    "maxLitresPerTransaction": 150,
-    "maxTransactionsPer24h": 1,
-    "excludedFuelTypes": [
-      "AdBlue"
-    ],
-    "notStackableWith": [
-      "fleet_card",
-      "shell_card",
-      "motorcharge",
-      "motorpass"
-    ],
-    "requiresBarcode": false,
-    "participatingStationScope": "participating Shell Reddy Express and Coles Express locations after eligible in-store spend",
-    "expiryDate": null,
-    "lastVerifiedAt": "2026-07-04",
-    "nextReviewAt": "2026-08-04",
-    "sourceUrl": "https://www.reddyexpress.com.au/terms-and-conditions/spend-20-get-10-cents-per-litre-fuel-discount",
-    "stationBrands": [
-      "Shell Reddy Express",
-      "Reddy Express",
-      "Coles Express"
-    ],
-    "brandIncludes": [
-      "shell",
-      "reddy",
-      "coles express"
-    ]
-  },
-  {
     "id": "nrma_ampol",
     "label": "NRMA / Ampol",
     "shortLabel": "NRMA / Ampol",
@@ -212,9 +178,9 @@
     "notStackableWith": [],
     "requiresBarcode": true,
     "participatingStationScope": "participating Caltex and Better Choice locations",
-    "expiryDate": null,
-    "lastVerifiedAt": "2026-07-04",
-    "nextReviewAt": "2026-08-04",
+    "expiryDate": "2026-06-30",
+    "lastVerifiedAt": "2026-07-09",
+    "nextReviewAt": "2026-08-09",
     "sourceUrl": "https://rac.com.au/membership-benefits/discounts-and-special-offers/member-benefit-caltex",
     "stationBrands": [
       "Caltex",

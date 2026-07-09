@@ -49,6 +49,18 @@ test("WA FuelWatch route planning caps broad regional request fan-out", () => {
   });
 });
 
+test("WA FuelWatch planner maps LPG to product 5", () => {
+  const plan = waFuelWatchRequestPlan({
+    points: [{ lat: -31.9523, lon: 115.8613 }],
+    radiusKm: 8,
+    fuels: ["LPG"],
+    now: new Date("2026-06-17T03:00:00Z"),
+  });
+
+  assert.deepEqual(plan.products, [{ fuelCode: "LPG", product: 5 }]);
+  assert.equal(plan.requestCount, plan.regionIds.length);
+});
+
 test("WA FuelWatch tomorrow availability follows the 2:30pm AWST publication window", () => {
   assert.equal(waTomorrowPriceAvailable(new Date("2026-06-17T06:29:00Z")), false);
   assert.equal(waTomorrowPriceAvailable(new Date("2026-06-17T06:30:00Z")), true);
@@ -214,7 +226,7 @@ test("WA FuelWatch cooldown serves stale cache instead of hammering a failing pr
         assert.equal(secondFailure.cacheMode, "stale");
         assert.equal(cooledDown.cacheMode, "stale");
         assert.equal(cooledDown.degraded, true);
-        assert.match(cooledDown.warning, /cooling down/);
+        assert.match(cooledDown.warning, /saved price data/);
         assert.equal(callsAfterSharedFailure, 4);
         assert.equal(upstreamCalls, callsAfterCircuitOpened);
       } finally {

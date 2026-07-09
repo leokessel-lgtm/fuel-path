@@ -1,6 +1,6 @@
 # Route recommendation logic rules
 
-Last updated: 2026-07-06
+Last updated: 2026-07-09
 
 This document records the current Fuel Path route recommendation rules across backend scoring, frontend display and product wording. It is the working source of truth for the Plan route recommendation card.
 
@@ -87,7 +87,7 @@ The Plan result should not show:
 
 Plan should make discount eligibility explicit before a driver acts on a recommendation. The default recommendation card should show a compact eligibility chip. The expanded eligibility card should state whether the displayed price is pump-only, a selected eligible discount, membership/app dependent, policy-limited, or lower-but-not-applied because the user has not selected/proven that discount.
 
-Vehicle settings may contain up to five saved vehicle profiles, but only the active vehicle supplies current Plan and Nearby defaults. For petrol and diesel vehicles, the active profile supplies fuel grade only; route ranking must still use the backend standard fill estimate and must not expose tank-size controls or fuel-level assumptions. For EVs, the active profile supplies connector filters, usable range and charging preference for Nearby and Plan charger discovery. Discounts, saved places and saved routes remain account-level unless a separate fleet/business mode explicitly changes that contract.
+Vehicle settings may contain up to five saved vehicle profiles, but only the active vehicle supplies current Plan and Nearby defaults. For petrol, LPG and diesel vehicles, the active profile supplies fuel grade, tank size and the standard economy estimate used by live Plan route ranking. Manual fuel changes in Nearby or Plan clear the active vehicle context and should present as fuel-only search/routing assumptions until the user selects a saved vehicle again. Settings fuel changes still edit the selected saved vehicle profile. When two or more vehicles are saved, the app chrome should let the user switch vehicle context without visiting Settings. LPG is a selectable fuel grade inside the fuel-vehicle flow, not a separate EV-style route mode. Plan must not expose fuel-level controls or make visible reachability assumptions for fuel vehicles. For EVs, the active profile supplies connector filters, usable range and charging preference for Nearby and Plan charger discovery. Discounts, saved places and saved routes remain account-level unless a separate fleet/business mode explicitly changes that contract.
 
 Station brand preferences are account-level and separate from vehicle setup, discounts and legacy policy mode. By default, Nearby and Plan must show all station brands. When the user chooses `preferred only`, Nearby fuel results and map markers should show only the selected station brands, with a visible one-search override to show all brands. Plan route scoring must apply the selected brands before ranking so a hidden brand cannot become the recommendation. Plan and Nearby must disclose when preferred brands are filtering the result set, and empty states should offer a clear recovery path rather than forcing a weak recommendation.
 
@@ -99,15 +99,25 @@ Fuel-cycle thinking should inform alerts only as backend background intelligence
 
 Home and Work fuel alerts should be modelled later as place watches inside the same alert budget, not as a competing notification stream. Route alerts remain the primary notification type. A future Home/Work alert should only compete as a lower-priority fuel opportunity after route alerts are quiet, and should require stronger value than a route alert because the app has less route intent. It must not launch as a separate daily reminder.
 
-Saved-route alert economics may use the selected route vehicle profile for notification payload context, including fuel, tank size and EV range/connector fields where available. This does not change the public Plan recommendation ranking rule above: Plan ranking must still avoid exposing tank-size controls or fuel-level assumptions unless a separate, reviewed route-scoring change is made.
+Saved-route alert economics may use the selected route vehicle profile for notification payload context, including fuel, tank size and EV range/connector fields where available. Live Plan route scoring uses the active vehicle profile for the same fuel, tank-size and standard-economy context so native Plan and saved-route alert economics do not diverge. Fuel-level and reserve inputs remain fixed route-scoring defaults unless a separate, reviewed route-scoring change introduces explicit controls.
 
 Places & routes settings should separate key places from favourite routes. Home and Work are special quick-plan shortcuts and should stay compact until edited. Favourite routes are saved from Plan, can be renamed or removed from Settings, and may expose small helper actions such as setting the route start as Home or destination as Work. Notification controls remain in Notifications; Places & routes may show whether a route is saved or watching but should not duplicate the alert rule editor.
 
-The discount wallet should list specific, user-recognisable Australian programmes with their connected station networks. Each programme must carry `discountType`, `expiryDate`, `sourceUrl`, `lastVerifiedAt`, `nextReviewAt`, litre cap, transaction cap, barcode requirement, participating-station scope and state/fuel exclusions where relevant. Only active `direct_cpl` offers should be visible in the wallet or applied to route pricing. Do not use a generic `Fleet card` or generic motoring-club bucket as a user-facing discount unless each card or programme is modelled separately. Partner perks such as Linkt Rewards, Telstra Plus, Wilson Parking and NAB Goodies should be represented as separate 7-Eleven offers rather than merged into the generic 7-Eleven app row. Variable offers such as Costco member fuel pricing, 7-Eleven Fuel Lock, gift-card cashback and price-lock mechanics should not be shown in the direct discount wallet or subtracted from pump prices.
+The discount wallet should list specific, user-recognisable Australian programmes with their connected station networks. Each programme must carry `discountType`, `expiryDate`, `sourceUrl`, `lastVerifiedAt`, `nextReviewAt`, litre cap, transaction cap, barcode requirement, participating-station scope and state/fuel exclusions where relevant. Only active `direct_cpl` offers should be visible in the wallet or applied to route pricing. Do not include discounts that require an extra in-store purchase, same-transaction spend or qualifying purchase before the driver can get the displayed c/L reduction. Everyday Rewards and Flybuys-style fuel dockets may remain in the registry when the user can choose them as a wallet entitlement, but extra-spend offers such as the Reddy/Shell Coles Express $20 in-store purchase discount must stay out of direct route pricing. An offer is active only when its expiry date is blank or today/future, its source still supports the displayed value and its next review date has not passed. If source terms have expired, fail closed: keep the record for audit if useful, but do not show it in the wallet or apply it to station pricing until refreshed evidence supports reinstatement. Do not use a generic `Fleet card` or generic motoring-club bucket as a user-facing discount unless each card or programme is modelled separately. Partner perks such as Linkt Rewards, Telstra Plus, Wilson Parking and NAB Goodies should be represented as separate 7-Eleven offers rather than merged into the generic 7-Eleven app row. Variable offers such as Costco member fuel pricing, 7-Eleven Fuel Lock, gift-card cashback and price-lock mechanics should not be shown in the direct discount wallet or subtracted from pump prices.
 
 Discount metadata is authored once in `shared/discountRegistry.json`. The mobile app uses a generated in-project copy for Expo bundling compatibility, but the shared file remains the source of truth. Build and typecheck scripts must sync the generated mobile copy before compiling.
 
-Route pricing must apply only eligible selected direct c/L discounts. If a discount has a fuel-specific value, use that value for the requested fuel. If a discount has a litre cap, route economics must cap the effective discount to the evaluated fill volume. If a discount has state inclusions or exclusions, do not apply it outside the eligible state scope. Do not stack multiple non-stackable partner discounts; use the best eligible single discount unless a provider explicitly proves stacking.
+Discount evidence needs a monthly review loop because partner pages and app perks change quietly. Each monthly review should:
+
+- re-open every `sourceUrl` for active and recently expired rules
+- record whether the c/L value, litre cap, daily transaction cap, fuel exclusions, state exclusions, station scope, stacking rule and expiry still match the registry
+- search for new or removed Australian c/L fuel offers across supermarket docket, motoring club, toll-account, telco, parking, bank, insurance, energy, seniors and clean partner programmes
+- reject in-store spend, same-transaction purchase and qualifying-purchase offers from direct route pricing even when the headline c/L value is attractive
+- treat account-only, docket and app-only offers as eligible only when the user has explicitly selected that entitlement and no further in-store spend or qualifying purchase condition is required
+- update `lastVerifiedAt`, `nextReviewAt`, source evidence and tests in the same change
+- remove or expire any offer that cannot be verified from a current source before it can influence a user-facing price
+
+Route pricing must apply only eligible selected direct c/L discounts. If a discount has a fuel-specific value, use that value for the requested fuel. The evaluated fill volume is calculated from `tankLitres * (1 - tankPercent / 100)` with a 5 L minimum and a backend fallback of 40 L when inputs are missing. If a discount has a litre cap, route economics must cap the effective discount to the evaluated fill volume. If a discount has state inclusions or exclusions, do not apply it outside the eligible state scope. Do not stack multiple non-stackable partner discounts; use the best eligible single discount unless a provider explicitly proves stacking.
 
 Plan recommendation and station-detail sheets should size to their content. Do not use fixed tall sheet heights that leave empty white space below the evidence or detail content.
 
@@ -317,6 +327,8 @@ The current smart detour thresholds widen as route value increases:
 - `minSavingDollars` — minimum after-detour savings threshold required for a station to count as a viable match (defaults to $1.50; values below 0 are treated as 0).
 - `maxDetourMinutes` — hard upper bound for detour pass/fail even when the smart rule would permit more (defaults to 30; bounded to 1..30).
 
+Native live Plan requests must send the active vehicle tank size, the standard economy estimate for that vehicle energy type, `minSavingDollars` and `maxDetourMinutes` to `api/score`. Once a Plan result is visible, changing the active vehicle, tank size, minimum saving or maximum detour must re-run the route score so the native recommendation does not display stale economics. Fuel-level and reserve values remain fixed native defaults of 45% tank and 35 km reserve until explicit reviewed controls exist.
+
 These values are intentionally not user-facing controls in current UI patterns, but scoring contexts and recommendation evidence must preserve them.
 
 These values are backend scoring aids. They should not become user-facing controls.
@@ -359,7 +371,7 @@ estimated route value after detour fuel
 
 Do not add stale-price penalty to ranking.
 
-Do not add hidden fuel tank or fuel-level reachability assumptions for fuel vehicles.
+Do not add hidden fuel-level reachability assumptions for fuel vehicles. Tank size may be supplied from the active vehicle profile for scoring economics, but it should not become a prominent Plan control.
 
 ### Route and detour quality
 
@@ -405,6 +417,7 @@ Fuel Path must treat `petrol cycle guidance` and `local price trend` as separate
 
 - `petrol cycle guidance` is only eligible for known Australian unleaded petrol cycle markets: Sydney, Melbourne, Brisbane, Adelaide and Perth/Mandurah.
 - `petrol cycle guidance` is only eligible for unleaded petrol grades: E10, U91, P95 and P98.
+- LPG route and Nearby support is current-price comparison only. It may use live provider prices, selected discounts and the normal route economics, but it must not imply petrol-cycle timing or an LPG-specific prediction claim.
 - Diesel, premium diesel, LPG, EV charging and unsupported fuels must not receive petrol-cycle copy. They may only receive current-price comparison or local trend copy when enough evidence exists.
 - Canberra, Hobart, Darwin and regional markets must not receive petrol-cycle copy by default. They may receive local trend copy only when enough fresh local observations exist.
 - State-level requests such as `NSW` or `WA` are not enough to prove a city cycle market. Cycle guidance must be scoped to the supported city/market, not the whole state.
@@ -616,7 +629,7 @@ Compared with the next-best route option at 176.9 c/L. Your price includes eligi
 Suggested stop adds a 0.1 min detour and is best by 20.0 c/L.
 ```
 
-Route navigation must preserve the route contract when the user opens directions from a Plan recommendation. The outbound URL must include origin, the recommended station as a waypoint, and the final destination. Use the Google Maps universal directions URL for this route-via-stop action because it supports cross-platform directions with waypoints. Do not silently switch this action to Apple Maps or Waze unless the implementation can preserve the detour stop plus final destination; single-destination native links are not equivalent.
+Route navigation must preserve the route contract when the user opens directions from a Plan recommendation. The outbound URL must include origin, the recommended station as a waypoint, and the final destination. Device Maps and Google Maps on Android should use native Android intents where possible, while Apple Maps may use a web handoff on Android because there is no native Android Apple Maps app. Do not silently switch this action to a provider unless the implementation can preserve the detour stop plus final destination. Waze may remain stop-first because its native route handoff does not preserve the full final-destination contract; label that option as `Waze to stop` rather than full-route navigation.
 
 Not allowed:
 

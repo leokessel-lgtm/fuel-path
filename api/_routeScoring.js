@@ -196,7 +196,7 @@ function scoreRouteForCorridor({ source, route, stations, fuel, tankLitres, tank
     .map((station) => Number(station.prices?.[fuel]))
     .filter(validPumpPriceCpl);
   const baselineCpl = median(availablePrices);
-  const fillLitres = ASSUMED_ROUTE_FILL_LITRES;
+  const fillLitres = calculateRouteFillLitres({ tankLitres, tankPercent });
   const tankRangeKm = ((tankLitres * (tankPercent / 100)) / economy) * 100;
   let staleExcludedCandidates = 0;
 
@@ -266,6 +266,7 @@ function scoreRouteForCorridor({ source, route, stations, fuel, tankLitres, tank
       fillLitres: round(fillLitres, 1),
       netSaving: round(netSaving, 2),
       reachable,
+      matchesDetourRule,
       matchesDecisionRule,
       openNow: station.openNow !== false,
       eligible: true,
@@ -599,11 +600,9 @@ function routeRecommendationOrder(left, right) {
 }
 
 function routeRecommendationPriority(candidate) {
-  return candidate.station?.openNow !== false &&
-    candidate.reachable !== false &&
-    candidate.matchesDecisionRule !== false
-    ? 0
-    : 1;
+  if (candidate.station?.openNow === false || candidate.reachable === false) return 2;
+  if (candidate.matchesDetourRule === false) return 1;
+  return 0;
 }
 
 function routeValueSummary(candidate) {
@@ -636,6 +635,16 @@ function whyNotCheapest(best, cheapest) {
 
 function minBy(values, scorer) {
   return values.reduce((best, item) => (scorer(item) < scorer(best) ? item : best), values[0]);
+}
+
+function calculateRouteFillLitres({ tankLitres, tankPercent } = {}) {
+  const tankSize = Number(tankLitres);
+  const currentPercent = Number(tankPercent);
+  if (!Number.isFinite(tankSize) || tankSize <= 0 || !Number.isFinite(currentPercent)) {
+    return ASSUMED_ROUTE_FILL_LITRES;
+  }
+  const fillLitres = tankSize * (1 - Math.min(100, Math.max(0, currentPercent)) / 100);
+  return Math.max(5, fillLitres);
 }
 
 function routeTimingAdvice(candidate, { minSavingDollars = SMART_HARD_REJECT_SAVING_DOLLARS, maxDetourMinutes = SMART_MAX_DETOUR_MINUTES, fillLitres = 0 } = {}) {

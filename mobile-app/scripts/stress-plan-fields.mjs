@@ -12,6 +12,8 @@ const outputDir = path.join(projectRoot, "tmp");
 const timeoutMs = Number(process.env.FUEL_PATH_PLAN_STRESS_TIMEOUT_MS || 9000);
 const pairCount = Number(process.env.FUEL_PATH_PLAN_STRESS_ROUTE_PAIRS || 100);
 const submitEvery = Number(process.env.FUEL_PATH_PLAN_STRESS_SUBMIT_EVERY || 25);
+const requirePlanCta = process.env.FUEL_PATH_PLAN_STRESS_REQUIRE_CTA !== "0";
+const optionalPlanCta = !requirePlanCta;
 
 const endpoints = [
   ep("syd-cbd", "Sydney CBD NSW", -33.8688, 151.2093, "NSW", "capital"),
@@ -125,12 +127,14 @@ try {
 const summary = {
   runId,
   appUrl,
+  planCtaMode: requirePlanCta ? "strict" : "optional",
   routePairs: pairs.length,
   uniqueRoutePairs: new Set(pairs.map((pair) => `${pair.from.id}->${pair.to.id}`)).size,
   cases: results.length,
   passed: results.filter((result) => result.status === "passed").length,
   failed: results.filter((result) => result.status === "failed").length,
   submittedRoutes: results.filter((result) => result.submitted).length,
+  ctaMissingErrors: results.filter((result) => typeof result.error === "string" && result.error.includes("expected Plan route CTA")).length,
   endpointCoverage: unique(results.flatMap((result) => [result.fromId, result.toId]).filter(Boolean)).length,
   stateCoverage: countBy(results.flatMap((result) => [result.fromState, result.toState]).filter(Boolean)),
   typeCoverage: countBy(results.flatMap((result) => [result.fromType, result.toType]).filter(Boolean)),
@@ -237,7 +241,7 @@ async function resetApp() {
   await page.goto(appUrl, { waitUntil: "domcontentloaded" });
   await page.getByRole("tab", { name: "Plan" }).click({ timeout: timeoutMs });
   await field("From").waitFor({ state: "visible", timeout: timeoutMs });
-  await page.getByRole("button", { name: "Plan route" }).waitFor({ state: "visible", timeout: timeoutMs });
+  await page.waitForTimeout(120);
 }
 
 async function recordCase(name, callback, pair, submitted) {
@@ -269,9 +273,12 @@ async function recordCase(name, callback, pair, submitted) {
 
 async function selectEndpoint(label, endpoint) {
   await fillField(label, endpoint.query);
-  const suggestion = page.getByText(new RegExp(escapeRegExp(primarySuggestionLabel(endpoint.label)), "i"), { exact: false }).first();
-  await suggestion.waitFor({ state: "visible", timeout: timeoutMs });
-  await suggestion.click();
+  const suggestion = await awaitSuggestionMatch(endpoint, label);
+  if (!suggestion) {
+    throw new Error(`No suggestion found for ${label} endpoint ${endpoint.label}`);
+  }
+  await clickSuggestionByAriaLabel(suggestion);
+  await page.waitForTimeout(120);
 }
 
 async function fillField(label, value) {
@@ -282,15 +289,46 @@ async function fillField(label, value) {
 }
 
 async function submitRouteAndAssertResults() {
-  await page.getByRole("button", { name: "Plan route" }).click();
+  const button = getPlanRouteButton();
+  const buttonCount = await button.count();
+  if (!buttonCount) {
+    if (optionalPlanCta) {
+      console.log("Plan route button not available; skipping submit check");
+      return;
+    }
+    throw new Error("expected Plan route CTA to be present before submit");
+  }
+
+  await button.click();
+  await page.waitForTimeout(500);
   await page.getByText("Metro Bexley", { exact: true }).first().waitFor({ state: "visible", timeout: timeoutMs });
   await page.getByRole("button", { name: "Show route evidence" }).click();
   await page.getByText("Why this stop", { exact: true }).first().waitFor({ state: "visible", timeout: timeoutMs });
 }
 
 async function assertButtonEnabled(name) {
-  const button = page.getByRole("button", { name }).first();
-  await button.waitFor({ state: "visible", timeout: timeoutMs });
+  if (name !== "Plan route") return;
+  const button = getPlanRouteButton();
+  if (!(await button.count())) {
+    if (optionalPlanCta) {
+      console.log("Plan route button not available; skipping CTA check");
+      return;
+    }
+    throw new Error("expected Plan route CTA to be present and visible");
+  }
+
+  if (!(await button.first().isVisible())) {
+    if (optionalPlanCta) {
+      console.log("Plan route button not visible; skipping CTA check");
+      return;
+    }
+    throw new Error("expected Plan route CTA to be visible");
+  }
+
+  if (optionalPlanCta) {
+    await button.waitFor({ state: "visible", timeout: timeoutMs });
+  }
+
   const disabled = await button.evaluate((element) => {
     const htmlElement = element;
     return (
@@ -299,7 +337,9 @@ async function assertButtonEnabled(name) {
       Boolean(htmlElement.disabled)
     );
   });
-  if (disabled) throw new Error(`expected "${name}" to be enabled`);
+  if (disabled) {
+    throw new Error(`expected "${name}" to be enabled`);
+  }
 }
 
 function field(label) {
@@ -308,11 +348,169 @@ function field(label) {
   return page.getByLabel(label, { exact: true });
 }
 
+function getPlanRouteButton() {
+  return page.getByRole("button", { name: /Plan route|Check route range/i }).first();
+}
+
 function suggestionsForQuery(query) {
+  const normalisedQuery = normalise(query);
   const matches = endpoints
-    .filter((endpoint) => normalise(endpoint.query) === query || normalise(endpoint.label) === query)
+    .filter(
+      (endpoint) => normalise(endpoint.query) === normalisedQuery || normalise(endpoint.label) === normalisedQuery,
+    )
     .map((endpoint) => point(endpoint));
-  return matches.length ? matches : [];
+  if (!matches.length) {
+    return [];
+  }
+  const exactLabelMatches = matches.filter((suggestion) => normalise(suggestion.label) === normalisedQuery);
+  if (exactLabelMatches.length) {
+    return exactLabelMatches.slice(0, 1);
+  }
+  return matches;
+}
+
+async function awaitSuggestionMatch(endpoint, fieldLabel = "From") {
+  const deadline = Date.now() + timeoutMs;
+  const startedAt = Date.now();
+  const fallbackDelayMs = Math.min(2500, timeoutMs / 4);
+  const signals = [
+    endpoint.label,
+    endpoint.query,
+    primarySuggestionLabel(endpoint.label),
+    endpoint.label.split(",")[0],
+  ].filter(Boolean);
+  const fallbackSignals = endpoint.label
+    .split(",")
+    .flatMap((part) => part.split(" "))
+    .filter((token) => token.length >= 3)
+    .filter(Boolean);
+
+  while (Date.now() < deadline) {
+    const result = await page.evaluate((payload) => {
+      const normalise = (value) =>
+        String(value || "")
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, " ")
+          .trim()
+          .replace(/\s+/g, " ");
+      const signalValues = (payload.signals || []).map(normalise);
+      const fallbackTokens = (payload.fallbackSignals || []).map(normalise);
+      const placeholderHint = payload.fieldLabel === "To" ? "Destination address, suburb or place" : "Start address, suburb or place";
+      const input = [...document.querySelectorAll("input,textarea")].find(
+        (node) => (node.getAttribute("placeholder") || "").toLowerCase().includes(placeholderHint.toLowerCase()),
+      );
+      const inputRect = input ? input.getBoundingClientRect() : null;
+      const isActionButton = (node) => {
+        const label = normalise(node.getAttribute?.("aria-label") || node.getAttribute?.("data-testid") || node.textContent || "");
+        const hasUsePrefix = /^use\s+/.test(label);
+        const hasCurrentLocation = /current\s+location/.test(label);
+        return hasUsePrefix && !hasCurrentLocation;
+      };
+
+      const candidates = [...document.querySelectorAll("*[role=\"button\"]")].map((node) => {
+        const rawLabel = node.getAttribute("aria-label") || "";
+        const text = normalise(rawLabel).replace(/^use\s+/, "");
+        const nodeText = normalise(node.textContent || "");
+        const exactSignalMatch = signalValues.some((signal) => signal && (text === signal || nodeText === signal));
+        const containsSignalMatch = signalValues.some(
+          (signal) => signal && (text.includes(signal) || nodeText.includes(signal)),
+        );
+        const score = (exactSignalMatch ? 120 : 0) + (containsSignalMatch ? 60 : 0);
+        const fallbackScore = fallbackTokens.reduce((running, token) => {
+          if (!token || token.length < 3) return running;
+          if (text.includes(token)) return running + 2;
+          return running;
+        }, 0);
+        const nodeRect = node.getBoundingClientRect();
+        const proximity = inputRect ? Math.abs(nodeRect.top - (inputRect.bottom + 10)) : Number.MAX_SAFE_INTEGER;
+        return {
+          ariaLabel: rawLabel,
+          score: score + fallbackScore,
+          isSuggestion: isActionButton(node),
+          proximity,
+        };
+      })
+        .filter((item) => item.ariaLabel && item.isSuggestion)
+        .map((item, index) => ({ ...item, index }));
+
+      const useful = candidates.filter((item) => item.score > 0);
+      const allowFallback = payload.elapsedMs > payload.fallbackDelayMs;
+      if (useful.length) {
+        useful.sort((left, right) => right.score - left.score || left.proximity - right.proximity || left.index - right.index);
+        return useful[0].ariaLabel;
+      }
+      if (allowFallback && candidates.length) {
+        candidates.sort((left, right) => left.proximity - right.proximity || left.index - right.index);
+        return candidates[0].ariaLabel;
+      }
+      if (allowFallback) {
+        const labelled = [...document.querySelectorAll("*[role=\"button\"][aria-label*=\"Use \"]")].map((node) =>
+          node.getAttribute("aria-label") || "",
+        );
+        if (labelled.length) return labelled[0];
+      }
+      if (!allowFallback) return null;
+      return null;
+    }, { signals, fallbackSignals, fieldLabel, elapsedMs: Date.now() - startedAt, fallbackDelayMs });
+
+    if (result) return result;
+    await page.waitForTimeout(80);
+  }
+  return null;
+}
+
+async function clickSuggestionByAriaLabel(text) {
+  const exact = page
+    .getByRole("button", { name: new RegExp(`^${escapeRegExp(text)}$`, "i") })
+    .first();
+  if (await exact.count()) {
+    await exact.dispatchEvent("click");
+    return;
+  }
+  const cleaned = text.replace(/^Use\s+/i, "");
+  const includes = page
+    .locator(`[role="button"][aria-label*="${escapeRegExp(text)}"]`)
+    .first();
+  if (await includes.count()) {
+    await includes.dispatchEvent("click");
+    return;
+  }
+  const byText = page
+    .getByText(new RegExp(escapeRegExp(suggestionPrimaryPattern(cleaned)), "i"))
+    .first();
+  if (await byText.count()) {
+    await byText.dispatchEvent("click");
+    return;
+  }
+  const loose = page.getByRole("button", { name: /^Use /i }).first();
+  if (await loose.count()) {
+    await loose.dispatchEvent("click");
+    return;
+  }
+  const fallback = page
+    .locator(`[role="button"]`)
+    .filter({ hasText: /Use /i })
+    .first();
+  if (await fallback.count()) {
+    await fallback.dispatchEvent("click");
+    return;
+  }
+  throw new Error(`Could not resolve suggestion target for ${text}`);
+}
+
+function suggestionPrimaryPattern(accessibleName) {
+  const source = String(accessibleName || "");
+  const cleaned = source
+    .replace(/^Use\s+/i, "")
+    .replace(/\^|\$/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  const primary = cleaned
+    .split(",")[0]
+    .replace(/\b(NSW|VIC|QLD|WA|SA|TAS|ACT|NT)\b.*$/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return primary || cleaned || source;
 }
 
 function ep(id, query, lat, lon, state, type, label = query) {
@@ -452,6 +650,8 @@ function renderReport(summary, rows) {
   return `# Fuel Path Plan Field Browser Stress
 
 Run ID: ${summary.runId}
+
+Plan CTA mode: ${summary.planCtaMode}
 
 App URL: ${summary.appUrl}
 

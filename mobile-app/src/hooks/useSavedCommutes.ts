@@ -35,13 +35,13 @@ export function useSavedCommutes() {
   const saveCommute = useCallback(({ from, fuel, name, to, vehicleId }: SaveCommuteInput) => {
     setSavedCommutes((current) => {
       const existing = current.find((commute) =>
-        sameCommute(commute, { from, fuel, to }),
+        sameCommute(commute, { from, fuel, to, vehicleId }),
       );
       if (existing) return current;
       const now = new Date().toISOString();
       return [
         {
-          id: makeCommuteId(from, to, fuel),
+          id: makeCommuteId(from, to, fuel, vehicleId),
           name,
           from,
           to,
@@ -98,10 +98,11 @@ function shortPointName(point: MapPoint) {
 
 function sameCommute(
   left: SavedCommute,
-  right: Pick<SavedCommute, "from" | "fuel" | "to">,
+  right: Pick<SavedCommute, "from" | "fuel" | "to"> & { vehicleId?: string },
 ) {
   return (
     left.fuel === right.fuel &&
+    sameCommuteVehicle(left.vehicleId, right.vehicleId) &&
     closeCoordinate(left.from.lat, right.from.lat) &&
     closeCoordinate(left.from.lon, right.from.lon) &&
     closeCoordinate(left.to.lat, right.to.lat) &&
@@ -109,17 +110,28 @@ function sameCommute(
   );
 }
 
+function sameCommuteVehicle(leftVehicleId?: string, rightVehicleId?: string) {
+  if (!leftVehicleId || !rightVehicleId) return true;
+  return leftVehicleId === rightVehicleId;
+}
+
 function closeCoordinate(left: number, right: number) {
   return Math.abs(left - right) < 0.0002;
 }
 
-function makeCommuteId(from: MapPoint, to: MapPoint, fuel: FuelCode) {
-  return [
+function makeCommuteId(from: MapPoint, to: MapPoint, fuel: FuelCode, vehicleId?: string) {
+  const parts = [
     "commute",
     fuel,
+    safeCommuteIdPart(vehicleId),
     from.lat.toFixed(4),
     from.lon.toFixed(4),
     to.lat.toFixed(4),
     to.lon.toFixed(4),
-  ].join(":");
+  ].filter(Boolean);
+  return parts.join(":");
+}
+
+function safeCommuteIdPart(value?: string) {
+  return value?.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 48) || "";
 }

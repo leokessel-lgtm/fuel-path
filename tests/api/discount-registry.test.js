@@ -6,10 +6,10 @@ const {
   _discountTermsForTests,
 } = require("../../api/_routeScoring");
 
-const TODAY = "2026-07-04";
+const TODAY = "2026-07-09";
 
-test("discount registry contains only active direct c/L offers with enforceable terms", () => {
-  assert.equal(discountRegistry.length, 13);
+test("discount registry contains direct c/L offers with enforceable terms", () => {
+  assert.equal(discountRegistry.length, 12);
   for (const program of discountRegistry) {
     assert.equal(program.discountType, "direct_cpl", `${program.id} must be direct_cpl`);
     assert.ok(program.centsPerLitre > 0, `${program.id} must have positive c/L`);
@@ -24,7 +24,25 @@ test("discount registry contains only active direct c/L offers with enforceable 
     assert.ok(program.nextReviewAt >= TODAY, `${program.id} needs current review coverage`);
     assert.ok(Array.isArray(program.stationBrands) && program.stationBrands.length, `${program.id} must declare station brands`);
     assert.ok(Array.isArray(program.brandIncludes) && program.brandIncludes.length, `${program.id} must declare backend brand matchers`);
+    assert.equal(noExtraInStorePurchaseRule(program), true, `${program.id} must not require extra in-store purchase`);
   }
+});
+
+test("expired discount offers stay out of active route pricing", () => {
+  const activeDiscountIds = discountRegistry
+    .filter(isActiveDirectDiscount)
+    .map((program) => program.id);
+
+  assert.equal(activeDiscountIds.length, 11);
+  assert.equal(activeDiscountIds.includes("rac_wa_caltex"), false);
+  assert.equal(activeDiscountIds.includes("racq_caltex"), true);
+});
+
+test("extra in-store purchase discounts are excluded from the pricing registry", () => {
+  const discountIds = discountRegistry.map((program) => program.id);
+  assert.equal(discountIds.includes("everyday_rewards"), true);
+  assert.equal(discountIds.includes("flybuys"), true);
+  assert.equal(discountIds.includes("reddy_express_instore"), false);
 });
 
 test("discount terms cap effective c/L against evaluated fill volume", () => {
@@ -77,3 +95,31 @@ test("state-scoped discounts fail closed outside eligible regions", () => {
   assert.equal(_discountTermsForTests.discountAppliesToStation(wilson, { source: "api_sa_fuel_price_reporting" }), false);
   assert.equal(_discountTermsForTests.discountAppliesToStation(wilson, { source: "api_nsw_fuelcheck" }), true);
 });
+
+function isActiveDirectDiscount(program) {
+  if (program.discountType !== "direct_cpl") return false;
+  if (Number(program.centsPerLitre || 0) <= 0) return false;
+  if (program.nextReviewAt < TODAY) return false;
+  if (!program.expiryDate) return true;
+  return program.expiryDate >= TODAY;
+}
+
+function noExtraInStorePurchaseRule(program) {
+  const text = [
+    program.id,
+    program.label,
+    program.shortLabel,
+    program.participatingStationScope,
+  ].join(" ").toLowerCase();
+  const excludedTerms = [
+    "in-store",
+    "instore",
+    "eligible spend",
+    "eligible purchase",
+    "qualifying spend",
+    "qualifying purchase",
+    "after spend",
+    "after purchase",
+  ];
+  return !excludedTerms.some((term) => text.includes(term));
+}

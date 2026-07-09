@@ -1,6 +1,6 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
-import { colors, radii, spacing, typeScale } from "../theme";
+import { colors, radii, spacing, surfaces, typography } from "../theme";
 import { MapPoint } from "../types";
 import { locationSuggestionDisplay } from "../utils/locationSuggestionDisplay";
 import { addressLocalityHint } from "../utils/routeInputPrecision";
@@ -9,12 +9,14 @@ export function AddressSuggestions({
   error,
   loading,
   onSelect,
+  onSelectStart,
   query,
   suggestions,
 }: {
   error: string;
   loading: boolean;
   onSelect: (point: MapPoint) => void;
+  onSelectStart?: () => void;
   query: string;
   suggestions: MapPoint[];
 }) {
@@ -37,30 +39,26 @@ export function AddressSuggestions({
             {suggestions.map((point) => {
               const display = locationSuggestionDisplay(point);
               return (
-                <Pressable
-                  accessibilityLabel={`Use ${point.label}`}
-                  accessibilityRole="button"
-                  key={`${point.lat}:${point.lon}:${point.label}`}
-                  onPress={() => onSelect(point)}
-                  style={({ pressed }) => [
-                    styles.suggestionItem,
-                    pressed && styles.suggestionItemPressed,
-                  ]}
-                >
-                  <View style={styles.suggestionTitleRow}>
-                    <Text numberOfLines={1} style={styles.suggestionTitle}>
-                      {display.title}
-                    </Text>
-                    {display.badge ? (
-                      <Text numberOfLines={1} style={styles.suggestionBadge}>
-                        {display.badge}
+                <View key={`${point.lat}:${point.lon}:${point.label}`}>
+                  <Pressable
+                    accessibilityLabel={`Use ${point.label}`}
+                    accessibilityRole="button"
+                    onPressIn={onSelectStart}
+                    onPress={() => onSelect(point)}
+                    style={styles.suggestionRow}
+                  >
+                    <View style={styles.lookupResultPin} />
+                    <View style={styles.suggestionCopy}>
+                      <Text numberOfLines={1} style={styles.suggestionTitle}>
+                        {display.title}
                       </Text>
-                    ) : null}
-                  </View>
-                  <Text numberOfLines={1} style={styles.suggestionMeta}>
-                    {display.subtitle}
-                  </Text>
-                </Pressable>
+                      <Text numberOfLines={1} style={styles.suggestionMeta}>
+                        {display.subtitle}
+                      </Text>
+                    </View>
+                  </Pressable>
+                  <View style={styles.suggestionDivider} />
+                </View>
               );
             })}
           </ScrollView>
@@ -90,11 +88,20 @@ const styles = StyleSheet.create({
   suggestionItemPressed: {
     backgroundColor: colors.greenSoft,
   },
-  suggestionTitle: {
-    color: colors.ink,
+  suggestionRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: spacing.sm,
+    minHeight: 52,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  suggestionCopy: {
     flex: 1,
-    fontSize: typeScale.body,
-    fontWeight: "600",
+    minWidth: 0,
+  },
+  suggestionTitle: {
+    ...typography.bodyStrong,
     minWidth: 0,
   },
   suggestionTitleRow: {
@@ -103,34 +110,33 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     minWidth: 0,
   },
-  suggestionBadge: {
-    backgroundColor: colors.greenSoft,
-    borderRadius: radii.sm,
-    color: colors.greenDark,
-    flexShrink: 0,
-    fontSize: typeScale.micro,
-    fontWeight: "700",
-    maxWidth: 112,
-    overflow: "hidden",
-    paddingHorizontal: spacing.xs,
-    paddingVertical: 2,
-  },
   suggestionMeta: {
-    color: colors.muted,
-    fontSize: typeScale.caption,
-    fontWeight: "400",
+    ...typography.metadata,
     marginTop: 2,
   },
+  suggestionDivider: {
+    backgroundColor: colors.line,
+    height: StyleSheet.hairlineWidth,
+    marginLeft: spacing.md,
+  },
   suggestionStatus: {
-    color: colors.muted,
-    fontSize: typeScale.caption,
-    fontWeight: "400",
-    padding: spacing.md,
+    ...typography.metadata,
+    padding: spacing.sm,
   },
   suggestionError: {
+    ...typography.metadata,
     color: colors.red,
-    fontSize: typeScale.caption,
-    fontWeight: "500",
-    padding: spacing.md,
+    padding: spacing.sm,
+  },
+  lookupResultPin: {
+    ...surfaces.secondaryAction,
+    backgroundColor: colors.green,
+    borderColor: colors.white,
+    borderRadius: radii.pill,
+    borderBottomLeftRadius: 3,
+    borderWidth: 2,
+    height: 15,
+    transform: [{ rotate: "-45deg" }],
+    width: 15,
   },
 });

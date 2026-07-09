@@ -10,8 +10,14 @@ type AlertIdentity = {
   userId: string;
 };
 
+type AlertCapability = {
+  expiresAt: string;
+  token: string;
+};
+
 type SyncResult = {
   message: string;
+  remoteDeliveryEnabled?: boolean;
   status: "synced" | "skipped" | "failed";
   syncedAt?: string;
 };
@@ -50,15 +56,24 @@ export async function syncSavedRouteAlert({
       });
     }
 
-    await postAlertJson("/api/saved-routes", capability.token, backendSavedRoutePayload({
+    const savedRoute = await postAlertJson("/api/saved-routes", capability.token, backendSavedRoutePayload({
       commute,
       enabled,
       identity,
       preferences,
     }));
+    const remoteDeliveryEnabled = routeWatchRemoteDeliveryEnabled(savedRoute);
+    if (enabled && remoteDeliveryEnabled === false) {
+      return {
+        status: "skipped",
+        remoteDeliveryEnabled,
+        message: "Smart route watch was saved, but push delivery is not enabled for this build yet.",
+      };
+    }
 
     return {
       status: "synced",
+      remoteDeliveryEnabled,
       message: enabled
         ? "Smart route watch updated."
         : "Route watch turned off.",
@@ -198,18 +213,13 @@ function estimatedEconomy(vehicle: VehicleProfile) {
   return 8.2;
 }
 
-async function getAlertCapability(identity: AlertIdentity): Promise<{ token: string; expiresAt: string } | null> {
+async function getAlertCapability(identity: AlertIdentity): Promise<AlertCapability | null> {
   try {
     const raw = await AsyncStorage.getItem(ALERT_CAPABILITY_KEY);
     if (raw) {
-      const parsed = JSON.parse(raw) as Partial<{ token: string; expiresAt: string }>;
-      if (
-        parsed.token &&
-        parsed.expiresAt &&
-        new Date(parsed.expiresAt).getTime() - ALERT_CAPABILITY_REFRESH_BUFFER_MS > Date.now()
-      ) {
-        return { token: parsed.token, expiresAt: parsed.expiresAt };
-      }
+      const capability = normaliseAlertCapability(JSON.parse(raw));
+      if (capability) return capability;
+      await AsyncStorage.removeItem(ALERT_CAPABILITY_KEY);
     }
   } catch {
     // Fall through to requesting a fresh scoped capability.
@@ -224,17 +234,28 @@ async function getAlertCapability(identity: AlertIdentity): Promise<{ token: str
       },
       body: JSON.stringify(identity),
     });
-    const payload = await response.json();
-    if (!response.ok || !payload?.token || !payload?.expiresAt) return null;
-    const capability = {
-      token: String(payload.token),
-      expiresAt: String(payload.expiresAt),
-    };
+    const payload = await readAlertJson(response);
+    const capability = normaliseAlertCapability(payload);
+    if (!response.ok || !capability) return null;
     await AsyncStorage.setItem(ALERT_CAPABILITY_KEY, JSON.stringify(capability));
     return capability;
   } catch {
     return null;
   }
+}
+
+function normaliseAlertCapability(payload: unknown): AlertCapability | null {
+  if (!payload || typeof payload !== "object") return null;
+  const token = typeof (payload as { token?: unknown }).token === "string"
+    ? (payload as { token: string }).token.trim()
+    : "";
+  const expiresAt = typeof (payload as { expiresAt?: unknown }).expiresAt === "string"
+    ? (payload as { expiresAt: string }).expiresAt
+    : "";
+  const expiresAtMs = new Date(expiresAt).getTime();
+  if (!token || !Number.isFinite(expiresAtMs)) return null;
+  if (expiresAtMs - ALERT_CAPABILITY_REFRESH_BUFFER_MS <= Date.now()) return null;
+  return { token, expiresAt };
 }
 
 async function postAlertJson(path: string, token: string, body: unknown) {
@@ -247,11 +268,18 @@ async function postAlertJson(path: string, token: string, body: unknown) {
     },
     body: JSON.stringify(body),
   });
-  const payload = await response.json();
+  const payload = await readAlertJson(response);
   if (!response.ok) {
     throw new Error("Route watch could not update. Your saved route is still on this device, so you can try again.");
   }
   return payload;
+}
+
+function routeWatchRemoteDeliveryEnabled(payload: unknown) {
+  if (!payload || typeof payload !== "object") return undefined;
+  const alerts = (payload as { alerts?: { pushDeliveryEnabled?: unknown } }).alerts;
+  if (typeof alerts?.pushDeliveryEnabled !== "boolean") return undefined;
+  return alerts.pushDeliveryEnabled;
 }
 
 async function deleteAlertJson(path: string, token: string, params: Record<string, string>) {
@@ -263,11 +291,21 @@ async function deleteAlertJson(path: string, token: string, params: Record<strin
       Authorization: `Bearer ${token}`,
     },
   });
-  const payload = await response.json();
+  const payload = await readAlertJson(response);
   if (!response.ok) {
     throw new Error("Route watch could not update. Your saved route is still on this device, so you can try again.");
   }
   return payload;
+}
+
+async function readAlertJson(response: Response): Promise<Record<string, unknown> | null> {
+  const text = await response.text();
+  if (!text.trim()) return null;
+  try {
+    return JSON.parse(text) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
 }
 
 function randomId() {

@@ -3,10 +3,17 @@
 import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-const repoRoot = path.resolve(process.cwd(), "..");
+const scriptDir = path.dirname(fileURLToPath(import.meta.url));
+const mobileRoot = path.resolve(scriptDir, "..");
+const repoRoot = path.resolve(mobileRoot, "..");
 const outputRoot = path.resolve(repoRoot, "tmp/native-smoke");
-const artifactsDir = path.resolve(process.cwd(), "native-artifacts");
+const artifactsDirs = [
+  path.resolve(repoRoot, "native-artifacts"),
+  path.resolve(mobileRoot, "native-artifacts"),
+];
+const localDebugApk = path.resolve(mobileRoot, "android/app/build/outputs/apk/debug/app-debug.apk");
 const sdkRoot = findAndroidSdkRoot();
 const adb = path.join(sdkRoot, "platform-tools", "adb");
 const emulator = path.join(sdkRoot, "emulator", "emulator");
@@ -22,7 +29,8 @@ for (let i = 2; i < process.argv.length; i += 1) {
   args.set(key, value);
 }
 
-const artifact = path.resolve(args.get("--artifact") || process.env.FUEL_PATH_NATIVE_ARTIFACT || newestApk() || "");
+const allowDebugArtifact = args.has("--allow-debug-artifact") || process.env.FUEL_PATH_ALLOW_DEBUG_COLD_START === "1";
+const artifact = resolveInputPath(args.get("--artifact") || process.env.FUEL_PATH_NATIVE_ARTIFACT || newestApk() || (allowDebugArtifact ? localDebugApk : ""));
 const runs = Number(args.get("--runs") || 5);
 const settleMs = Number(args.get("--settle-ms") || 10000);
 const requestedSerial = args.get("--device-serial") || process.env.FUEL_PATH_ANDROID_DEVICE_SERIAL || "";
@@ -48,6 +56,9 @@ const lines = [
 try {
   assertFile(adb, "adb");
   assertFile(emulator, "emulator");
+  if (!artifact) {
+    fail("Preview or release APK artifact required. Pass --artifact <path>, set FUEL_PATH_NATIVE_ARTIFACT, or use --allow-debug-artifact only when Metro is intentionally part of the test.");
+  }
   assertFile(artifact, "APK artifact");
   const device = await ensureAndroidBooted();
   lines.push(`Device: ${device.type} ${device.serial}`);
@@ -73,27 +84,49 @@ try {
     results.push({
       run,
       launchCommandMs,
-      status: size > 250000 ? "passed" : "weak",
+      status: size > 250000 ? "captured" : "weak",
       screenshot,
       size,
     });
   }
 
+  const resumeResult = await captureForegroundResume(timestamp, settleMs);
+
   const logcat = adbCommand(["logcat", "-d", "-t", "1000"]).stdout;
-  const failureLines = logcat.split("\n").filter((line) => /\b(FATAL EXCEPTION|TypeError: undefined is not a function)\b/i.test(line));
-  const mapWarningLines = logcat.split("\n").filter((line) => /GoogleCertificatesRslt|Authorization failure|API key|ApiNotActivated|REQUEST_DENIED|Application credential header not valid|GLSUser/i.test(line));
-  const passed = results.filter((item) => item.status === "passed").length;
-  const failed = results.length - passed;
+  const failureLines = logcat
+    .split("\n")
+    .filter((line) => /\b(FATAL EXCEPTION|TypeError: undefined is not a function|Unable to load script|packager does not seem to be running|loadJSBundleFromAssets)\b/i.test(line));
+  const mapWarningLines = logcat.split("\n").filter(isMapCredentialWarningLine);
+  const captured = results.filter((item) => item.status === "captured").length;
+  const weakCaptures = results.length - captured;
+  const resumeWeak = resumeResult.status !== "captured";
   const launchDurations = results.map((item) => item.launchCommandMs).sort((a, b) => a - b);
   const p50 = percentile(launchDurations, 0.5);
   const p90 = percentile(launchDurations, 0.9);
 
-  lines.push(`Status: ${failed || failureLines.length || mapWarningLines.length ? "partial" : "passed"}`);
-  lines.push(`Result: ${passed}/${runs} screenshots above minimum size`);
+  lines.push(`Status: ${failureLines.length ? "failed" : weakCaptures || resumeWeak || mapWarningLines.length ? "partial" : "passed"}`);
+  lines.push(`Screenshot capture: ${captured}/${runs} above minimum size`);
+  lines.push(`Foreground resume: ${resumeResult.status}`);
   lines.push(`Launch command p50: ${p50} ms`);
   lines.push(`Launch command p90: ${p90} ms`);
   lines.push(`Runtime failure lines: ${failureLines.length}`);
   lines.push(`Map warning lines: ${mapWarningLines.length}`);
+  if (mapWarningLines.length) {
+    lines.push("");
+    lines.push("## Map warning lines");
+    lines.push("");
+    for (const line of mapWarningLines.slice(0, 20)) {
+      lines.push(`- ${line.trim()}`);
+    }
+  }
+  if (failureLines.length) {
+    lines.push("");
+    lines.push("## Runtime failures");
+    lines.push("");
+    for (const line of failureLines.slice(0, 20)) {
+      lines.push(`- ${line.trim()}`);
+    }
+  }
   lines.push("");
   lines.push("## Screenshots");
   lines.push("");
@@ -102,10 +135,12 @@ try {
   for (const item of results) {
     lines.push(`| ${item.run} | ${item.status} | ${item.launchCommandMs} ms | ${item.screenshot ? path.relative(repoRoot, item.screenshot) : item.reason} | ${item.size ? `${Math.round(item.size / 1024)} KB` : ""} |`);
   }
+  lines.push(`| foreground resume | ${resumeResult.status} | ${resumeResult.resumeCommandMs} ms | ${resumeResult.screenshot ? path.relative(repoRoot, resumeResult.screenshot) : resumeResult.reason} | ${resumeResult.size ? `${Math.round(resumeResult.size / 1024)} KB` : ""} |`);
   lines.push("");
   lines.push("## Brutal interpretation");
   lines.push("");
   lines.push("- This proves repeated Android launch and settled screenshot capture on the selected device only.");
+  lines.push("- Foreground resume proves the installed app returns from Android Home/background to a settled screenshot; it is not a deep process-death restore test.");
   lines.push("- Emulator pass is render-repeatability evidence, not performance evidence.");
   lines.push("- Any Google Maps credential warning keeps Android native readiness amber until a physical-device pass confirms real tiles and acceptable frames.");
   lines.push("");
@@ -120,11 +155,17 @@ try {
 }
 
 function newestApk() {
-  if (!existsSync(artifactsDir)) return "";
-  return readdirSync(artifactsDir)
-    .filter((name) => /^fuel-path-preview-android.*\.apk$/.test(name))
-    .map((name) => path.join(artifactsDir, name))
+  return artifactsDirs
+    .filter((dir) => existsSync(dir))
+    .flatMap((dir) => readdirSync(dir)
+      .filter((name) => /^fuel-path-preview-android.*\.apk$/.test(name))
+      .map((name) => path.join(dir, name)))
     .sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs)[0] || "";
+}
+
+function resolveInputPath(value) {
+  if (!value) return "";
+  return path.isAbsolute(value) ? value : path.resolve(process.cwd(), value);
 }
 
 async function ensureAndroidBooted() {
@@ -179,6 +220,32 @@ function adbSpawnSync(commandArgs, options = {}) {
   return spawnSync(adb, adbArgs(commandArgs), options);
 }
 
+async function captureForegroundResume(stamp, waitMs) {
+  adbCommand(["shell", "input", "keyevent", "3"]);
+  await wait(1000);
+  const started = Date.now();
+  adbCommand(["shell", "am", "start", "-n", activityName]);
+  const resumeCommandMs = Date.now() - started;
+  await wait(waitMs);
+  const screenshot = path.join(outputRoot, `android-cold-start-smoke-${stamp}-foreground-resume.png`);
+  const capture = adbSpawnSync(["exec-out", "screencap", "-p"], { encoding: "buffer", maxBuffer: 10 * 1024 * 1024 });
+  if (capture.status !== 0 || capture.stdout.length < 1024) {
+    return {
+      reason: capture.stderr?.toString() || "empty screenshot",
+      resumeCommandMs,
+      status: "failed",
+    };
+  }
+  writeFileSync(screenshot, capture.stdout);
+  const size = statSync(screenshot).size;
+  return {
+    resumeCommandMs,
+    screenshot,
+    size,
+    status: size > 250000 ? "captured" : "weak",
+  };
+}
+
 function command(binary, commandArgs, options = {}) {
   return {
     stdout: execFileSync(binary, commandArgs, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], ...options }),
@@ -198,6 +265,16 @@ function findAndroidSdkRoot() {
 
 function assertFile(file, label) {
   if (!file || !existsSync(file)) throw new Error(`${label} not found: ${file}`);
+}
+
+function isMapCredentialWarningLine(line) {
+  if (/GoogleCertificatesRslt/i.test(line) && /PhFlagUpdateRegistry|Phenotype/i.test(line)) return false;
+  return /GoogleCertificatesRslt|Authorization failure|API key|ApiNotActivated|REQUEST_DENIED|Application credential header not valid|GLSUser/i.test(line);
+}
+
+function fail(message) {
+  console.error(message);
+  process.exit(1);
 }
 
 function percentile(values, ratio) {

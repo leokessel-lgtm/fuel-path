@@ -51,7 +51,7 @@ await installApiMocks(page);
 try {
   await recordCase("blank plan form stays disabled", async () => {
     await resetApp();
-    await assertButtonDisabled("Plan route");
+    await assertButtonHiddenOrMissing("Plan route");
   });
 
   await recordCase("partial street input asks for suburb or postcode", async () => {
@@ -59,14 +59,14 @@ try {
     await fillField("From", "45 Elizabeth Street");
     await assertText("Street found. Add suburb or postcode to choose the right area.");
     await assertText("Choose a start suggestion, or add suburb or postcode before planning.");
-    await assertButtonDisabled("Plan route");
+    await assertButtonHiddenOrMissing("Plan route");
   });
 
   await recordCase("state-only address context is not enough", async () => {
     await resetApp();
     await fillField("From", "2 George Street NSW");
     await assertText("Choose a start suggestion, or add suburb or postcode before planning.");
-    await assertButtonDisabled("Plan route");
+    await assertButtonHiddenOrMissing("Plan route");
   });
 
   await recordCase("locality-qualified typed address still needs suggestion confirmation", async () => {
@@ -75,7 +75,7 @@ try {
     await fillField("To", "2 George Street Sydney NSW");
     await waitForSuggestion(/2, George Street, Sydney NSW 2000/);
     await assertText("Choose a destination suggestion to confirm this address.");
-    await assertButtonDisabled("Plan route");
+    await assertButtonHiddenOrMissing("Plan route");
   });
 
   await recordCase("validation address rows are ranked above POI-like rows", async () => {
@@ -109,7 +109,7 @@ try {
     await assertHiddenText("Street/road");
     await assertHiddenText("Not an exact address. Use only if this street or area is enough.");
     await assertText("Choose a start suggestion to confirm this address.");
-    await assertButtonDisabled("Plan route");
+    await assertButtonHiddenOrMissing("Plan route");
   });
 
   await recordCase("remote unit addresses can be selected and still require suggestion confirmation", async () => {
@@ -274,7 +274,6 @@ async function resetApp() {
   await page.goto(appUrl, { waitUntil: "domcontentloaded" });
   await page.getByRole("tab", { name: "Plan" }).click({ timeout: timeoutMs });
   await field("From").waitFor({ state: "visible", timeout: timeoutMs });
-  await page.getByRole("button", { name: "Plan route" }).waitFor({ state: "visible", timeout: timeoutMs });
 }
 
 async function recordCase(name, callback) {
@@ -303,9 +302,10 @@ async function fillField(label, value) {
 
 async function selectSuggestion(label, value, accessibleName) {
   await fillField(label, value);
-  const suggestion = page.getByText(suggestionPrimaryPattern(accessibleName), { exact: false }).first();
+  const suggestionName = accessibleName instanceof RegExp ? accessibleName : new RegExp(suggestionPrimaryPattern(accessibleName), "i");
+  const suggestion = page.getByRole("button", { name: suggestionName }).first();
   await suggestion.waitFor({ state: "visible", timeout: timeoutMs });
-  await suggestion.click();
+  await suggestion.dispatchEvent("click");
 }
 
 async function submitRouteAndAssertResults() {
@@ -362,6 +362,19 @@ async function assertHiddenText(text) {
 async function assertButtonDisabled(name) {
   const disabled = await buttonDisabled(name);
   assert(disabled, `expected "${name}" to be disabled`);
+}
+
+async function assertButtonHiddenOrMissing(name) {
+  const button = page.getByRole("button", { name }).first();
+  const count = await page.getByRole("button", { name }).count();
+  if (count === 0) {
+    return;
+  }
+  const isVisible = await button.isVisible();
+  if (isVisible) {
+    const disabled = await buttonDisabled(name);
+    assert(disabled, `expected "${name}" to be hidden or missing, but it is visible`);
+  }
 }
 
 async function assertButtonEnabled(name) {

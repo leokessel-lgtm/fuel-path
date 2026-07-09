@@ -8,6 +8,7 @@ export type BrandStyle = {
   initials: string;
   color: string;
   icon?: ImageSourcePropType;
+  markerIcon?: ImageSourcePropType;
   aliases: string[];
 };
 
@@ -17,6 +18,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "EG",
     color: "#173f8a",
     icon: require("../../assets/brand-icons/eg-ampol.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/eg-ampol.png"),
     aliases: ["eg ampol", "eg australia", "eg fuel", "eg group", "eurogarages"],
   },
   {
@@ -24,6 +26,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "R",
     color: "#df2f2f",
     icon: require("../../assets/brand-icons/reddy.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/reddy.png"),
     aliases: ["reddy", "reddy express", "shell reddy", "coles express"],
   },
   {
@@ -31,6 +34,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "S",
     color: "#f6b800",
     icon: require("../../assets/brand-icons/shell.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/shell.png"),
     aliases: ["shell"],
   },
   {
@@ -38,6 +42,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "A",
     color: "#e53935",
     icon: require("../../assets/brand-icons/ampol.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/ampol.png"),
     aliases: ["ampol", "ampol foodary"],
   },
   {
@@ -45,6 +50,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "C",
     color: "#1565c0",
     icon: require("../../assets/brand-icons/caltex.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/caltex.png"),
     aliases: ["caltex"],
   },
   {
@@ -52,6 +58,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "B",
     color: "#0f5c8c",
     icon: require("../../assets/brand-icons/budget.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/budget.png"),
     aliases: ["budget", "budget petrol"],
   },
   {
@@ -59,6 +66,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "BP",
     color: "#138a36",
     icon: require("../../assets/brand-icons/bp.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/bp.png"),
     aliases: ["bp", "bp connect"],
   },
   {
@@ -66,6 +74,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "7",
     color: "#ef6c00",
     icon: require("../../assets/brand-icons/seven-eleven.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/seven-eleven.png"),
     aliases: ["7-eleven", "7 eleven", "7eleven", "711"],
   },
   {
@@ -73,6 +82,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "U",
     color: "#1e63b5",
     icon: require("../../assets/brand-icons/united.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/united.png"),
     aliases: ["united", "united petroleum"],
   },
   {
@@ -80,6 +90,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "M",
     color: "#1b7f5c",
     icon: require("../../assets/brand-icons/metro.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/metro.png"),
     aliases: ["metro", "metro fuel", "metro petroleum"],
   },
   {
@@ -87,6 +98,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "M",
     color: "#1f4f9c",
     icon: require("../../assets/brand-icons/mobil.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/mobil.png"),
     aliases: ["mobil"],
   },
   {
@@ -94,6 +106,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "C",
     color: "#005dab",
     icon: require("../../assets/brand-icons/costco.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/costco.png"),
     aliases: ["costco", "costco fuel", "costco wholesale"],
   },
   {
@@ -101,6 +114,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "SW",
     color: "#5f2d86",
     icon: require("../../assets/brand-icons/speedway.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/speedway.png"),
     aliases: ["speedway"],
   },
   {
@@ -108,6 +122,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "P",
     color: "#1597d3",
     icon: require("../../assets/brand-icons/pearl.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/pearl.png"),
     aliases: ["pearl", "pearl energy"],
   },
   {
@@ -115,6 +130,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "UG",
     color: "#ff8200",
     icon: require("../../assets/brand-icons/ugo.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/ugo.png"),
     aliases: ["u-go", "u go", "ugo"],
   },
   {
@@ -122,6 +138,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "E",
     color: "#009b4d",
     icon: require("../../assets/brand-icons/enhance.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/enhance.png"),
     aliases: ["enhance"],
   },
   {
@@ -129,6 +146,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "A",
     color: "#f26b21",
     icon: require("../../assets/brand-icons/astron.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/astron.png"),
     aliases: ["astron", "astron energy"],
   },
   {
@@ -136,6 +154,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "AE",
     color: "#2f95c8",
     icon: require("../../assets/brand-icons/arko.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/arko.png"),
     aliases: ["arko", "arko energy"],
   },
   {
@@ -143,6 +162,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "L",
     color: "#0b5ea8",
     icon: require("../../assets/brand-icons/liberty.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/liberty.png"),
     aliases: ["liberty", "liberty oil", "liberty convenience"],
   },
   {
@@ -150,6 +170,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "UP",
     color: "#f36b2a",
     icon: require("../../assets/brand-icons/ultra.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/ultra.png"),
     aliases: ["ultra", "ultra petroleum"],
   },
   {
@@ -157,6 +178,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "AP",
     color: "#222970",
     icon: require("../../assets/brand-icons/apw.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/apw.png"),
     aliases: ["apw", "apw fuel"],
   },
   {
@@ -164,6 +186,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "IP",
     color: "#b59a20",
     icon: require("../../assets/brand-icons/inland.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/inland.png"),
     aliases: ["inland", "inland petroleum"],
   },
   {
@@ -171,6 +194,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "AP",
     color: "#0072bc",
     icon: require("../../assets/brand-icons/apco.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/apco.png"),
     aliases: ["apco"],
   },
   {
@@ -178,6 +202,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "AP",
     color: "#f39b21",
     icon: require("../../assets/brand-icons/ampm.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/ampm.png"),
     aliases: ["am/pm", "ampm", "am pm"],
   },
   {
@@ -185,6 +210,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "AF",
     color: "#0b7a43",
     icon: require("../../assets/brand-icons/atlas-fuel.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/atlas-fuel.png"),
     aliases: ["atlas fuel", "atlas"],
   },
   {
@@ -192,6 +218,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "BP",
     color: "#0e6ba8",
     icon: require("../../assets/brand-icons/bennetts-petroleum.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/bennetts-petroleum.png"),
     aliases: ["bennett's petroleum", "bennetts petroleum", "bennett petroleum", "bennetts"],
   },
   {
@@ -199,6 +226,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "BC",
     color: "#f1c232",
     icon: require("../../assets/brand-icons/better-choice.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/better-choice.png"),
     aliases: ["better choice", "better choice fuel"],
   },
   {
@@ -206,6 +234,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "EP",
     color: "#6b2b8a",
     icon: require("../../assets/brand-icons/endeavour-petroleum.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/endeavour-petroleum.png"),
     aliases: ["endeavour petroleum", "ee fuels", "eefuels"],
   },
   {
@@ -213,6 +242,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "FF",
     color: "#e53935",
     icon: require("../../assets/brand-icons/freedom-fuels.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/freedom-fuels.png"),
     aliases: ["freedom fuels", "freedom fuel"],
   },
   {
@@ -220,6 +250,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "FX",
     color: "#1c4f9c",
     icon: require("../../assets/brand-icons/fuelxpress.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/fuelxpress.png"),
     aliases: ["fuelxpress", "fuel xpress"],
   },
   {
@@ -227,6 +258,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "IO",
     color: "#232323",
     icon: require("../../assets/brand-icons/ior.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/ior.png"),
     aliases: ["ior", "ior pty ltd"],
   },
   {
@@ -234,6 +266,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "L",
     color: "#e84353",
     icon: require("../../assets/brand-icons/lowes.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/lowes.png"),
     aliases: ["lowes", "lowes petrol"],
   },
   {
@@ -241,6 +274,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "M",
     color: "#1f6fb5",
     icon: require("../../assets/brand-icons/mogas.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/mogas.png"),
     aliases: ["mogas", "mogas regional"],
   },
   {
@@ -248,6 +282,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "OT",
     color: "#d3e31f",
     icon: require("../../assets/brand-icons/otr.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/otr.png"),
     aliases: ["on the run", "otr"],
   },
   {
@@ -255,6 +290,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "PF",
     color: "#1f64b7",
     icon: require("../../assets/brand-icons/pacific-fuel-solutions.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/pacific-fuel-solutions.png"),
     aliases: ["pacific fuel solutions", "pacific fuel solutio"],
   },
   {
@@ -262,6 +298,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "PP",
     color: "#1f64b7",
     icon: require("../../assets/brand-icons/pacific-petroleum.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/pacific-petroleum.png"),
     aliases: ["pacific petroleum"],
   },
   {
@@ -269,6 +306,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "P",
     color: "#173f8a",
     icon: require("../../assets/brand-icons/perrys.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/perrys.png"),
     aliases: ["perrys", "perrys fuel", "perrys fuel distributors"],
   },
   {
@@ -276,6 +314,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "P",
     color: "#178448",
     icon: require("../../assets/brand-icons/puma-energy.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/puma-energy.png"),
     aliases: ["puma energy", "puma"],
   },
   {
@@ -283,6 +322,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "RF",
     color: "#c8202f",
     icon: require("../../assets/brand-icons/riordan-fuels.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/riordan-fuels.png"),
     aliases: ["riordan fuels", "riordan fuel", "riordan"],
   },
   {
@@ -290,6 +330,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "S",
     color: "#ef6c00",
     icon: require("../../assets/brand-icons/solo.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/solo.png"),
     aliases: ["solo", "solo corp", "solo oil"],
   },
   {
@@ -297,6 +338,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "TP",
     color: "#0b5fa5",
     icon: require("../../assets/brand-icons/tas-petroleum.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/tas-petroleum.png"),
     aliases: ["tas petroleum", "tas petrol", "taspet"],
   },
   {
@@ -304,6 +346,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "V",
     color: "#2637a8",
     icon: require("../../assets/brand-icons/vibe.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/vibe.png"),
     aliases: ["vibe", "vibe petroleum"],
   },
   {
@@ -311,6 +354,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "WP",
     color: "#26a7df",
     icon: require("../../assets/brand-icons/woodham-petroleum.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/woodham-petroleum.png"),
     aliases: ["woodham petroleum", "woodham"],
   },
   {
@@ -318,6 +362,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "X",
     color: "#2b2b2b",
     icon: require("../../assets/brand-icons/x-convenience.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/x-convenience.png"),
     aliases: ["x convenience", "x-convenience"],
   },
   {
@@ -325,6 +370,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "B",
     color: "#1a4f8f",
     icon: require("../../assets/brand-icons/burk.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/burk.png"),
     aliases: ["burk", "burk fuel", "burk fuels"],
   },
   {
@@ -332,6 +378,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "CG",
     color: "#1d6e9d",
     icon: require("../../assets/brand-icons/cgl-fuel.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/cgl-fuel.png"),
     aliases: ["cgl", "cgl fuel", "cgl fuels"],
   },
   {
@@ -339,6 +386,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "D",
     color: "#0f5c8c",
     icon: require("../../assets/brand-icons/dunnings.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/dunnings.png"),
     aliases: ["dunnings", "dunnings fuel"],
   },
   {
@@ -346,6 +394,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "E",
     color: "#1e4c88",
     icon: require("../../assets/brand-icons/eagle-petroleum.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/eagle-petroleum.png"),
     aliases: ["eagle", "eagle petroleum", "eagle fuels"],
   },
   {
@@ -353,6 +402,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "FD",
     color: "#0c6f9d",
     icon: require("../../assets/brand-icons/fdwa.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/fdwa.png"),
     aliases: ["fdwa", "fuel distributors wa"],
   },
   {
@@ -360,6 +410,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "MF",
     color: "#175f8a",
     icon: require("../../assets/brand-icons/maisey-fuels.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/maisey-fuels.png"),
     aliases: ["maisey", "maisey fuels", "maisy fuels"],
   },
   {
@@ -367,6 +418,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "PF",
     color: "#0b5ea8",
     icon: require("../../assets/brand-icons/petro-fuels.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/petro-fuels.png"),
     aliases: ["petro fuels", "petro fuel"],
   },
   {
@@ -374,6 +426,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "WA",
     color: "#174c7c",
     icon: require("../../assets/brand-icons/wa-fuels.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/wa-fuels.png"),
     aliases: ["wa fuels", "wa fuel"],
   },
   {
@@ -381,6 +434,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "AF",
     color: "#185f8c",
     icon: require("../../assets/brand-icons/apollo-fuel.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/apollo-fuel.png"),
     aliases: ["apollo fuel", "apollo"],
   },
   {
@@ -388,6 +442,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "FF",
     color: "#1f6fb5",
     icon: require("../../assets/brand-icons/fastfuel.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/fastfuel.png"),
     aliases: ["fastfuel", "fastfuel 24/7", "fast fuel"],
   },
   {
@@ -395,6 +450,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "FZ",
     color: "#247a4d",
     icon: require("../../assets/brand-icons/fuel-zone.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/fuel-zone.png"),
     aliases: ["fuel zone", "fuelzone"],
   },
   {
@@ -402,6 +458,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "G",
     color: "#efb321",
     icon: require("../../assets/brand-icons/gull.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/gull.png"),
     aliases: ["gull"],
   },
   {
@@ -409,6 +466,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "HE",
     color: "#0b7a43",
     icon: require("../../assets/brand-icons/hope-energy.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/hope-energy.png"),
     aliases: ["hope energy", "hopeenergy", "hopefuel"],
   },
   {
@@ -416,6 +474,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "L+",
     color: "#111827",
     icon: require("../../assets/brand-icons/lmct.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/lmct.png"),
     aliases: ["lmct", "lmct+"],
   },
   {
@@ -423,6 +482,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "M",
     color: "#1c4f9c",
     icon: require("../../assets/brand-icons/matex.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/matex.png"),
     aliases: ["matex", "matex fuel"],
   },
   {
@@ -430,6 +490,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "P",
     color: "#d97706",
     icon: require("../../assets/brand-icons/payless-fuel.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/payless-fuel.png"),
     aliases: ["payless", "payless fuel"],
   },
   {
@@ -437,6 +498,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "S",
     color: "#d21f26",
     icon: require("../../assets/brand-icons/sinopec.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/sinopec.png"),
     aliases: ["sinopec"],
   },
   {
@@ -444,6 +506,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "M",
     color: "#1c4f9c",
     icon: require("../../assets/brand-icons/metco.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/metco.png"),
     aliases: ["metco"],
   },
   {
@@ -451,6 +514,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "D",
     color: "#247a4d",
     icon: require("../../assets/brand-icons/dayef.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/dayef.png"),
     aliases: ["dayef"],
   },
   {
@@ -458,6 +522,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "DB",
     color: "#8a4b1f",
     icon: require("../../assets/brand-icons/des-brown-service-centre.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/des-brown-service-centre.png"),
     aliases: ["des brown", "des brown service centre"],
   },
   {
@@ -465,6 +530,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "P",
     color: "#1f64b7",
     icon: require("../../assets/brand-icons/petrogas.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/petrogas.png"),
     aliases: ["petrogas"],
   },
   {
@@ -472,6 +538,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "PF",
     color: "#c8202f",
     icon: require("../../assets/brand-icons/phoenix-fuels.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/phoenix-fuels.png"),
     aliases: ["phoenix fuels", "phoenix fuel", "phoenix"],
   },
   {
@@ -479,6 +546,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "P",
     color: "#5f2d86",
     icon: require("../../assets/brand-icons/powerfuel.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/powerfuel.png"),
     aliases: ["powerfuel", "power fuel"],
   },
   {
@@ -486,6 +554,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "P",
     color: "#173f8a",
     icon: require("../../assets/brand-icons/prime-petroleum.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/prime-petroleum.png"),
     aliases: ["prime", "prime petroleum"],
   },
   {
@@ -493,6 +562,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "R",
     color: "#168f63",
     icon: require("../../assets/brand-icons/roo-petroleum.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/roo-petroleum.png"),
     aliases: ["roo", "roo petroleum"],
   },
   {
@@ -500,6 +570,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "S",
     color: "#2b2b2b",
     icon: require("../../assets/brand-icons/supreme-fuel.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/supreme-fuel.png"),
     aliases: ["supreme fuel", "supreme petroleum", "supreme"],
   },
   {
@@ -507,6 +578,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "W",
     color: "#0f5c8c",
     icon: require("../../assets/brand-icons/westside.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/westside.png"),
     aliases: ["westside", "westside petroleum"],
   },
   {
@@ -514,6 +586,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "I",
     color: "#2c5f5c",
     icon: require("../../assets/brand-icons/independent.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/independent.png"),
     aliases: [
       "independent",
       "unbranded",
@@ -541,6 +614,7 @@ export const stationBrandStyles: BrandStyle[] = [
     initials: "F",
     color: "#247a4d",
     icon: require("../../assets/brand-icons/generic-fuel.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/generic-fuel.png"),
     aliases: [
       "temco",
       "temco petroleum",
@@ -579,6 +653,7 @@ export function brandStyleForStation(station: Station): BrandStyle {
       .slice(0, 2),
     color: colors.blue,
     icon: require("../../assets/brand-icons/generic-fuel.png"),
+    markerIcon: require("../../assets/brand-marker-overlays/generic-fuel.png"),
     aliases: [],
   };
 }

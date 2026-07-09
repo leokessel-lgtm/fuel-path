@@ -268,14 +268,14 @@ function checkSimctl() {
 }
 
 function checkNativePublicEnv() {
-  const baseUrl = process.env.EXPO_PUBLIC_FUEL_PATH_API_BASE_URL || "";
+  const baseUrl = process.env.EXPO_PUBLIC_FUEL_PATH_API_BASE_URL || "https://fuel-path.vercel.app";
   const validBaseUrl = Boolean(baseUrl) && !["127.0.0.1", "localhost", "::1"].some((host) => baseUrl.includes(host));
   const capabilityConfigured =
     process.env.ALERTS_CLIENT_WRITE_ENABLED === "1" &&
     Boolean(process.env.ALERTS_CLIENT_CAPABILITY_SECRET || process.env.ALERTS_CLIENT_WRITE_TOKEN);
   checks.push({
-    name: "Physical-device API URL exported locally",
-    detail: validBaseUrl ? "" : "Export EXPO_PUBLIC_FUEL_PATH_API_BASE_URL to a LAN or HTTPS URL before device runs.",
+    name: "Physical-device API URL reachable locally",
+    detail: validBaseUrl ? "" : "Use a LAN or HTTPS EXPO_PUBLIC_FUEL_PATH_API_BASE_URL before device runs.",
     status: validBaseUrl ? "pass" : "warn",
   });
   checks.push({

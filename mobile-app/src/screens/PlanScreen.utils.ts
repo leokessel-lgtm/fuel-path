@@ -271,14 +271,21 @@ export function sameSavedCommuteRoute(
   commute: SavedCommute,
   endpoints: { from: MapPoint; to: MapPoint },
   fuel: FuelCode,
+  vehicleId?: string,
 ) {
   return (
     commute.fuel === fuel &&
+    sameSavedCommuteVehicle(commute.vehicleId, vehicleId) &&
     closeCoordinate(commute.from.lat, endpoints.from.lat) &&
     closeCoordinate(commute.from.lon, endpoints.from.lon) &&
     closeCoordinate(commute.to.lat, endpoints.to.lat) &&
     closeCoordinate(commute.to.lon, endpoints.to.lon)
   );
+}
+
+function sameSavedCommuteVehicle(leftVehicleId?: string, rightVehicleId?: string) {
+  if (!leftVehicleId || !rightVehicleId) return true;
+  return leftVehicleId === rightVehicleId;
 }
 
 function closeCoordinate(left: number, right: number) {

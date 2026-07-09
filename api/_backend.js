@@ -263,6 +263,7 @@ function stationWithDiscountRules(station) {
 function isActiveDirectDiscountRule(rule) {
   if (rule.discountType !== "direct_cpl") return false;
   if (Number(rule.centsPerLitre || 0) <= 0) return false;
+  if (rule.nextReviewAt < todayIsoDate()) return false;
   if (!rule.expiryDate) return true;
   return rule.expiryDate >= todayIsoDate();
 }

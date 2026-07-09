@@ -42,6 +42,23 @@ export function useAppPreferences() {
   }, [loaded, preferences]);
 
   const updateFuel = useCallback((fuel: FuelCode) => {
+    setPreferences((current) => ({
+      ...current,
+      activeVehicleId: "",
+      vehicleName: "",
+      vehicleRego: "",
+      vehicleEnergyType: fuel === "DL" || fuel === "PDL" ? "diesel" : "petrol",
+      fuel,
+      evConnectors: [],
+      fuelTankLitres: defaultPreferences.fuelTankLitres,
+      evBatteryKwh: defaultPreferences.evBatteryKwh,
+      evRangeKm: defaultPreferences.evRangeKm,
+      homeChargingAccess: defaultPreferences.homeChargingAccess,
+      evChargingPreference: defaultPreferences.evChargingPreference,
+    }));
+  }, []);
+
+  const updateVehicleFuel = useCallback((fuel: FuelCode) => {
     setPreferences((current) => updateActiveVehicle(current, {
       fuel,
       vehicleEnergyType: fuel === "DL" || fuel === "PDL" ? "diesel" : "petrol",
@@ -233,6 +250,7 @@ export function useAppPreferences() {
     togglePreferredStationBrand,
     updateDecisionRule,
     updateFuel,
+    updateVehicleFuel,
     updateHomeChargingAccess,
     updateNavigationApp,
     updateVehicleProfile,

@@ -4,7 +4,7 @@ import { FuelCode, MapPoint, SavedCommute, Weekday } from "../types";
 
 const SAVED_COMMUTES_KEY = "fuel-path:saved-commutes:v1";
 const MAX_SAVED_COMMUTES = 20;
-const fuelCodes: FuelCode[] = ["E10", "U91", "P95", "P98", "DL", "PDL"];
+const fuelCodes: FuelCode[] = ["E10", "U91", "P95", "P98", "DL", "PDL", "LPG"];
 const weekdays: Weekday[] = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
 export const defaultCommuteAlertDays: Weekday[] = ["mon", "tue", "wed", "thu", "fri"];
 export const migratedCommuteAlertDays: Weekday[] = weekdays;
@@ -99,11 +99,11 @@ function isSavedCommute(value: unknown): value is SavedCommute {
 function isMapPoint(value: unknown): value is MapPoint {
   if (!value || typeof value !== "object") return false;
   const point = value as Partial<MapPoint>;
+  const lat = Number(point.lat);
+  const lon = Number(point.lon);
   return (
-    typeof point.lat === "number" &&
-    Number.isFinite(point.lat) &&
-    typeof point.lon === "number" &&
-    Number.isFinite(point.lon) &&
+    Number.isFinite(lat) &&
+    Number.isFinite(lon) &&
     typeof point.label === "string"
   );
 }

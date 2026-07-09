@@ -40,6 +40,7 @@ export function VehicleFuelCard({
   onAddVehicle,
   onFuelChange,
   onHomeChargingAccessChange,
+  onClearVehicleProfile,
   onRemoveVehicle,
   onSelectVehicle,
   onToggleEvConnector,
@@ -50,6 +51,7 @@ export function VehicleFuelCard({
   onAddVehicle: (vehicleEnergyType?: VehicleEnergyType) => void;
   onFuelChange: (fuel: FuelCode) => void;
   onHomeChargingAccessChange: (homeChargingAccess: HomeChargingAccess) => void;
+  onClearVehicleProfile: () => void;
   onRemoveVehicle: (vehicleId: string) => void;
   onSelectVehicle: (vehicleId: string) => void;
   onToggleEvConnector: (connector: EvConnector) => void;
@@ -64,6 +66,7 @@ export function VehicleFuelCard({
   const usesFuel = preferences.vehicleEnergyType !== "electric";
   const usesEvCharging = preferences.vehicleEnergyType === "electric";
   const canAddVehicle = preferences.vehicles.length < maxVehicleProfiles;
+  const hasVehicleDetails = Boolean(preferences.vehicleName.trim() || preferences.vehicleRego.trim());
 
   return (
     <View style={styles.card}>
@@ -249,6 +252,16 @@ export function VehicleFuelCard({
         </View>
       ) : null}
 
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ disabled: !hasVehicleDetails }}
+        disabled={!hasVehicleDetails}
+        onPress={onClearVehicleProfile}
+        style={[styles.removeButton, !hasVehicleDetails && styles.removeButtonDisabled]}
+      >
+        <Text style={[styles.removeButtonText, !hasVehicleDetails && styles.removeButtonTextDisabled]}>Clear current vehicle details</Text>
+      </Pressable>
+
       {preferences.vehicles.length > 1 ? (
         <Pressable
           accessibilityRole="button"
@@ -347,7 +360,7 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
   },
   title: {
-    ...typography.title,
+    ...typography.listTitle,
   },
   muted: {
     ...typography.metadata,
@@ -520,9 +533,15 @@ const styles = StyleSheet.create({
     minHeight: 36,
     justifyContent: "center",
   },
+  removeButtonDisabled: {
+    opacity: 0.45,
+  },
   removeButtonText: {
     color: colors.red,
     fontSize: typography.compactButtonLabel.fontSize,
     fontWeight: typography.compactButtonLabel.fontWeight,
+  },
+  removeButtonTextDisabled: {
+    color: colors.muted,
   },
 });

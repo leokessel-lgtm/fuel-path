@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { colors, radii, spacing, surfaces, typeScale } from "../theme";
 import { FuelCode } from "../types";
 
-const fuelCodes: FuelCode[] = ["E10", "U91", "P95", "P98", "DL", "PDL"];
+const fuelCodes: FuelCode[] = ["E10", "U91", "P95", "P98", "DL", "PDL", "LPG"];
 
 export function FuelSelector({
   value,

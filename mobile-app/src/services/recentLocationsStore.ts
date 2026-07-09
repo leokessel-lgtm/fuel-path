@@ -52,11 +52,11 @@ function normaliseMapPoint(point: MapPoint): MapPoint {
 function isMapPoint(value: unknown): value is MapPoint {
   if (!value || typeof value !== "object") return false;
   const point = value as Partial<MapPoint>;
+  const lat = Number(point.lat);
+  const lon = Number(point.lon);
   return (
-    typeof point.lat === "number" &&
-    Number.isFinite(point.lat) &&
-    typeof point.lon === "number" &&
-    Number.isFinite(point.lon) &&
+    Number.isFinite(lat) &&
+    Number.isFinite(lon) &&
     typeof point.label === "string"
   );
 }

@@ -1,17 +1,20 @@
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { basename, join, resolve } from "node:path";
+import { basename, dirname, isAbsolute, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { inflateSync } from "node:zlib";
 
-const root = resolve("..");
-const outputRoot = resolve(root, "tmp", "native-smoke");
+const scriptDir = dirname(fileURLToPath(import.meta.url));
+const mobileRoot = resolve(scriptDir, "..");
+const repoRoot = resolve(mobileRoot, "..");
+const outputRoot = resolve(repoRoot, "tmp", "native-smoke");
 const sdkRoot = findAndroidSdkRoot();
 const adb = join(sdkRoot, "platform-tools", "adb");
 const emulator = join(sdkRoot, "emulator", "emulator");
 const avdName = process.env.FUEL_PATH_ANDROID_AVD || "Fuel_Path_Arm64_API_35";
 const packageName = "com.fuelpath.app";
 const activityName = "com.fuelpath.app/.MainActivity";
-const artifact = resolve(argumentValue("--artifact") || process.env.FUEL_PATH_NATIVE_ARTIFACT || "");
+const artifact = resolveInputPath(argumentValue("--artifact") || process.env.FUEL_PATH_NATIVE_ARTIFACT || "");
 const mapSettleMs = Number(process.env.FUEL_PATH_ANDROID_MAP_SETTLE_MS || argumentValue("--map-settle-ms") || 8_000);
 const requirePhysicalDevice = process.argv.includes("--require-physical");
 const requestedDeviceSerial = argumentValue("--device-serial") || process.env.FUEL_PATH_ANDROID_DEVICE_SERIAL || "";
@@ -39,14 +42,16 @@ try {
   await launchPreviewApp();
   await wait(mapSettleMs);
   resetGfxinfo();
+  await tapLabel("Plan", "plan tab", { x: 260, y: 2220 });
+  await wait(1_500);
   await capture("plan");
-  await tap(540, 2220, "nearby tab");
+  await tapLabel("Nearby", "nearby tab", { x: 540, y: 2220 });
   await wait(2_500);
   await capture("nearby");
   await swipe(540, 1160, 540, 760, "nearby pan/list drag");
   await wait(1_500);
   await capture("nearby-after-pan");
-  await tap(860, 2220, "account tab");
+  await tapLabel("Settings", "settings tab", { x: 860, y: 2220 });
   await wait(1_500);
   await capture("account");
   await performMeasuredFramePass();
@@ -65,7 +70,7 @@ try {
     .filter((line) => /\b(FATAL EXCEPTION|TypeError: undefined is not a function)\b/i.test(line));
   const mapWarningLines = logcat.stdout
     .split("\n")
-    .filter((line) => /GoogleCertificatesRslt|Authorization failure|API key|ApiNotActivated|REQUEST_DENIED|Application credential header not valid|GLSUser/i.test(line));
+    .filter(isMapCredentialWarningLine);
   const frameSummary = parseGfxinfo(gfxinfo.stdout);
   const mapTileSummaries = screenshots
     .filter((path) => /-(plan|nearby|nearby-after-pan)\.png$/.test(path))
@@ -219,6 +224,19 @@ async function tap(x, y, label) {
   marks.push({ name: label, at: new Date().toISOString() });
 }
 
+async function tapLabel(text, label, fallback) {
+  const bounds = findNodeBoundsByText(readUiDump(), text);
+  const point = bounds ? centreOfBounds(bounds) : fallback;
+  await tap(Math.round(point.x), Math.round(point.y), label);
+  marks.push({
+    name: `${label} target`,
+    text,
+    target: bounds ? "ui_dump" : "fallback",
+    x: Math.round(point.x),
+    y: Math.round(point.y),
+  });
+}
+
 async function swipe(x1, y1, x2, y2, label) {
   adbCommand(["shell", "input", "swipe", String(x1), String(y1), String(x2), String(y2), "450"]);
   marks.push({ name: label, at: new Date().toISOString() });
@@ -230,7 +248,7 @@ async function measuredSwipe(x1, y1, x2, y2, durationMs, label) {
 }
 
 async function performMeasuredFramePass() {
-  await tap(540, 2220, "nearby tab before measured frame pass");
+  await tapLabel("Nearby", "nearby tab before measured frame pass", { x: 540, y: 2220 });
   await wait(1_000);
   resetGfxinfo("gfxinfo_reset_before_measured_frame_pass");
   await measuredSwipe(500, 1800, 500, 600, 1200, "measured nearby upward drag");
@@ -243,16 +261,10 @@ async function performMeasuredFramePass() {
 }
 
 async function capture(name) {
-  let foreground = false;
-  try {
-    const dump = readUiDump();
-    if (dump.includes(`package="${packageName}"`)) {
-      foreground = true;
-    } else {
-      foreground = isFuelPathForeground();
-    }
-  } catch (error) {
-    foreground = isFuelPathForeground();
+  let foreground = isPreviewAppVisible();
+  if (!foreground) {
+    await bringPreviewAppToForeground(`foreground recovery before ${name}`);
+    foreground = isPreviewAppVisible();
   }
   if (!foreground) {
     throw new Error(`Could not capture ${name}: Fuel Path is not foreground.`);
@@ -267,6 +279,22 @@ async function capture(name) {
   }
   writeFileSync(path, result.stdout);
   screenshots.push(path);
+}
+
+async function bringPreviewAppToForeground(reason) {
+  adbCommand(["shell", "am", "start", "-n", activityName]);
+  marks.push({ name: reason, at: new Date().toISOString() });
+  await wait(1_500);
+}
+
+function isPreviewAppVisible() {
+  try {
+    const dump = readUiDump();
+    if (dump.includes(`package="${packageName}"`)) return true;
+  } catch (error) {
+    // Fall back to window focus below.
+  }
+  return isFuelPathForeground();
 }
 
 function isFuelPathForeground() {
@@ -321,10 +349,42 @@ function readUiDump() {
   return readResult.stdout || "";
 }
 
+function findNodeBoundsByText(xml, text) {
+  const escaped = escapeRegExp(escapeXmlAttribute(text));
+  const nodePattern = new RegExp(`<node\\b(?=[^>]*(?:text|content-desc)="${escaped}")[^>]*bounds="\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\]"[^>]*/?>`, "i");
+  const match = xml.match(nodePattern);
+  if (!match) return null;
+  return {
+    left: Number(match[1]),
+    top: Number(match[2]),
+    right: Number(match[3]),
+    bottom: Number(match[4]),
+  };
+}
+
+function centreOfBounds(bounds) {
+  return {
+    x: (bounds.left + bounds.right) / 2,
+    y: (bounds.top + bounds.bottom) / 2,
+  };
+}
+
+function escapeXmlAttribute(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+}
+
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function readApkCertificate() {
   const apksigner = latestTool("build-tools", "apksigner");
   if (!apksigner) return { error: "apksigner not found" };
-  const javaHome = process.env.JAVA_HOME || join(root, "var", "tooling", "java", "jdk-21.0.11+10", "Contents", "Home");
+  const javaHome = process.env.JAVA_HOME || join(repoRoot, "var", "tooling", "java", "jdk-21.0.11+10", "Contents", "Home");
   const result = spawnSync(apksigner, ["verify", "--print-certs", artifact], {
     encoding: "utf8",
     env: { ...process.env, JAVA_HOME: javaHome },
@@ -369,7 +429,9 @@ function buildAttentionItems(frameSummary, mapWarningLines, mapTileSummaries) {
     attentionItems.push(`Google map tiles appear blank in ${blankSummaries.length}/${mapTileSummaries.length} map screenshots; first colour ratio ${blankSummaries[0].colourRatio}, detail buckets ${blankSummaries[0].detailBuckets}.`);
   }
   if (frameSummary.totalFrames < 30) {
-    attentionItems.push(`Frame evidence is insufficient for a performance claim: ${frameSummary.totalFrames} rendered frames captured.`);
+    attentionItems.push(frameSummary.renderSurfacePresent
+      ? `Frame timing is unavailable from gfxinfo: ${frameSummary.totalFrames} counted frames, but ${frameSummary.viewRootCount} ViewRootImpl and ${frameSummary.graphicsBufferCount} graphics buffers were present. Treat this as render evidence only.`
+      : `Frame evidence is insufficient for a performance claim: ${frameSummary.totalFrames} rendered frames captured.`);
     return attentionItems;
   }
   if (frameSummary.jankyPercent > 20) {
@@ -381,9 +443,24 @@ function buildAttentionItems(frameSummary, mapWarningLines, mapTileSummaries) {
   return attentionItems;
 }
 
+function isMapCredentialWarningLine(line) {
+  if (/GoogleCertificatesRslt/i.test(line) && /PhFlagUpdateRegistry|Phenotype/i.test(line)) return false;
+  return /GoogleCertificatesRslt|Authorization failure|API key|ApiNotActivated|REQUEST_DENIED|Application credential header not valid|GLSUser/i.test(line);
+}
+
 function parseGfxinfo(output) {
   const totalFrames = matchNumber(output, /Total frames rendered:\s+(\d+)/);
   const jankyFrames = matchNumber(output, /Janky frames:\s+(\d+)/);
+  const viewRootCount = matchNumber(output, /Total ViewRootImpl\s+:\s+(\d+)/);
+  const attachedViewCount = matchNumber(output, /Total attached Views\s+:\s+(\d+)/);
+  const renderNodeMemory = matchText(output, /Total RenderNode\s+:\s+([^\n]+)/).trim();
+  const graphicsBufferCount = (output.match(/^\s*0x[0-9a-f]+\s+\|/gim) || []).length;
+  const graphicsBufferEstimateKb = matchNumber(output, /Total allocated by GraphicBufferAllocator \(estimate\):\s+([\d.]+)\s+KB/);
+  const profileDataRows = output
+    .split("---PROFILEDATA---")[1]
+    ?.split("\n")
+    .filter((line) => /^\d/.test(line.trim()))
+    .length || 0;
   return {
     totalFrames,
     jankyFrames,
@@ -391,6 +468,13 @@ function parseGfxinfo(output) {
     percentile90Ms: totalFrames ? matchNumber(output, /90th percentile:\s+(\d+)ms/) : null,
     percentile95Ms: totalFrames ? matchNumber(output, /95th percentile:\s+(\d+)ms/) : null,
     percentile99Ms: totalFrames ? matchNumber(output, /99th percentile:\s+(\d+)ms/) : null,
+    viewRootCount,
+    attachedViewCount,
+    renderNodeMemory,
+    graphicsBufferCount,
+    graphicsBufferEstimateKb,
+    profileDataRows,
+    renderSurfacePresent: viewRootCount > 0 && graphicsBufferCount > 0,
   };
 }
 
@@ -415,6 +499,12 @@ function writeReport(result) {
     `- p90: ${result.frameSummary.percentile90Ms} ms`,
     `- p95: ${result.frameSummary.percentile95Ms} ms`,
     `- p99: ${result.frameSummary.percentile99Ms} ms`,
+    `- Render surface present: ${result.frameSummary.renderSurfacePresent}`,
+    `- View roots: ${result.frameSummary.viewRootCount}`,
+    `- Attached views: ${result.frameSummary.attachedViewCount}`,
+    `- Graphics buffers: ${result.frameSummary.graphicsBufferCount}`,
+    `- Graphics buffer estimate: ${result.frameSummary.graphicsBufferEstimateKb} KB`,
+    `- Profile frame rows: ${result.frameSummary.profileDataRows}`,
     "",
     "## Map Tile Summary",
     "",
@@ -596,6 +686,11 @@ function latestTool(group, tool) {
 function argumentValue(name) {
   const index = process.argv.indexOf(name);
   return index >= 0 ? process.argv[index + 1] : "";
+}
+
+function resolveInputPath(value) {
+  if (!value) return "";
+  return isAbsolute(value) ? value : resolve(process.cwd(), value);
 }
 
 function matchNumber(value, pattern) {

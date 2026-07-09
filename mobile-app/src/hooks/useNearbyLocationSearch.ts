@@ -33,6 +33,15 @@ export function useNearbyLocationSearch(context?: LocationSearchContext) {
     });
   };
 
+  const activateLocationSearch = () => {
+    searchRequestRef.current += 1;
+    setLocationSearchActive(true);
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    setLocationSuggestions([]);
+    setSuggestionsLoading(false);
+    setLocationError("");
+  };
+
   const clearLocationSearch = () => {
     searchRequestRef.current += 1;
     if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
@@ -92,6 +101,7 @@ export function useNearbyLocationSearch(context?: LocationSearchContext) {
     setLocationQuery,
     suggestionsLoading,
     updateLocationQuery,
+    activateLocationSearch,
   };
 }
 

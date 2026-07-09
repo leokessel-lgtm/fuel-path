@@ -70,6 +70,11 @@ export const typography = {
     fontSize: typeScale.title,
     fontWeight: "700" as const,
   },
+  listTitle: {
+    color: colors.ink,
+    fontSize: typeScale.lead,
+    fontWeight: "700" as const,
+  },
   bodyStrong: {
     color: colors.ink,
     fontSize: typeScale.body,

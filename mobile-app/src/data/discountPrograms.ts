@@ -8,6 +8,7 @@ export const activeDirectDiscountPrograms = discountPrograms.filter(isActiveDire
 function isActiveDirectDiscount(program: DiscountRule) {
   if (program.discountType !== "direct_cpl") return false;
   if (program.centsPerLitre <= 0) return false;
+  if (program.nextReviewAt < todayIsoDate()) return false;
   if (!program.expiryDate) return true;
   return program.expiryDate >= todayIsoDate();
 }

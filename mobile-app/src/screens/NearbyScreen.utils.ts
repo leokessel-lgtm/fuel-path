@@ -1,7 +1,12 @@
+import * as IntentLauncher from "expo-intent-launcher";
 import { ActionSheetIOS, Alert, Linking, Platform } from "react-native";
 
 import { AppPreferences, EvConnector, MapPoint, NavigationAppPreference } from "../types";
 import { NearbyMode } from "../components/NearbyEvControls";
+
+const ANDROID_VIEW_ACTION = "android.intent.action.VIEW";
+const ANDROID_GOOGLE_MAPS_PACKAGE = "com.google.android.apps.maps";
+const ANDROID_WAZE_PACKAGE = "com.waze";
 
 export function sameStationCodes(left: string[], right: string[]) {
   if (left.length !== right.length) return false;
@@ -55,10 +60,10 @@ export async function openDirections(
   const safeLon = Number(lon);
   const appleMapsUrl = `http://maps.apple.com/?daddr=${safeLat},${safeLon}&q=${label}&dirflg=d`;
   const wazeUrl = `https://waze.com/ul?ll=${safeLat},${safeLon}&navigate=yes&utm_source=fuelpath`;
+  const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${safeLat},${safeLon}&travelmode=driving`;
   if (Platform.OS === "ios") {
-    const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${safeLat},${safeLon}&travelmode=driving`;
     const nativeGoogleMapsUrl = nativeGoogleMapsUrlFor(googleMapsUrl);
-    const url = await chooseNavigationUrl({
+    const option = await chooseNavigationOption({
       navigationApp,
       title: "Navigate to destination",
       options: [
@@ -67,24 +72,49 @@ export async function openDirections(
         ...(await canOpenGoogleMaps() ? [{ label: "Google Maps", provider: "google_maps" as const, url: nativeGoogleMapsUrl }] : []),
       ],
     });
-    if (url) await Linking.openURL(url);
+    await openNavigationOption(option);
     return;
   }
   if (Platform.OS === "android") {
     const geoUrl = `geo:0,0?q=${safeLat},${safeLon}(${label})`;
-    const url = await chooseNavigationUrl({
+    const option = await chooseNavigationOption({
       navigationApp,
       title: "Navigate to destination",
       options: [
-        { label: "Waze", provider: "waze", url: wazeUrl },
-        { label: "Maps", provider: "device_maps", url: geoUrl },
+        {
+          fallbackUrl: appleMapsUrl,
+          label: "Apple Maps",
+          provider: "apple_maps",
+          url: appleMapsUrl,
+        },
+        {
+          androidIntent: androidWazeIntent(safeLat, safeLon),
+          fallbackUrl: wazeUrl,
+          label: "Waze",
+          provider: "waze",
+          url: androidWazeUrl(safeLat, safeLon),
+        },
+        {
+          androidIntent: androidGoogleMapsIntent(androidGoogleNavigationUrl(safeLat, safeLon)),
+          fallbackUrl: googleMapsUrl,
+          label: "Google Maps",
+          provider: "google_maps",
+          url: googleMapsUrl,
+        },
+        {
+          androidIntent: androidDeviceMapsIntent(geoUrl),
+          fallbackUrl: googleMapsUrl,
+          label: "Maps",
+          provider: "device_maps",
+          url: geoUrl,
+        },
       ],
     });
-    if (url) await Linking.openURL(url);
+    await openNavigationOption(option);
     return;
   }
   const url =
-    `https://www.google.com/maps/dir/?api=1&destination=${safeLat},${safeLon}&travelmode=driving`;
+    googleMapsUrl;
   await Linking.openURL(url);
 }
 
@@ -114,7 +144,7 @@ export async function openRouteDirectionsViaStop({
     const appleMapsUrl = appleMapsRouteViaStopUrl(origin, stop, destination);
     const nativeGoogleMapsUrl = nativeGoogleMapsUrlFor(googleMapsUrl);
     const wazeStopUrl = `https://waze.com/ul?ll=${coordinateParam(stop.lat, stop.lon)}&navigate=yes&utm_source=fuelpath`;
-    const url = await chooseNavigationUrl({
+    const option = await chooseNavigationOption({
       navigationApp,
       title: "Navigate via fuel stop",
       options: [
@@ -123,20 +153,46 @@ export async function openRouteDirectionsViaStop({
         ...(await canOpenGoogleMaps() ? [{ label: "Google Maps", provider: "google_maps" as const, url: nativeGoogleMapsUrl }] : []),
       ],
     });
-    if (url) await Linking.openURL(url);
+    await openNavigationOption(option);
     return;
   }
   if (Platform.OS === "android") {
     const wazeStopUrl = `https://waze.com/ul?ll=${coordinateParam(stop.lat, stop.lon)}&navigate=yes&utm_source=fuelpath`;
-    const url = await chooseNavigationUrl({
+    const appleMapsUrl = appleMapsRouteViaStopUrl(origin, stop, destination);
+    const option = await chooseNavigationOption({
       navigationApp,
       title: "Navigate via fuel stop",
       options: [
-        { label: "Waze to stop", provider: "waze", url: wazeStopUrl },
-        { label: "Google Maps", provider: "google_maps", url: googleMapsUrl },
+        {
+          androidIntent: androidGoogleMapsIntent(googleMapsUrl),
+          fallbackUrl: googleMapsUrl,
+          label: "Maps",
+          provider: "device_maps",
+          url: googleMapsUrl,
+        },
+        {
+          fallbackUrl: appleMapsUrl,
+          label: "Apple Maps",
+          provider: "apple_maps",
+          url: appleMapsUrl,
+        },
+        {
+          androidIntent: androidWazeIntent(stop.lat, stop.lon),
+          fallbackUrl: wazeStopUrl,
+          label: "Waze to stop",
+          provider: "waze",
+          url: androidWazeUrl(stop.lat, stop.lon),
+        },
+        {
+          androidIntent: androidGoogleMapsIntent(googleMapsUrl),
+          fallbackUrl: googleMapsUrl,
+          label: "Google Maps",
+          provider: "google_maps",
+          url: googleMapsUrl,
+        },
       ],
     });
-    if (url) await Linking.openURL(url);
+    await openNavigationOption(option);
     return;
   }
   await Linking.openURL(googleMapsUrl);
@@ -164,6 +220,37 @@ function nativeGoogleMapsUrlFor(googleMapsUrl: string) {
   return `comgooglemapsurl://${googleMapsUrl.replace(/^https?:\/\//, "")}`;
 }
 
+function androidGoogleNavigationUrl(lat: number, lon: number) {
+  return `google.navigation:q=${Number(lat)},${Number(lon)}&mode=d`;
+}
+
+function androidGoogleMapsIntent(data: string) {
+  return {
+    action: ANDROID_VIEW_ACTION,
+    data,
+    packageName: ANDROID_GOOGLE_MAPS_PACKAGE,
+  };
+}
+
+function androidDeviceMapsIntent(data: string) {
+  return {
+    action: ANDROID_VIEW_ACTION,
+    data,
+  };
+}
+
+function androidWazeUrl(lat: number, lon: number) {
+  return `waze://?ll=${Number(lat)},${Number(lon)}&navigate=yes&utm_source=fuelpath`;
+}
+
+function androidWazeIntent(lat: number, lon: number) {
+  return {
+    action: ANDROID_VIEW_ACTION,
+    data: androidWazeUrl(lat, lon),
+    packageName: ANDROID_WAZE_PACKAGE,
+  };
+}
+
 async function canOpenWaze() {
   return Linking.canOpenURL("waze://");
 }
@@ -173,12 +260,35 @@ async function canOpenGoogleMaps() {
 }
 
 type NavigationOption = {
+  androidIntent?: {
+    action: string;
+    data: string;
+    packageName?: string;
+  };
+  fallbackUrl?: string;
   label: string;
   provider: NavigationAppPreference;
   url: string;
 };
 
-function chooseNavigationUrl({
+async function openNavigationOption(option: NavigationOption | undefined) {
+  if (!option) return;
+  try {
+    if (Platform.OS === "android" && option.androidIntent) {
+      await IntentLauncher.startActivityAsync(option.androidIntent.action, {
+        data: option.androidIntent.data,
+        packageName: option.androidIntent.packageName,
+      });
+      return;
+    }
+    await Linking.openURL(option.url);
+  } catch (error) {
+    if (!option.fallbackUrl) throw error;
+    await Linking.openURL(option.fallbackUrl);
+  }
+}
+
+function chooseNavigationOption({
   navigationApp,
   options,
   title,
@@ -193,18 +303,18 @@ function chooseNavigationUrl({
       || options.find((option) => option.provider === "apple_maps")
       || options.find((option) => option.provider === "google_maps")
       || options[0];
-    return Promise.resolve(preferred?.url);
+    return Promise.resolve(preferred);
   }
-  if (options.length <= 1) return Promise.resolve(options[0]?.url);
+  if (options.length <= 1) return Promise.resolve(options[0]);
   if (Platform.OS === "android") {
-    return new Promise<string | undefined>((resolve) => {
+    return new Promise<NavigationOption | undefined>((resolve) => {
       Alert.alert(
         title,
         undefined,
         [
           ...options.map((option) => ({
             text: option.label,
-            onPress: () => resolve(option.url),
+            onPress: () => resolve(option),
           })),
           {
             style: "cancel" as const,
@@ -219,7 +329,7 @@ function chooseNavigationUrl({
       );
     });
   }
-  return new Promise<string | undefined>((resolve) => {
+  return new Promise<NavigationOption | undefined>((resolve) => {
     ActionSheetIOS.showActionSheetWithOptions(
       {
         cancelButtonIndex: options.length,
@@ -227,7 +337,7 @@ function chooseNavigationUrl({
         title,
       },
       (buttonIndex) => {
-        resolve(buttonIndex < options.length ? options[buttonIndex]?.url : undefined);
+        resolve(buttonIndex < options.length ? options[buttonIndex] : undefined);
       },
     );
   });

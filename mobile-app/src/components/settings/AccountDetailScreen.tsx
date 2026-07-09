@@ -32,6 +32,7 @@ export function AccountDetailScreen({
   onToggleEvConnector,
   onTogglePreferredStationBrand,
   onAddVehicle,
+  onClearVehicleProfile,
   onRemoveVehicle,
   onSelectVehicle,
   onVehicleEnergyTypeChange,
@@ -63,6 +64,7 @@ export function AccountDetailScreen({
           onAddVehicle={onAddVehicle}
           onFuelChange={onFuelChange}
           onHomeChargingAccessChange={onHomeChargingAccessChange}
+          onClearVehicleProfile={onClearVehicleProfile}
           onRemoveVehicle={onRemoveVehicle}
           onSelectVehicle={onSelectVehicle}
           onToggleEvConnector={onToggleEvConnector}
@@ -131,7 +133,11 @@ export function AccountDetailScreen({
   );
 }
 
-const navigationOptions: Array<{ label: string; summary: string; value: NavigationAppPreference }> = [
+const navigationOptions: Array<{
+  label: string;
+  summary: string;
+  value: NavigationAppPreference;
+}> = [
   {
     label: "Device maps",
     summary: "Apple Maps on iPhone/iPad, Maps on Android.",
@@ -144,7 +150,9 @@ const navigationOptions: Array<{ label: string; summary: string; value: Navigati
   },
   {
     label: "Apple Maps",
-    summary: "Apple devices only. Falls back to device maps elsewhere.",
+    summary: Platform.OS === "ios"
+      ? "Native Apple Maps handoff on iPhone and iPad."
+      : "Opens Apple Maps in the browser on Android.",
     value: "apple_maps",
   },
   {

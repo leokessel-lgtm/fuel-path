@@ -33,6 +33,7 @@ export function StationMap({
   routePoints = emptyRoutePoints,
   cameraInsets,
   userLocation,
+  onMapPress,
 }: {
   centre: MapPoint;
   chargers?: EvCharger[];
@@ -49,6 +50,7 @@ export function StationMap({
   routePoints?: MapPoint[];
   cameraInsets?: CameraInsets;
   userLocation?: MapPoint;
+  onMapPress?: () => void;
 }) {
   useEffect(() => {
     onViewportStationsChange?.(stations.map((item) => item.station.stationCode));
@@ -286,7 +288,7 @@ const styles = StyleSheet.create({
   },
   userLocationPin: {
     ...shadow.soft,
-    backgroundColor: colors.blue,
+    backgroundColor: colors.route,
     borderColor: colors.white,
     borderRadius: radii.pill,
     borderBottomLeftRadius: 4,
@@ -300,14 +302,12 @@ const styles = StyleSheet.create({
   },
   userLocationPinInner: {
     backgroundColor: colors.white,
-    borderColor: colors.blueSoft,
     borderRadius: radii.pill,
-    borderWidth: 2,
-    height: 10,
-    left: 7,
+    height: 8,
+    left: 8,
     position: "absolute",
-    top: 7,
-    width: 10,
+    top: 8,
+    width: 8,
   },
   pin: {
     ...shadow.soft,

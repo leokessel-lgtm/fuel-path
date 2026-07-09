@@ -19,6 +19,7 @@ const energyOptions: Array<{ label: string; shortLabel: string; value: NearbyEne
   { label: "P98", shortLabel: "P98", value: "P98" },
   { label: "Diesel", shortLabel: "Diesel", value: "DL" },
   { label: "Premium diesel", shortLabel: "Premium diesel", value: "PDL" },
+  { label: "LPG", shortLabel: "LPG", value: "LPG" },
   { label: "EV charge", shortLabel: "EV charge", value: "EV" },
 ];
 
@@ -49,7 +50,7 @@ export function NearbyEnergySelector({
         style={styles.energyButton}
       >
         <View>
-          <Text style={styles.energyEyebrow}>{eyebrow}</Text>
+          {eyebrow ? <Text style={styles.energyEyebrow}>{eyebrow}</Text> : null}
           <Text style={styles.energyButtonText}>{selected.shortLabel}</Text>
         </View>
         <Text style={styles.energyChevron}>{open ? "▲" : "▼"}</Text>

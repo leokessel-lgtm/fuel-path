@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import {
   Platform,
   Pressable,
@@ -15,6 +15,7 @@ import MapView, {
   type Region,
 } from "react-native-maps";
 
+import { brandStyleForStation } from "../data/brandAssets";
 import { colors, mapSkin, radii, shadow, spacing } from "../theme";
 import { EvCharger, MapPoint, StationViewModel } from "../types";
 import { BrandBadge } from "./BrandBadge";
@@ -113,6 +114,7 @@ export function StationMap({
   const [mapReady, setMapReady] = useState(false);
   const [mapMovedByUser, setMapMovedByUser] = useState(false);
   const [cameraResetVersion, setCameraResetVersion] = useState(0);
+  const [markerAssetRefreshVersion, setMarkerAssetRefreshVersion] = useState(0);
   const [currentRegion, setCurrentRegion] = useState<Region>(() =>
     regionForPoint(centre),
   );
@@ -274,6 +276,22 @@ export function StationMap({
     mapReady,
     routeEndpoints,
   ]);
+
+  useEffect(() => {
+    if (!mapReady || Platform.OS !== "android" || !markerGroups.priceMarkers.length) {
+      return;
+    }
+    const firstRefresh = setTimeout(() => {
+      setMarkerAssetRefreshVersion((current) => current + 1);
+    }, 650);
+    const secondRefresh = setTimeout(() => {
+      setMarkerAssetRefreshVersion((current) => current + 1);
+    }, 1600);
+    return () => {
+      clearTimeout(firstRefresh);
+      clearTimeout(secondRefresh);
+    };
+  }, [mapReady, markerGroups.priceMarkers.length]);
 
   useEffect(() => {
     if (!mapReady || !mapRef.current || !selectedStationCode) return;
@@ -528,49 +546,76 @@ export function StationMap({
           const subdued = Boolean(
             routeEndpoints && selectedStationCode && !selected,
           );
+          const brandStyle = brandStyleForStation(item.station);
+          const brandIcon = brandStyle.markerIcon || brandStyle.icon;
+          const nativeBrandIcon =
+            typeof brandIcon === "number" ? brandIcon : undefined;
           return (
-            <Marker
-              {...decorativeStationMarkerAccessibility}
-              coordinate={{
-                latitude: item.station.lat,
-                longitude: item.station.lon,
-              }}
-              key={item.station.stationCode}
-              onPress={() => handleMarkerPress(item.station.stationCode)}
-              ref={(marker) => {
-                markerRefs.current[item.station.stationCode] = marker;
-              }}
-              tracksViewChanges={Platform.OS === "android"}
-              zIndex={selected ? 700 : subdued ? 420 : 500}
-            >
-              <View style={styles.pinAnchor}>
-                <View
-                  style={[
-                    styles.pin,
-                    subdued && styles.pinSubdued,
-                    selected && styles.pinSelected,
-                  ]}
-                >
-                  <Text
+            <Fragment key={`${item.station.stationCode}-marker-stack`}>
+              <Marker
+                {...decorativeStationMarkerAccessibility}
+                coordinate={{
+                  latitude: item.station.lat,
+                  longitude: item.station.lon,
+                }}
+                key={`${item.station.stationCode}-${markerAssetRefreshVersion}`}
+                onPress={() => handleMarkerPress(item.station.stationCode)}
+                ref={(marker) => {
+                  markerRefs.current[item.station.stationCode] = marker;
+                }}
+                tracksViewChanges={Platform.OS === "android"}
+                zIndex={selected ? 700 : subdued ? 420 : 500}
+              >
+                <View style={styles.pinAnchor}>
+                  <View
                     style={[
-                      styles.pinPrice,
-                      selected && styles.pinPriceSelected,
+                      styles.pin,
+                      subdued && styles.pinSubdued,
+                      selected && styles.pinSelected,
                     ]}
                   >
-                    {item.adjustedCpl.toFixed(1)}
-                  </Text>
-                  <View style={styles.pinBrand}>
-                    <BrandBadge station={item.station} size={22} />
+                    <Text
+                      style={[
+                        styles.pinPrice,
+                        selected && styles.pinPriceSelected,
+                      ]}
+                    >
+                      {item.adjustedCpl.toFixed(1)}
+                    </Text>
+                    <View style={styles.pinBrand}>
+                      {Platform.OS === "android" ? null : (
+                        <BrandBadge
+                          marker
+                          station={item.station}
+                          size={22}
+                        />
+                      )}
+                    </View>
                   </View>
+                  <View
+                    style={[
+                      styles.pinPointer,
+                      selected && styles.pinPointerSelected,
+                    ]}
+                  />
                 </View>
-                <View
-                  style={[
-                    styles.pinPointer,
-                    selected && styles.pinPointerSelected,
-                  ]}
+              </Marker>
+              {Platform.OS === "android" && nativeBrandIcon ? (
+                <Marker
+                  {...decorativeStationMarkerAccessibility}
+                  anchor={{ x: 0.5, y: 1.35 }}
+                  coordinate={{
+                    latitude: item.station.lat,
+                    longitude: item.station.lon,
+                  }}
+                  image={nativeBrandIcon}
+                  key={`${item.station.stationCode}-brand-${markerAssetRefreshVersion}`}
+                  onPress={() => handleMarkerPress(item.station.stationCode)}
+                  tracksViewChanges={false}
+                  zIndex={selected ? 720 : subdued ? 440 : 520}
                 />
-              </View>
-            </Marker>
+              ) : null}
+            </Fragment>
           );
         })}
       </MapView>

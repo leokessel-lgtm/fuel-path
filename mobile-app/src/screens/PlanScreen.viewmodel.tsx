@@ -8,6 +8,7 @@ import {
 } from "react-native";
 
 import { geocodeAddress, getRoute, getRouteEvFallbackChargers, planFuelRoute } from "../api/fuelPathApi";
+import { NearbyEnergyChoice, NearbyEnergySelector } from "../components/NearbyEvControls";
 import { PlanRouteEditorCard } from "../components/PlanRouteEditorCard";
 import { PlanRouteSummaryCard } from "../components/PlanRouteSummaryCard";
 import { PlanRouteSheet } from "../components/PlanRouteSheet";
@@ -120,6 +121,7 @@ export function PlanScreenLogic({
   const [toPoint, setToPoint] = useState<MapPoint>();
   const [routeState, dispatchRoute] = useReducer(planRouteReducer, initialPlanRouteState);
   const [locatingFrom, setLocatingFrom] = useState(false);
+  const [fuelSelectorOpen, setFuelSelectorOpen] = useState(false);
   const keyboardHeight = useKeyboardHeight();
   const { height: windowHeight } = useWindowDimensions();
   const {
@@ -144,6 +146,7 @@ export function PlanScreenLogic({
   } = usePlanSheetState();
   const routeEditVersionRef = useRef(0);
   const routeRequestIdRef = useRef(0);
+  const activeAddressFieldRef = useRef<"from" | "to" | null>(null);
   const fromSelectionSuppressRef = useRef(false);
   const toSelectionSuppressRef = useRef(false);
   const fromSelectionSuppressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -183,6 +186,10 @@ export function PlanScreenLogic({
     to,
     toContext: toSearchContext,
   });
+
+  useEffect(() => {
+    activeAddressFieldRef.current = activeAddressField;
+  }, [activeAddressField]);
 
   usePlanCurrentLocationSync({
     currentLocation,
@@ -377,8 +384,25 @@ export function PlanScreenLogic({
     reopenRouteEditor();
   };
 
+  const handleAddressFieldBlur = (field: "from" | "to") => {
+    setTimeout(() => {
+      if (field === "from" && fromSelectionSuppressRef.current) return;
+      if (field === "to" && toSelectionSuppressRef.current) return;
+      if (activeAddressFieldRef.current === field) setActiveAddressField(null);
+    }, 120);
+  };
+
+  const handleEnergyChange = (value: NearbyEnergyChoice) => {
+    setFuelSelectorOpen(false);
+    if (value === "EV") {
+      onVehicleEnergyTypeChange("electric");
+      return;
+    }
+    onVehicleEnergyTypeChange(value === "DL" || value === "PDL" ? "diesel" : "petrol");
+    onFuelChange(value);
+  };
+
   const handleToChange = (value: string) => {
-    console.log("PLAN_TO_CHANGE", value);
     markRouteEdited();
     setActiveAddressField("to");
     setTo(value);
@@ -673,40 +697,50 @@ export function PlanScreenLogic({
             onPress={() => dispatchRoute({ type: "collapse-controls", collapsed: false })}
           />
         ) : (
-          <PlanRouteEditorCard
-            activeAddressField={activeAddressField}
-            canPlanRoute={canPlanRoute}
-            maxHeight={planEditorMaxHeight}
-            from={from}
-            fromSuggestions={fromSuggestions}
-            loading={loading}
-            locatingFrom={locatingFrom}
-            onFromChange={handleFromChange}
-            onFromFocus={() => setActiveAddressField("from")}
-            onFromBlur={() => setActiveAddressField(null)}
-            onFromSelectionStart={() => beginAddressFieldSelection("from")}
-            onPlanRoute={() => loadRoute()}
-            onSelectAddressSuggestion={selectAddressSuggestion}
-            onSelectQuickPlace={applyQuickPlace}
-            onRemoveRecent={onRemoveRecentLocation}
-            onSelectSavedCommute={applySavedCommute}
-            onToChange={handleToChange}
-            onToBlur={() => setActiveAddressField(null)}
-            onToSelectionStart={() => beginAddressFieldSelection("to")}
-            onToFocus={() => setActiveAddressField("to")}
-            onUseCurrentFromLocation={useCurrentFromLocation}
-            quickPlaces={quickPlaces}
-            routePrecisionHint={routePrecisionHint}
-            routeError={!routeStarted ? error : ""}
-            routePlanningBlocked={routePlanningBlocked}
-            savedCommutes={savedCommutes}
-            suggestionsError={suggestionsError}
-            suggestionsLoading={suggestionsLoading}
-            to={to}
-            toSuggestions={toSuggestions}
-            vehicleEnergyType={preferences.vehicleEnergyType}
-            vehicleRouteNotice={vehicleRouteNotice}
-          />
+          <>
+            <PlanRouteEditorCard
+              activeAddressField={activeAddressField}
+              canPlanRoute={canPlanRoute}
+              maxHeight={planEditorMaxHeight}
+              from={from}
+              fromSuggestions={fromSuggestions}
+              loading={loading}
+              locatingFrom={locatingFrom}
+              onFromChange={handleFromChange}
+              onFromFocus={() => setActiveAddressField("from")}
+              onFromBlur={() => handleAddressFieldBlur("from")}
+              onFromSelectionStart={() => beginAddressFieldSelection("from")}
+              onPlanRoute={() => loadRoute()}
+              onSelectAddressSuggestion={selectAddressSuggestion}
+              onSelectQuickPlace={applyQuickPlace}
+              onRemoveRecent={onRemoveRecentLocation}
+              onSelectSavedCommute={applySavedCommute}
+              onToChange={handleToChange}
+              onToBlur={() => handleAddressFieldBlur("to")}
+              onToSelectionStart={() => beginAddressFieldSelection("to")}
+              onToFocus={() => setActiveAddressField("to")}
+              onUseCurrentFromLocation={useCurrentFromLocation}
+              quickPlaces={quickPlaces}
+              routePrecisionHint={routePrecisionHint}
+              routeError={!routeStarted ? error : ""}
+              routePlanningBlocked={routePlanningBlocked}
+              savedCommutes={savedCommutes}
+              suggestionsError={suggestionsError}
+              suggestionsLoading={suggestionsLoading}
+              to={to}
+              toSuggestions={toSuggestions}
+              vehicleEnergyType={preferences.vehicleEnergyType}
+              vehicleRouteNotice={vehicleRouteNotice}
+            />
+            <NearbyEnergySelector
+              eyebrow=""
+              includeEv
+              onChange={handleEnergyChange}
+              onToggleOpen={() => setFuelSelectorOpen((current) => !current)}
+              open={fuelSelectorOpen}
+              value={preferences.vehicleEnergyType === "electric" ? "EV" : preferences.fuel}
+            />
+          </>
         )}
       </View>
 
@@ -776,6 +810,7 @@ const styles = StyleSheet.create({
     top: 0,
   },
   topControls: {
+    gap: spacing.xs,
     left: spacing.md,
     position: "absolute",
     right: spacing.md,

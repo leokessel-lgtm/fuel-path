@@ -46,6 +46,12 @@ const accountScreen = read("src/screens/AccountScreen.tsx");
 const stationRow = read("src/components/StationRow.tsx");
 const brandBadge = read("src/components/BrandBadge.tsx");
 const brandAssets = read("src/data/brandAssets.ts");
+const androidMarkerOverlayDimensions = [
+  "bp.png",
+  "shell.png",
+  "caltex.png",
+  "eg-ampol.png",
+].map((filename) => readPngDimensions(`assets/brand-marker-overlays/${filename}`));
 const betaPrivacyCard = read("src/components/BetaPrivacyCard.tsx");
 const discountPrograms = read("src/data/discountPrograms.ts");
 const discountProgramAssets = read("src/data/discountProgramAssets.ts");
@@ -330,13 +336,26 @@ const checks = [
       nativeMap.includes("tracksViewChanges={Platform.OS === \"android\"}") &&
       nativeMap.includes("styles.pinBrand") &&
       nativeMap.includes("styles.pinPointer") &&
-      nativeMap.includes("<BrandBadge station={item.station} size={22} />") &&
+      nativeMap.includes("<BrandBadge") &&
+      nativeMap.includes("Platform.OS === \"android\" ? null") &&
+      nativeMap.includes("brandStyle.markerIcon || brandStyle.icon") &&
+      nativeMap.includes("const nativeBrandIcon =") &&
+      nativeMap.includes("image={nativeBrandIcon}") &&
+      nativeMap.includes("anchor={{ x: 0.5, y: 1.35 }}") &&
+      nativeMap.includes("marker") &&
+      nativeMap.includes("station={item.station}") &&
+      nativeMap.includes("size={22}") &&
       nativeMap.includes("zIndex={selected ? 700 : subdued ? 420 : 500}") &&
       brandBadge.includes("const style = brandStyleForStation(station);") &&
-      brandBadge.includes("source={style.icon}") &&
-      brandBadge.includes("renderToHardwareTextureAndroid") &&
+      brandBadge.includes("marker = false") &&
+      brandBadge.includes("const source = style.icon || (marker ? style.markerIcon : undefined);") &&
+      brandBadge.includes("const imageSize = Math.max(12, size - 4);") &&
+      brandBadge.includes("resizeMode=\"contain\"") &&
       brandAssets.includes("markerIcon?: ImageSourcePropType;") &&
       brandAssets.includes("markerIcon: require(\"../../assets/brand-marker-overlays/bp.png\")") &&
+      androidMarkerOverlayDimensions.every(
+        ({ width, height }) => width <= 20 && height <= 20,
+      ) &&
       nativeMap.includes("backgroundColor: colors.greenDark") &&
       nativeMap.includes("backgroundColor: \"transparent\"") &&
       nativeMap.includes("borderRadius: radii.md") &&
@@ -1023,6 +1042,12 @@ const checks = [
     ok:
       planScreen.includes("PlanRouteEditorCard") &&
       planRouteEditorCard.includes("AddressSuggestions") &&
+      !planRouteEditorCard.includes("NearbyEnergySelector") &&
+      planScreen.includes("NearbyEnergySelector") &&
+      planScreen.includes('eyebrow=""') &&
+      planScreen.includes("const handleAddressFieldBlur = (field: \"from\" | \"to\")") &&
+      planScreen.includes("fromSelectionSuppressRef.current") &&
+      planScreen.includes("toSelectionSuppressRef.current") &&
       routeAddressSuggestions.includes("addressLocalityHint") &&
       routeInputPrecision.includes("Add suburb or postcode to narrow the address.") &&
       routeInputPrecision.includes("Street found. Add suburb or postcode to choose the right area.") &&
@@ -1520,6 +1545,18 @@ function read(relativePath) {
 
 function countOccurrences(value, pattern) {
   return value.split(pattern).length - 1;
+}
+
+function readPngDimensions(relativePath) {
+  const buffer = fs.readFileSync(path.join(root, relativePath));
+  const pngSignature = "89504e470d0a1a0a";
+  if (buffer.subarray(0, 8).toString("hex") !== pngSignature) {
+    throw new Error(`${relativePath} is not a PNG file.`);
+  }
+  return {
+    width: buffer.readUInt32BE(16),
+    height: buffer.readUInt32BE(20),
+  };
 }
 
 function readScreenSource(defaultPath, viewModelPath) {

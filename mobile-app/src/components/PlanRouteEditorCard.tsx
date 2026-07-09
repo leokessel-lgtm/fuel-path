@@ -119,7 +119,7 @@ export function PlanRouteEditorCard({
             />
           </View>
           {activeAddressField === "from" && quickPlaces.length && !fromLookupActive ? (
-              <QuickPlaceShortcuts
+            <QuickPlaceShortcuts
               onSelectStart={onFromSelectionStart}
               onSelect={onSelectQuickPlace}
               onRemoveRecent={onRemoveRecent}
@@ -137,17 +137,17 @@ export function PlanRouteEditorCard({
               suggestions={fromSuggestions}
             />
           ) : null}
-      <TextInput
-        accessibilityLabel="To"
-        value={to}
-        onChangeText={onToChange}
-        onFocus={onToFocus}
-        onBlur={onToBlur}
-        onPressIn={onToFocus}
-        onSubmitEditing={onPlanRoute}
-        placeholder="Destination address, suburb or place"
-        placeholderTextColor={colors.muted}
-        returnKeyType="search"
+          <TextInput
+            accessibilityLabel="To"
+            value={to}
+            onChangeText={onToChange}
+            onFocus={onToFocus}
+            onBlur={onToBlur}
+            onPressIn={onToFocus}
+            onSubmitEditing={onPlanRoute}
+            placeholder="Destination address, suburb or place"
+            placeholderTextColor={colors.muted}
+            returnKeyType="search"
             style={styles.input}
           />
           {activeAddressField === "to" && quickPlaces.length && !toLookupActive ? (

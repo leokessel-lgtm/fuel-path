@@ -14,11 +14,16 @@ It is meant to answer four questions:
 npm run test:ui-ux-stress-loop:list
 npm run test:ui-ux-stress-loop:quick
 npm run test:ui-ux-stress-loop
+npm run test:ui-ux-stress-loop:quick-post-merge
 npm run test:ui-ux-stress-loop:full
 npm run test:ui-ux-stress-loop:native
 ```
 
 The default profile is `broad`.
+
+Use `--plan-field-pairs <n>` to override Plan field stress coverage without changing profile defaults.
+
+`test:ui-ux-stress-loop:quick-post-merge` is a local post-merge variant that keeps the quick profile and runs plan-field entry with 300 pairs against local Expo web.
 
 Use a different target with:
 
@@ -64,4 +69,3 @@ npm run web -- --port 8081
 cd ..
 npm run test:ui-ux-stress-loop:quick -- --app-url http://127.0.0.1:8081/
 ```
-

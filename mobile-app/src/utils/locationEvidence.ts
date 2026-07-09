@@ -78,8 +78,8 @@ export function locationEvidence(point: MapPoint): LocationEvidence {
 
   if (point.provider === "google" || point.provider === "addressr") {
     return {
-      detail: "Matched by an external location provider.",
-      label: "External lookup",
+      detail: "Matched by a location lookup.",
+      label: "Location lookup",
       level: "external",
     };
   }

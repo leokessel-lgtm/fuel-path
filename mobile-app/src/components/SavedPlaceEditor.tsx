@@ -12,6 +12,7 @@ import { searchLocations } from "../api/fuelPathApi";
 import { getCurrentMapPoint } from "../services/currentLocation";
 import { colors, radii, spacing, surfaces, typeScale } from "../theme";
 import { MapPoint } from "../types";
+import { userVisibleErrorMessage } from "../utils/userVisibleErrors";
 import { CurrentLocationFieldButton, currentLocationFieldInset } from "./CurrentLocationFieldButton";
 import { LocationEvidenceChip } from "./LocationEvidenceChip";
 import { StationMap } from "./StationMap";
@@ -61,9 +62,11 @@ function SavedPlaceEditorFields({
 }: SavedPlaceEditorProps) {
   const [editor, dispatchEditor] = useReducer(editorReducer, point, initialEditorState);
   const [locating, setLocating] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
   const sessionTokenRef = useRef<string | null>(null);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchRequestRef = useRef(0);
+  const selectionSuppressRef = useRef(false);
 
   if (!sessionTokenRef.current) {
     sessionTokenRef.current = makeLocationSessionToken();
@@ -93,7 +96,7 @@ function SavedPlaceEditorFields({
         })
         .catch((err: Error) => {
           if (searchRequestRef.current !== requestId) return;
-          dispatchEditor({ type: "search-error", message: err.message });
+          dispatchEditor({ type: "search-error", message: userVisibleErrorMessage(err, "address") });
         })
         .finally(() => {
           if (searchRequestRef.current === requestId) dispatchEditor({ type: "search-idle" });
@@ -108,6 +111,19 @@ function SavedPlaceEditorFields({
     dispatchEditor({ type: "saved", label, point: nextPoint });
     sessionTokenRef.current = makeLocationSessionToken();
   };
+  const savePointWithSelectionSilence = (nextPoint: MapPoint) => {
+    selectionSuppressRef.current = true;
+    savePoint(nextPoint);
+    setTimeout(() => {
+      selectionSuppressRef.current = false;
+    }, 0);
+  };
+  const beginSuggestionSelection = () => {
+    selectionSuppressRef.current = true;
+    setTimeout(() => {
+      selectionSuppressRef.current = false;
+    }, 300);
+  };
 
   const useCurrentLocation = async () => {
     setLocating(true);
@@ -118,7 +134,7 @@ function SavedPlaceEditorFields({
     } catch (err) {
       dispatchEditor({
         type: "search-error",
-        message: err instanceof Error ? err.message : "Current location is not available.",
+        message: userVisibleErrorMessage(err, "current_location"),
       });
     } finally {
       setLocating(false);
@@ -162,6 +178,13 @@ function SavedPlaceEditorFields({
         <TextInput
           accessibilityLabel={`Search ${label.toLowerCase()} address or place`}
           accessibilityHint={`Type a ${label.toLowerCase()} address, suburb or place and choose a suggestion.`}
+          onBlur={() => {
+            setTimeout(() => {
+              if (selectionSuppressRef.current) return;
+              setIsFocused(false);
+            }, 120);
+          }}
+          onFocus={() => setIsFocused(true)}
           onChangeText={(value) => {
             updateQuery(value);
           }}
@@ -179,7 +202,7 @@ function SavedPlaceEditorFields({
         />
       </View>
 
-      {editor.suggestions.length ? (
+      {isFocused && editor.suggestions.length ? (
         <View style={styles.suggestionList}>
           {editor.suggestions.map((suggestion) => (
             <Pressable
@@ -187,24 +210,25 @@ function SavedPlaceEditorFields({
               accessibilityHint={`Sets this location as ${label.toLowerCase()}.`}
               accessibilityRole="button"
               key={`${kind}:${suggestion.lat}:${suggestion.lon}:${suggestion.label}`}
-              onPress={() => savePoint(suggestion)}
+              onPressIn={beginSuggestionSelection}
+              onPress={() => savePointWithSelectionSilence(suggestion)}
               style={({ pressed }) => [
                 styles.suggestion,
                 pressed && styles.suggestionPressed,
               ]}
             >
-              <Text numberOfLines={1} style={styles.suggestionTitle}>
-                {shortPlaceTitle(suggestion)}
-              </Text>
-              <Text numberOfLines={1} style={styles.suggestionMeta}>
-                {shortPlaceMeta(suggestion)}
-              </Text>
-              <View style={styles.suggestionEvidence}>
-                <LocationEvidenceChip
-                  point={suggestion}
-                  showDetail={suggestionNeedsPrecisionDetail(suggestion)}
-                />
+              <View style={styles.suggestionTextContent}>
+                <Text numberOfLines={1} style={styles.suggestionTitle}>
+                  {shortPlaceTitle(suggestion)}
+                </Text>
+                <Text numberOfLines={1} style={styles.suggestionMeta}>
+                  {shortPlaceMeta(suggestion)}
+                </Text>
               </View>
+              <LocationEvidenceChip
+                point={suggestion}
+                showDetail={suggestionNeedsPrecisionDetail(suggestion)}
+              />
             </Pressable>
           ))}
         </View>
@@ -309,9 +333,7 @@ function shortPlaceMeta(point: MapPoint) {
 }
 
 function suggestionNeedsPrecisionDetail(point: MapPoint) {
-  return point.sourceLabel === "Needs confirmation" ||
-    point.sourceLabel === "Street/road" ||
-    point.sourceLabel === "Near address match";
+  return Boolean(point.refineRequired || point.matchType === "building_refine" || point.sourceLabel === "Needs confirmation");
 }
 
 const styles = StyleSheet.create({
@@ -376,10 +398,8 @@ const styles = StyleSheet.create({
     position: "relative",
   },
   input: {
-    backgroundColor: colors.white,
-    borderColor: colors.line,
+    ...surfaces.field,
     borderRadius: radii.lg,
-    borderWidth: 1,
     color: colors.ink,
     fontSize: typeScale.body,
     fontWeight: "500",
@@ -418,14 +438,16 @@ const styles = StyleSheet.create({
     fontSize: typeScale.body,
     fontWeight: "600",
   },
+  suggestionTextContent: {
+    flex: 1,
+    minWidth: 0,
+    marginRight: spacing.sm,
+  },
   suggestionMeta: {
     color: colors.muted,
     fontSize: typeScale.caption,
     fontWeight: "400",
     marginTop: 2,
-  },
-  suggestionEvidence: {
-    marginTop: spacing.xs,
   },
   mapBox: {
     borderColor: colors.line,

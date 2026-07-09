@@ -76,10 +76,16 @@ Confirmed against the live reference table:
 
 - Fuel ID `2`: `U91`.
 - Fuel ID `3`: `DL`.
+- Fuel ID `4`: `LPG`.
 - Fuel ID `5`: `P95`.
 - Fuel ID `8`: `P98`.
 - Fuel ID `12`: `E10`.
 - Fuel ID `14`: `PDL`.
+
+Observed in the live QLD price feed on 2026-07-09 but not exposed as primary app fuel options:
+
+- Fuel ID `19`: `e85`.
+- Fuel ID `21`: `OPAL`.
 
 ## Integration Notes
 

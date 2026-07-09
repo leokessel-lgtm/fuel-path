@@ -1,0 +1,1145 @@
+{
+  "runId": "2026-07-09T03-55-48-052",
+  "generatedAt": "2026-07-09T03:55:48.144Z",
+  "total": 24,
+  "completed": 24,
+  "failed": 0,
+  "results": [
+    {
+      "route": {
+        "id": "nsw-sydney-newcastle",
+        "region": "NSW",
+        "from": "Sydney CBD NSW",
+        "to": "Newcastle NSW",
+        "startQuery": "Sydney",
+        "endQuery": "Newcastle"
+      },
+      "competitor": "FuelRadar",
+      "status": "completed",
+      "screenshotForm": "/Users/leonardo.kesselring/Documents/AI Agents/Fuel Path App/output/playwright/competitor-route-browser-pass-2026-07-09T03-55-48-052/fuelradar-nsw-sydney-newcastle-form.png",
+      "screenshotResult": "/Users/leonardo.kesselring/Documents/AI Agents/Fuel Path App/output/playwright/competitor-route-browser-pass-2026-07-09T03-55-48-052/fuelradar-nsw-sydney-newcastle-result.png",
+      "scanUrl": "https://fuelradar.com.au/api/tools/route-scan?start_lat=-33.868800&start_lng=151.209300&end_lat=-32.928300&end_lng=151.781700&efficiency=8.5&tank_size=50",
+      "routeDistanceKm": 152.5,
+      "routeDurationMin": 114,
+      "stationCount": 108,
+      "startPicked": "Sydney, New South WalesNew South Wales 2000",
+      "endPicked": "Newcastle, New South WalesNew South Wales 2300",
+      "topStation": {
+        "stationId": 18639,
+        "stationName": "Pearl Energy Mayfield",
+        "brand": "Pearl",
+        "address": "132 MAITLAND RD, MAYFIELD",
+        "fuel": null,
+        "price": "155.5",
+        "distanceToRouteKm": null,
+        "distanceAlongRouteKm": 152.5,
+        "detourLabel": "4.7km detour",
+        "updatedAt": "2026-07-04 06:28:37",
+        "latitude": -32.9017846,
+        "longitude": 151.7419818
+      },
+      "topStations": [
+        {
+          "stationId": 18639,
+          "stationName": "Pearl Energy Mayfield",
+          "brand": "Pearl",
+          "address": "132 MAITLAND RD, MAYFIELD",
+          "fuel": null,
+          "price": "155.5",
+          "distanceToRouteKm": null,
+          "distanceAlongRouteKm": 152.5,
+          "detourLabel": "4.7km detour",
+          "updatedAt": "2026-07-04 06:28:37",
+          "latitude": -32.9017846,
+          "longitude": 151.7419818
+        },
+        {
+          "stationId": 466,
+          "stationName": "United Petroleum Mayfield",
+          "brand": "United",
+          "address": "40 Industrial Drive, Mayfield",
+          "fuel": null,
+          "price": "155.5",
+          "distanceToRouteKm": null,
+          "distanceAlongRouteKm": 152.5,
+          "detourLabel": "4.4km detour",
+          "updatedAt": "2026-07-04 08:00:11",
+          "latitude": -32.897243,
+          "longitude": 151.751809
+        },
+        {
+          "stationId": 18530,
+          "stationName": "United Mayfield South",
+          "brand": "United",
+          "address": "86-88 MAITLAND RD, MAYFIELD",
+          "fuel": null,
+          "price": "155.5",
+          "distanceToRouteKm": null,
+          "distanceAlongRouteKm": 152.5,
+          "detourLabel": "4.5km detour",
+          "updatedAt": "2026-07-04 08:25:02",
+          "latitude": -32.90309546,
+          "longitude": 151.74378193
+        },
+        {
+          "stationId": 18070,
+          "stationName": "Metro Islington",
+          "brand": "Metro",
+          "address": "144 Maitland Road, ISLINGTON",
+          "fuel": null,
+          "price": "155.5",
+          "distanceToRouteKm": null,
+          "distanceAlongRouteKm": 152.4,
+          "detourLabel": "3.5km detour",
+          "updatedAt": "2026-07-06 01:09:51",
+          "latitude": -32.9151886,
+          "longitude": 151.7480046
+        },
+        {
+          "stationId": 1756,
+          "stationName": "Arko Energy Freshwater",
+          "brand": "Arko",
+          "address": "119 Harbord Rd, Freshwater",
+          "fuel": null,
+          "price": "157.9",
+          "distanceToRouteKm": null,
+          "distanceAlongRouteKm": 16.3,
+          "detourLabel": "1km detour",
+          "updatedAt": "2026-07-09 01:51:08",
+          "latitude": -33.77247,
+          "longitude": 151.279536
+        }
+      ]
+    },
+    {
+      "route": {
+        "id": "nsw-sydney-newcastle",
+        "region": "NSW",
+        "from": "Sydney CBD NSW",
+        "to": "Newcastle NSW",
+        "startQuery": "Sydney",
+        "endQuery": "Newcastle"
+      },
+      "competitor": "PetrolSpy",
+      "status": "map-location-surface-no-route-flow",
+      "screenshot": "/Users/leonardo.kesselring/Documents/AI Agents/Fuel Path App/output/playwright/competitor-route-browser-pass-2026-07-09T03-55-48-052/petrolspy-nsw-sydney-newcastle.png",
+      "url": "https://petrolspy.com.au/map/location/au/nsw",
+      "observation": {
+        "text": "PetrolSpy Aus/NZ\nFuel Prices Near Me\n\nCheap FuelCheck petrol prices in New South Wales, Australia\n\nChance to win a $25 fuel card every day\n\nHistorical Unleaded & E10 fuel price cycle graphs\n\nFREE fuel app for Australia &",
+        "hasRouteLikeInput": false,
+        "hasSearch": true
+      }
+    },
+    {
+      "route": {
+        "id": "nsw-sydney-newcastle",
+        "region": "NSW",
+        "from": "Sydney CBD NSW",
+        "to": "Newcastle NSW",
+        "startQuery": "Sydney",
+        "endQuery": "Newcastle"
+      },
+      "competitor": "NSW FuelCheck",
+      "status": "fuelcheck-public-surface-no-route-flow",
+      "screenshot": "/Users/leonardo.kesselring/Documents/AI Agents/Fuel Path App/output/playwright/competitor-route-browser-pass-2026-07-09T03-55-48-052/fuelcheck-nsw-sydney-newcastle.png",
+      "url": "https://www.fuelcheck.nsw.gov.au",
+      "observation": {
+        "text": "HOME\n\nCOMPATIBILITY\n\nNSW TRENDS\n\nHELP\n\nABOUT\n\nREPORT AN ISSUE\n\nPRIVACY POLICY\n\nCLOSE\n\nFuelCheck - Home\n\t\n Fuel Near Me\nAverage Price Now\nE10\n\n166.7\n\n -0.07 CENTS\n\n​\nEthanol 94 / Unleaded 91 (E10-U91)\nAll Brands\nRemember "
+      }
+    },
+    {
+      "route": {
+        "id": "act-nsw-canberra-sydney",
+        "region": "ACT/NSW",
+        "from": "Canberra ACT",
+        "to": "Sydney CBD NSW",
+        "startQuery": "Canberra",
+        "endQuery": "Sydney"
+      },
+      "competitor": "FuelRadar",
+      "status": "completed",
+      "screenshotForm": "/Users/leonardo.kesselring/Documents/AI Agents/Fuel Path App/output/playwright/competitor-route-browser-pass-2026-07-09T03-55-48-052/fuelradar-act-nsw-canberra-sydney-form.png",
+      "screenshotResult": "/Users/leonardo.kesselring/Documents/AI Agents/Fuel Path App/output/playwright/competitor-route-browser-pass-2026-07-09T03-55-48-052/fuelradar-act-nsw-canberra-sydney-result.png",
+      "scanUrl": "https://fuelradar.com.au/api/tools/route-scan?start_lat=-35.280900&start_lng=149.130000&end_lat=-33.868800&end_lng=151.209300&efficiency=8.5&tank_size=50",
+      "routeDistanceKm": 320.8,
+      "routeDurationMin": 241,
+      "stationCount": 120,
+      "startPicked": "Canberra, Australian Capital TerritoryAustralian Capital Territory 2600",
+      "endPicked": "Sydney, New South WalesNew South Wales 2000",
+      "topStation": {
+        "stationId": 1517,
+        "stationName": "Budget Kogarah",
+        "brand": "Budget",
+        "address": "132 Princes Hway, Kogarah",
+        "fuel": null,
+        "price": "151.7",
+        "distanceToRouteKm": null,
+        "distanceAlongRouteKm": 303.5,
+        "detourLabel": "4.5km detour",
+        "updatedAt": "2026-07-01 20:10:06",
+        "latitude": -33.974841,
+        "longitude": 151.12831
+      },
+      "topStations": [
+        {
+          "stationId": 1517,
+          "stationName": "Budget Kogarah",
+          "brand": "Budget",
+          "address": "132 Princes Hway, Kogarah",
+          "fuel": null,
+          "price": "151.7",
+          "distanceToRouteKm": null,
+          "distanceAlongRouteKm": 303.5,
+          "detourLabel": "4.5km detour",
+          "updatedAt": "2026-07-01 20:10:06",
+          "latitude": -33.974841,
+          "longitude": 151.12831
+        },
+        {
+          "stationId": 18297,
+          "stationName": "Metro Petroleum Appin",
+          "brand": "Metro",
+          "address": "34 APPIN RD, APPIN",
+          "fuel": null,
+          "price": "151.9",
+          "distanceToRouteKm": null,
+          "distanceAlongRouteKm": 250.9,
+          "detourLabel": "4.2km detour",
+          "updatedAt": "2026-07-02 18:40:01",
+          "latitude": -34.2037991,
+          "longitude": 150.78666117
+        },
+        {
+          "stationId": 1897,
+          "stationName": "Independent Appin",
+          "brand": "Independent",
+          "address": "71 Appin Road, Appin",
+          "fuel": null,
+          "price": "151.9",
+          "distanceToRouteKm": null,
+          "distanceAlongRouteKm": 251.3,
+          "detourLabel": "4km detour",
+          "updatedAt": "2026-07-01 07:47:52",
+          "latitude": -34.20078,
+          "longitude": 150.787571
+        },
+        {
+          "stationId": 18431,
+          "stationName": "Metro Petroleum Earlwood",
+          "brand": "Metro",
+          "address": "281 HOMER ST, EARLWOOD",
+          "fuel": null,
+          "price": "152.9",
+          "distanceToRouteKm": null,
+          "distanceAlongRouteKm": 307.9,
+          "detourLabel": null,
+          "updatedAt": "2026-07-09 03:00:29",
+          "latitude": -33.92638397,
+          "longitude": 151.12768841
+        },
+        {
+          "stationId": 20637,
+          "stationName": "ARKO Earlwood",
+          "brand": "Arko",
+          "address": "108 HOMER ST, EARLWOOD",
+          "fuel": null,
+          "price": "153.5",
+          "distanceToRouteKm": null,
+          "distanceAlongRouteKm": 308.9,
+          "detourLabel": null,
+          "updatedAt": "2026-07-08 21:22:53",
+          "latitude": -33.92404824,
+          "longitude": 151.13587501
+        }
+      ]
+    },
+    {
+      "route": {
+        "id": "act-nsw-canberra-sydney",
+        "region": "ACT/NSW",
+        "from": "Canberra ACT",
+        "to": "Sydney CBD NSW",
+        "startQuery": "Canberra",
+        "endQuery": "Sydney"
+      },
+      "competitor": "PetrolSpy",
+      "status": "map-location-surface-no-route-flow",
+      "screenshot": "/Users/leonardo.kesselring/Documents/AI Agents/Fuel Path App/output/playwright/competitor-route-browser-pass-2026-07-09T03-55-48-052/petrolspy-act-nsw-canberra-sydney.png",
+      "url": "https://petrolspy.com.au/map/location/au/nsw",
+      "observation": {
+        "text": "PetrolSpy Aus/NZ\nFuel Prices Near Me\n\nCheap FuelCheck petrol prices in New South Wales, Australia\n\nChance to win a $25 fuel card every day\n\nHistorical Unleaded & E10 fuel price cycle graphs\n\nFREE fuel app for Australia &",
+        "hasRouteLikeInput": false,
+        "hasSearch": true
+      }
+    },
+    {
+      "route": {
+        "id": "act-nsw-canberra-sydney",
+        "region": "ACT/NSW",
+        "from": "Canberra ACT",
+        "to": "Sydney CBD NSW",
+        "startQuery": "Canberra",
+        "endQuery": "Sydney"
+      },
+      "competitor": "NSW FuelCheck",
+      "status": "fuelcheck-public-surface-no-route-flow",
+      "screenshot": "/Users/leonardo.kesselring/Documents/AI Agents/Fuel Path App/output/playwright/competitor-route-browser-pass-2026-07-09T03-55-48-052/fuelcheck-act-nsw-canberra-sydney.png",
+      "url": "https://www.fuelcheck.nsw.gov.au",
+      "observation": {
+        "text": "HOME\n\nCOMPATIBILITY\n\nNSW TRENDS\n\nHELP\n\nABOUT\n\nREPORT AN ISSUE\n\nPRIVACY POLICY\n\nCLOSE\n\nFuelCheck - Home\n\t\n Fuel Near Me\nAverage Price Now\nE10\n\n166.7\n\n -0.07 CENTS\n\n​\nEthanol 94 / Unleaded 91 (E10-U91)\nAll Brands\nRemember "
+      }
+    },
+    {
+      "route": {
+        "id": "vic-melbourne-ballarat",
+        "region": "VIC",
+        "from": "Melbourne CBD VIC",
+        "to": "Ballarat VIC",
+        "startQuery": "Melbourne",
+        "endQuery": "Ballarat"
+      },
+      "competitor": "FuelRadar",
+      "status": "completed",
+      "screenshotForm": "/Users/leonardo.kesselring/Documents/AI Agents/Fuel Path App/output/playwright/competitor-route-browser-pass-2026-07-09T03-55-48-052/fuelradar-vic-melbourne-ballarat-form.png",
+      "screenshotResult": "/Users/leonardo.kesselring/Documents/AI Agents/Fuel Path App/output/playwright/competitor-route-browser-pass-2026-07-09T03-55-48-052/fuelradar-vic-melbourne-ballarat-result.png",
+      "scanUrl": "https://fuelradar.com.au/api/tools/route-scan?start_lat=-37.813600&start_lng=144.963100&end_lat=-37.6071117&end_lng=143.83876166666667&efficiency=8.5&tank_size=50",
+      "routeDistanceKm": 132,
+      "routeDurationMin": 99,
+      "stationCount": 120,
+      "startPicked": "Melbourne, VictoriaVictoria 3000",
+      "endPicked": "Ballarat, VIC (3350)VIC 3350",
+      "topStation": {
+        "stationId": 278106476251216030,
+        "stationName": "Burk Kingsville",
+        "brand": "Burk",
+        "address": "88-94 Williamstown Road, Kingsville",
+        "fuel": null,
+        "price": "153.3",
+        "distanceToRouteKm": null,
+        "distanceAlongRouteKm": 9,
+        "detourLabel": "0.9km detour",
+        "updatedAt": "2026-07-08 06:00:00",
+        "latitude": -37.80752283,
+        "longitude": 144.88425595
+      },
+      "topStations": [
+        {
+          "stationId": 278106476251216030,
+          "stationName": "Burk Kingsville",
+          "brand": "Burk",
+          "address": "88-94 Williamstown Road, Kingsville",
+          "fuel": null,
+          "price": "153.3",
+          "distanceToRouteKm": null,
+          "distanceAlongRouteKm": 9,
+          "detourLabel": "0.9km detour",
+          "updatedAt": "2026-07-08 06:00:00",
+          "latitude": -37.80752283,
+          "longitude": 144.88425595
+        },
+        {
+          "stationId": 943996674555742100,
+          "stationName": "Costco Ardeer (Members only)",
+          "brand": "Costco",
+          "address": "740 Ballarat Road, Ardeer",
+          "fuel": null,
+          "price": "154.7",
+          "distanceToRouteKm": null,
+          "distanceAlongRouteKm": 19.7,
+          "detourLabel": "1.3km detour",
+          "updatedAt": "2026-07-08 06:00:00",
+          "latitude": -37.77115854,
+          "longitude": 144.79914822
+        },
+        {
+          "stationId": 493986730849619300,
+          "stationName": "OOM energy Deer Park",
+          "brand": "Independent",
+          "address": "970 Western Highway, BURNSIDE",
+          "fuel": null,
+          "price": "156.9",
+          "distanceToRouteKm": null,
+          "distanceAlongRouteKm": 24.7,
+          "detourLabel": "1.4km detour",
+          "updatedAt": "2026-07-08 10:37:32",
+          "latitude": -37.76280182,
+          "longitude": 144.75692098
+        },
+        {
+          "stationId": 486061451637220540,
+          "stationName": "United Deer Park Central",
+          "brand": "United",
+          "address": "810 Ballarat Road, Deer Park",
+          "fuel": null,
+          "price": "156.9",
+          "distanceToRouteKm": null,
+          "distanceAlongRouteKm": 22.4,
+          "detourLabel": "1km detour",
+          "updatedAt": "2026-07-08 11:35:07",
+          "latitude": -37.769917961488,
+          "longitude": 144.77534986666
+        },
+        {
+          "stationId": 1130453484609947900,
+          "stationName": "Metro Petroleum Golden Point",
+          "brand": "Metro Fuel",
+          "address": "411 Main Road, GOLDEN POINT",
+          "fuel": null,
+          "price": "157.3",
+          "distanceToRouteKm": null,
+          "distanceAlongRouteKm": 129.8,
+          "detourLabel": "4.4km detour",
+          "updatedAt": "2026-07-08 06:53:04",
+          "latitude": -37.57262317,
+          "longitude": 143.8703748
+        }
+      ]
+    },
+    {
+      "route": {
+        "id": "vic-melbourne-ballarat",
+        "region": "VIC",
+        "from": "Melbourne CBD VIC",
+        "to": "Ballarat VIC",
+        "startQuery": "Melbourne",
+        "endQuery": "Ballarat"
+      },
+      "competitor": "PetrolSpy",
+      "status": "map-location-surface-no-route-flow",
+      "screenshot": "/Users/leonardo.kesselring/Documents/AI Agents/Fuel Path App/output/playwright/competitor-route-browser-pass-2026-07-09T03-55-48-052/petrolspy-vic-melbourne-ballarat.png",
+      "url": "https://petrolspy.com.au/map/location/au/vic",
+      "observation": {
+        "text": "PetrolSpy Aus/NZ\nFuel Prices Near Me\n\nCheap user-reported petrol prices in Victoria, Australia\n\nChance to win a $25 fuel card every day\n\nHistorical Unleaded & E10 fuel price cycle graphs\n\nFREE fuel app for Australia & NZ",
+        "hasRouteLikeInput": false,
+        "hasSearch": true
+      }
+    },
+    {
+      "route": {
+        "id": "vic-melbourne-ballarat",
+        "region": "VIC",
+        "from": "Melbourne CBD VIC",
+        "to": "Ballarat VIC",
+        "startQuery": "Melbourne",
+        "endQuery": "Ballarat"
+      },
+      "competitor": "NSW FuelCheck",
+      "status": "outside-coverage-no-route-flow",
+      "screenshot": "/Users/leonardo.kesselring/Documents/AI Agents/Fuel Path App/output/playwright/competitor-route-browser-pass-2026-07-09T03-55-48-052/fuelcheck-vic-melbourne-ballarat.png",
+      "url": "https://www.fuelcheck.nsw.gov.au",
+      "observation": {
+        "text": "HOME\n\nCOMPATIBILITY\n\nNSW TRENDS\n\nHELP\n\nABOUT\n\nREPORT AN ISSUE\n\nPRIVACY POLICY\n\nCLOSE\n\nFuelCheck - Home\n\t\n Fuel Near Me\nAverage Price Now\nE10\n\n166.7\n\n -0.07 CENTS\n\n​\nEthanol 94 / Unleaded 91 (E10-U91)\nAll Brands\nRemember "
+      }
+    },
+    {
+      "route": {
+        "id": "qld-brisbane-longreach",
+        "region": "QLD",
+        "from": "Brisbane CBD QLD",
+        "to": "Longreach QLD",
+        "startQuery": "Brisbane",
+        "endQuery": "Longreach"
+      },
+      "competitor": "FuelRadar",
+      "status": "completed",
+      "screenshotForm": "/Users/leonardo.kesselring/Documents/AI Agents/Fuel Path App/output/playwright/competitor-route-browser-pass-2026-07-09T03-55-48-052/fuelradar-qld-brisbane-longreach-form.png",
+      "screenshotResult": "/Users/leonardo.kesselring/Documents/AI Agents/Fuel Path App/output/playwright/competitor-route-browser-pass-2026-07-09T03-55-48-052/fuelradar-qld-brisbane-longreach-result.png",
+      "scanUrl": "https://fuelradar.com.au/api/tools/route-scan?start_lat=-27.469800&start_lng=153.025100&end_lat=-23.4406455&end_lng=144.2513171&efficiency=8.5&tank_size=50",
+      "routeDistanceKm": 1284.2,
+      "routeDurationMin": 963,
+      "stationCount": 65,
+      "startPicked": "Brisbane, QueenslandQueensland 4000",
+      "endPicked": "Longreach, QLD (4730)QLD 4730",
+      "topStation": {
+        "stationId": 61401730,
+        "stationName": "Quill Petroleum",
+        "brand": "Independent",
+        "address": "155 Musgrave Rd",
+        "fuel": null,
+        "price": "159.5",
+        "distanceToRouteKm": null,
+        "distanceAlongRouteKm": 3.1,
+        "detourLabel": "0.6km detour",
+        "updatedAt": "2026-07-08 06:32:00",
+        "latitude": -27.455124731986,
+        "longitude": 153.00704090675
+      },
+      "topStations": [
+        {
+          "stationId": 61401730,
+          "stationName": "Quill Petroleum",
+          "brand": "Independent",
+          "address": "155 Musgrave Rd",
+          "fuel": null,
+          "price": "159.5",
+          "distanceToRouteKm": null,
+          "distanceAlongRouteKm": 3.1,
+          "detourLabel": "0.6km detour",
+          "updatedAt": "2026-07-08 06:32:00",
+          "latitude": -27.455124731986,
+          "longitude": 153.00704090675
+        },
+        {
+          "stationId": 61477691,
+          "stationName": "Liberty Annerley",
+          "brand": "Liberty",
+          "address": "338 Ipswich Rd",
+          "fuel": null,
+          "price": "159.5",
+          "distanceToRouteKm": null,
+          "distanceAlongRouteKm": 5.1,
+          "detourLabel": "3.9km detour",
+          "updatedAt": "2026-07-04 13:41:09",
+          "latitude": -27.5039354087,
+          "longitude": 153.03488278112
+        },
+        {
+          "stationId": 61477937,
+          "stationName": "United Woolloongabba",
+          "brand": "United",
+          "address": "28 Ipswich Road",
+          "fuel": null,
+          "price": "159.5",
+          "distanceToRouteKm": null,
+          "distanceAlongRouteKm": 3,
+          "detourLabel": "2.3km detour",
+          "updatedAt": "2026-07-06 15:25:04",
+          "latitude": -27.487922,
+          "longitude": 153.036159
+        },
+        {
+          "stationId": 61401348,
+          "stationName": "U-Go Lutwyche",
+          "brand": "U-Go",
+          "address": "404 Lutwyche Rd & Fuller St",
+          "fuel": null,
+          "price": "159.5",
+          "distanceToRouteKm": null,
+          "distanceAlongRouteKm": 6.4,
+          "detourLabel": "4.7km detour",
+          "updatedAt": "2026-07-06 11:27:17",
+          "latitude": -27.425953,
+          "longitude": 153.032041
+        },
+        {
+          "stationId": 61401131,
+          "stationName": "Quill Petroleum Hawthorne",
+          "brand": "Independent",
+          "address": "1 Hawthorne Rd",
+          "fuel": null,
+          "price": "159.9",
+          "distanceToRouteKm": null,
+          "distanceAlongRouteKm": 4.4,
+          "detourLabel": "3.4km detour",
+          "updatedAt": "2026-07-05 12:56:55",
+          "latitude": -27.472295835233,
+          "longitude": 153.05950272884
+        }
+      ]
+    },
+    {
+      "route": {
+        "id": "qld-brisbane-longreach",
+        "region": "QLD",
+        "from": "Brisbane CBD QLD",
+        "to": "Longreach QLD",
+        "startQuery": "Brisbane",
+        "endQuery": "Longreach"
+      },
+      "competitor": "PetrolSpy",
+      "status": "map-location-surface-no-route-flow",
+      "screenshot": "/Users/leonardo.kesselring/Documents/AI Agents/Fuel Path App/output/playwright/competitor-route-browser-pass-2026-07-09T03-55-48-052/petrolspy-qld-brisbane-longreach.png",
+      "url": "https://petrolspy.com.au/map/location/au/qld",
+      "observation": {
+        "text": "PetrolSpy Aus/NZ\nFuel Prices Near Me\n\nCheap FuelWatch petrol prices in Queensland, Australia\n\nChance to win a $25 fuel card every day\n\nHistorical Unleaded & E10 fuel price cycle graphs\n\nFREE fuel app for Australia & NZ!\n",
+        "hasRouteLikeInput": false,
+        "hasSearch": true
+      }
+    },
+    {
+      "route": {
+        "id": "qld-brisbane-longreach",
+        "region": "QLD",
+        "from": "Brisbane CBD QLD",
+        "to": "Longreach QLD",
+        "startQuery": "Brisbane",
+        "endQuery": "Longreach"
+      },
+      "competitor": "NSW FuelCheck",
+      "status": "outside-coverage-no-route-flow",
+      "screenshot": "/Users/leonardo.kesselring/Documents/AI Agents/Fuel Path App/output/playwright/competitor-route-browser-pass-2026-07-09T03-55-48-052/fuelcheck-qld-brisbane-longreach.png",
+      "url": "https://www.fuelcheck.nsw.gov.au",
+      "observation": {
+        "text": "HOME\n\nCOMPATIBILITY\n\nNSW TRENDS\n\nHELP\n\nABOUT\n\nREPORT AN ISSUE\n\nPRIVACY POLICY\n\nCLOSE\n\nFuelCheck - Home\n\t\n Fuel Near Me\nAverage Price Now\nE10\n\n166.7\n\n -0.07 CENTS\n\n​\nEthanol 94 / Unleaded 91 (E10-U91)\nAll Brands\nRemember "
+      }
+    },
+    {
+      "route": {
+        "id": "wa-perth-broome",
+        "region": "WA",
+        "from": "Perth CBD WA",
+        "to": "Broome WA",
+        "startQuery": "Perth",
+        "endQuery": "Broome"
+      },
+      "competitor": "FuelRadar",
+      "status": "completed",
+      "screenshotForm": "/Users/leonardo.kesselring/Documents/AI Agents/Fuel Path App/output/playwright/competitor-route-browser-pass-2026-07-09T03-55-48-052/fuelradar-wa-perth-broome-form.png",
+      "screenshotResult": "/Users/leonardo.kesselring/Documents/AI Agents/Fuel Path App/output/playwright/competitor-route-browser-pass-2026-07-09T03-55-48-052/fuelradar-wa-perth-broome-result.png",
+      "scanUrl": "https://fuelradar.com.au/api/tools/route-scan?start_lat=-31.950500&start_lng=115.860500&end_lat=-17.9552129&end_lng=122.2420694&efficiency=8.5&tank_size=50",
+      "routeDistanceKm": 2187.8,
+      "routeDurationMin": 1641,
+      "stationCount": 94,
+      "startPicked": "Perth, Western AustraliaWestern Australia 6000",
+      "endPicked": "Broome, WA (6725)WA 6725",
+      "topStation": {
+        "stationId": 86485524,
+        "stationName": "Burk Malaga",
+        "brand": "Burk",
+        "address": "1 Harlond Ave",
+        "fuel": null,
+        "price": "153.3",
+        "distanceToRouteKm": null,
+        "distanceAlongRouteKm": 14.2,
+        "detourLabel": "1.1km detour",
+        "updatedAt": "2026-07-09 12:00:06",
+        "latitude": -31.855778,
+        "longitude": 115.891559
+      },
+      "topStations": [
+        {
+          "stationId": 86485524,
+          "stationName": "Burk Malaga",
+          "brand": "Burk",
+          "address": "1 Harlond Ave",
+          "fuel": null,
+          "price": "153.3",
+          "distanceToRouteKm": null,
+          "distanceAlongRouteKm": 14.2,
+          "detourLabel": "1.1km detour",
+          "updatedAt": "2026-07-09 12:00:06",
+          "latitude": -31.855778,
+          "longitude": 115.891559
+        },
+        {
+          "stationId": 93376952,
+          "stationName": "Burk Mount Lawley",
+          "brand": "Burk",
+          "address": "791 Beaufort St",
+          "fuel": null,
+          "price": "153.3",
+          "distanceToRouteKm": null,
+          "distanceAlongRouteKm": 4.3,
+          "detourLabel": "0.8km detour",
+          "updatedAt": "2026-07-09 12:00:06",
+          "latitude": -31.925887,
+          "longitude": 115.880225
+        },
+        {
+          "stationId": 20861838,
+          "stationName": "Dunning's Chittering",
+          "brand": "Shell",
+          "address": "5066 Great Northern Hwy",
+          "fuel": null,
+          "price": "154.9",
+          "distanceToRouteKm": null,
+          "distanceAlongRouteKm": 74,
+          "detourLabel": "2.7km detour",
+          "updatedAt": "2026-07-09 12:00:06",
+          "latitude": -31.464965,
+          "longitude": 116.051302
+        },
+        {
+          "stationId": 20618159,
+          "stationName": "Vibe Morley",
+          "brand": "Vibe",
+          "address": "430 Morley Dr",
+          "fuel": null,
+          "price": "154.9",
+          "distanceToRouteKm": null,
+          "distanceAlongRouteKm": 9.8,
+          "detourLabel": null,
+          "updatedAt": "2026-07-09 12:00:06",
+          "latitude": -31.887832,
+          "longitude": 115.889889
+        },
+        {
+          "stationId": 18023614,
+          "stationName": "Vibe Beechboro",
+          "brand": "Vibe",
+          "address": "495 Beechboro Rd North",
+          "fuel": null,
+          "price": "154.9",
+          "distanceToRouteKm": null,
+          "distanceAlongRouteKm": 14.2,
+          "detourLabel": "2.4km detour",
+          "updatedAt": "2026-07-09 12:00:06",
+          "latitude": -31.869,
+          "longitude": 115.924439
+        }
+      ]
+    },
+    {
+      "route": {
+        "id": "wa-perth-broome",
+        "region": "WA",
+        "from": "Perth CBD WA",
+        "to": "Broome WA",
+        "startQuery": "Perth",
+        "endQuery": "Broome"
+      },
+      "competitor": "PetrolSpy",
+      "status": "map-location-surface-no-route-flow",
+      "screenshot": "/Users/leonardo.kesselring/Documents/AI Agents/Fuel Path App/output/playwright/competitor-route-browser-pass-2026-07-09T03-55-48-052/petrolspy-wa-perth-broome.png",
+      "url": "https://petrolspy.com.au/map/location/au/wa",
+      "observation": {
+        "text": "PetrolSpy Aus/NZ\nFuel Prices Near Me\n\nCheap FuelWatch petrol prices in Western Australia, Australia\n\nChance to win a $25 fuel card every day\n\nHistorical Unleaded & E10 fuel price cycle graphs\n\nFREE fuel app for Australia",
+        "hasRouteLikeInput": false,
+        "hasSearch": true
+      }
+    },
+    {
+      "route": {
+        "id": "wa-perth-broome",
+        "region": "WA",
+        "from": "Perth CBD WA",
+        "to": "Broome WA",
+        "startQuery": "Perth",
+        "endQuery": "Broome"
+      },
+      "competitor": "NSW FuelCheck",
+      "status": "outside-coverage-no-route-flow",
+      "screenshot": "/Users/leonardo.kesselring/Documents/AI Agents/Fuel Path App/output/playwright/competitor-route-browser-pass-2026-07-09T03-55-48-052/fuelcheck-wa-perth-broome.png",
+      "url": "https://www.fuelcheck.nsw.gov.au",
+      "observation": {
+        "text": "HOME\n\nCOMPATIBILITY\n\nNSW TRENDS\n\nHELP\n\nABOUT\n\nREPORT AN ISSUE\n\nPRIVACY POLICY\n\nCLOSE\n\nFuelCheck - Home\n\t\n Fuel Near Me\nAverage Price Now\nE10\n\n166.7\n\n -0.07 CENTS\n\n​\nEthanol 94 / Unleaded 91 (E10-U91)\nAll Brands\nRemember "
+      }
+    },
+    {
+      "route": {
+        "id": "sa-adelaide-coober-pedy",
+        "region": "SA",
+        "from": "Adelaide CBD SA",
+        "to": "Coober Pedy SA",
+        "startQuery": "Adelaide",
+        "endQuery": "Coober Pedy"
+      },
+      "competitor": "FuelRadar",
+      "status": "completed",
+      "screenshotForm": "/Users/leonardo.kesselring/Documents/AI Agents/Fuel Path App/output/playwright/competitor-route-browser-pass-2026-07-09T03-55-48-052/fuelradar-sa-adelaide-coober-pedy-form.png",
+      "screenshotResult": "/Users/leonardo.kesselring/Documents/AI Agents/Fuel Path App/output/playwright/competitor-route-browser-pass-2026-07-09T03-55-48-052/fuelradar-sa-adelaide-coober-pedy-result.png",
+      "scanUrl": "https://fuelradar.com.au/api/tools/route-scan?start_lat=-34.928500&start_lng=138.600700&end_lat=-28.8963969&end_lng=134.7946522&efficiency=8.5&tank_size=50",
+      "routeDistanceKm": 988.9,
+      "routeDurationMin": 742,
+      "stationCount": 110,
+      "startPicked": "Adelaide, South AustraliaSouth Australia 5000",
+      "endPicked": "Coober Pedy, SA (5723)SA 5723",
+      "topStation": {
+        "stationId": 61577032,
+        "stationName": "Costco Kilburn",
+        "brand": "Costco",
+        "address": "404-406 Churchill Road",
+        "fuel": null,
+        "price": "151.7",
+        "distanceToRouteKm": null,
+        "distanceAlongRouteKm": 9.6,
+        "detourLabel": "1.9km detour",
+        "updatedAt": "2026-07-08 00:04:49",
+        "latitude": -34.863972881195,
+        "longitude": 138.58272886726
+      },
+      "topStations": [
+        {
+          "stationId": 61577032,
+          "stationName": "Costco Kilburn",
+          "brand": "Costco",
+          "address": "404-406 Churchill Road",
+          "fuel": null,
+          "price": "151.7",
+          "distanceToRouteKm": null,
+          "distanceAlongRouteKm": 9.6,
+          "detourLabel": "1.9km detour",
+          "updatedAt": "2026-07-08 00:04:49",
+          "latitude": -34.863972881195,
+          "longitude": 138.58272886726
+        },
+        {
+          "stationId": 61577398,
+          "stationName": "United Ottoway",
+          "brand": "United",
+          "address": "207 Grand Junction Rd",
+          "fuel": null,
+          "price": "155.5",
+          "distanceToRouteKm": null,
+          "distanceAlongRouteKm": 13.6,
+          "detourLabel": "1.3km detour",
+          "updatedAt": "2026-07-06 05:35:03",
+          "latitude": -34.850628159713,
+          "longitude": 138.53627512331
+        },
+        {
+          "stationId": 61577244,
+          "stationName": "Liberty Port Adelaide",
+          "brand": "Liberty",
+          "address": " Cnr St Vincents & Perkins Drive",
+          "fuel": null,
+          "price": "155.5",
+          "distanceToRouteKm": null,
+          "distanceAlongRouteKm": 16,
+          "detourLabel": "2.7km detour",
+          "updatedAt": "2026-07-09 00:51:52",
+          "latitude": -34.843167,
+          "longitude": 138.514511
+        },
+        {
+          "stationId": 61501156,
+          "stationName": "United Rosewater",
+          "brand": "United",
+          "address": "128 Grand Junction Rd",
+          "fuel": null,
+          "price": "155.5",
+          "distanceToRouteKm": null,
+          "distanceAlongRouteKm": 14.3,
+          "detourLabel": "2.3km detour",
+          "updatedAt": "2026-07-06 05:30:11",
+          "latitude": -34.851699,
+          "longitude": 138.524799
+        },
+        {
+          "stationId": 61577257,
+          "stationName": "Solo Clare St",
+          "brand": "Solo",
+          "address": "19 Clare St",
+          "fuel": null,
+          "price": "155.5",
+          "distanceToRouteKm": null,
+          "distanceAlongRouteKm": 15.5,
+          "detourLabel": "3.7km detour",
+          "updatedAt": "2026-07-06 04:45:39",
+          "latitude": -34.852580149386,
+          "longitude": 138.50803313128
+        }
+      ]
+    },
+    {
+      "route": {
+        "id": "sa-adelaide-coober-pedy",
+        "region": "SA",
+        "from": "Adelaide CBD SA",
+        "to": "Coober Pedy SA",
+        "startQuery": "Adelaide",
+        "endQuery": "Coober Pedy"
+      },
+      "competitor": "PetrolSpy",
+      "status": "map-location-surface-no-route-flow",
+      "screenshot": "/Users/leonardo.kesselring/Documents/AI Agents/Fuel Path App/output/playwright/competitor-route-browser-pass-2026-07-09T03-55-48-052/petrolspy-sa-adelaide-coober-pedy.png",
+      "url": "https://petrolspy.com.au/map/location/au/sa",
+      "observation": {
+        "text": "PetrolSpy Aus/NZ\nFuel Prices Near Me\n\nCheap FuelWatch petrol prices in South Australia, Australia\n\nChance to win a $25 fuel card every day\n\nHistorical Unleaded & E10 fuel price cycle graphs\n\nFREE fuel app for Australia &",
+        "hasRouteLikeInput": false,
+        "hasSearch": true
+      }
+    },
+    {
+      "route": {
+        "id": "sa-adelaide-coober-pedy",
+        "region": "SA",
+        "from": "Adelaide CBD SA",
+        "to": "Coober Pedy SA",
+        "startQuery": "Adelaide",
+        "endQuery": "Coober Pedy"
+      },
+      "competitor": "NSW FuelCheck",
+      "status": "outside-coverage-no-route-flow",
+      "screenshot": "/Users/leonardo.kesselring/Documents/AI Agents/Fuel Path App/output/playwright/competitor-route-browser-pass-2026-07-09T03-55-48-052/fuelcheck-sa-adelaide-coober-pedy.png",
+      "url": "https://www.fuelcheck.nsw.gov.au",
+      "observation": {
+        "text": "HOME\n\nCOMPATIBILITY\n\nNSW TRENDS\n\nHELP\n\nABOUT\n\nREPORT AN ISSUE\n\nPRIVACY POLICY\n\nCLOSE\n\nFuelCheck - Home\n\t\n Fuel Near Me\nAverage Price Now\nE10\n\n166.7\n\n -0.07 CENTS\n\n​\nEthanol 94 / Unleaded 91 (E10-U91)\nAll Brands\nRemember "
+      }
+    },
+    {
+      "route": {
+        "id": "tas-hobart-strahan",
+        "region": "TAS",
+        "from": "Hobart TAS",
+        "to": "Strahan TAS",
+        "startQuery": "Hobart",
+        "endQuery": "Strahan"
+      },
+      "competitor": "FuelRadar",
+      "status": "completed",
+      "screenshotForm": "/Users/leonardo.kesselring/Documents/AI Agents/Fuel Path App/output/playwright/competitor-route-browser-pass-2026-07-09T03-55-48-052/fuelradar-tas-hobart-strahan-form.png",
+      "screenshotResult": "/Users/leonardo.kesselring/Documents/AI Agents/Fuel Path App/output/playwright/competitor-route-browser-pass-2026-07-09T03-55-48-052/fuelradar-tas-hobart-strahan-result.png",
+      "scanUrl": "https://fuelradar.com.au/api/tools/route-scan?start_lat=-42.882100&start_lng=147.327200&end_lat=-42.1550426&end_lng=145.3251049&efficiency=8.5&tank_size=50",
+      "routeDistanceKm": 237.8,
+      "routeDurationMin": 178,
+      "stationCount": 35,
+      "startPicked": "Hobart, TasmaniaTasmania 7000",
+      "endPicked": "Strahan, TAS (7468)TAS 7468",
+      "topStation": {
+        "stationId": 20079,
+        "stationName": "Astron New Norfolk",
+        "brand": "Astron",
+        "address": "20 BURNETT ST, New Norfolk",
+        "fuel": null,
+        "price": "159.5",
+        "distanceToRouteKm": null,
+        "distanceAlongRouteKm": 31.7,
+        "detourLabel": "0.6km detour",
+        "updatedAt": "2026-07-04 05:29:55",
+        "latitude": -42.78041,
+        "longitude": 147.0621907
+      },
+      "topStations": [
+        {
+          "stationId": 20079,
+          "stationName": "Astron New Norfolk",
+          "brand": "Astron",
+          "address": "20 BURNETT ST, New Norfolk",
+          "fuel": null,
+          "price": "159.5",
+          "distanceToRouteKm": null,
+          "distanceAlongRouteKm": 31.7,
+          "detourLabel": "0.6km detour",
+          "updatedAt": "2026-07-04 05:29:55",
+          "latitude": -42.78041,
+          "longitude": 147.0621907
+        },
+        {
+          "stationId": 211,
+          "stationName": "Tas Petroleum Moonah (unmanned)",
+          "brand": "Tas",
+          "address": "138-140 Main Rd, Moonah",
+          "fuel": null,
+          "price": "159.9",
+          "distanceToRouteKm": null,
+          "distanceAlongRouteKm": 6.5,
+          "detourLabel": "2.5km detour",
+          "updatedAt": "2026-07-09 03:24:23",
+          "latitude": -42.84477,
+          "longitude": 147.29325
+        },
+        {
+          "stationId": 14,
+          "stationName": "BP Moonah",
+          "brand": "BP",
+          "address": "30 Main Road, Moonah",
+          "fuel": null,
+          "price": "159.9",
+          "distanceToRouteKm": null,
+          "distanceAlongRouteKm": 5.8,
+          "detourLabel": "2.2km detour",
+          "updatedAt": "2026-07-09 01:01:04",
+          "latitude": -42.84915,
+          "longitude": 147.29649
+        },
+        {
+          "stationId": 184,
+          "stationName": "Ampol BENNETTS PETROLEUM Lenah Valley",
+          "brand": "Ampol",
+          "address": "101 Augusta Road, Lenah Valley",
+          "fuel": null,
+          "price": "159.9",
+          "distanceToRouteKm": null,
+          "distanceAlongRouteKm": 4,
+          "detourLabel": "0.6km detour",
+          "updatedAt": "2026-07-09 02:39:15",
+          "latitude": -42.8655207,
+          "longitude": 147.2968076
+        },
+        {
+          "stationId": 144,
+          "stationName": "Ampol Brooker",
+          "brand": "Ampol",
+          "address": "188 Brooker Avenue, North Hobart",
+          "fuel": null,
+          "price": "159.9",
+          "distanceToRouteKm": null,
+          "distanceAlongRouteKm": 1.7,
+          "detourLabel": "0.9km detour",
+          "updatedAt": "2026-07-09 02:52:23",
+          "latitude": -42.8710984,
+          "longitude": 147.3224479
+        }
+      ]
+    },
+    {
+      "route": {
+        "id": "tas-hobart-strahan",
+        "region": "TAS",
+        "from": "Hobart TAS",
+        "to": "Strahan TAS",
+        "startQuery": "Hobart",
+        "endQuery": "Strahan"
+      },
+      "competitor": "PetrolSpy",
+      "status": "map-location-surface-no-route-flow",
+      "screenshot": "/Users/leonardo.kesselring/Documents/AI Agents/Fuel Path App/output/playwright/competitor-route-browser-pass-2026-07-09T03-55-48-052/petrolspy-tas-hobart-strahan.png",
+      "url": "https://petrolspy.com.au/map/location/au/tas",
+      "observation": {
+        "text": "PetrolSpy Aus/NZ\nFuel Prices Near Me\n\nCheap FuelCheck petrol prices in Tasmania, Australia\n\nChance to win a $25 fuel card every day\n\nHistorical Unleaded & E10 fuel price cycle graphs\n\nFREE fuel app for Australia & NZ!\n\n ",
+        "hasRouteLikeInput": false,
+        "hasSearch": true
+      }
+    },
+    {
+      "route": {
+        "id": "tas-hobart-strahan",
+        "region": "TAS",
+        "from": "Hobart TAS",
+        "to": "Strahan TAS",
+        "startQuery": "Hobart",
+        "endQuery": "Strahan"
+      },
+      "competitor": "NSW FuelCheck",
+      "status": "outside-coverage-no-route-flow",
+      "screenshot": "/Users/leonardo.kesselring/Documents/AI Agents/Fuel Path App/output/playwright/competitor-route-browser-pass-2026-07-09T03-55-48-052/fuelcheck-tas-hobart-strahan.png",
+      "url": "https://www.fuelcheck.nsw.gov.au",
+      "observation": {
+        "text": "HOME\n\nCOMPATIBILITY\n\nNSW TRENDS\n\nHELP\n\nABOUT\n\nREPORT AN ISSUE\n\nPRIVACY POLICY\n\nCLOSE\n\nFuelCheck - Home\n\t\n Fuel Near Me\nAverage Price Now\nE10\n\n166.7\n\n -0.07 CENTS\n\n​\nEthanol 94 / Unleaded 91 (E10-U91)\nAll Brands\nRemember "
+      }
+    },
+    {
+      "route": {
+        "id": "nt-darwin-alice-springs",
+        "region": "NT",
+        "from": "Darwin NT",
+        "to": "Alice Springs NT",
+        "startQuery": "Darwin",
+        "endQuery": "Alice Springs"
+      },
+      "competitor": "FuelRadar",
+      "status": "completed",
+      "screenshotForm": "/Users/leonardo.kesselring/Documents/AI Agents/Fuel Path App/output/playwright/competitor-route-browser-pass-2026-07-09T03-55-48-052/fuelradar-nt-darwin-alice-springs-form.png",
+      "screenshotResult": "/Users/leonardo.kesselring/Documents/AI Agents/Fuel Path App/output/playwright/competitor-route-browser-pass-2026-07-09T03-55-48-052/fuelradar-nt-darwin-alice-springs-result.png",
+      "scanUrl": "https://fuelradar.com.au/api/tools/route-scan?start_lat=-12.463400&start_lng=130.845600&end_lat=-23.6991012&end_lng=133.88151316666668&efficiency=8.5&tank_size=50",
+      "routeDistanceKm": 1676.7,
+      "routeDurationMin": 1257,
+      "stationCount": 26,
+      "startPicked": "Darwin, Northern TerritoryNorthern Territory 0800",
+      "endPicked": "Alice Springs, NT (0870)NT 0870",
+      "topStation": {
+        "stationId": 59268316,
+        "stationName": "Solo Stuart Park ",
+        "brand": "Solo",
+        "address": "34-36 Stuart Highway",
+        "fuel": null,
+        "price": "169.5",
+        "distanceToRouteKm": null,
+        "distanceAlongRouteKm": 2.2,
+        "detourLabel": "1.7km detour",
+        "updatedAt": "2026-07-09 12:00:12",
+        "latitude": -12.448807,
+        "longitude": 130.8415
+      },
+      "topStations": [
+        {
+          "stationId": 59268316,
+          "stationName": "Solo Stuart Park ",
+          "brand": "Solo",
+          "address": "34-36 Stuart Highway",
+          "fuel": null,
+          "price": "169.5",
+          "distanceToRouteKm": null,
+          "distanceAlongRouteKm": 2.2,
+          "detourLabel": "1.7km detour",
+          "updatedAt": "2026-07-09 12:00:12",
+          "latitude": -12.448807,
+          "longitude": 130.8415
+        },
+        {
+          "stationId": 56876288,
+          "stationName": "Fuelxpress Winnellie",
+          "brand": "FuelXpress",
+          "address": "46 Coonawarra Road",
+          "fuel": null,
+          "price": "169.5",
+          "distanceToRouteKm": null,
+          "distanceAlongRouteKm": 6.3,
+          "detourLabel": "4.8km detour",
+          "updatedAt": "2026-07-09 12:00:12",
+          "latitude": -12.43074,
+          "longitude": 130.87497
+        },
+        {
+          "stationId": 53462678,
+          "stationName": "United Parap Pieface",
+          "brand": "United",
+          "address": "209 Stuart Hwy ",
+          "fuel": null,
+          "price": "169.5",
+          "distanceToRouteKm": null,
+          "distanceAlongRouteKm": 4.4,
+          "detourLabel": "3.4km detour",
+          "updatedAt": "2026-07-09 12:00:12",
+          "latitude": -12.4329,
+          "longitude": 130.848332
+        },
+        {
+          "stationId": 34287423,
+          "stationName": "United Darwin (smith Street) Pieface",
+          "brand": "United",
+          "address": "103 Smith Street",
+          "fuel": null,
+          "price": "169.5",
+          "distanceToRouteKm": null,
+          "distanceAlongRouteKm": 1.5,
+          "detourLabel": "1.2km detour",
+          "updatedAt": "2026-07-09 12:00:12",
+          "latitude": -12.458111,
+          "longitude": 130.836149
+        },
+        {
+          "stationId": 43513100,
+          "stationName": "Shell Reddy Express Darwin City",
+          "brand": "Shell",
+          "address": "37 DALY ST",
+          "fuel": null,
+          "price": "170.9",
+          "distanceToRouteKm": null,
+          "distanceAlongRouteKm": 1.6,
+          "detourLabel": "1.2km detour",
+          "updatedAt": "2026-07-09 12:00:12",
+          "latitude": -12.454479,
+          "longitude": 130.838773
+        }
+      ]
+    },
+    {
+      "route": {
+        "id": "nt-darwin-alice-springs",
+        "region": "NT",
+        "from": "Darwin NT",
+        "to": "Alice Springs NT",
+        "startQuery": "Darwin",
+        "endQuery": "Alice Springs"
+      },
+      "competitor": "PetrolSpy",
+      "status": "map-location-surface-no-route-flow",
+      "screenshot": "/Users/leonardo.kesselring/Documents/AI Agents/Fuel Path App/output/playwright/competitor-route-browser-pass-2026-07-09T03-55-48-052/petrolspy-nt-darwin-alice-springs.png",
+      "url": "https://petrolspy.com.au/map/location/au/nt",
+      "observation": {
+        "text": "PetrolSpy Aus/NZ\nFuel Prices Near Me\n\nCheap MyFuel NT petrol prices in Northen Territory, Australia\n\nChance to win a $25 fuel card every day\n\nHistorical Unleaded & E10 fuel price cycle graphs\n\nFREE fuel app for Australia",
+        "hasRouteLikeInput": false,
+        "hasSearch": true
+      }
+    },
+    {
+      "route": {
+        "id": "nt-darwin-alice-springs",
+        "region": "NT",
+        "from": "Darwin NT",
+        "to": "Alice Springs NT",
+        "startQuery": "Darwin",
+        "endQuery": "Alice Springs"
+      },
+      "competitor": "NSW FuelCheck",
+      "status": "outside-coverage-no-route-flow",
+      "screenshot": "/Users/leonardo.kesselring/Documents/AI Agents/Fuel Path App/output/playwright/competitor-route-browser-pass-2026-07-09T03-55-48-052/fuelcheck-nt-darwin-alice-springs.png",
+      "url": "https://www.fuelcheck.nsw.gov.au",
+      "observation": {
+        "text": "HOME\n\nCOMPATIBILITY\n\nNSW TRENDS\n\nHELP\n\nABOUT\n\nREPORT AN ISSUE\n\nPRIVACY POLICY\n\nCLOSE\n\nFuelCheck - Home\n\t\n Fuel Near Me\nAverage Price Now\nE10\n\n166.7\n\n -0.07 CENTS\n\n​\nEthanol 94 / Unleaded 91 (E10-U91)\nAll Brands\nRemember "
+      }
+    }
+  ]
+}

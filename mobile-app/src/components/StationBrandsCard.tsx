@@ -290,10 +290,8 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   searchInput: {
-    backgroundColor: colors.white,
-    borderColor: colors.line,
+    ...surfaces.field,
     borderRadius: radii.lg,
-    borderWidth: 1,
     color: colors.ink,
     fontSize: typeScale.body,
     fontWeight: "500",
@@ -302,7 +300,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
   },
   secondaryButton: {
-    ...surfaces.softPanel,
+    ...surfaces.secondaryAction,
     borderRadius: radii.pill,
     minHeight: 38,
     justifyContent: "center",

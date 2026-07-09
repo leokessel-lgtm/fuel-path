@@ -1,10 +1,12 @@
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const root = resolve("..");
-const appRoot = resolve(".");
-const outputRoot = resolve(root, "tmp", "native-smoke");
+const scriptDir = dirname(fileURLToPath(import.meta.url));
+const appRoot = resolve(scriptDir, "..");
+const repoRoot = resolve(appRoot, "..");
+const outputRoot = resolve(repoRoot, "tmp", "native-smoke");
 const avdName = process.env.FUEL_PATH_ANDROID_AVD || "Fuel_Path_Arm64_API_35";
 const port = process.env.FUEL_PATH_ANDROID_SMOKE_PORT || "8082";
 const sdkRoot = findAndroidSdkRoot();

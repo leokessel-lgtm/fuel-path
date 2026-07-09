@@ -3,8 +3,14 @@ import { BackHandler, Platform } from "react-native";
 
 import { SettingsSection } from "../components/settings/settingsSections";
 
-export function useSettingsSection() {
-  const [activeSection, setActiveSection] = useState<SettingsSection | null>(null);
+export function useSettingsSection(initialSection: SettingsSection | null = null) {
+  const [activeSection, setActiveSection] = useState<SettingsSection | null>(initialSection);
+
+  useEffect(() => {
+    if (initialSection) {
+      setActiveSection(initialSection);
+    }
+  }, [initialSection]);
 
   useEffect(() => {
     if (Platform.OS === "web" || !activeSection) return undefined;

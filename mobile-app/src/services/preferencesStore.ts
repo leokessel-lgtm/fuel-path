@@ -9,6 +9,7 @@ import {
   FuelCode,
   HomeChargingAccess,
   MapPoint,
+  NavigationAppPreference,
   StationBrandMode,
   VehicleProfile,
   VehicleEnergyType,
@@ -17,12 +18,13 @@ import { normalisePreferredStationBrands } from "../utils/stationBrandPreference
 
 const PREFERENCES_KEY = "fuel-path:preferences:v1";
 const DEFAULT_VEHICLE_ID = "vehicle-default";
-const fuelCodes: FuelCode[] = ["E10", "U91", "P95", "P98", "DL", "PDL"];
+const fuelCodes: FuelCode[] = ["E10", "U91", "P95", "P98", "DL", "PDL", "LPG"];
 const evConnectors: EvConnector[] = ["CCS2", "CHADEMO", "TYPE2", "TESLA", "NACS"];
 const vehicleEnergyTypes: VehicleEnergyType[] = ["petrol", "diesel", "electric"];
 const homeChargingAccessValues: HomeChargingAccess[] = ["unknown", "yes", "no"];
 const evChargingPreferences: EvChargingPreference[] = ["balanced", "cheap", "fast", "reliable", "nearby"];
 const stationBrandModes: StationBrandMode[] = ["all", "preferred_only"];
+const navigationAppPreferences: NavigationAppPreference[] = ["device_maps", "ask", "apple_maps", "google_maps", "waze"];
 const discountIds = new Set(activeDirectDiscountPrograms.map((program) => program.id));
 
 export const defaultPreferences: AppPreferences = {
@@ -42,6 +44,7 @@ export const defaultPreferences: AppPreferences = {
   approvedPolicyBrands: ["Ampol", "BP", "Shell"],
   stationBrandMode: "all",
   preferredStationBrands: [],
+  navigationApp: "device_maps",
   activeVehicleId: DEFAULT_VEHICLE_ID,
   vehicles: [
     {
@@ -116,18 +119,20 @@ function normalisePreferences(preferences: Partial<AppPreferences>): AppPreferen
   });
   const vehicles = normaliseVehicleProfiles(preferences.vehicles, legacyVehicle);
   const requestedVehicleId = String(preferences.activeVehicleId || "");
-  const activeVehicle = vehicles.find((vehicle) => vehicle.id === requestedVehicleId) || vehicles[0];
+  const matchedVehicle = vehicles.find((vehicle) => vehicle.id === requestedVehicleId);
+  const activeVehicle = requestedVehicleId ? matchedVehicle || vehicles[0] : null;
+  const currentProfile = activeVehicle || legacyVehicle;
   return {
-    vehicleName: activeVehicle.name,
-    vehicleRego: activeVehicle.rego,
-    vehicleEnergyType: activeVehicle.vehicleEnergyType,
-    fuel: activeVehicle.fuel,
-    evConnectors: activeVehicle.evConnectors,
-    fuelTankLitres: activeVehicle.fuelTankLitres,
-    evBatteryKwh: activeVehicle.evBatteryKwh,
-    evRangeKm: activeVehicle.evRangeKm,
-    homeChargingAccess: activeVehicle.homeChargingAccess,
-    evChargingPreference: activeVehicle.evChargingPreference,
+    vehicleName: activeVehicle ? activeVehicle.name : "",
+    vehicleRego: activeVehicle ? activeVehicle.rego : "",
+    vehicleEnergyType: currentProfile.vehicleEnergyType,
+    fuel: currentProfile.fuel,
+    evConnectors: activeVehicle ? activeVehicle.evConnectors : [],
+    fuelTankLitres: activeVehicle ? activeVehicle.fuelTankLitres : defaultPreferences.fuelTankLitres,
+    evBatteryKwh: activeVehicle ? activeVehicle.evBatteryKwh : defaultPreferences.evBatteryKwh,
+    evRangeKm: activeVehicle ? activeVehicle.evRangeKm : defaultPreferences.evRangeKm,
+    homeChargingAccess: activeVehicle ? activeVehicle.homeChargingAccess : defaultPreferences.homeChargingAccess,
+    evChargingPreference: activeVehicle ? activeVehicle.evChargingPreference : defaultPreferences.evChargingPreference,
     minSavingDollars: boundedNumber(
       preferences.minSavingDollars,
       1,
@@ -146,7 +151,10 @@ function normalisePreferences(preferences: Partial<AppPreferences>): AppPreferen
       ? (preferences.stationBrandMode as StationBrandMode)
       : defaultPreferences.stationBrandMode,
     preferredStationBrands: normalisePreferredStationBrands(preferences.preferredStationBrands),
-    activeVehicleId: activeVehicle.id,
+    navigationApp: navigationAppPreferences.includes(preferences.navigationApp as NavigationAppPreference)
+      ? (preferences.navigationApp as NavigationAppPreference)
+      : defaultPreferences.navigationApp,
+    activeVehicleId: activeVehicle ? activeVehicle.id : "",
     vehicles,
     selectedDiscounts: normaliseSelectedDiscounts(preferences.selectedDiscounts),
     discountRedemptions: normaliseDiscountRedemptions(preferences.discountRedemptions),
@@ -279,11 +287,11 @@ function normaliseMapPoint(point: MapPoint): MapPoint {
 function isMapPoint(value: unknown): value is MapPoint {
   if (!value || typeof value !== "object") return false;
   const point = value as Partial<MapPoint>;
+  const lat = Number(point.lat);
+  const lon = Number(point.lon);
   return (
-    typeof point.lat === "number" &&
-    Number.isFinite(point.lat) &&
-    typeof point.lon === "number" &&
-    Number.isFinite(point.lon) &&
+    Number.isFinite(lat) &&
+    Number.isFinite(lon) &&
     typeof point.label === "string"
   );
 }

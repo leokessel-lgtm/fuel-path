@@ -26,6 +26,14 @@ Start the local Fuel Path API from the project root:
 python3 web-demo/server.py --host 127.0.0.1 --port 4174 --env prototype/.env
 ```
 
+For local web preview to use that local backend, set the public API base URL when starting Expo:
+
+```sh
+EXPO_PUBLIC_FUEL_PATH_API_BASE_URL=http://127.0.0.1:4174 npm run web -- --port 8081
+```
+
+If you leave it unset, localhost web defaults to the production API (`https://fuel-path.vercel.app`).
+
 Start the native app preview from this folder:
 
 ```sh

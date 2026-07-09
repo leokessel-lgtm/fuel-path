@@ -17,9 +17,7 @@ export const styles = StyleSheet.create({
     paddingTop: spacing.xs,
   },
   rootTitle: {
-    color: colors.ink,
-    fontSize: typeScale.title,
-    fontWeight: "900",
+    ...typography.title,
   },
   rootSubtitle: {
     color: colors.muted,
@@ -59,9 +57,7 @@ export const styles = StyleSheet.create({
     textTransform: "uppercase",
   },
   rowTitle: {
-    color: colors.ink,
-    fontSize: typeScale.lead,
-    fontWeight: "800",
+    ...typography.listTitle,
     marginTop: 2,
   },
   rowSummary: {
@@ -90,13 +86,11 @@ export const styles = StyleSheet.create({
   },
   headerBackText: {
     color: colors.green,
-    fontSize: typeScale.body,
-    fontWeight: "800",
+    fontSize: typography.buttonLabel.fontSize,
+    fontWeight: typography.buttonLabel.fontWeight,
   },
   detailTitle: {
-    color: colors.ink,
-    fontSize: typeScale.title,
-    fontWeight: "900",
+    ...typography.title,
   },
   eyebrow: {
     ...typography.eyebrow,
@@ -110,5 +104,51 @@ export const styles = StyleSheet.create({
     fontSize: typeScale.caption,
     fontWeight: "400",
     lineHeight: 18,
+  },
+  preferenceGroup: {
+    gap: spacing.xs,
+  },
+  sectionLabel: {
+    ...typography.sectionLabel,
+    textTransform: "uppercase",
+  },
+  preferenceRow: {
+    alignItems: "center",
+    borderColor: colors.line,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: spacing.sm,
+    justifyContent: "space-between",
+    minHeight: 58,
+    padding: spacing.sm,
+  },
+  preferenceRowSelected: {
+    backgroundColor: colors.greenSoft,
+    borderColor: colors.green,
+  },
+  preferenceCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  preferenceTitle: {
+    ...typography.bodyStrong,
+  },
+  preferenceSummary: {
+    color: colors.muted,
+    fontSize: typeScale.caption,
+    fontWeight: "400",
+    lineHeight: 17,
+    marginTop: 2,
+  },
+  preferenceState: {
+    color: colors.muted,
+    fontSize: typeScale.caption,
+    fontWeight: "800",
+    minWidth: 58,
+    textAlign: "right",
+  },
+  preferenceStateSelected: {
+    color: colors.greenDark,
   },
 });

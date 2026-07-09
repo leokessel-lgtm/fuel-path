@@ -52,6 +52,7 @@ export function StationMap({
   routePoints = emptyRoutePoints,
   cameraInsets,
   userLocation,
+  onMapPress,
 }: {
   centre: MapPoint;
   chargers?: EvCharger[];
@@ -68,6 +69,7 @@ export function StationMap({
   routePoints?: MapPoint[];
   cameraInsets?: CameraInsets;
   userLocation?: MapPoint;
+  onMapPress?: () => void;
 }) {
   const mapElementRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<Leaflet.Map | null>(null);
@@ -78,10 +80,18 @@ export function StationMap({
   const lastReportedUserCentreKeyRef = useRef("");
   const programmaticMoveRef = useRef(false);
   const userMovedMapRef = useRef(false);
+  const mapPressRef = useRef(onMapPress);
   const zoomingRef = useRef(false);
   const scheduledWorkRef = useRef<number[]>([]);
   const [mapReady, setMapReady] = useState(false);
   const [mapRenderVersion, setMapRenderVersion] = useState(0);
+
+  useEffect(() => {
+    mapPressRef.current = onMapPress;
+  }, [onMapPress]);
+  const handleMapPress = () => {
+    mapPressRef.current?.();
+  };
 
   useEffect(() => {
     let active = true;
@@ -115,6 +125,7 @@ export function StationMap({
           userMovedMapRef.current = true;
         }
       });
+      map.on("click", handleMapPress);
       map.on("zoomstart", () => {
         zoomingRef.current = true;
       });
@@ -136,18 +147,19 @@ export function StationMap({
       setMapReady(true);
     });
 
-    return () => {
-      active = false;
-      setMapReady(false);
-      clearScheduledMapWork(scheduledWorkRef);
-      const markerLayer = markerLayerRef.current;
-      const map = mapRef.current;
-      markerLayerRef.current = null;
-      if (map) {
-        map.stop();
-        map.off();
-        markerLayer?.clearLayers();
-        markerLayer?.remove();
+      return () => {
+        active = false;
+        setMapReady(false);
+        clearScheduledMapWork(scheduledWorkRef);
+        const markerLayer = markerLayerRef.current;
+        const map = mapRef.current;
+        markerLayerRef.current = null;
+        if (map) {
+          map.off("click", handleMapPress);
+          map.stop();
+          map.off();
+          markerLayer?.clearLayers();
+          markerLayer?.remove();
         map.remove();
       }
       mapRef.current = null;
@@ -491,9 +503,9 @@ function addLocationMarker(
   const marker = L.marker([centre.lat, centre.lon], {
     icon: L.divIcon({
       className: "",
-      html: `<div class="fuel-path-location-pin"><span></span></div>`,
-      iconAnchor: [14, 28],
-      iconSize: [28, 28],
+      html: `<div class="fuel-path-point-pin-anchor"><div class="fuel-path-location-pin"><span></span></div></div>`,
+      iconAnchor: [22, 44],
+      iconSize: [44, 44],
     }),
     zIndexOffset: 800,
   });
@@ -509,9 +521,9 @@ function addUserLocationMarker(
   const marker = L.marker([location.lat, location.lon], {
     icon: L.divIcon({
       className: "",
-      html: `<div aria-label="My location" class="fuel-path-user-location-pin"><span></span></div>`,
-      iconAnchor: [15, 30],
-      iconSize: [30, 30],
+      html: `<div aria-label="My location" class="fuel-path-point-pin-anchor"><div class="fuel-path-user-location-pin"><span></span></div></div>`,
+      iconAnchor: [22, 44],
+      iconSize: [44, 44],
     }),
     title: "My location",
     zIndexOffset: 900,
@@ -528,9 +540,9 @@ function addDestinationMarker(
   const marker = L.marker([point.lat, point.lon], {
     icon: L.divIcon({
       className: "",
-      html: `<div class="fuel-path-destination-pin"><span></span></div>`,
-      iconAnchor: [14, 28],
-      iconSize: [28, 28],
+      html: `<div class="fuel-path-point-pin-anchor"><div class="fuel-path-destination-pin"><span></span></div></div>`,
+      iconAnchor: [22, 44],
+      iconSize: [44, 44],
     }),
     zIndexOffset: 700,
   });
@@ -1129,6 +1141,17 @@ function ensureLeafletStyles() {
         font-weight: 900;
         line-height: 14px;
       }
+      .fuel-path-point-pin-anchor {
+        align-items: center;
+        box-sizing: border-box;
+        display: flex;
+        flex-direction: column;
+        height: 44px;
+        justify-content: flex-start;
+        overflow: visible;
+        padding-top: 1px;
+        width: 44px;
+      }
       .fuel-path-location-pin {
         background: ${colors.ink};
         border: 3px solid ${colors.white};
@@ -1151,10 +1174,10 @@ function ensureLeafletStyles() {
         width: 8px;
       }
       .fuel-path-user-location-pin {
-        background: ${colors.blue};
+        background: ${colors.route};
         border: 3px solid ${colors.white};
         border-radius: 999px 999px 999px 4px;
-        box-shadow: 0 8px 18px rgba(45, 95, 154, 0.28);
+        box-shadow: 0 8px 18px ${mapSkin.routeShadow};
         box-sizing: border-box;
         height: 30px;
         position: relative;
@@ -1163,15 +1186,13 @@ function ensureLeafletStyles() {
       }
       .fuel-path-user-location-pin span {
         background: ${colors.white};
-        border: 2px solid ${colors.blueSoft};
         border-radius: 999px;
-        box-sizing: border-box;
         display: block;
-        height: 10px;
-        left: 7px;
+        height: 8px;
+        left: 8px;
         position: absolute;
-        top: 7px;
-        width: 10px;
+        top: 8px;
+        width: 8px;
       }
       .fuel-path-destination-pin {
         background: ${mapSkin.route};

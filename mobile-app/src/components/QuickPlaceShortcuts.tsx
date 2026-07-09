@@ -1,7 +1,8 @@
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { colors, radii, spacing, typeScale } from "../theme";
+import { colors, radii, spacing, surfaces, typography } from "../theme";
 import { MapPoint } from "../types";
+import { locationSuggestionDisplay } from "../utils/locationSuggestionDisplay";
 
 export type QuickPlace = {
   key: string;
@@ -11,175 +12,144 @@ export type QuickPlace = {
 };
 
 export function QuickPlaceShortcuts({
-  onClearRecents,
-  onRemoveRecent,
   onSelect,
+  onSelectStart,
+  onRemoveRecent,
+  targetField,
   places,
-  showClearRecents,
 }: {
-  onClearRecents?: () => void;
-  onRemoveRecent?: (point: MapPoint) => void;
   onSelect: (kind: "from" | "to", point: MapPoint) => void;
+  onSelectStart?: () => void;
+  onRemoveRecent?: (point: MapPoint) => void;
+  targetField?: "from" | "to";
   places: QuickPlace[];
-  showClearRecents: boolean;
 }) {
   if (!places.length) return null;
+  const targetLabel = targetField === "to" ? "destination" : "start";
 
   return (
     <View style={styles.panel}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Quick start</Text>
-        {showClearRecents && onClearRecents ? (
-          <Pressable
-            accessibilityLabel="Clear recent route locations"
-            accessibilityRole="button"
-            onPress={onClearRecents}
-            style={styles.clearButton}
-          >
-            <Text style={styles.clearButtonText}>Clear recents</Text>
-          </Pressable>
-        ) : null}
-      </View>
-      <ScrollView
-        contentContainerStyle={styles.row}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-      >
-        {places.map((place) => (
-          <View key={place.key} style={styles.group}>
-            <View style={styles.labelRow}>
-              <Text numberOfLines={1} style={styles.label}>
-                {place.label}
-              </Text>
-              {place.kind === "recent" && onRemoveRecent ? (
+      <View style={styles.list}>
+        {places.map((place, index) => {
+          const display = locationSuggestionDisplay(place.point);
+          return (
+            <View key={place.key}>
+              <View style={styles.row}>
                 <Pressable
-                  accessibilityLabel={`Remove recent route location ${place.point.label}`}
                   accessibilityRole="button"
-                  onPress={() => onRemoveRecent(place.point)}
-                  style={styles.removeButton}
+                  accessibilityLabel={`Use ${targetLabel} ${place.label}`}
+                  onPressIn={onSelectStart}
+                  onPress={() => onSelect(targetField || "from", place.point)}
+                  style={styles.placeButton}
                 >
-                  <Text style={styles.removeButtonText}>Remove</Text>
+                  <View style={place.kind === "home" || place.kind === "work" ? styles.pin : styles.dot} />
+                  <View style={styles.texts}>
+                    <Text numberOfLines={1} style={styles.titleText}>
+                      {display.title}
+                    </Text>
+                    <Text numberOfLines={1} style={styles.metaText}>
+                      {display.subtitle}
+                    </Text>
+                  </View>
                 </Pressable>
-              ) : null}
+                {place.kind === "recent" && onRemoveRecent ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Clear recent route locations"
+                    onPress={() => onRemoveRecent(place.point)}
+                    style={styles.recentClearButton}
+                  >
+                    <Text numberOfLines={1} style={styles.recentClearText}>
+                      Clear
+                    </Text>
+                  </Pressable>
+                ) : null}
+              </View>
+              {index < places.length - 1 ? <View style={styles.divider} /> : null}
             </View>
-            <View style={styles.actions}>
-              <Pressable
-                accessibilityLabel={`Use ${place.label} as start`}
-                accessibilityRole="button"
-                onPress={() => onSelect("from", place.point)}
-                style={styles.button}
-              >
-                <Text style={styles.buttonText}>From</Text>
-              </Pressable>
-              <Pressable
-                accessibilityLabel={`Use ${place.label} as destination`}
-                accessibilityRole="button"
-                onPress={() => onSelect("to", place.point)}
-                style={styles.button}
-              >
-                <Text style={styles.buttonText}>To</Text>
-              </Pressable>
-            </View>
-          </View>
-        ))}
-      </ScrollView>
+          );
+        })}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   panel: {
-    backgroundColor: colors.panel,
-    borderColor: colors.line,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    gap: spacing.sm,
-    padding: spacing.sm,
-  },
-  title: {
-    color: colors.muted,
-    fontSize: 10,
-    fontWeight: "500",
-    textTransform: "uppercase",
-  },
-  header: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: spacing.sm,
-    justifyContent: "space-between",
-    minHeight: 30,
-  },
-  clearButton: {
-    alignItems: "center",
-    borderColor: colors.line,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    justifyContent: "center",
-    minHeight: 30,
-    paddingHorizontal: spacing.sm,
-  },
-  clearButtonText: {
-    color: colors.muted,
-    fontSize: 10,
-    fontWeight: "500",
-  },
-  row: {
-    gap: spacing.sm,
-    paddingRight: spacing.sm,
-  },
-  group: {
     backgroundColor: colors.white,
     borderColor: colors.line,
     borderRadius: radii.md,
     borderWidth: 1,
-    minWidth: 136,
-    padding: spacing.sm,
+    overflow: "hidden",
   },
-  labelRow: {
+  list: {
+    backgroundColor: colors.white,
+  },
+  row: {
+    alignItems: "center",
+    display: "flex",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingRight: spacing.xs,
+    gap: spacing.sm,
+  },
+  placeButton: {
     alignItems: "center",
     flexDirection: "row",
-    gap: spacing.xs,
-    justifyContent: "space-between",
-    minHeight: 30,
-  },
-  label: {
-    color: colors.ink,
+    gap: spacing.sm,
+    minHeight: 52,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
     flex: 1,
-    fontSize: typeScale.caption,
-    fontWeight: "600",
     minWidth: 0,
   },
-  removeButton: {
+  recentClearButton: {
     alignItems: "center",
-    borderColor: colors.line,
-    borderRadius: radii.pill,
-    borderWidth: 1,
+    borderRadius: radii.md,
     justifyContent: "center",
-    minHeight: 28,
+    minHeight: 32,
     paddingHorizontal: spacing.sm,
   },
-  removeButtonText: {
-    color: colors.red,
-    fontSize: 10,
-    fontWeight: "600",
+  divider: {
+    backgroundColor: colors.line,
+    height: StyleSheet.hairlineWidth,
+    marginLeft: spacing.md,
   },
-  actions: {
-    flexDirection: "row",
-    gap: spacing.xs,
-    marginTop: spacing.sm,
-  },
-  button: {
-    alignItems: "center",
-    backgroundColor: colors.blueSoft,
-    borderRadius: radii.pill,
+  texts: {
     flex: 1,
-    justifyContent: "center",
-    minHeight: 30,
-    paddingHorizontal: spacing.sm,
+    minWidth: 0,
   },
-  buttonText: {
-    color: colors.blue,
-    fontSize: typeScale.caption,
-    fontWeight: "600",
+  titleText: {
+    ...typography.bodyStrong,
+    minWidth: 0,
+  },
+  metaText: {
+    ...typography.metadata,
+    marginTop: 2,
+  },
+  pin: {
+    ...surfaces.secondaryAction,
+    backgroundColor: colors.green,
+    borderColor: colors.white,
+    borderRadius: radii.pill,
+    borderBottomLeftRadius: 3,
+    borderWidth: 2,
+    height: 15,
+    transform: [{ rotate: "-45deg" }],
+    width: 15,
+  },
+  dot: {
+    ...surfaces.secondaryAction,
+    backgroundColor: colors.greenSoft,
+    borderColor: colors.green,
+    borderRadius: radii.pill,
+    borderWidth: 2,
+    height: 12,
+    width: 12,
+  },
+  recentClearText: {
+    color: colors.muted,
+    fontSize: 12,
+    fontWeight: "500",
   },
 });

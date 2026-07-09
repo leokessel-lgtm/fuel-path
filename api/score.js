@@ -13,6 +13,7 @@ const {
   setParam,
   stringParam,
 } = require("./_backend");
+const { publicErrorMessage } = require("./_publicErrors");
 
 const ACTUAL_DETOUR_MAX_MINUTES = 30;
 const ACTUAL_DETOUR_MIN_SAVING_DOLLARS = 1.5;
@@ -146,7 +147,7 @@ module.exports = async function handler(req, res) {
     sendJson(res, 200, combinedPlanRoute ? { route: routePlan.builtRoute, score: payload } : payload);
   } catch (error) {
     sendJson(res, 400, {
-      error: error instanceof Error ? error.message : "Could not score route",
+      error: publicErrorMessage(error, "route"),
     });
   }
 };
@@ -159,7 +160,7 @@ async function routeEndpoint(req, res) {
     sendJson(res, 200, await buildRoute({ from, to }));
   } catch (error) {
     sendJson(res, 400, {
-      error: error instanceof Error ? error.message : "Route not found",
+      error: publicErrorMessage(error, "route"),
     });
   }
 }
@@ -373,7 +374,7 @@ async function refineCandidateActualDetour({ baseRoute, buildRoute, candidate, e
       ...candidate,
       actualDetour: {
         source: "unavailable",
-        warning: error instanceof Error ? error.message : "Actual detour estimate unavailable",
+        warning: "Checked detour timing timed out, so Fuel Path kept the estimated detour.",
       },
     };
   }

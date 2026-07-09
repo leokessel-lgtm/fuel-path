@@ -1,11 +1,13 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
-import { basename, join, resolve } from "node:path";
+import { basename, dirname, isAbsolute, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const mobileRoot = resolve(".");
-const repoRoot = resolve("..");
+const scriptDir = dirname(fileURLToPath(import.meta.url));
+const mobileRoot = resolve(scriptDir, "..");
+const repoRoot = resolve(mobileRoot, "..");
 const outputRoot = join(repoRoot, "tmp", "native-smoke");
-const artifact = resolve(argumentValue("--artifact") || process.env.FUEL_PATH_NATIVE_ARTIFACT || latestArtifact());
+const artifact = resolveInputPath(argumentValue("--artifact") || process.env.FUEL_PATH_NATIVE_ARTIFACT || latestArtifact());
 const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
 const appJson = JSON.parse(readFileSync(join(mobileRoot, "app.json"), "utf8")).expo;
 const packageName = appJson.android?.package || "com.fuelpath.app";
@@ -41,7 +43,9 @@ console.log(`Android Maps key fix packet ${report.status}: ${mdPath}`);
 if (report.status !== "ready_for_cloud_fix") process.exit(1);
 
 function markdown(data) {
-  const artifactCommandPath = data.artifactName ? `native-artifacts/${data.artifactName}` : "native-artifacts/YOUR_PREVIEW.apk";
+  const artifactCommandPath = data.artifact
+    ? relativeArtifactCommandPath(data.artifact)
+    : "native-artifacts/YOUR_PREVIEW.apk";
   return [
     "# Android Maps Key Fix Packet",
     "",
@@ -97,7 +101,7 @@ function readApkCertificate() {
   }
   const apksigner = latestTool("build-tools", "apksigner");
   if (!apksigner) return { error: "apksigner not found" };
-  const javaHome = process.env.JAVA_HOME || join(repoRoot, "var", "tooling", "java", "jdk-21.0.11+10", "Contents", "Home");
+  const javaHome = process.env.JAVA_HOME || androidStudioJavaHome() || join(repoRoot, "var", "tooling", "java", "jdk-21.0.11+10", "Contents", "Home");
   const result = spawnSync(apksigner, ["verify", "--print-certs", artifact], {
     encoding: "utf8",
     env: { ...process.env, JAVA_HOME: javaHome },
@@ -137,9 +141,12 @@ function detectCloudAccess() {
 
 function latestArtifact() {
   const nativeArtifacts = join(mobileRoot, "native-artifacts");
-  return listFiles(nativeArtifacts)
+  const previewArtifact = listFiles(nativeArtifacts)
     .filter((file) => file.endsWith(".apk"))
-    .sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs)[0] || "";
+    .sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs)[0];
+  if (previewArtifact) return previewArtifact;
+  const debugArtifact = join(mobileRoot, "android", "app", "build", "outputs", "apk", "debug", "app-debug.apk");
+  return existsSync(debugArtifact) ? debugArtifact : "";
 }
 
 function latestTool(group, tool) {
@@ -164,6 +171,17 @@ function which(binary) {
   return result.stdout.trim();
 }
 
+function androidStudioJavaHome() {
+  const home = "/Applications/Android Studio.app/Contents/jbr/Contents/Home";
+  return existsSync(home) ? home : "";
+}
+
+function relativeArtifactCommandPath(file) {
+  if (!file) return "native-artifacts/YOUR_PREVIEW.apk";
+  const relative = file.startsWith(`${mobileRoot}/`) ? file.slice(mobileRoot.length + 1) : file;
+  return relative || "native-artifacts/YOUR_PREVIEW.apk";
+}
+
 function listFiles(directory) {
   if (!directory || !existsSync(directory)) return [];
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -176,6 +194,11 @@ function listFiles(directory) {
 function argumentValue(name) {
   const index = process.argv.indexOf(name);
   return index >= 0 ? process.argv[index + 1] : "";
+}
+
+function resolveInputPath(value) {
+  if (!value) return "";
+  return isAbsolute(value) ? value : resolve(process.cwd(), value);
 }
 
 function matchText(text, pattern) {

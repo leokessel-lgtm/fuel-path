@@ -1,4 +1,4 @@
-export type FuelCode = "E10" | "U91" | "P95" | "P98" | "DL" | "PDL";
+export type FuelCode = "E10" | "U91" | "P95" | "P98" | "DL" | "PDL" | "LPG";
 
 export type FuelPathTab = "plan" | "nearby" | "account";
 
@@ -17,6 +17,8 @@ export type EvChargingPreference = "balanced" | "cheap" | "fast" | "reliable" | 
 export type Weekday = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
 
 export type StationBrandMode = "all" | "preferred_only";
+
+export type NavigationAppPreference = "device_maps" | "ask" | "apple_maps" | "google_maps" | "waze";
 
 export type VehicleProfile = {
   id: string;
@@ -49,6 +51,7 @@ export type AppPreferences = {
   approvedPolicyBrands: string[];
   stationBrandMode: StationBrandMode;
   preferredStationBrands: string[];
+  navigationApp: NavigationAppPreference;
   activeVehicleId: string;
   vehicles: VehicleProfile[];
   selectedDiscounts: string[];

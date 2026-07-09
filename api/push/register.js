@@ -6,6 +6,7 @@ const {
   registerPushDevice,
   sendJson,
 } = require("../_backend");
+const { publicErrorMessage } = require("../_publicErrors");
 
 module.exports = async function handler(req, res) {
   if (!methodAllowed(req, res, ["POST"])) return;
@@ -15,8 +16,8 @@ module.exports = async function handler(req, res) {
       const writeSecurity = alertsWriteSecurity();
       sendJson(res, 401, {
         error: writeSecurity.tokenConfigured
-          ? "Push device registration requires a valid token."
-          : "Push device registration requires ALERTS_WRITE_TOKEN before durable storage is enabled.",
+          ? "Notifications cannot sync from this session."
+          : "Notifications are not available yet.",
         alerts: await alertsStatus(),
       });
       return;
@@ -25,7 +26,7 @@ module.exports = async function handler(req, res) {
     sendJson(res, 202, await registerPushDevice(req.body || {}));
   } catch (error) {
     sendJson(res, 400, {
-      error: error instanceof Error ? error.message : "Invalid push device registration",
+      error: publicErrorMessage(error, "alerts"),
       alerts: await alertsStatus(),
     });
   }

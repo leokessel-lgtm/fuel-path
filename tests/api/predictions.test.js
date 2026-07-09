@@ -918,7 +918,7 @@ test("prediction collection endpoint is authorised and reuses predictions functi
     });
 
     assert.equal(rejected.status, 401);
-    assert.match(rejected.payload.error, /collection requires/);
+    assert.match(rejected.payload.error, /Fuel-cycle measurement cannot run from this session/);
     assert.equal(accepted.status, 202);
     assert.equal(accepted.payload.dryRun, true);
     assert.equal(accepted.payload.summary.limit, 1);
@@ -975,7 +975,7 @@ test("prediction back-test writes require a configured token", async () => {
     );
 
     assert.equal(rejected.status, 401);
-    assert.match(rejected.payload.error, /valid token/);
+    assert.match(rejected.payload.error, /Fuel-cycle measurement is not available from this session/);
     assert.equal(rejected.payload.predictions.writeSecurity.tokenRequired, true);
     assert.equal(accepted.status, 202);
   } finally {
@@ -992,7 +992,7 @@ test("prediction back-test rejects unsupported payloads", async () => {
   });
 
   assert.equal(response.status, 400);
-  assert.match(response.payload.error, /fuel is not supported/);
+  assert.match(response.payload.error, /does not support that fuel yet/);
   assert.equal(response.payload.predictions.accuracyClaimsAllowed, false);
 });
 

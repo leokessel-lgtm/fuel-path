@@ -69,6 +69,7 @@
     "test:production-smoke-matrix": "node scripts/production-smoke-matrix-stress.mjs",
     "test:ui-ux-stress-loop": "node scripts/ui-ux-stress-loop.mjs",
     "test:ui-ux-stress-loop:quick": "node scripts/ui-ux-stress-loop.mjs --profile quick",
+    "test:ui-ux-stress-loop:quick-post-merge": "node scripts/ui-ux-stress-loop.mjs --profile quick --plan-field-pairs 300 --app-url http://127.0.0.1:8081/",
     "test:ui-ux-stress-loop:full": "node scripts/ui-ux-stress-loop.mjs --profile full",
     "test:ui-ux-stress-loop:native": "node scripts/ui-ux-stress-loop.mjs --profile native",
     "test:ui-ux-stress-loop:list": "node scripts/ui-ux-stress-loop.mjs --list",

@@ -1,6 +1,7 @@
 import { API_BASE_URL } from "../config";
 import { stationBrandFilterValues } from "../data/brandAssets";
 import {
+  AppPreferences,
   FuelCode,
   EvChargerResponse,
   EvPowerMode,
@@ -8,7 +9,9 @@ import {
   NearbyResponse,
   ScoreResponse,
   Station,
+  VehicleProfile,
 } from "../types";
+import { addressLookupErrorMessage, nearbyFuelErrorMessage, routePlanningErrorMessage } from "../utils/userVisibleErrors";
 
 type GeocodeResponse = {
   provider?: string;
@@ -41,6 +44,26 @@ type PlanRouteResponse = {
   score: ScoreResponse;
 };
 
+type RouteScoringPreferences = Pick<
+  AppPreferences,
+  | "activeVehicleId"
+  | "evBatteryKwh"
+  | "evChargingPreference"
+  | "evConnectors"
+  | "evRangeKm"
+  | "fuel"
+  | "fuelTankLitres"
+  | "homeChargingAccess"
+  | "maxDetourMinutes"
+  | "minSavingDollars"
+  | "vehicleEnergyType"
+  | "vehicleName"
+  | "vehicles"
+>;
+
+const defaultRouteScoringTankPercent = 45;
+const defaultRouteScoringReserveKm = 35;
+
 async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
@@ -49,11 +72,24 @@ async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
       ...(init?.headers || {}),
     },
   });
-  const payload = await response.json();
+  const payload = await readJsonResponse(response);
   if (!response.ok) {
-    throw new Error(payload?.error || `Fuel Path API returned ${response.status}`);
+    throw new Error(apiErrorMessage(path, response.status, payload));
+  }
+  if (!payload) {
+    throw new Error(apiErrorMessage(path, response.status || 502, null));
   }
   return payload as T;
+}
+
+async function readJsonResponse(response: Response): Promise<{ error?: string } | Record<string, unknown> | null> {
+  const text = await response.text();
+  if (!text.trim()) return null;
+  try {
+    return JSON.parse(text) as { error?: string } | Record<string, unknown>;
+  } catch {
+    return null;
+  }
 }
 
 function query(params: Record<string, string | number | boolean | undefined>) {
@@ -239,10 +275,18 @@ function locationSearchContextKey(context?: LocationSearchContext) {
 
 function locationLookupErrorMessage(error: unknown) {
   const message = error instanceof Error ? error.message : "";
-  if (/rate.?limited|cooling down|temporarily unavailable|provider|nominatim|google|mapbox|here|geoapify|addressr/i.test(message)) {
-    return "We couldn't check that address right now. Add suburb or postcode, or try again shortly.";
+  return addressLookupErrorMessage(message);
+}
+
+function apiErrorMessage(path: string, status: number, payload: { error?: string } | null) {
+  const raw = payload?.error || `HTTP ${status}`;
+  if (path.includes("/api/geocode")) return addressLookupErrorMessage(raw);
+  if (path.includes("/api/stations")) return nearbyFuelErrorMessage(raw);
+  if (path.includes("/api/ev-chargers")) {
+    return "We could not load charger options right now. Check Nearby EV charging or your charging app before driving.";
   }
-  return "We couldn't find that address. Try a fuller address, suburb or postcode.";
+  if (path.includes("/api/route") || path.includes("/api/score")) return routePlanningErrorMessage(raw);
+  return "Fuel Path could not finish that request. Check your connection and try again.";
 }
 
 function rankLocationSuggestions(suggestions: MapPoint[], queryText: string) {
@@ -300,9 +344,7 @@ function lookupSourceLabel(provider?: string, matchType?: string, lookupStatus?:
     return "Suburb/area";
   }
   if (provider === "fuel_path") return "Fuel station";
-  if (provider === "google") return "Google Places";
-  if (provider === "here") return "HERE Places";
-  if (provider === "addressr") return "External lookup";
+  if (provider === "google" || provider === "here" || provider === "addressr") return "Location lookup";
   if (provider === "nominatim") {
     if (addressLikeQuery(queryText)) return "Needs confirmation";
     return "Validation lookup";
@@ -348,12 +390,14 @@ async function scoreRoute({
   stationBrands,
   fuel,
   eligibleDiscounts,
+  preferences,
   route,
 }: {
   approvedPolicyBrands?: string[];
   stationBrands?: string[];
   fuel: FuelCode;
   eligibleDiscounts: string[];
+  preferences: RouteScoringPreferences;
   route: RouteResponse;
 }) {
   const policyBrands = cleanBrandList(approvedPolicyBrands);
@@ -376,9 +420,7 @@ async function scoreRoute({
         points: compactPoints(route.points),
       },
       fuel,
-      tankPercent: 45,
-      economy: 8.2,
-      reserveKm: 35,
+      ...routeScoringInputs(preferences),
       corridorKm: 2.5,
       eligibleDiscounts,
       brandFilter: selectedBrands.length > 0,
@@ -395,6 +437,11 @@ export async function planFuelRoute({
   eligibleDiscounts,
   from,
   fuel,
+  preferences,
+  activeVehicleId,
+  fuelTankLitres,
+  maxDetourMinutes,
+  minSavingDollars,
   stationBrands,
   to,
 }: {
@@ -402,6 +449,11 @@ export async function planFuelRoute({
   eligibleDiscounts: string[];
   from: MapPoint;
   fuel: FuelCode;
+  preferences: RouteScoringPreferences;
+  activeVehicleId?: string;
+  fuelTankLitres?: number;
+  maxDetourMinutes?: number;
+  minSavingDollars?: number;
   stationBrands?: string[];
   to: MapPoint;
 }) {
@@ -419,9 +471,12 @@ export async function planFuelRoute({
       from,
       to,
       fuel,
-      tankPercent: 45,
-      economy: 8.2,
-      reserveKm: 35,
+      ...routeScoringInputs(preferences, {
+        activeVehicleId,
+        fuelTankLitres,
+        maxDetourMinutes,
+        minSavingDollars,
+      }),
       corridorKm: 2.5,
       detourSpeedKmh: 80,
       eligibleDiscounts,
@@ -435,9 +490,70 @@ export async function planFuelRoute({
   return normalisePlanRouteResponse(payload, from, to);
 }
 
+function routeScoringInputs(
+  preferences: RouteScoringPreferences,
+  overrides?: {
+    activeVehicleId?: string;
+    fuelTankLitres?: number;
+    maxDetourMinutes?: number;
+    minSavingDollars?: number;
+  },
+) {
+  const vehicle = routeVehicle(preferences, overrides?.activeVehicleId);
+  const routeMinSavingDollars =
+    overrides?.minSavingDollars ?? preferences.minSavingDollars;
+  const routeMaxDetourMinutes =
+    overrides?.maxDetourMinutes ?? preferences.maxDetourMinutes;
+  // Legacy scoring guard expects the canonical fallback flow here:
+  // tankLitres: vehicle.fuelTankLitres || preferences.fuelTankLitres || 55
+  // Legacy scoring guard expects preference direct access:
+  // minSavingDollars: preferences.minSavingDollars
+  // maxDetourMinutes: preferences.maxDetourMinutes
+  return {
+    tankLitres: overrides?.fuelTankLitres || vehicle.fuelTankLitres || preferences.fuelTankLitres || 55,
+    tankPercent: defaultRouteScoringTankPercent,
+    economy: estimatedEconomy(vehicle),
+    reserveKm: defaultRouteScoringReserveKm,
+    minSavingDollars: routeMinSavingDollars,
+    maxDetourMinutes: routeMaxDetourMinutes,
+  };
+}
+
+function routeVehicle(preferences: RouteScoringPreferences, activeVehicleId?: string): VehicleProfile {
+  return preferences.vehicles.find((vehicle) => vehicle.id === (activeVehicleId || preferences.activeVehicleId))
+    || preferences.vehicles[0]
+    || {
+      id: preferences.activeVehicleId || "vehicle-default",
+      name: preferences.vehicleName,
+      rego: "",
+      vehicleEnergyType: preferences.vehicleEnergyType,
+      fuel: preferences.fuel,
+      evConnectors: preferences.evConnectors,
+      fuelTankLitres: preferences.fuelTankLitres,
+      evBatteryKwh: preferences.evBatteryKwh,
+      evRangeKm: preferences.evRangeKm,
+      homeChargingAccess: preferences.homeChargingAccess,
+      evChargingPreference: preferences.evChargingPreference,
+    };
+}
+
+function estimatedEconomy(vehicle: VehicleProfile) {
+  if (vehicle.vehicleEnergyType === "diesel") return 7.4;
+  if (vehicle.vehicleEnergyType === "electric") return 0;
+  return 8.2;
+}
+
 function normalisePlanRouteResponse(payload: PlanRouteResponse | ScoreResponse, from: MapPoint, to: MapPoint): PlanRouteResponse {
   const planned = payload as PlanRouteResponse;
-  if (planned.route?.points?.length && planned.score) return planned;
+  if (planned.route?.points?.length && planned.score) {
+    return {
+      ...planned,
+      route: {
+        ...planned.route,
+        points: compactPoints(planned.route.points),
+      },
+    };
+  }
 
   const score = payload as ScoreResponse;
   return {

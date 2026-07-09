@@ -98,3 +98,39 @@ test("SA normalisation skips unavailable 9999 prices", () => {
 
   assert.equal(stations.length, 0);
 });
+
+test("SA normalisation maps LPG fuel id", () => {
+  const [station] = normaliseSaPayload(
+    {
+      S: [
+        {
+          S: 61501047,
+          A: "2 Gas Lane",
+          N: "BP LPG Example",
+          B: 5,
+          P: "5000",
+          G1: 611,
+          G2: 189,
+          G3: 4,
+          Lat: -34.93,
+          Lng: 138.6,
+        },
+      ],
+    },
+    {
+      SitePrices: [
+        {
+          SiteId: 61501047,
+          FuelId: 4,
+          TransactionDateUtc: "2026-07-09T00:15:00",
+          Price: 1099,
+        },
+      ],
+    },
+    brandPayload,
+    regionPayload,
+  );
+
+  assert.equal(station.prices.LPG, 109.9);
+  assert.equal(station.updatedAt, "2026-07-09T00:15:00.000Z");
+});

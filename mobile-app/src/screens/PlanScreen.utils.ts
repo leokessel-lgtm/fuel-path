@@ -247,7 +247,7 @@ export function routeContextNotice(context: ScoreResponse["context"]) {
   if (limited.capability === "fallback") {
     return `Using fallback data for ${limited.region}. Do not treat it as a live price recommendation.`;
   }
-  return "No live fuel provider covers this route yet.";
+  return "Live prices are not available for this route yet.";
 }
 
 export function displayLocationLabel(point: MapPoint, fallback: string) {
@@ -271,14 +271,21 @@ export function sameSavedCommuteRoute(
   commute: SavedCommute,
   endpoints: { from: MapPoint; to: MapPoint },
   fuel: FuelCode,
+  vehicleId?: string,
 ) {
   return (
     commute.fuel === fuel &&
+    sameSavedCommuteVehicle(commute.vehicleId, vehicleId) &&
     closeCoordinate(commute.from.lat, endpoints.from.lat) &&
     closeCoordinate(commute.from.lon, endpoints.from.lon) &&
     closeCoordinate(commute.to.lat, endpoints.to.lat) &&
     closeCoordinate(commute.to.lon, endpoints.to.lon)
   );
+}
+
+function sameSavedCommuteVehicle(leftVehicleId?: string, rightVehicleId?: string) {
+  if (!leftVehicleId || !rightVehicleId) return true;
+  return leftVehicleId === rightVehicleId;
 }
 
 function closeCoordinate(left: number, right: number) {

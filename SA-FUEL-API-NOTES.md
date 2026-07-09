@@ -46,6 +46,7 @@ Implementation rules:
 
 - Prices are returned in tenths of a cent, so `1859` becomes `185.9 c/L`.
 - Price value `9999` means the product is unavailable and must not be shown as a pump price.
+- The FPP Direct fuel mapping used by QLD/SA includes Fuel ID `4` as `LPG`; Fuel Path may expose LPG through the same fuel-vehicle flow as petrol and diesel grades.
 - Site detail data should be cached daily where practical.
 - Price retrieval should not be called more often than once per minute.
 - Fuel Path keeps the normal backend cache guard in front of live SA calls.

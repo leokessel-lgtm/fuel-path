@@ -1,26 +1,39 @@
-import { Image } from "expo-image";
-import { StyleSheet, Text, View } from "react-native";
+import { Image, StyleSheet, Text, View } from "react-native";
 
 import { brandStyleForStation } from "../data/brandAssets";
 import { colors } from "../theme";
 import { Station } from "../types";
 
-export function BrandBadge({ station, size = 34 }: { station: Station; size?: number }) {
+export function BrandBadge({
+  station,
+  size = 34,
+  marker = false,
+}: {
+  station: Station;
+  size?: number;
+  marker?: boolean;
+}) {
   const style = brandStyleForStation(station);
+  const source = style.icon || (marker ? style.markerIcon : undefined);
+  const imageSize = Math.max(12, size - 4);
   return (
     <View
       style={[
         styles.badge,
         {
-          backgroundColor: style.icon ? colors.white : style.color,
+          backgroundColor: source ? colors.white : style.color,
           height: size,
           width: size,
           borderRadius: size / 2,
         },
       ]}
     >
-      {style.icon ? (
-        <Image cachePolicy="memory-disk" contentFit="contain" source={style.icon} style={styles.image} />
+      {source ? (
+        <Image
+          resizeMode="contain"
+          source={source}
+          style={[styles.image, { height: imageSize, width: imageSize }]}
+        />
       ) : (
         <Text style={[styles.initials, { fontSize: Math.max(10, size * 0.34) }]}>
           {style.initials}
@@ -39,8 +52,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   image: {
-    height: "100%",
-    width: "100%",
+    flexShrink: 0,
   },
   initials: {
     color: colors.white,

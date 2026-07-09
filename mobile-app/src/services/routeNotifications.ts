@@ -34,6 +34,7 @@ export async function configureRouteNotificationHandler() {
   if (androidNotificationsUnavailableInExpoGo()) return;
 
   const Notifications = await import("expo-notifications");
+  await ensureRouteAlertChannel(Notifications);
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
       shouldPlaySound: false,
@@ -59,9 +60,16 @@ export async function getRouteNotificationPermission(): Promise<PermissionResult
     };
   }
 
-  const Notifications = await import("expo-notifications");
-  const permission = await Notifications.getPermissionsAsync();
-  return permissionResultForStatus(permission.status);
+  try {
+    const Notifications = await import("expo-notifications");
+    const permission = await Notifications.getPermissionsAsync();
+    return permissionResultForStatus(permission.status);
+  } catch {
+    return {
+      state: "unavailable",
+      message: "Could not check notification permission on this build. You can still save commutes.",
+    };
+  }
 }
 
 export async function requestRouteNotificationPermission(): Promise<PermissionResult> {
@@ -79,16 +87,23 @@ export async function requestRouteNotificationPermission(): Promise<PermissionRe
     };
   }
 
-  const Notifications = await import("expo-notifications");
-  await ensureRouteAlertChannel(Notifications);
+  try {
+    const Notifications = await import("expo-notifications");
+    await ensureRouteAlertChannel(Notifications);
 
-  const existing = await Notifications.getPermissionsAsync();
-  if (existing.status === "granted") {
-    return permissionResultForStatus(existing.status);
+    const existing = await Notifications.getPermissionsAsync();
+    if (existing.status === "granted") {
+      return permissionResultForStatus(existing.status);
+    }
+
+    const requested = await Notifications.requestPermissionsAsync();
+    return permissionResultForStatus(requested.status);
+  } catch {
+    return {
+      state: "unavailable",
+      message: "Could not request notification permission on this build. You can still save commutes.",
+    };
   }
-
-  const requested = await Notifications.requestPermissionsAsync();
-  return permissionResultForStatus(requested.status);
 }
 
 export async function scheduleSavedCommuteAlert(commute: SavedCommute): Promise<ScheduleResult> {

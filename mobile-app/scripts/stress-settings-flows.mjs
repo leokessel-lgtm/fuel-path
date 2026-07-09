@@ -211,7 +211,7 @@ async function exerciseVehicleSwitching(page) {
   await clickVisible(page, "Plan", viewport.height - 130);
   const planText = await visibleText(page);
   assertIncludes(planText, "EV");
-  assertIncludes(planText, "Check route range");
+  assertIncludes(planText, "420 km");
 
   await clickVisible(page, "Nearby", viewport.height - 130);
   const nearbyText = await visibleText(page);

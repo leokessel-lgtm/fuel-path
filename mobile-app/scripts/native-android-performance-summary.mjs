@@ -1,9 +1,12 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
-import { basename, join, resolve } from "node:path";
+import { basename, dirname, isAbsolute, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const root = resolve("..");
-const outputRoot = resolve(root, "tmp", "native-smoke");
-const reportPath = resolve(argumentValue("--report") || latestPreviewSmokeReport() || "");
+const scriptDir = dirname(fileURLToPath(import.meta.url));
+const mobileRoot = resolve(scriptDir, "..");
+const repoRoot = resolve(mobileRoot, "..");
+const outputRoot = resolve(repoRoot, "tmp", "native-smoke");
+const reportPath = resolveInputPath(argumentValue("--report") || latestPreviewSmokeReport() || "");
 const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
 const outJson = join(outputRoot, `android-performance-summary-${timestamp}.json`);
 const outMd = join(outputRoot, `android-performance-summary-${timestamp}.md`);
@@ -150,6 +153,11 @@ function latestPreviewSmokeReport() {
 function argumentValue(name) {
   const index = process.argv.indexOf(name);
   return index >= 0 ? process.argv[index + 1] : "";
+}
+
+function resolveInputPath(value) {
+  if (!value) return "";
+  return isAbsolute(value) ? value : resolve(process.cwd(), value);
 }
 
 function fail(message) {

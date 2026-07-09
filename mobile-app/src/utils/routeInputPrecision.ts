@@ -35,7 +35,7 @@ function addressHasNarrowingContext(query: string) {
   return hasAddressLocalityContext(text);
 }
 
-function hasAddressLocalityContext(query: string) {
+export function hasAddressLocalityContext(query: string) {
   const withoutState = query
     .replace(/\b(nsw|act|qld|vic|wa|sa|tas|nt)\b/gi, " ")
     .replace(/\b\d+[a-z]?(?:\/\d+[a-z]?)?\b/gi, " ")

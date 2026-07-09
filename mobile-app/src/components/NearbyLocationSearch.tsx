@@ -1,37 +1,44 @@
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
-import { colors, radii, shadow, spacing, surfaces, typeScale } from "../theme";
+import { colors, radii, shadow, spacing, surfaces, typeScale, typography } from "../theme";
 import { MapPoint } from "../types";
 import { locationSuggestionDisplay } from "../utils/locationSuggestionDisplay";
 import { CurrentLocationFieldButton, currentLocationFieldInset } from "./CurrentLocationFieldButton";
 
 export function NearbyLocationSearch({
   locationError,
+  onActivateSearch,
+  onBeginSelection,
+  onBlur,
   locationQuery,
   locationSearchActive,
   locationSuggestions,
+  onSelectQuickLocation,
   onApplyLocationSearch,
   onQueryChange,
-  onSelectRecentLocation,
   onSelectSuggestion,
   onUseCurrentLocation,
-  recentLocations,
+  quickLocations,
   resolvingLocation,
   suggestionsLoading,
 }: {
   locationError: string;
+  onActivateSearch: () => void;
+  onBeginSelection: () => void;
+  onBlur: () => void;
   locationQuery: string;
   locationSearchActive: boolean;
   locationSuggestions: MapPoint[];
+  onSelectQuickLocation: (location: MapPoint) => void;
   onApplyLocationSearch: () => void;
   onQueryChange: (value: string) => void;
-  onSelectRecentLocation: (location: MapPoint) => void;
   onSelectSuggestion: (location: MapPoint) => void;
   onUseCurrentLocation: () => void;
-  recentLocations: MapPoint[];
+  quickLocations: Array<MapPoint & { kind: "home" | "work" | "recent" }>;
   resolvingLocation: boolean;
   suggestionsLoading: boolean;
 }) {
+  const lookupActive = suggestionsLoading || locationSuggestions.length > 0;
   return (
     <View style={styles.locationCard}>
       <View style={styles.locationInputRow}>
@@ -40,7 +47,8 @@ export function NearbyLocationSearch({
             accessibilityLabel="Nearby location"
             value={locationQuery}
             onChangeText={onQueryChange}
-            onFocus={() => onQueryChange(locationQuery)}
+            onFocus={onActivateSearch}
+            onBlur={onBlur}
             onSubmitEditing={onApplyLocationSearch}
             placeholder="Search address, suburb or place"
             placeholderTextColor={colors.muted}
@@ -53,7 +61,7 @@ export function NearbyLocationSearch({
             onPress={onUseCurrentLocation}
           />
         </View>
-        {locationQuery.trim() || resolvingLocation ? (
+        {locationQuery.trim() ? (
           <Pressable
             accessibilityLabel="Find nearby location"
             onPress={onApplyLocationSearch}
@@ -66,7 +74,7 @@ export function NearbyLocationSearch({
           </Pressable>
         ) : null}
       </View>
-      {locationSearchActive && locationQuery.trim().length >= 3 ? (
+      {locationSearchActive && locationSuggestions.length > 0 ? (
         <View style={styles.lookupResults}>
           {suggestionsLoading ? (
             <Text style={styles.lookupLoading}>Searching...</Text>
@@ -75,20 +83,25 @@ export function NearbyLocationSearch({
             <LocationResultRow
               key={`${location.lat}:${location.lon}:${location.label}`}
               location={location}
+              onPressIn={onBeginSelection}
               onPress={() => onSelectSuggestion(location)}
-              recent={false}
+              kind="suggestion"
             />
           ))}
         </View>
       ) : null}
-      {locationSearchActive && !locationQuery.trim() && recentLocations.length ? (
-        <View style={styles.lookupResults}>
-          {recentLocations.map((location) => (
+          {locationSearchActive && quickLocations.length && !lookupActive ? (
+            <View style={styles.lookupResults}>
+              {suggestionsLoading ? (
+                <Text style={styles.lookupLoading}>Searching...</Text>
+              ) : null}
+              {quickLocations.map((location) => (
             <LocationResultRow
               key={`${location.lat}:${location.lon}:${location.label}`}
               location={location}
-              onPress={() => onSelectRecentLocation(location)}
-              recent
+              onPressIn={onBeginSelection}
+              onPress={() => onSelectQuickLocation(location)}
+              kind={location.kind}
             />
           ))}
         </View>
@@ -100,30 +113,30 @@ export function NearbyLocationSearch({
 
 function LocationResultRow({
   location,
+  onPressIn,
   onPress,
-  recent,
+  kind,
 }: {
   location: MapPoint;
+  onPressIn: () => void;
   onPress: () => void;
-  recent: boolean;
+  kind: "home" | "work" | "recent" | "suggestion";
 }) {
   const display = locationSuggestionDisplay(location);
+  const iconStyle = kind === "suggestion" ? styles.lookupResultPin : styles.recentSearchDot;
+  const label = kind === "home" ? "Home" : kind === "work" ? "Work" : kind === "recent" ? "Recent" : "Search";
   return (
     <Pressable
-      accessibilityLabel={recent ? `Use recent search ${location.label}` : `Use suggested location ${location.label}`}
+      accessibilityLabel={`Use ${label.toLowerCase()} location ${location.label}`}
+      onPressIn={onPressIn}
       onPress={onPress}
       style={styles.lookupResultRow}
     >
-      <View style={recent ? styles.recentSearchDot : styles.lookupResultPin} />
+      <View style={iconStyle} />
       <View style={styles.lookupResultCopy}>
         <Text numberOfLines={1} style={styles.lookupResultTitle}>
           {display.title}
         </Text>
-        {display.badge ? (
-          <Text numberOfLines={1} style={styles.lookupResultBadge}>
-            {display.badge}
-          </Text>
-        ) : null}
         <Text numberOfLines={1} style={styles.lookupResultMeta}>
           {display.subtitle}
         </Text>
@@ -136,9 +149,9 @@ const styles = StyleSheet.create({
   locationCard: {
     ...shadow.float,
     ...surfaces.floating,
-    borderRadius: radii.xxl,
-    gap: spacing.sm,
-    padding: spacing.sm,
+    borderRadius: radii.control,
+    gap: spacing.xs,
+    padding: spacing.xs,
   },
   locationInputRow: {
     alignItems: "center",
@@ -152,25 +165,21 @@ const styles = StyleSheet.create({
     position: "relative",
   },
   locationInput: {
-    backgroundColor: colors.white,
-    borderColor: colors.line,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    color: colors.ink,
+    ...surfaces.field,
+    ...typography.fieldText,
+    borderRadius: radii.control,
     flex: 1,
-    fontSize: typeScale.body,
-    fontWeight: "500",
     minHeight: 44,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingVertical: spacing.xs,
   },
   locationInputWithIcon: {
     paddingRight: currentLocationFieldInset,
   },
   locationButton: {
+    ...surfaces.secondaryAction,
     alignItems: "center",
-    backgroundColor: colors.green,
-    borderRadius: radii.md,
+    borderRadius: radii.control,
     justifyContent: "center",
     minHeight: 44,
     paddingHorizontal: spacing.md,
@@ -179,9 +188,8 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   locationButtonText: {
-    color: colors.white,
-    fontSize: typeScale.caption,
-    fontWeight: "700",
+    ...typography.compactButtonLabel,
+    color: colors.greenDark,
   },
   lookupResults: {
     borderTopColor: colors.line,
@@ -190,9 +198,7 @@ const styles = StyleSheet.create({
     paddingTop: spacing.sm,
   },
   lookupLoading: {
-    color: colors.muted,
-    fontSize: typeScale.caption,
-    fontWeight: "400",
+    ...typography.metadata,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
   },
@@ -228,33 +234,17 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   lookupResultTitle: {
-    color: colors.ink,
+    ...typography.bodyStrong,
     flex: 1,
-    fontSize: typeScale.caption,
-    fontWeight: "600",
-  },
-  lookupResultBadge: {
-    alignSelf: "flex-start",
-    backgroundColor: colors.greenSoft,
-    borderRadius: radii.sm,
-    color: colors.greenDark,
-    fontSize: typeScale.micro,
-    fontWeight: "700",
-    marginTop: 2,
-    maxWidth: 112,
-    overflow: "hidden",
-    paddingHorizontal: spacing.xs,
-    paddingVertical: 2,
   },
   lookupResultMeta: {
-    color: colors.muted,
+    ...typography.metadata,
     fontSize: 11,
-    fontWeight: "400",
     marginTop: 1,
   },
   locationError: {
     color: colors.red,
     fontSize: 11,
-    fontWeight: "500",
+    fontWeight: typography.metadataStrong.fontWeight,
   },
 });

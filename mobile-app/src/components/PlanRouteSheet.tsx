@@ -2,7 +2,7 @@ import { useCallback, useState } from "react";
 import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, Text, View, type LayoutChangeEvent, type ListRenderItem } from "react-native";
 
 import { colors, radii, shadow, spacing, surfaces, typeScale, typography } from "../theme";
-import { EvCharger, EvChargerResponse, MapPoint, ScoreResponse, StationViewModel, VehicleEnergyType } from "../types";
+import { EvCharger, EvChargerResponse, MapPoint, NavigationAppPreference, ScoreResponse, StationViewModel, VehicleEnergyType } from "../types";
 import { stationTimestampLine } from "../utils/decisionEvidence";
 import { fuelMismatchContextLine, fuelMismatchLine } from "../utils/fuelMismatch";
 import { tomorrowPriceView } from "../utils/pricing";
@@ -35,6 +35,7 @@ export function PlanRouteSheet({
   onLayout,
   onMinimise,
   onNavigationOpened,
+  navigationApp,
   onSaveCommute,
   onSelectStation,
   onSelectCharger,
@@ -73,6 +74,7 @@ export function PlanRouteSheet({
   evFallbackLoading?: boolean;
   loading: boolean;
   loadingLabel?: string;
+  navigationApp: NavigationAppPreference;
   onLayout?: (event: LayoutChangeEvent) => void;
   onMinimise: () => void;
   onNavigationOpened?: (station: StationViewModel) => void;
@@ -155,7 +157,7 @@ export function PlanRouteSheet({
             <StationDetailPanel
               onNavigate={() => {
                 onNavigationOpened?.(selected);
-                openPlanStationDirections(selected, routeEndpoints);
+                openPlanStationDirections(selected, navigationApp, routeEndpoints);
               }}
               onShowStops={onShowStops}
               selected={selected}
@@ -176,6 +178,7 @@ export function PlanRouteSheet({
               evFallbackLoading={evFallbackLoading}
               loading={loading}
               loadingLabel={loadingLabel}
+              navigationApp={navigationApp}
               onSaveCommute={onSaveCommute}
               onNavigationOpened={onNavigationOpened}
               onSelectStation={onSelectStation}
@@ -297,6 +300,7 @@ function RouteResultsPanel({
   evFallbackLoading = false,
   loading,
   loadingLabel,
+  navigationApp,
   onSaveCommute,
   onNavigationOpened,
   onSelectStation,
@@ -331,6 +335,7 @@ function RouteResultsPanel({
   evFallbackLoading?: boolean;
   loading: boolean;
   loadingLabel?: string;
+  navigationApp: NavigationAppPreference;
   onSaveCommute: () => void;
   onNavigationOpened?: (station: StationViewModel) => void;
   onSelectStation: (stationCode: string) => void;
@@ -462,7 +467,7 @@ function RouteResultsPanel({
                   onPress={(event) => {
                     event.stopPropagation();
                     onNavigationOpened?.(best);
-                    openPlanStationDirections(best, routeEndpoints);
+                    openPlanStationDirections(best, navigationApp, routeEndpoints);
                   }}
                   style={styles.recommendationNavigateButton}
                 >
@@ -575,6 +580,7 @@ function RouteResultsPanel({
               context={evRouteContext}
               error={evFallbackError}
               loading={evFallbackLoading}
+              navigationApp={navigationApp}
               onSelectCharger={onSelectCharger}
               selectedChargerId={selectedChargerId}
               vehicleEnergyType={vehicleEnergyType}
@@ -646,11 +652,13 @@ function PlanStopRow({
 
 function openPlanStationDirections(
   station: StationViewModel,
+  navigationApp: NavigationAppPreference,
   routeEndpoints?: { from: MapPoint; to: MapPoint },
 ) {
   if (routeEndpoints) {
     return openRouteDirectionsViaStop({
       destination: routeEndpoints.to,
+      navigationApp,
       origin: routeEndpoints.from,
       stop: {
         lat: station.station.lat,
@@ -659,7 +667,7 @@ function openPlanStationDirections(
       },
     });
   }
-  return openDirections(station.station.lat, station.station.lon, station.station.address || station.station.name);
+  return openDirections(station.station.lat, station.station.lon, station.station.address || station.station.name, navigationApp);
 }
 
 function RouteFollowUpPrompt({
@@ -826,9 +834,9 @@ function routeDetourSummaryPhrase(detourLine: string) {
 function capabilityLabelForPlan(capability: string) {
   if (capability === "live") return "Live data";
   if (capability === "limited") return "Limited data";
-  if (capability === "pending_access") return "Pending data";
+  if (capability === "pending_access") return "Prices not enabled";
   if (capability === "fallback") return "Fallback data";
-  if (capability === "unsupported") return "Unsupported";
+  if (capability === "unsupported") return "Not covered yet";
   return "Data check";
 }
 
@@ -837,6 +845,7 @@ function EvRoutePlanPanel({
   context,
   error,
   loading,
+  navigationApp,
   onSelectCharger,
   selectedChargerId,
   vehicleEnergyType,
@@ -845,6 +854,7 @@ function EvRoutePlanPanel({
   context?: EvChargerResponse["context"] | null;
   error: string;
   loading: boolean;
+  navigationApp: NavigationAppPreference;
   onSelectCharger?: (chargerId: string) => void;
   selectedChargerId?: string;
   vehicleEnergyType: VehicleEnergyType;
@@ -931,7 +941,7 @@ function EvRoutePlanPanel({
             accessibilityRole="button"
             onPress={(event) => {
               event.stopPropagation();
-              openDirections(charger.lat, charger.lon, charger.address || charger.name);
+              openDirections(charger.lat, charger.lon, charger.address || charger.name, navigationApp);
             }}
             style={styles.fallbackNavigateButton}
           >
@@ -998,7 +1008,7 @@ const styles = StyleSheet.create({
   sheet: {
     ...shadow.float,
     ...surfaces.floating,
-    borderRadius: radii.xxl,
+    borderRadius: radii.control,
     bottom: spacing.sm,
     gap: spacing.sm,
     left: spacing.md,
@@ -1014,7 +1024,10 @@ const styles = StyleSheet.create({
     maxHeight: 430,
   },
   sheetMinimised: {
-    height: 74,
+    gap: 0,
+    height: 62,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
   },
   sheetTopBar: {
     alignItems: "center",

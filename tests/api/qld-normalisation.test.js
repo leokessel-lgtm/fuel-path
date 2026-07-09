@@ -101,3 +101,29 @@ test("QLD normalisation keeps genuine level-one locality regions", () => {
   assert.equal(station.prices.U91, 171.9);
 }
 );
+
+test("QLD normalisation maps LPG fuel id", () => {
+  const [station] = normaliseQldPayload(
+    {
+      S: [
+        {
+          S: 61401144,
+          A: "44 LPG Rd",
+          N: "BP LPG Test",
+          B: 5,
+          P: "4000",
+          G1: 364,
+          G2: 1,
+          Lat: -27.47,
+          Lng: 153.02,
+        },
+      ],
+    },
+    { SitePrices: [{ SiteId: 61401144, FuelId: 4, Price: 1079, TransactionDateUtc: "2026-07-09T00:15:00" }] },
+    brandPayload,
+    regionPayload,
+  );
+
+  assert.equal(station.prices.LPG, 107.9);
+  assert.equal(station.updatedAt, "2026-07-09T00:15:00.000Z");
+});

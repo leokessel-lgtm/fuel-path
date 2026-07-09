@@ -1,43 +1,38 @@
-import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
-import { colors, radii, shadow, spacing, surfaces, typeScale } from "../theme";
-import { FuelCode, MapPoint, SavedCommute, VehicleEnergyType } from "../types";
+import { colors, radii, shadow, spacing, surfaces, typeScale, typography } from "../theme";
+import { MapPoint, SavedCommute, VehicleEnergyType } from "../types";
 import { CurrentLocationFieldButton, currentLocationFieldInset } from "./CurrentLocationFieldButton";
-import { NearbyEnergyChoice, NearbyEnergySelector } from "./NearbyEvControls";
 import { QuickPlace, QuickPlaceShortcuts } from "./QuickPlaceShortcuts";
 import { AddressSuggestions } from "./RouteAddressSuggestions";
-import { SavedCommuteShortcuts } from "./SavedCommuteShortcuts";
 
 export function PlanRouteEditorCard({
   activeAddressField,
   canPlanRoute,
   maxHeight,
-  fuel,
   from,
   fromSuggestions,
   loading,
   locatingFrom,
-  onClearRecentLocations,
   onFromChange,
   onFromFocus,
-  onFuelChange,
+  onFromBlur,
+  onFromSelectionStart,
   onPlanRoute,
-  onRemoveRecentLocation,
   onSelectAddressSuggestion,
   onSelectQuickPlace,
+  onRemoveRecent,
   onSelectSavedCommute,
   onToChange,
   onToFocus,
+  onToBlur,
+  onToSelectionStart,
   onUseCurrentFromLocation,
-  onVehicleEnergyTypeChange,
   quickPlaces,
-  recentLocationsCount,
   routePrecisionHint,
   routeError,
   routePlanningBlocked,
   savedCommutes,
-  showPlanningShortcuts,
   suggestionsError,
   suggestionsLoading,
   to,
@@ -48,31 +43,29 @@ export function PlanRouteEditorCard({
   activeAddressField: "from" | "to" | null;
   canPlanRoute: boolean;
   maxHeight?: number;
-  fuel: FuelCode;
   from: string;
   fromSuggestions: MapPoint[];
   loading: boolean;
   locatingFrom: boolean;
-  onClearRecentLocations?: () => void;
   onFromChange: (value: string) => void;
   onFromFocus: () => void;
-  onFuelChange: (fuel: FuelCode) => void;
+  onFromBlur: () => void;
+  onFromSelectionStart: () => void;
   onPlanRoute: () => void;
-  onRemoveRecentLocation?: (point: MapPoint) => void;
   onSelectAddressSuggestion: (field: "from" | "to", point: MapPoint) => void;
   onSelectQuickPlace: (field: "from" | "to", point: MapPoint) => void;
+  onRemoveRecent?: (point: MapPoint) => void;
   onSelectSavedCommute: (commute: SavedCommute) => void;
   onToChange: (value: string) => void;
   onToFocus: () => void;
+  onToBlur: () => void;
+  onToSelectionStart: () => void;
   onUseCurrentFromLocation: () => void;
-  onVehicleEnergyTypeChange: (vehicleEnergyType: VehicleEnergyType) => void;
   quickPlaces: QuickPlace[];
-  recentLocationsCount: number;
   routePrecisionHint: string;
   routeError: string;
   routePlanningBlocked: boolean;
   savedCommutes: SavedCommute[];
-  showPlanningShortcuts: boolean;
   suggestionsError: string;
   suggestionsLoading: "from" | "to" | null;
   to: string;
@@ -80,17 +73,8 @@ export function PlanRouteEditorCard({
   vehicleEnergyType: VehicleEnergyType;
   vehicleRouteNotice: string;
 }) {
-  const showFuelSelector = true;
-  const [fuelSelectorOpen, setFuelSelectorOpen] = useState(false);
-  const handleEnergyChange = (value: NearbyEnergyChoice) => {
-    setFuelSelectorOpen(false);
-    if (value === "EV") {
-      onVehicleEnergyTypeChange("electric");
-      return;
-    }
-    onVehicleEnergyTypeChange(value === "DL" || value === "PDL" ? "diesel" : "petrol");
-    onFuelChange(value);
-  };
+  const fromLookupActive = suggestionsLoading === "from" || Boolean(suggestionsError) || fromSuggestions.length > 0;
+  const toLookupActive = suggestionsLoading === "to" || Boolean(suggestionsError) || toSuggestions.length > 0;
   const primaryLabel =
     vehicleEnergyType === "electric"
       ? loading
@@ -120,6 +104,7 @@ export function PlanRouteEditorCard({
               value={from}
               onChangeText={onFromChange}
               onFocus={onFromFocus}
+              onBlur={onFromBlur}
               onPressIn={onFromFocus}
               onSubmitEditing={onPlanRoute}
               placeholder="Start address, suburb or place"
@@ -133,10 +118,20 @@ export function PlanRouteEditorCard({
               onPress={onUseCurrentFromLocation}
             />
           </View>
+          {activeAddressField === "from" && quickPlaces.length && !fromLookupActive ? (
+            <QuickPlaceShortcuts
+              onSelectStart={onFromSelectionStart}
+              onSelect={onSelectQuickPlace}
+              onRemoveRecent={onRemoveRecent}
+              places={quickPlaces}
+              targetField="from"
+            />
+          ) : null}
           {activeAddressField === "from" ? (
             <AddressSuggestions
               error={suggestionsError}
               loading={suggestionsLoading === "from"}
+              onSelectStart={onFromSelectionStart}
               onSelect={(point) => onSelectAddressSuggestion("from", point)}
               query={from}
               suggestions={fromSuggestions}
@@ -147,6 +142,7 @@ export function PlanRouteEditorCard({
             value={to}
             onChangeText={onToChange}
             onFocus={onToFocus}
+            onBlur={onToBlur}
             onPressIn={onToFocus}
             onSubmitEditing={onPlanRoute}
             placeholder="Destination address, suburb or place"
@@ -154,26 +150,26 @@ export function PlanRouteEditorCard({
             returnKeyType="search"
             style={styles.input}
           />
+          {activeAddressField === "to" && quickPlaces.length && !toLookupActive ? (
+            <QuickPlaceShortcuts
+              onSelectStart={onToSelectionStart}
+              onSelect={onSelectQuickPlace}
+              onRemoveRecent={onRemoveRecent}
+              places={quickPlaces}
+              targetField="to"
+            />
+          ) : null}
           {activeAddressField === "to" ? (
             <AddressSuggestions
               error={suggestionsError}
               loading={suggestionsLoading === "to"}
+              onSelectStart={onToSelectionStart}
               onSelect={(point) => onSelectAddressSuggestion("to", point)}
               query={to}
               suggestions={toSuggestions}
             />
           ) : null}
         </View>
-        {showFuelSelector ? (
-          <NearbyEnergySelector
-            eyebrow="Plan with"
-            includeEv
-            onChange={handleEnergyChange}
-            onToggleOpen={() => setFuelSelectorOpen((current) => !current)}
-            open={fuelSelectorOpen}
-            value={vehicleEnergyType === "electric" ? "EV" : fuel}
-          />
-        ) : null}
         {routePrecisionHint ? (
           <Text style={styles.routePrecisionHint}>{routePrecisionHint}</Text>
         ) : null}
@@ -182,18 +178,20 @@ export function PlanRouteEditorCard({
             {routeError}
           </Text>
         ) : null}
-        <Pressable
-          accessibilityLabel="Plan route"
-          accessibilityRole="button"
-          disabled={!canPlanRoute || loading || routePlanningBlocked}
-          onPress={onPlanRoute}
-          style={[
-            styles.primaryButton,
-            (!canPlanRoute || loading || routePlanningBlocked) && styles.primaryButtonDisabled,
-          ]}
-        >
-          <Text style={styles.primaryButtonText}>{routePlanningBlocked ? "Route charging coming soon" : primaryLabel}</Text>
-        </Pressable>
+        {canPlanRoute ? (
+          <Pressable
+            accessibilityLabel="Plan route"
+            accessibilityRole="button"
+            disabled={loading || routePlanningBlocked}
+            onPress={onPlanRoute}
+            style={[
+              styles.primaryButton,
+              (loading || routePlanningBlocked) && styles.primaryButtonDisabled,
+            ]}
+          >
+            <Text style={styles.primaryButtonText}>{routePlanningBlocked ? "Route charging coming soon" : primaryLabel}</Text>
+          </Pressable>
+        ) : null}
       </ScrollView>
     </View>
   );
@@ -203,26 +201,22 @@ const styles = StyleSheet.create({
   searchCard: {
     ...shadow.float,
     ...surfaces.floating,
-    borderRadius: radii.xxl,
+    borderRadius: radii.control,
     overflow: "hidden",
-    gap: spacing.sm,
-    padding: spacing.sm,
+    gap: spacing.xs,
+    padding: spacing.xs,
   },
   searchCardContent: {
-    gap: spacing.sm,
+    gap: spacing.xs,
   },
   routeNoticeCard: {
-    backgroundColor: colors.panel,
-    borderColor: colors.line,
-    borderRadius: radii.lg,
-    borderWidth: 1,
+    ...surfaces.field,
+    borderRadius: radii.control,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
   },
   routeNoticeText: {
-    color: colors.muted,
-    fontSize: typeScale.caption,
-    fontWeight: "600",
+    ...typography.metadataStrong,
     lineHeight: 18,
   },
   inputRow: {
@@ -233,36 +227,30 @@ const styles = StyleSheet.create({
     position: "relative",
   },
   input: {
-    backgroundColor: colors.white,
-    borderColor: colors.line,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    color: colors.ink,
-    fontSize: typeScale.body,
-    fontWeight: "500",
+    ...surfaces.field,
+    ...typography.fieldText,
+    borderRadius: radii.control,
     minHeight: 44,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingVertical: spacing.xs,
   },
   inputWithIcon: {
     paddingRight: currentLocationFieldInset,
   },
   routePrecisionHint: {
-    color: colors.muted,
-    fontSize: typeScale.caption,
-    fontWeight: "400",
+    ...typography.metadata,
     paddingHorizontal: spacing.sm,
   },
   routeError: {
     color: colors.red,
-    fontSize: typeScale.caption,
-    fontWeight: "600",
+    fontSize: typography.metadataStrong.fontSize,
+    fontWeight: typography.metadataStrong.fontWeight,
     paddingHorizontal: spacing.sm,
   },
   primaryButton: {
     ...surfaces.darkAction,
     alignItems: "center",
-    borderRadius: radii.pill,
+    borderRadius: radii.control,
     justifyContent: "center",
     minHeight: 52,
     paddingVertical: spacing.md,
@@ -271,8 +259,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#aeb8b2",
   },
   primaryButtonText: {
+    ...typography.buttonLabel,
     color: colors.white,
-    fontSize: typeScale.body,
-    fontWeight: "700",
   },
 });

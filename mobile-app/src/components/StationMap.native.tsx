@@ -1,5 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  useWindowDimensions,
+} from "react-native";
 import MapView, {
   Marker,
   Polyline,
@@ -8,8 +15,9 @@ import MapView, {
   type Region,
 } from "react-native-maps";
 
+import { brandStyleForStation } from "../data/brandAssets";
 import { colors, mapSkin, radii, shadow, spacing } from "../theme";
-import { MapPoint, StationViewModel } from "../types";
+import { EvCharger, MapPoint, StationViewModel } from "../types";
 import { BrandBadge } from "./BrandBadge";
 
 const maxStationMarkers = 420;
@@ -17,18 +25,23 @@ const routeMaxPriceMarkers = 18;
 const compactRouteMaxPriceMarkers = 14;
 const defaultMarkerDensity = {
   maxPriceMarkers: 8,
-  maxDotMarkers: 18,
   markerGridSize: 240,
   compactMarkerGridSize: 128,
 };
+const tabletMarkerDensity = {
+  maxPriceMarkers: 20,
+  markerGridSize: 150,
+  compactMarkerGridSize: 110,
+};
 const compactMarkerDensity = {
   maxPriceMarkers: 3,
-  maxDotMarkers: 8,
   markerGridSize: 390,
   compactMarkerGridSize: 230,
 };
 const nearbyInitialRegionDelta = 0.035;
 const nearbyInitialMarkerRadiusKm = 4.2;
+const routeCameraChargerLimit = 16;
+const maxEvMarkers = 96;
 const decorativeStationMarkerAccessibility = {
   accessibilityElementsHidden: true,
   importantForAccessibility: "no-hide-descendants" as const,
@@ -49,12 +62,16 @@ type ClusterMarker = {
 };
 
 const emptyRoutePoints: MapPoint[] = [];
+const emptyChargers: EvCharger[] = [];
 
 export function StationMap({
   centre,
+  chargers = emptyChargers,
   stations,
+  selectedChargerId,
   selectedStationCode,
   onSelect,
+  onSelectCharger,
   onViewportStationsChange,
   onMapSearchAreaChange,
   cameraFocusKey,
@@ -63,84 +80,154 @@ export function StationMap({
   routePoints = emptyRoutePoints,
   cameraInsets,
   userLocation,
+  onMapPress,
 }: {
   centre: MapPoint;
+  chargers?: EvCharger[];
   stations: StationViewModel[];
+  selectedChargerId?: string;
   selectedStationCode?: string;
   onSelect: (stationCode: string) => void;
+  onSelectCharger?: (chargerId: string) => void;
   onViewportStationsChange?: (stationCodes: string[]) => void;
-  onMapSearchAreaChange?: (area: { centre: MapPoint; radiusKm: number }) => void;
+  onMapSearchAreaChange?: (area: {
+    centre: MapPoint;
+    radiusKm: number;
+  }) => void;
   cameraFocusKey?: string;
   showCentreMarker?: boolean;
   routeEndpoints?: { from: MapPoint; to: MapPoint };
   routePoints?: MapPoint[];
   cameraInsets?: CameraInsets;
   userLocation?: MapPoint;
+  onMapPress?: () => void;
 }) {
   const { width } = useWindowDimensions();
   const mapRef = useRef<MapView | null>(null);
   const markerRefs = useRef<Record<string, MapMarker | null>>({});
   const lastCameraKeyRef = useRef("");
   const lastReportedUserCentreKeyRef = useRef("");
+  const lastSelectedChargerIdRef = useRef<string | undefined>(undefined);
   const programmaticMoveRef = useRef(false);
   const userMovedMapRef = useRef(false);
   const userGestureStartedRef = useRef(false);
   const [mapReady, setMapReady] = useState(false);
   const [mapMovedByUser, setMapMovedByUser] = useState(false);
   const [cameraResetVersion, setCameraResetVersion] = useState(0);
-  const [currentRegion, setCurrentRegion] = useState<Region>(() => regionForPoint(centre));
+  const [markerAssetRefreshVersion, setMarkerAssetRefreshVersion] = useState(0);
+  const [currentRegion, setCurrentRegion] = useState<Region>(() =>
+    regionForPoint(centre),
+  );
 
   const visibleRoutePoints = useMemo(
     () => (routePoints.length >= 2 ? sampleRoutePoints(routePoints, 1200) : []),
     [routePoints],
   );
-  const markerDensity = useMemo(() => nativeMarkerDensity(width), [width]);
-  const routePriceMarkerLimit = useMemo(() => nativeRoutePriceMarkerLimit(width), [width]);
+  const markerDensity = useMemo(
+    () => nativeMarkerDensity(width, Platform.OS === "ios" && Platform.isPad),
+    [width],
+  );
+  const routePriceMarkerLimit = useMemo(
+    () => nativeRoutePriceMarkerLimit(width),
+    [width],
+  );
   const activeInsets = useMemo(
-    () => resolveCameraInsets(routeEndpoints ? "route" : "nearby", cameraInsets),
+    () =>
+      resolveCameraInsets(routeEndpoints ? "route" : "nearby", cameraInsets),
     [cameraInsets, routeEndpoints],
   );
   const cameraKey = useMemo(
-    () => [
-      routeEndpoints ? "route" : "nearby",
-      cameraFocusKey || "initial",
-      cameraResetVersion,
-      cameraInsetsKey(activeInsets),
-    ].join("|"),
+    () =>
+      [
+        routeEndpoints ? "route" : "nearby",
+        cameraFocusKey || "initial",
+        cameraResetVersion,
+        cameraInsetsKey(activeInsets),
+      ].join("|"),
     [activeInsets, cameraFocusKey, cameraResetVersion, routeEndpoints],
   );
   const cameraCoordinates = useMemo(() => {
     if (routeEndpoints) {
-      const routeStationCameraPoints = stations.slice(0, routePriceMarkerLimit).map((item) => ({
-        lat: item.station.lat,
-        lon: item.station.lon,
-        label: item.station.name,
-      }));
-      if (visibleRoutePoints.length >= 2) return [...visibleRoutePoints, ...routeStationCameraPoints];
-      return [routeEndpoints.from, routeEndpoints.to, ...routeStationCameraPoints];
+      const routeStationCameraPoints = stations
+        .slice(0, routePriceMarkerLimit)
+        .map((item) => ({
+          lat: item.station.lat,
+          lon: item.station.lon,
+          label: item.station.name,
+        }));
+      const routeChargerCameraPoints = prioritiseSelectedChargers(
+        chargers,
+        selectedChargerId,
+      )
+        .slice(0, routeCameraChargerLimit)
+        .map((charger) => ({
+          lat: charger.lat,
+          lon: charger.lon,
+          label: charger.name,
+        }));
+      if (visibleRoutePoints.length >= 2) {
+        return [
+          ...visibleRoutePoints,
+          ...routeStationCameraPoints,
+          ...routeChargerCameraPoints,
+        ];
+      }
+      return [
+        routeEndpoints.from,
+        routeEndpoints.to,
+        ...routeStationCameraPoints,
+        ...routeChargerCameraPoints,
+      ];
     }
     return nearbyCameraPointsForCentre(centre, nearbyInitialMarkerRadiusKm);
-  }, [centre, routeEndpoints, routePriceMarkerLimit, stations, visibleRoutePoints]);
+  }, [
+    centre,
+    chargers,
+    routeEndpoints,
+    routePriceMarkerLimit,
+    selectedChargerId,
+    stations,
+    visibleRoutePoints,
+  ]);
   const initialRegion = useMemo(() => regionForPoint(centre), [centre]);
-  const markerGroups = useMemo(
-    () => {
-      if (routeEndpoints) {
-        return {
-          priceMarkers: prioritiseSelectedStations(stations, selectedStationCode).slice(0, routePriceMarkerLimit),
-          dotMarkers: [],
-          clusterMarkers: [],
-        };
-      }
-      return visibleMarkerGroups(stations.slice(0, maxStationMarkers), currentRegion, markerDensity, selectedStationCode);
-    },
-    [currentRegion, markerDensity, routeEndpoints, routePriceMarkerLimit, selectedStationCode, stations],
-  );
+  const markerGroups = useMemo(() => {
+    if (routeEndpoints) {
+      return {
+        priceMarkers: prioritiseSelectedStations(
+          stations,
+          selectedStationCode,
+        ).slice(0, routePriceMarkerLimit),
+        clusterMarkers: [],
+      };
+    }
+    return visibleMarkerGroups(
+      stations.slice(0, maxStationMarkers),
+      currentRegion,
+      markerDensity,
+      selectedStationCode,
+    );
+  }, [
+    currentRegion,
+    markerDensity,
+    routeEndpoints,
+    routePriceMarkerLimit,
+    selectedStationCode,
+    stations,
+  ]);
   const interactiveClusterMarkers = useMemo(
     () =>
       markerGroups.clusterMarkers.filter((cluster) =>
         clusterFitsInteractiveRegion(cluster, currentRegion, activeInsets),
       ),
     [activeInsets, currentRegion, markerGroups.clusterMarkers],
+  );
+  const visibleChargers = useMemo(
+    () =>
+      prioritiseSelectedChargers(chargers, selectedChargerId).slice(
+        0,
+        maxEvMarkers,
+      ),
+    [chargers, selectedChargerId],
   );
 
   useEffect(() => {
@@ -155,11 +242,17 @@ export function StationMap({
 
     runProgrammaticMapMove(programmaticMoveRef, () => {
       if (!routeEndpoints) {
-        mapRef.current?.animateToRegion(regionForPoint(centre, nearbyInitialRegionDelta), 260);
+        mapRef.current?.animateToRegion(
+          regionForPoint(centre, nearbyInitialRegionDelta),
+          260,
+        );
         return;
       }
       if (cameraCoordinates.length === 1) {
-        mapRef.current?.animateToRegion(regionForPoint(cameraCoordinates[0]), 260);
+        mapRef.current?.animateToRegion(
+          regionForPoint(cameraCoordinates[0]),
+          260,
+        );
         return;
       }
       mapRef.current?.fitToCoordinates(
@@ -185,8 +278,26 @@ export function StationMap({
   ]);
 
   useEffect(() => {
+    if (!mapReady || Platform.OS !== "android" || !markerGroups.priceMarkers.length) {
+      return;
+    }
+    const firstRefresh = setTimeout(() => {
+      setMarkerAssetRefreshVersion((current) => current + 1);
+    }, 650);
+    const secondRefresh = setTimeout(() => {
+      setMarkerAssetRefreshVersion((current) => current + 1);
+    }, 1600);
+    return () => {
+      clearTimeout(firstRefresh);
+      clearTimeout(secondRefresh);
+    };
+  }, [mapReady, markerGroups.priceMarkers.length]);
+
+  useEffect(() => {
     if (!mapReady || !mapRef.current || !selectedStationCode) return;
-    const selected = stations.find((item) => item.station.stationCode === selectedStationCode);
+    const selected = stations.find(
+      (item) => item.station.stationCode === selectedStationCode,
+    );
     if (!selected) return;
 
     markerRefs.current[selectedStationCode]?.showCallout();
@@ -204,6 +315,39 @@ export function StationMap({
       });
     }
   }, [mapReady, selectedStationCode, stations]);
+
+  useEffect(() => {
+    if (!selectedChargerId) {
+      lastSelectedChargerIdRef.current = undefined;
+      return;
+    }
+    const previousSelectedChargerId = lastSelectedChargerIdRef.current;
+    lastSelectedChargerIdRef.current = selectedChargerId;
+    if (
+      !mapReady ||
+      !mapRef.current ||
+      !previousSelectedChargerId ||
+      previousSelectedChargerId === selectedChargerId
+    ) {
+      return;
+    }
+    const selected = chargers.find(
+      (charger) => charger.id === selectedChargerId,
+    );
+    if (!selected || userMovedMapRef.current) return;
+
+    runProgrammaticMapMove(programmaticMoveRef, () => {
+      mapRef.current?.animateCamera(
+        {
+          center: {
+            latitude: selected.lat,
+            longitude: selected.lon,
+          },
+        },
+        { duration: 260 },
+      );
+    });
+  }, [chargers, mapReady, selectedChargerId]);
 
   const handleRegionChangeComplete = (region: Region) => {
     setCurrentRegion(region);
@@ -237,15 +381,9 @@ export function StationMap({
 
   const handleClusterPress = (cluster: ClusterMarker) => {
     runProgrammaticMapMove(programmaticMoveRef, () => {
-      mapRef.current?.fitToCoordinates(
-        cluster.items.map((item) => ({
-          latitude: item.station.lat,
-          longitude: item.station.lon,
-        })),
-        {
-          animated: true,
-          edgePadding: activeInsets,
-        },
+      mapRef.current?.animateToRegion(
+        regionForClusterZoom(cluster, currentRegion),
+        260,
       );
     });
   };
@@ -255,6 +393,11 @@ export function StationMap({
       <MapView
         ref={mapRef}
         initialRegion={initialRegion}
+        onPress={(event: { nativeEvent?: { action?: string } }) => {
+          if (event.nativeEvent?.action === "press") {
+            onMapPress?.();
+          }
+        }}
         onMapReady={() => setMapReady(true)}
         onPanDrag={() => {
           if (!programmaticMoveRef.current) {
@@ -293,13 +436,18 @@ export function StationMap({
 
         {!routeEndpoints && userLocation ? (
           <Marker
-            coordinate={{ latitude: userLocation.lat, longitude: userLocation.lon }}
+            coordinate={{
+              latitude: userLocation.lat,
+              longitude: userLocation.lon,
+            }}
             title="My location"
             tracksViewChanges={false}
             zIndex={900}
           >
-            <View style={styles.userLocationPin}>
-              <View style={styles.userLocationPinInner} />
+            <View style={styles.pointPinAnchor}>
+              <View style={styles.userLocationPin}>
+                <View style={styles.userLocationPinInner} />
+              </View>
             </View>
           </Marker>
         ) : null}
@@ -311,8 +459,10 @@ export function StationMap({
             tracksViewChanges={false}
             zIndex={800}
           >
-            <View style={styles.locationPin}>
-              <View style={styles.locationPinInner} />
+            <View style={styles.pointPinAnchor}>
+              <View style={styles.locationPin}>
+                <View style={styles.locationPinInner} />
+              </View>
             </View>
           </Marker>
         ) : null}
@@ -327,24 +477,13 @@ export function StationMap({
             tracksViewChanges={false}
             zIndex={700}
           >
-            <View style={styles.destinationPin}>
-              <View style={styles.destinationPinInner} />
+            <View style={styles.pointPinAnchor}>
+              <View style={styles.destinationPin}>
+                <View style={styles.destinationPinInner} />
+              </View>
             </View>
           </Marker>
         ) : null}
-
-        {markerGroups.dotMarkers.map((item) => (
-          <Marker
-            {...decorativeStationMarkerAccessibility}
-            coordinate={{ latitude: item.station.lat, longitude: item.station.lon }}
-            key={`dot-${item.station.stationCode}`}
-            onPress={() => handleMarkerPress(item.station.stationCode)}
-            tracksViewChanges={false}
-            zIndex={100}
-          >
-            <View style={styles.compactPin} />
-          </Marker>
-        ))}
 
         {interactiveClusterMarkers.map((cluster) => (
           <Marker
@@ -361,40 +500,131 @@ export function StationMap({
           </Marker>
         ))}
 
-        {markerGroups.priceMarkers.map((item) => {
-          const selected = item.station.stationCode === selectedStationCode;
-          const subdued = Boolean(routeEndpoints && selectedStationCode && !selected);
+        {visibleChargers.map((charger) => {
+          const selected = charger.id === selectedChargerId;
+          const label = charger.maxPowerKw
+            ? `${Math.round(charger.maxPowerKw)}kW`
+            : "";
           return (
             <Marker
-              {...decorativeStationMarkerAccessibility}
-              coordinate={{ latitude: item.station.lat, longitude: item.station.lon }}
-              key={item.station.stationCode}
-              onPress={() => handleMarkerPress(item.station.stationCode)}
-              ref={(marker) => {
-                markerRefs.current[item.station.stationCode] = marker;
-              }}
-              tracksViewChanges={false}
-              zIndex={selected ? 700 : subdued ? 420 : 500}
+              accessibilityLabel={`Select charger ${charger.name}`}
+              accessibilityRole="button"
+              coordinate={{ latitude: charger.lat, longitude: charger.lon }}
+              key={charger.id}
+              onPress={() => onSelectCharger?.(charger.id)}
+              tracksViewChanges={Platform.OS === "android"}
+              zIndex={selected ? 760 : 560}
             >
-              <View style={styles.pinAnchor}>
-                <View style={[styles.pin, subdued && styles.pinSubdued, selected && styles.pinSelected]}>
-                  <Text style={[styles.pinPrice, selected && styles.pinPriceSelected]}>
-                    {item.adjustedCpl.toFixed(1)}
+              <View style={styles.evPinAnchor}>
+                <View style={[styles.evPin, selected && styles.evPinSelected]}>
+                  <Text
+                    style={[
+                      styles.evPinCode,
+                      selected && styles.evPinCodeSelected,
+                    ]}
+                  >
+                    EV
                   </Text>
-                  <View style={styles.pinBrand}>
-                    <BrandBadge station={item.station} size={22} />
-                  </View>
+                  {label ? (
+                    <Text
+                      style={[
+                        styles.evPinLabel,
+                        selected && styles.evPinLabelSelected,
+                      ]}
+                    >
+                      {label}
+                    </Text>
+                  ) : null}
                 </View>
-                <View style={[styles.pinPointer, selected && styles.pinPointerSelected]} />
               </View>
             </Marker>
+          );
+        })}
+
+        {markerGroups.priceMarkers.map((item) => {
+          const selected = item.station.stationCode === selectedStationCode;
+          const subdued = Boolean(
+            routeEndpoints && selectedStationCode && !selected,
+          );
+          const brandStyle = brandStyleForStation(item.station);
+          const brandIcon = brandStyle.markerIcon || brandStyle.icon;
+          const nativeBrandIcon =
+            typeof brandIcon === "number" ? brandIcon : undefined;
+          return (
+            <Fragment key={`${item.station.stationCode}-marker-stack`}>
+              <Marker
+                {...decorativeStationMarkerAccessibility}
+                coordinate={{
+                  latitude: item.station.lat,
+                  longitude: item.station.lon,
+                }}
+                key={`${item.station.stationCode}-${markerAssetRefreshVersion}`}
+                onPress={() => handleMarkerPress(item.station.stationCode)}
+                ref={(marker) => {
+                  markerRefs.current[item.station.stationCode] = marker;
+                }}
+                tracksViewChanges={Platform.OS === "android"}
+                zIndex={selected ? 700 : subdued ? 420 : 500}
+              >
+                <View style={styles.pinAnchor}>
+                  <View
+                    style={[
+                      styles.pin,
+                      subdued && styles.pinSubdued,
+                      selected && styles.pinSelected,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.pinPrice,
+                        selected && styles.pinPriceSelected,
+                      ]}
+                    >
+                      {item.adjustedCpl.toFixed(1)}
+                    </Text>
+                    <View style={styles.pinBrand}>
+                      {Platform.OS === "android" ? null : (
+                        <BrandBadge
+                          marker
+                          station={item.station}
+                          size={22}
+                        />
+                      )}
+                    </View>
+                  </View>
+                  <View
+                    style={[
+                      styles.pinPointer,
+                      selected && styles.pinPointerSelected,
+                    ]}
+                  />
+                </View>
+              </Marker>
+              {Platform.OS === "android" && nativeBrandIcon ? (
+                <Marker
+                  {...decorativeStationMarkerAccessibility}
+                  anchor={{ x: 0.5, y: 1.35 }}
+                  coordinate={{
+                    latitude: item.station.lat,
+                    longitude: item.station.lon,
+                  }}
+                  image={nativeBrandIcon}
+                  key={`${item.station.stationCode}-brand-${markerAssetRefreshVersion}`}
+                  onPress={() => handleMarkerPress(item.station.stationCode)}
+                  tracksViewChanges={false}
+                  zIndex={selected ? 720 : subdued ? 440 : 520}
+                />
+              ) : null}
+            </Fragment>
           );
         })}
       </MapView>
 
       {mapMovedByUser && cameraKey === lastCameraKeyRef.current ? (
         <Pressable
-          accessibilityLabel={routeEndpoints ? "Return to route" : "Recenter map"}
+          accessibilityLabel={
+            routeEndpoints ? "Return to route" : "Recenter map"
+          }
           accessibilityRole="button"
           onPress={() => {
             userMovedMapRef.current = false;
@@ -405,7 +635,9 @@ export function StationMap({
           }}
           style={styles.recenterButton}
         >
-          <Text style={styles.recenterText}>{routeEndpoints ? "Route" : "Center"}</Text>
+          <Text style={styles.recenterText}>
+            {routeEndpoints ? "Route" : "Center"}
+          </Text>
         </Pressable>
       ) : null}
     </View>
@@ -447,12 +679,15 @@ function visibleMarkerGroups(
   const compactCells = new Set<string>();
   const clusterGroups = new Map<string, StationViewModel[]>();
   const priceMarkers: StationViewModel[] = [];
-  const dotMarkers: StationViewModel[] = [];
-  const visibleStations = stations.filter((item) => stationInRegion(item, region));
+  const visibleStations = stations.filter((item) =>
+    stationInRegion(item, region),
+  );
 
   const ranked = [...visibleStations].sort((left, right) => {
     const leftProtected = protectedCodes.has(left.station.stationCode) ? 0 : 1;
-    const rightProtected = protectedCodes.has(right.station.stationCode) ? 0 : 1;
+    const rightProtected = protectedCodes.has(right.station.stationCode)
+      ? 0
+      : 1;
     return (
       leftProtected - rightProtected ||
       markerPriorityScore(left) - markerPriorityScore(right)
@@ -467,16 +702,11 @@ function visibleMarkerGroups(
 
     if (
       protectedMarker ||
-      (priceMarkers.length < density.maxPriceMarkers && !priceCells.has(priceCell))
+      (priceMarkers.length < density.maxPriceMarkers &&
+        !priceCells.has(priceCell))
     ) {
       priceMarkers.push(item);
       priceCells.add(priceCell);
-      compactCells.add(compactCell);
-      continue;
-    }
-
-    if (dotMarkers.length < density.maxDotMarkers && !compactCells.has(compactCell)) {
-      dotMarkers.push(item);
       compactCells.add(compactCell);
       continue;
     }
@@ -501,7 +731,7 @@ function visibleMarkerGroups(
     .map(clusterMarkerForItems)
     .sort((left, right) => right.count - left.count);
 
-  return { priceMarkers, dotMarkers, clusterMarkers };
+  return { priceMarkers, clusterMarkers };
 }
 
 function stationInRegion(item: StationViewModel, region: Region) {
@@ -541,8 +771,10 @@ function clusterFitsInteractiveRegion(
 ) {
   const safeLatDelta = Math.max(region.latitudeDelta, 0.005);
   const safeLonDelta = Math.max(region.longitudeDelta, 0.005);
-  const yRatio = 1 - (cluster.lat - (region.latitude - safeLatDelta / 2)) / safeLatDelta;
-  const xRatio = (cluster.lon - (region.longitude - safeLonDelta / 2)) / safeLonDelta;
+  const yRatio =
+    1 - (cluster.lat - (region.latitude - safeLatDelta / 2)) / safeLatDelta;
+  const xRatio =
+    (cluster.lon - (region.longitude - safeLonDelta / 2)) / safeLonDelta;
   const topRatio = Math.min(0.46, Math.max(0.08, insets.top / 900));
   const bottomRatio = Math.min(0.48, Math.max(0.12, insets.bottom / 900));
   const sideRatio = 0.12;
@@ -554,22 +786,99 @@ function clusterFitsInteractiveRegion(
   );
 }
 
-function nativeMarkerDensity(width: number) {
+function regionForClusterZoom(
+  cluster: ClusterMarker,
+  currentRegion: Region,
+): Region {
+  const bounds = boundsForCluster(cluster);
+  const contentLatDelta = Math.max(
+    (bounds.maxLat - bounds.minLat) * 2.4,
+    0.006,
+  );
+  const contentLonDelta = Math.max(
+    (bounds.maxLon - bounds.minLon) * 2.4,
+    0.006,
+  );
+  const zoomedLatDelta = Math.max(
+    Math.min(currentRegion.latitudeDelta * 0.55, contentLatDelta),
+    0.004,
+  );
+  const zoomedLonDelta = Math.max(
+    Math.min(currentRegion.longitudeDelta * 0.55, contentLonDelta),
+    0.004,
+  );
+
+  return {
+    latitude: cluster.lat,
+    longitude: cluster.lon,
+    latitudeDelta: Math.min(zoomedLatDelta, currentRegion.latitudeDelta * 0.72),
+    longitudeDelta: Math.min(
+      zoomedLonDelta,
+      currentRegion.longitudeDelta * 0.72,
+    ),
+  };
+}
+
+function boundsForCluster(cluster: ClusterMarker) {
+  return cluster.items.reduce(
+    (bounds, item) => ({
+      minLat: Math.min(bounds.minLat, item.station.lat),
+      maxLat: Math.max(bounds.maxLat, item.station.lat),
+      minLon: Math.min(bounds.minLon, item.station.lon),
+      maxLon: Math.max(bounds.maxLon, item.station.lon),
+    }),
+    {
+      minLat: Number.POSITIVE_INFINITY,
+      maxLat: Number.NEGATIVE_INFINITY,
+      minLon: Number.POSITIVE_INFINITY,
+      maxLon: Number.NEGATIVE_INFINITY,
+    },
+  );
+}
+
+function nativeMarkerDensity(width: number, isPad = false) {
+  if (isPad || width >= 700) return tabletMarkerDensity;
   return width <= 430 ? compactMarkerDensity : defaultMarkerDensity;
 }
 
-function prioritiseSelectedStations(stations: StationViewModel[], selectedStationCode?: string) {
+function prioritiseSelectedStations(
+  stations: StationViewModel[],
+  selectedStationCode?: string,
+) {
   if (!selectedStationCode) return stations;
-  const selected = stations.find((item) => item.station.stationCode === selectedStationCode);
+  const selected = stations.find(
+    (item) => item.station.stationCode === selectedStationCode,
+  );
   if (!selected) return stations;
-  return [selected, ...stations.filter((item) => item.station.stationCode !== selectedStationCode)];
+  return [
+    selected,
+    ...stations.filter(
+      (item) => item.station.stationCode !== selectedStationCode,
+    ),
+  ];
+}
+
+function prioritiseSelectedChargers(
+  chargers: EvCharger[],
+  selectedChargerId?: string,
+) {
+  if (!selectedChargerId) return chargers;
+  const selected = chargers.find((charger) => charger.id === selectedChargerId);
+  if (!selected) return chargers;
+  return [
+    selected,
+    ...chargers.filter((charger) => charger.id !== selectedChargerId),
+  ];
 }
 
 function nativeRoutePriceMarkerLimit(width: number) {
   return width <= 430 ? compactRouteMaxPriceMarkers : routeMaxPriceMarkers;
 }
 
-function protectedStationCodes(stations: StationViewModel[], selectedStationCode?: string) {
+function protectedStationCodes(
+  stations: StationViewModel[],
+  selectedStationCode?: string,
+) {
   const codes = new Set<string>();
   if (selectedStationCode) codes.add(selectedStationCode);
   const cheapest = minBy(stations, (item) => item.adjustedCpl);
@@ -633,8 +942,13 @@ function nearestStationsForCamera(
 function markerCell(item: StationViewModel, region: Region, gridSize: number) {
   const safeLatDelta = Math.max(region.latitudeDelta, 0.005);
   const safeLonDelta = Math.max(region.longitudeDelta, 0.005);
-  const x = ((item.station.lon - (region.longitude - safeLonDelta / 2)) / safeLonDelta) * 1000;
-  const y = ((item.station.lat - (region.latitude - safeLatDelta / 2)) / safeLatDelta) * 1000;
+  const x =
+    ((item.station.lon - (region.longitude - safeLonDelta / 2)) /
+      safeLonDelta) *
+    1000;
+  const y =
+    ((item.station.lat - (region.latitude - safeLatDelta / 2)) / safeLatDelta) *
+    1000;
   return `${Math.round(x / gridSize)}:${Math.round(y / gridSize)}`;
 }
 
@@ -643,7 +957,9 @@ function sampleRoutePoints(points: MapPoint[], maxPoints: number) {
   const sampled: MapPoint[] = [];
   let previousIndex = -1;
   for (let index = 0; index < maxPoints; index += 1) {
-    const sourceIndex = Math.round((index / (maxPoints - 1)) * (points.length - 1));
+    const sourceIndex = Math.round(
+      (index / (maxPoints - 1)) * (points.length - 1),
+    );
     if (sourceIndex !== previousIndex) {
       sampled.push(points[sourceIndex]);
       previousIndex = sourceIndex;
@@ -652,7 +968,10 @@ function sampleRoutePoints(points: MapPoint[], maxPoints: number) {
   return sampled;
 }
 
-function resolveCameraInsets(mode: "nearby" | "route", insets?: CameraInsets): Required<CameraInsets> {
+function resolveCameraInsets(
+  mode: "nearby" | "route",
+  insets?: CameraInsets,
+): Required<CameraInsets> {
   const defaults =
     mode === "route"
       ? { top: 22, right: 22, bottom: 26, left: 22 }
@@ -724,6 +1043,14 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     position: "relative",
   },
+  pointPinAnchor: {
+    alignItems: "center",
+    height: 44,
+    justifyContent: "flex-start",
+    overflow: "visible",
+    paddingTop: 1,
+    width: 44,
+  },
   locationPin: {
     ...shadow.soft,
     backgroundColor: colors.ink,
@@ -746,7 +1073,7 @@ const styles = StyleSheet.create({
   },
   userLocationPin: {
     ...shadow.soft,
-    backgroundColor: colors.blue,
+    backgroundColor: colors.route,
     borderColor: colors.white,
     borderRadius: radii.pill,
     borderBottomLeftRadius: 4,
@@ -757,14 +1084,12 @@ const styles = StyleSheet.create({
   },
   userLocationPinInner: {
     backgroundColor: colors.white,
-    borderColor: colors.blueSoft,
     borderRadius: radii.pill,
-    borderWidth: 2,
-    height: 10,
-    left: 7,
+    height: 8,
+    left: 8,
     position: "absolute",
-    top: 7,
-    width: 10,
+    top: 8,
+    width: 8,
   },
   destinationPin: {
     ...shadow.soft,
@@ -788,6 +1113,7 @@ const styles = StyleSheet.create({
   },
   pinAnchor: {
     alignItems: "center",
+    backgroundColor: "transparent",
   },
   pin: {
     ...shadow.soft,
@@ -806,7 +1132,6 @@ const styles = StyleSheet.create({
     boxShadow: "0 0 0 4px rgba(255, 106, 61, 0.35)",
   },
   pinSubdued: {
-    opacity: 0.68,
     transform: [{ scale: 0.94 }],
   },
   pinPrice: {
@@ -822,6 +1147,7 @@ const styles = StyleSheet.create({
   },
   pinPriceSelected: {
     backgroundColor: colors.black,
+    color: colors.white,
   },
   pinBrand: {
     alignItems: "center",
@@ -844,15 +1170,6 @@ const styles = StyleSheet.create({
   pinPointerSelected: {
     borderTopColor: colors.white,
   },
-  compactPin: {
-    ...shadow.soft,
-    backgroundColor: colors.white,
-    borderColor: colors.green,
-    borderRadius: radii.pill,
-    borderWidth: 3,
-    height: 18,
-    width: 18,
-  },
   clusterPin: {
     ...shadow.soft,
     alignItems: "center",
@@ -869,6 +1186,47 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontSize: 11,
     fontWeight: "900",
+  },
+  evPinAnchor: {
+    alignItems: "center",
+    minHeight: 44,
+    minWidth: 44,
+    justifyContent: "center",
+  },
+  evPin: {
+    ...shadow.soft,
+    alignItems: "center",
+    backgroundColor: colors.blueSoft,
+    borderColor: colors.white,
+    borderRadius: radii.pill,
+    borderWidth: 2,
+    justifyContent: "center",
+    minHeight: 34,
+    minWidth: 42,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 4,
+  },
+  evPinSelected: {
+    backgroundColor: colors.black,
+    borderColor: mapSkin.route,
+  },
+  evPinCode: {
+    color: colors.blue,
+    fontSize: 10,
+    fontWeight: "900",
+    lineHeight: 12,
+  },
+  evPinCodeSelected: {
+    color: colors.white,
+  },
+  evPinLabel: {
+    color: colors.blue,
+    fontSize: 9,
+    fontWeight: "900",
+    lineHeight: 11,
+  },
+  evPinLabelSelected: {
+    color: colors.white,
   },
   recenterButton: {
     ...shadow.soft,

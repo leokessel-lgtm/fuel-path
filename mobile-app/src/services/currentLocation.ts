@@ -24,43 +24,65 @@ async function resolveCurrentMapPoint({
     return resolveBrowserMapPoint(label, requestPermission);
   }
 
+  let servicesEnabled = true;
   try {
-    const servicesEnabled = await Location.hasServicesEnabledAsync();
-    if (!servicesEnabled) {
-      throw new Error("Location services are turned off on this device.");
-    }
-  } catch (err) {
-    if (err instanceof Error && err.message.includes("turned off")) {
-      throw err;
-    }
+    servicesEnabled = await Location.hasServicesEnabledAsync();
+  } catch {
+    throw new Error("Current location is not available on this device right now.");
+  }
+  if (!servicesEnabled) {
+    throw new Error("Location services are turned off on this device.");
   }
 
-  const permission = requestPermission
-    ? await Location.requestForegroundPermissionsAsync()
-    : await Location.getForegroundPermissionsAsync();
+  const permission = await nativeLocationPermission(requestPermission);
   if (permission.status !== "granted") {
     throw new Error("Location permission was not granted.");
   }
 
-  const lastKnown = await Location.getLastKnownPositionAsync({
-    maxAge: 5 * 60 * 1000,
-    requiredAccuracy: 5000,
-  });
-  const current =
-    lastKnown ||
-    (await withTimeout(
-      Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      }),
-      CURRENT_LOCATION_TIMEOUT_MS,
-      "Current location took too long. Try again near a window, or type a start address.",
-    ));
+  const lastKnown = await safeLastKnownPosition();
+  const current = lastKnown || await safeCurrentPosition();
 
   return {
     lat: current.coords.latitude,
     lon: current.coords.longitude,
     label,
   };
+}
+
+async function nativeLocationPermission(requestPermission: boolean) {
+  try {
+    return requestPermission
+      ? await Location.requestForegroundPermissionsAsync()
+      : await Location.getForegroundPermissionsAsync();
+  } catch {
+    throw new Error("Location permission could not be checked.");
+  }
+}
+
+async function safeLastKnownPosition() {
+  try {
+    return await Location.getLastKnownPositionAsync({
+      maxAge: 5 * 60 * 1000,
+      requiredAccuracy: 5000,
+    });
+  } catch {
+    return null;
+  }
+}
+
+async function safeCurrentPosition() {
+  try {
+    return await withTimeout(
+      Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      }),
+      CURRENT_LOCATION_TIMEOUT_MS,
+      "Current location took too long. Try again near a window, or type a start address.",
+    );
+  } catch (err) {
+    if (err instanceof Error && /too long/i.test(err.message)) throw err;
+    throw new Error("Current location is unavailable on this device right now.");
+  }
 }
 
 function resolveBrowserMapPoint(label: string, requestPermission: boolean): Promise<MapPoint> {
@@ -96,7 +118,7 @@ function resolveBrowserMapPoint(label: string, requestPermission: boolean): Prom
 
 function browserLocationError(error: GeolocationPositionError) {
   if (error.code === error.PERMISSION_DENIED) {
-    return "Location permission was blocked. Allow location for localhost, or type a start address.";
+    return "Location permission is off. Allow location for Fuel Path, or type a start address.";
   }
   if (error.code === error.POSITION_UNAVAILABLE) {
     return "Current location is unavailable. Try again, or type a start address.";

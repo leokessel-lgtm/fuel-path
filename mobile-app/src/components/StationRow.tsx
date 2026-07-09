@@ -160,16 +160,12 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   meta: {
-    color: colors.muted,
+    ...typography.metadata,
     flex: 1,
-    fontSize: typeScale.caption,
-    fontWeight: "400",
     minWidth: 0,
   },
   statusText: {
-    color: colors.muted,
-    fontSize: typeScale.caption,
-    fontWeight: "400",
+    ...typography.metadata,
     marginTop: 2,
   },
   evidence: {
@@ -191,21 +187,17 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   discount: {
+    ...typography.metadataStrong,
     color: colors.greenDark,
-    fontSize: typeScale.caption,
-    fontWeight: "500",
     marginTop: 2,
   },
   priceValue: {
-    color: colors.greenDark,
-    fontSize: typeScale.title,
-    fontWeight: "900",
+    ...typography.metric,
     lineHeight: 26,
   },
   fuelLabel: {
+    ...typography.compactButtonLabel,
     color: colors.muted,
-    fontSize: typeScale.caption,
-    fontWeight: "800",
     lineHeight: 16,
     textTransform: "uppercase",
   },

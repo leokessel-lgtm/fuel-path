@@ -23,7 +23,7 @@ const scenarios = [
         context: {
           source: "live",
           provider: "unsupported_region",
-          warning: "No live fuel provider covers this area yet.",
+          warning: "Live prices are not available for this area yet.",
           stationCount: 0,
           degraded: true,
         },
@@ -33,19 +33,19 @@ const scenarios = [
       await page.goto(appUrl, { waitUntil: "domcontentloaded" });
       await page.waitForTimeout(1800);
     },
-    expect: async (page) => assertVisibleState(page, ["No priced stations found", "No live fuel provider covers this area yet."], ["Could not load stations"]),
+    expect: async (page) => assertVisibleState(page, ["No priced stations found", "Live prices are not available for this area yet."], ["Could not load stations", "No live fuel provider"]),
   },
   {
     id: "nearby-fuel-provider-error",
     setup: async (page) => {
       await mockStatus(page);
-      await page.route("**/api/stations?**", async (route) => route.fulfill(jsonResponse({ error: "Fuel provider is temporarily unavailable. Try again shortly." }, 503)));
+      await page.route("**/api/stations?**", async (route) => route.fulfill(jsonResponse({ error: "Provider returned 503: upstream timeout" }, 503)));
     },
     run: async (page) => {
       await page.goto(appUrl, { waitUntil: "domcontentloaded" });
       await page.waitForTimeout(1800);
     },
-    expect: async (page) => assertVisibleState(page, ["Could not load stations", "Fuel provider is temporarily unavailable"], ["No priced stations found"]),
+    expect: async (page) => assertVisibleState(page, ["Could not load stations", "Prices for this fuel are not available here right now"], ["Provider returned", "upstream timeout", "No priced stations found"]),
   },
   {
     id: "ev-empty-directory-results",
@@ -85,7 +85,7 @@ const scenarios = [
       await maybeClick(page.getByRole("button", { name: "Show charger list", exact: true }));
       await page.waitForTimeout(600);
     },
-    expect: async (page) => assertVisibleState(page, ["EV charger provider is temporarily unavailable"], ["No matching chargers", "available now", "node:internal"]),
+    expect: async (page) => assertVisibleState(page, ["We could not load charger options right now"], ["EV charger provider", "No matching chargers", "available now", "node:internal"]),
   },
   {
     id: "plan-geocode-provider-failure",
@@ -102,7 +102,7 @@ const scenarios = [
       await page.getByRole("button", { name: "Plan route", exact: true }).click();
       await page.waitForTimeout(1200);
     },
-    expect: async (page) => assertVisibleState(page, ["We couldn't check that address right now"], ["nominatim lookup timed out", "node:internal", "TypeError"]),
+    expect: async (page) => assertVisibleState(page, ["We could not find that address"], ["nominatim lookup timed out", "node:internal", "TypeError"]),
   },
   {
     id: "plan-route-provider-failure",
@@ -114,7 +114,7 @@ const scenarios = [
     run: async (page) => {
       await planSimpleRoute(page);
     },
-    expect: async (page) => assertVisibleState(page, ["Route engine temporarily unavailable"], ["node:internal", "Cannot read", "Suggested stop"]),
+    expect: async (page) => assertVisibleState(page, ["We could not plan that drive right now"], ["Route engine", "node:internal", "Cannot read", "Suggested stop"]),
   },
   {
     id: "plan-score-empty-results",
@@ -126,7 +126,7 @@ const scenarios = [
         recommendations: [],
         contextStations: [],
         context: {
-          warning: "Route found, but no eligible stations match this fuel and detour setting.",
+          warning: "No useful fuel stop was found on this route. Try a different fuel, widen the trip, or check Nearby fuel.",
           stationCount: 0,
           source: "live",
           provider: "live",
@@ -137,7 +137,7 @@ const scenarios = [
     run: async (page) => {
       await planSimpleRoute(page);
     },
-    expect: async (page) => assertVisibleState(page, ["No fuel stops found", "Route found, but no eligible stations match"], ["Suggested fuel stops", "Best price by", "undefined"]),
+    expect: async (page) => assertVisibleState(page, ["No fuel stops found", "No useful fuel stop was found"], ["Route found, but no eligible stations", "Suggested fuel stops", "Best price by", "undefined"]),
   },
 ];
 

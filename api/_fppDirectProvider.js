@@ -28,6 +28,7 @@ const SA_REGION_PARAMS = {
 const QLD_FUEL_ID_TO_CODE = new Map([
   [2, "U91"],
   [3, "DL"],
+  [4, "LPG"],
   [5, "P95"],
   [8, "P98"],
   [12, "E10"],

@@ -28,6 +28,7 @@ const {
   supportedEvProviders,
   unsupportedEvProviderResult,
 } = require("./_evOpenChargeMap");
+const { publicErrorMessage } = require("./_publicErrors");
 
 const { loadEvChargers: loadOpenChargeMapEvChargers } = createOpenChargeMapAdapter();
 const { loadEvChargers: loadApiNinjasEvChargers } = createApiNinjasAdapter();
@@ -124,7 +125,7 @@ module.exports = async function handler(req, res) {
     sendJson(res, 200, payload);
   } catch (error) {
     sendJson(res, 400, {
-      error: error instanceof Error ? error.message : "Invalid EV charger query",
+      error: publicErrorMessage(error, "chargers"),
     });
   }
 };
@@ -224,11 +225,11 @@ function providerErrorResult({ error, provider, request }) {
       degraded: true,
       provenance: {
         source: provider,
-        label: `${provider} EV charger data`,
+        label: "Charger directory data",
         licence: "provider terms",
         realTimeAvailability: false,
       },
-      warning: `${provider} EV provider unavailable: ${error instanceof Error ? error.message : "unknown error"}`,
+      warning: "Some charger data is temporarily unavailable. Confirm availability in your charging app before driving.",
     },
     chargers: [],
   };
@@ -256,11 +257,11 @@ function providerRateLimitResult({ provider, request, reason = "" }) {
       degraded: false,
       provenance: {
         source: provider,
-        label: `${provider} EV charger data`,
+        label: "Charger directory data",
         licence: "provider terms",
         realTimeAvailability: false,
       },
-      warning: `${provider} is temporarily rate-limited. ${reason ? reason + ". " : ""}Skipping this enrichment source and keeping route result.`,
+      warning: "Some charger data is temporarily busy. Keeping available route results for now.",
     },
     chargers: [],
   };
@@ -288,11 +289,11 @@ function providerSignalHoldoffResult({ provider, request, reason = "" }) {
       degraded: true,
       provenance: {
         source: provider,
-        label: `${provider} EV charger data`,
+        label: "Charger directory data",
         licence: "provider terms",
         realTimeAvailability: false,
       },
-      warning: `${provider} route lookup is currently paused by route-quality guard. ${reason ? reason : "Quality signal limits reached."}`,
+      warning: "Route charger lookup is paused while data quality is checked. Use Nearby EV charging or your charging app before driving.",
     },
     chargers: [],
   };
@@ -340,13 +341,13 @@ function mergeProviderResults(results, request) {
       degraded,
       provenance: {
         source: providers.join("+"),
-        label: `Charger data from ${providers.join(" and ")}`,
+        label: "Charger data from configured directories",
         licence: "provider terms",
         realTimeAvailability: false,
       },
       warning: [
-        `EV charger directory cascade used ${providers.join(", ")}.`,
-        emptyProviders.length ? `No usable charger rows returned from ${emptyProviders.join(", ")}.` : "",
+        "Charger results were checked across available directories.",
+        emptyProviders.length ? "Some charger directories did not return usable rows." : "",
         warnings.join(" "),
       ].filter(Boolean).join(" ").trim(),
     },
@@ -358,7 +359,7 @@ function mergeProviderResults(results, request) {
   const warning = result?.context?.warning;
   if (!warning) return "";
   if (hasUsableRows && result?.context?.cacheMode === "provider_error") {
-    return `Optional ${result.context.provider} enrichment unavailable.`;
+    return "Some optional charger details are temporarily unavailable.";
   }
   return warning;
 }
@@ -366,8 +367,8 @@ function mergeProviderResults(results, request) {
 function googlePlacesHoldoffReason(decision = {}) {
   const blockers = Array.from(new Set(Array.isArray(decision.blockers) ? decision.blockers : []));
   return blockers.length
-    ? `Quality blockers: ${blockers.join(", ")}.`
-    : "Google Places EV cost controls or readiness blockers are active.";
+    ? "Route charger lookup is paused while data quality is checked."
+    : "Route charger lookup is paused while data quality is checked.";
 }
 
 function evResultNeedsEnrichment(result, request) {

@@ -386,22 +386,24 @@ const styles = StyleSheet.create({
   sheet: {
     ...shadow.float,
     ...surfaces.floating,
-    borderRadius: radii.xxl,
+    borderRadius: radii.control,
     bottom: nearbySheetBottomOffset,
     gap: spacing.sm,
     left: spacing.md,
-    padding: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.xs,
+    paddingBottom: spacing.md,
     position: "absolute",
     right: spacing.md,
     zIndex: 6,
   },
   sheetCollapsed: {
-    maxHeight: 330,
+    maxHeight: 285,
     overflow: "hidden",
   },
   sheetPeek: {
     bottom: 18,
-    maxHeight: 215,
+    maxHeight: 180,
     overflow: "hidden",
   },
   sheetExpanded: {
@@ -417,8 +419,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flex: 1,
     justifyContent: "center",
-    minHeight: 44,
-    paddingVertical: spacing.xs,
+    minHeight: 24,
+    paddingVertical: 2,
   },
   grabber: {
     alignSelf: "center",
@@ -514,7 +516,7 @@ const styles = StyleSheet.create({
   emptyCard: {
     backgroundColor: "#fff7ed",
     borderColor: "#fed7aa",
-    borderRadius: radii.md,
+    borderRadius: radii.control,
     borderWidth: 1,
     gap: spacing.sm,
     padding: spacing.md,

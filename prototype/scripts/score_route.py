@@ -40,6 +40,7 @@ RECOMMENDATION_MAX_PRICE_AGE_HOURS = 48.0
 QLD_FUEL_ID_TO_CODE = {
     2: "U91",
     3: "DL",
+    4: "LPG",
     5: "P95",
     8: "P98",
     12: "E10",

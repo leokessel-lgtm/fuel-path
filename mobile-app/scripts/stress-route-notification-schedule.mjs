@@ -3,11 +3,13 @@
 import assert from "node:assert/strict";
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import vm from "node:vm";
 import ts from "typescript";
 
-const repoRoot = path.resolve(process.cwd(), "..");
-const mobileRoot = process.cwd();
+const scriptDir = path.dirname(fileURLToPath(import.meta.url));
+const mobileRoot = path.resolve(scriptDir, "..");
+const repoRoot = path.resolve(mobileRoot, "..");
 const sourcePath = path.join(mobileRoot, "src/services/routeNotificationSchedule.ts");
 const smokeDir = path.join(repoRoot, "tmp/native-smoke");
 mkdirSync(smokeDir, { recursive: true });

@@ -1,6 +1,7 @@
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
 import {
+  BackHandler,
   Platform,
   Pressable,
   StyleSheet,
@@ -13,11 +14,13 @@ import { AccountScreen } from "./src/screens/AccountScreen";
 import { NearbyScreen } from "./src/screens/NearbyScreen";
 import { PlanScreen } from "./src/screens/PlanScreen";
 import { FuelPathLogo } from "./src/components/FuelPathLogo";
+import { SettingsSection } from "./src/components/settings/settingsSections";
 import { useAppPreferences } from "./src/hooks/useAppPreferences";
 import { useRecentLocations } from "./src/hooks/useRecentLocations";
 import { useRouteAlerts } from "./src/hooks/useRouteAlerts";
 import { useSavedCommutes } from "./src/hooks/useSavedCommutes";
 import { colors, radii, shadow, spacing, surfaces, typeScale, typography } from "./src/theme";
+import { MapPoint, VehicleProfile } from "./src/types";
 
 type TabKey = "plan" | "nearby" | "account";
 
@@ -50,45 +53,13 @@ function initialTab(): TabKey {
   return "nearby";
 }
 
-function TabIcon({ tab, selected }: { tab: TabKey; selected: boolean }) {
-  const iconTint = selected ? colors.white : "#9eaaa4";
-
-  if (tab === "plan") {
-    return (
-      <View style={styles.planIcon}>
-        <View style={[styles.planIconLine, { backgroundColor: iconTint }]} />
-        <View style={[styles.planIconStart, { borderColor: iconTint }]} />
-        <View style={[styles.planIconEnd, { backgroundColor: iconTint }]} />
-      </View>
-    );
-  }
-
-  if (tab === "nearby") {
-    return (
-      <View style={styles.nearbyIcon}>
-        <View style={[styles.nearbyPin, { backgroundColor: iconTint }]}>
-          <View
-            style={[
-              styles.nearbyPinCentre,
-              { backgroundColor: selected ? colors.green : colors.ink },
-            ]}
-          />
-        </View>
-      </View>
-    );
-  }
-
-  return (
-    <View style={styles.accountIcon}>
-      <View style={[styles.accountHead, { backgroundColor: iconTint }]} />
-      <View style={[styles.accountShoulders, { borderColor: iconTint }]} />
-    </View>
-  );
-}
-
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabKey>(() => initialTab());
+  const [initialAccountSection, setInitialAccountSection] = useState<SettingsSection | null>(null);
   const [releaseUpdateAvailable, setReleaseUpdateAvailable] = useState(false);
+  const [nearbyCentre, setNearbyCentre] = useState<MapPoint>();
+  const [currentLocation, setCurrentLocation] = useState<MapPoint>();
+  const [vehicleSwitcherOpen, setVehicleSwitcherOpen] = useState(false);
   const {
     clearNamedPlace,
     preferences,
@@ -104,7 +75,9 @@ export default function App() {
     togglePreferredStationBrand,
     updateDecisionRule,
     updateFuel,
+    updateVehicleFuel,
     updateHomeChargingAccess,
+    updateNavigationApp,
     updateVehicleProfile,
     updateVehicleEnergyType,
   } = useAppPreferences();
@@ -162,13 +135,52 @@ export default function App() {
     };
   }, []);
 
-  const hasNamedVehicle = Boolean(preferences.vehicleName.trim() || preferences.vehicleRego.trim());
-  const vehicleInitials = hasNamedVehicle
-    ? (preferences.vehicleRego || preferences.vehicleName).trim().slice(0, 2).toUpperCase()
-    : vehicleEnergyLabel(preferences.vehicleEnergyType).slice(0, 2).toUpperCase();
-  const vehicleDetail = preferences.vehicleName
-    ? `${vehicleEnergyLabel(preferences.vehicleEnergyType)} | ${vehicleProfileShortLabel(preferences)}`
+  useEffect(() => {
+    if (Platform.OS === "web" || activeTab === "nearby") return undefined;
+    const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
+      setActiveTab("nearby");
+      return true;
+    });
+    return () => subscription.remove();
+  }, [activeTab]);
+
+  const activeVehicle = preferences.vehicles.find((vehicle) => vehicle.id === preferences.activeVehicleId);
+  const hasVehicleContext = activeVehicle != null;
+  const vehicleInitials = activeVehicle
+    ? vehicleInitialsFor(activeVehicle)
+    : "FU";
+  const vehicleTitle = activeVehicle
+    ? vehicleDisplayName(activeVehicle)
+    : "Fuel only";
+  const vehicleDetail = activeVehicle
+    ? vehicleProfileShortLabel(activeVehicle)
     : vehicleProfileShortLabel(preferences);
+  const canSwitchVehicles = preferences.vehicles.length > 1;
+
+  const openVehicleProfile = () => {
+    setVehicleSwitcherOpen(false);
+    setInitialAccountSection("vehicle");
+    setActiveTab("account");
+  };
+
+  const handleVehiclePillPress = () => {
+    if (canSwitchVehicles) {
+      setVehicleSwitcherOpen((current) => !current);
+      return;
+    }
+    openVehicleProfile();
+  };
+
+  const handleSelectHeaderVehicle = (vehicleId: string) => {
+    selectVehicle(vehicleId);
+    setVehicleSwitcherOpen(false);
+  };
+
+  const handleTabPress = (tab: TabKey) => {
+    setActiveTab(tab);
+    setVehicleSwitcherOpen(false);
+    if (tab !== "account") setInitialAccountSection(null);
+  };
 
   return (
     <SafeAreaProvider>
@@ -176,17 +188,24 @@ export default function App() {
         <StatusBar style="dark" />
         <View style={styles.appShell}>
         <View role="banner" style={styles.header}>
-          <View style={styles.brandLockup}>
+          <Pressable
+            accessibilityLabel="Go to Nearby"
+            accessibilityRole="button"
+            hitSlop={6}
+            onPress={() => handleTabPress("nearby")}
+            style={({ pressed }) => [styles.brandLockup, pressed && styles.brandLockupPressed]}
+          >
             <FuelPathLogo />
             <View style={styles.brandText}>
               <Text maxFontSizeMultiplier={chromeTextScale} numberOfLines={1} style={styles.brand}>Fuel Path</Text>
               <Text maxFontSizeMultiplier={chromeTextScale} numberOfLines={1} style={styles.subhead}>Live fuel decisions</Text>
             </View>
-          </View>
+          </Pressable>
           <Pressable
-            accessibilityLabel={hasNamedVehicle ? "View vehicle profile" : "View fuel profile"}
+            accessibilityLabel={canSwitchVehicles ? "Switch vehicle profile" : "View vehicle profile"}
             accessibilityRole="button"
-            onPress={() => setActiveTab("account")}
+            accessibilityState={{ expanded: vehicleSwitcherOpen }}
+            onPress={handleVehiclePillPress}
             style={({ pressed }) => [styles.vehiclePill, pressed && styles.vehiclePillPressed]}
           >
             <View style={styles.vehicleIcon}>
@@ -194,7 +213,7 @@ export default function App() {
             </View>
             <View style={styles.vehicleTextGroup}>
               <Text maxFontSizeMultiplier={chromeTextScale} numberOfLines={1} style={styles.vehiclePrimary}>
-                {hasNamedVehicle ? preferences.vehicleRego || preferences.vehicleName : "Fuel profile"}
+                {vehicleTitle}
               </Text>
               <Text maxFontSizeMultiplier={chromeTextScale} numberOfLines={1} style={styles.vehicleSecondary}>
                 {vehicleDetail}
@@ -202,6 +221,58 @@ export default function App() {
             </View>
           </Pressable>
         </View>
+        {vehicleSwitcherOpen ? (
+          <View style={styles.vehicleSwitcher}>
+            <Pressable
+              accessibilityLabel={`Use fuel only ${preferences.fuel}`}
+              accessibilityRole="button"
+              onPress={() => {
+                updateFuel(preferences.fuel);
+                setVehicleSwitcherOpen(false);
+              }}
+              style={[styles.vehicleSwitchRow, !hasVehicleContext && styles.vehicleSwitchRowSelected]}
+            >
+              <View style={[styles.vehicleSwitchIcon, !hasVehicleContext && styles.vehicleSwitchIconSelected]}>
+                <Text style={[styles.vehicleSwitchIconText, !hasVehicleContext && styles.vehicleSwitchIconTextSelected]}>FU</Text>
+              </View>
+              <View style={styles.vehicleSwitchCopy}>
+                <Text style={styles.vehicleSwitchTitle}>Fuel only</Text>
+                <Text style={styles.vehicleSwitchMeta}>{vehicleProfileShortLabel(preferences)}</Text>
+              </View>
+            </Pressable>
+            {preferences.vehicles.map((vehicle) => {
+              const selected = vehicle.id === preferences.activeVehicleId;
+              return (
+                <Pressable
+                  accessibilityLabel={`Switch to ${vehicleDisplayName(vehicle)}`}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected }}
+                  key={vehicle.id}
+                  onPress={() => handleSelectHeaderVehicle(vehicle.id)}
+                  style={[styles.vehicleSwitchRow, selected && styles.vehicleSwitchRowSelected]}
+                >
+                  <View style={[styles.vehicleSwitchIcon, selected && styles.vehicleSwitchIconSelected]}>
+                    <Text style={[styles.vehicleSwitchIconText, selected && styles.vehicleSwitchIconTextSelected]}>
+                      {vehicleInitialsFor(vehicle)}
+                    </Text>
+                  </View>
+                  <View style={styles.vehicleSwitchCopy}>
+                    <Text style={styles.vehicleSwitchTitle}>{vehicleDisplayName(vehicle)}</Text>
+                    <Text style={styles.vehicleSwitchMeta}>{vehicleProfileShortLabel(vehicle)}</Text>
+                  </View>
+                </Pressable>
+              );
+            })}
+            <Pressable
+              accessibilityLabel="Manage vehicles in Settings"
+              accessibilityRole="button"
+              onPress={openVehicleProfile}
+              style={styles.vehicleManageButton}
+            >
+              <Text style={styles.vehicleManageText}>Manage vehicles</Text>
+            </Pressable>
+          </View>
+        ) : null}
         {releaseUpdateAvailable ? (
           <View role="status" style={styles.releaseBanner}>
             <Text style={styles.releaseBannerText}>New version ready</Text>
@@ -223,18 +294,30 @@ export default function App() {
               onFuelChange={updateFuel}
               onVehicleEnergyTypeChange={updateVehicleEnergyType}
               onAddRecentLocation={addRecentLocation}
-              onClearRecentLocations={clearRecentLocations}
-              onRemoveRecentLocation={removeRecentLocation}
               onSaveNamedPlace={saveNamedPlace}
               onSaveCommute={saveCommute}
+              onRemoveRecentLocation={removeRecentLocation}
               onToggleCommuteAlert={toggleCommuteAlert}
               alertSyncingCommuteId={alertSyncingCommuteId}
+              currentLocation={currentLocation}
+              onCurrentLocationChange={(point: MapPoint) => {
+                setCurrentLocation(point);
+                setNearbyCentre(point);
+              }}
               recentLocations={recentLocations}
               savedCommutes={savedCommutes}
             />
           ) : null}
           {activeTab === "nearby" ? (
-            <NearbyScreen preferences={preferences} onFuelChange={updateFuel} />
+            <NearbyScreen
+              preferences={preferences}
+              onAddRecentLocation={addRecentLocation}
+              onFuelChange={updateFuel}
+              recentLocations={recentLocations}
+              persistedCentre={nearbyCentre}
+              onPersistCentre={setNearbyCentre}
+              onCurrentLocationChange={setCurrentLocation}
+            />
           ) : null}
           {activeTab === "account" ? (
             <AccountScreen
@@ -242,10 +325,11 @@ export default function App() {
               notificationMessage={notificationMessage}
               notificationPermission={notificationPermission}
               alertSyncingCommuteId={alertSyncingCommuteId}
-              onFuelChange={updateFuel}
+              onFuelChange={updateVehicleFuel}
               onHomeChargingAccessChange={updateHomeChargingAccess}
               onToggleEvConnector={toggleEvConnector}
               onVehicleProfileChange={updateVehicleProfile}
+              onClearVehicleProfile={() => updateVehicleProfile({ vehicleName: "", vehicleRego: "" })}
               onVehicleEnergyTypeChange={updateVehicleEnergyType}
               onAddVehicle={addVehicle}
               onRemoveVehicle={removeVehicle}
@@ -259,9 +343,12 @@ export default function App() {
               onSetStationBrandMode={setStationBrandMode}
               onSetPreferredStationBrands={setPreferredStationBrands}
               onTogglePreferredStationBrand={togglePreferredStationBrand}
+              onNavigationAppChange={updateNavigationApp}
               onToggleCommuteAlert={toggleCommuteAlert}
               onUpdateCommuteAlertSettings={updateCommuteAlertSettings}
               onRemoveCommute={removeCommute}
+              initialSection={initialAccountSection}
+              onSectionStateReset={() => setInitialAccountSection(null)}
               savedCommutes={savedCommutes}
             />
           ) : null}
@@ -273,16 +360,15 @@ export default function App() {
               const selected = activeTab === tab.key;
               return (
                 <Pressable
+                  accessibilityLabel={tab.label}
                   accessibilityRole="tab"
                   accessibilityState={{ selected }}
-                  hitSlop={8}
+                  aria-selected={selected}
+                  hitSlop={10}
                   key={tab.key}
-                  onPress={() => setActiveTab(tab.key)}
+                  onPress={() => handleTabPress(tab.key)}
                   style={[styles.tabButton, selected && styles.tabButtonSelected]}
                 >
-                  <View style={[styles.tabIconShell, selected && styles.tabIconShellSelected]}>
-                    <TabIcon tab={tab.key} selected={selected} />
-                  </View>
                   <Text maxFontSizeMultiplier={chromeTextScale} numberOfLines={1} style={[styles.tabLabel, selected && styles.tabLabelSelected]}>{tab.label}</Text>
                 </Pressable>
               );
@@ -299,6 +385,15 @@ function vehicleEnergyLabel(value: string) {
   if (value === "electric") return "EV";
   if (value === "diesel") return "Diesel";
   return "Fuel";
+}
+
+function vehicleDisplayName(vehicle: VehicleProfile) {
+  return vehicle.rego || vehicle.name || "My vehicle";
+}
+
+function vehicleInitialsFor(vehicle: VehicleProfile) {
+  const source = vehicle.rego || vehicle.name || vehicleEnergyLabel(vehicle.vehicleEnergyType);
+  return source.trim().slice(0, 2).toUpperCase();
 }
 
 function vehicleProfileShortLabel(preferences: {
@@ -346,6 +441,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: spacing.sm,
     paddingRight: spacing.sm,
+  },
+  brandLockupPressed: {
+    opacity: 0.85,
   },
   brandText: {
     flexShrink: 1,
@@ -402,6 +500,81 @@ const styles = StyleSheet.create({
     fontWeight: "400",
     marginTop: 1,
   },
+  vehicleSwitcher: {
+    ...shadow.float,
+    ...surfaces.floating,
+    alignSelf: "flex-end",
+    borderRadius: radii.lg,
+    gap: spacing.xs,
+    marginRight: spacing.lg,
+    marginTop: spacing.xs,
+    maxWidth: 320,
+    padding: spacing.sm,
+    position: "absolute",
+    right: 0,
+    top: 64,
+    width: "82%",
+    zIndex: 50,
+  },
+  vehicleSwitchRow: {
+    alignItems: "center",
+    borderRadius: radii.md,
+    flexDirection: "row",
+    gap: spacing.sm,
+    minHeight: 46,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  vehicleSwitchRowSelected: {
+    backgroundColor: colors.greenSoft,
+  },
+  vehicleSwitchIcon: {
+    alignItems: "center",
+    backgroundColor: colors.panelStrong,
+    borderRadius: radii.pill,
+    height: 28,
+    justifyContent: "center",
+    width: 28,
+  },
+  vehicleSwitchIconSelected: {
+    backgroundColor: colors.green,
+  },
+  vehicleSwitchIconText: {
+    color: colors.greenDark,
+    fontSize: typeScale.caption,
+    fontWeight: "800",
+  },
+  vehicleSwitchIconTextSelected: {
+    color: colors.white,
+  },
+  vehicleSwitchCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  vehicleSwitchTitle: {
+    color: colors.ink,
+    fontSize: typeScale.caption,
+    fontWeight: "800",
+  },
+  vehicleSwitchMeta: {
+    color: colors.muted,
+    fontSize: typeScale.micro,
+    fontWeight: "500",
+    marginTop: 1,
+  },
+  vehicleManageButton: {
+    alignItems: "center",
+    borderTopColor: colors.line,
+    borderTopWidth: 1,
+    justifyContent: "center",
+    marginTop: spacing.xs,
+    minHeight: 36,
+  },
+  vehicleManageText: {
+    color: colors.greenDark,
+    fontSize: typeScale.caption,
+    fontWeight: "800",
+  },
   releaseBanner: {
     alignItems: "center",
     backgroundColor: colors.black,
@@ -440,12 +613,12 @@ const styles = StyleSheet.create({
     backgroundColor: colors.black,
     borderRadius: radii.pill,
     flexDirection: "row",
-    gap: spacing.xs,
-    marginBottom: spacing.md,
-    marginHorizontal: spacing.lg,
-    marginTop: spacing.sm,
+    gap: 4,
+    marginBottom: spacing.sm,
+    marginHorizontal: spacing.md,
+    marginTop: spacing.xs,
     maxWidth: 440,
-    padding: 6,
+    padding: 5,
     elevation: 12,
     width: "92%",
     zIndex: 20,
@@ -455,105 +628,22 @@ const styles = StyleSheet.create({
     borderRadius: radii.pill,
     flex: 1,
     justifyContent: "center",
-    minHeight: 54,
-    paddingVertical: 7,
+    minHeight: 44,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
   },
   tabButtonSelected: {
     backgroundColor: colors.green,
+    paddingHorizontal: spacing.lg,
   },
   tabLabel: {
     color: "#c4cdc8",
     fontSize: typeScale.caption,
-    fontWeight: "500",
-    marginTop: 4,
+    fontWeight: "600",
   },
   tabLabelSelected: {
     color: colors.white,
+    fontSize: typeScale.body,
     fontWeight: "700",
-  },
-  tabIconShell: {
-    alignItems: "center",
-    height: 24,
-    justifyContent: "center",
-    width: 32,
-  },
-  tabIconShellSelected: {
-    transform: [{ scale: 1.04 }],
-  },
-  planIcon: {
-    height: 22,
-    position: "relative",
-    width: 28,
-  },
-  planIconLine: {
-    borderRadius: radii.pill,
-    height: 4,
-    left: 5,
-    position: "absolute",
-    top: 10,
-    transform: [{ rotate: "-28deg" }],
-    width: 19,
-  },
-  planIconStart: {
-    borderRadius: radii.pill,
-    borderWidth: 3,
-    height: 9,
-    left: 2,
-    position: "absolute",
-    top: 11,
-    width: 9,
-  },
-  planIconEnd: {
-    borderRadius: radii.pill,
-    height: 9,
-    position: "absolute",
-    right: 2,
-    top: 3,
-    width: 9,
-  },
-  nearbyIcon: {
-    height: 22,
-    position: "relative",
-    width: 22,
-  },
-  nearbyPin: {
-    borderRadius: 9,
-    borderBottomLeftRadius: 3,
-    height: 18,
-    left: 2,
-    position: "absolute",
-    top: 1,
-    transform: [{ rotate: "-45deg" }],
-    width: 18,
-  },
-  nearbyPinCentre: {
-    borderRadius: radii.pill,
-    height: 7,
-    left: 5.5,
-    position: "absolute",
-    top: 5.5,
-    width: 7,
-  },
-  accountIcon: {
-    alignItems: "center",
-    height: 22,
-    justifyContent: "center",
-    position: "relative",
-    width: 26,
-  },
-  accountHead: {
-    borderRadius: radii.pill,
-    height: 8,
-    position: "absolute",
-    top: 2,
-    width: 8,
-  },
-  accountShoulders: {
-    borderRadius: radii.pill,
-    borderTopWidth: 3,
-    height: 12,
-    position: "absolute",
-    top: 12,
-    width: 22,
   },
 });

@@ -46,7 +46,7 @@ function staleProviderResult(provider, cache, error, extra = {}) {
     cacheMode: "stale",
     degraded: true,
     error: message,
-    warning: extra.warning || `${String(provider).toUpperCase()} live fuel provider unavailable; using stale cached prices.`,
+    warning: extra.warning || "Live prices are temporarily unavailable, so Fuel Path is using saved price data. Confirm prices before driving.",
   });
 }
 
@@ -98,7 +98,7 @@ function providerCooldownError(provider) {
 }
 
 function providerCooldownWarning(provider) {
-  return `${String(provider).toUpperCase()} live fuel provider is cooling down after repeated failures; using stale cached prices.`;
+  return "Live prices are temporarily busy, so Fuel Path is using saved price data. Confirm prices before driving.";
 }
 
 function appendWarning(...warnings) {

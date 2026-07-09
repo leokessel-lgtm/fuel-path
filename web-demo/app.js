@@ -25,7 +25,7 @@ const DEFAULT_TRIP = {
   tankPercent: 45,
   reserveKm: 35,
 };
-const FUELS = ["E10", "U91", "P95", "P98", "DL", "PDL"];
+const FUELS = ["E10", "U91", "P95", "P98", "DL", "PDL", "LPG"];
 const BRAND_ICON_BASE_URL = "./assets/brand-icons/";
 const BRAND_STYLES = {
   "eg ampol": {
@@ -891,15 +891,26 @@ function updateResolvedRoute(route) {
     if (route.provider === "open") {
       const distance = route.googleDistanceKm ? `${route.googleDistanceKm.toFixed(1)} km` : "driving route";
       const duration = route.googleDurationMin ? `, ${Math.round(route.googleDurationMin)} min` : "";
-      const googleNote = state.googleRouteError ? ` Google Directions unavailable: ${state.googleRouteError.message}.` : "";
+      const googleNote = state.googleRouteError ? ` ${publicRouteFallbackMessage(state.googleRouteError)}` : "";
       const cache = route.cacheHit ? " Cached route." : "";
       els.routeMatchStatus.textContent = `Using real address route: ${distance}${duration}.${googleNote}${cache}`;
       return;
     }
     const mode = route.localOnly ? "Using reversed sample corridor" : "Using sample corridor";
-    const fallback = state.googleRouteError ? ` Google route unavailable: ${state.googleRouteError.message}.` : "";
+    const fallback = state.googleRouteError ? ` ${publicRouteFallbackMessage(state.googleRouteError)}` : "";
     els.routeMatchStatus.textContent = `${mode}: ${route.baseRouteName}.${fallback}`;
   }
+}
+
+function publicRouteFallbackMessage(error) {
+  const message = String(error?.message || "");
+  if (/denied|not available|not configured/i.test(message)) {
+    return "Using the fallback route because driving directions are not available here.";
+  }
+  if (/timeout|timed out|network|fetch/i.test(message)) {
+    return "Using the fallback route because driving directions took too long.";
+  }
+  return "Using the fallback route for now.";
 }
 
 function markRoutePending() {
@@ -1794,7 +1805,7 @@ async function render() {
       if (renderId !== state.renderId) return;
       result = scoreCandidates(inputs);
       result.context.source = "sample";
-      result.context.apiError = error.message;
+      result.context.apiError = publicApiErrorMessage(error, "score");
       setModePill("Sample fallback", "warn");
     }
   } else {
@@ -1838,7 +1849,7 @@ function routeErrorResult(error) {
     context: {
       source: state.apiDefaultSource === "live" ? "api_nsw" : "sample",
       routeProvider: "unresolved",
-      routeError: error.message || "Route could not be resolved.",
+      routeError: publicRouteErrorMessage(error),
       generatedAt: new Date().toISOString(),
       cacheSeconds: 0,
       routeDistanceKm: 0,
@@ -1853,7 +1864,7 @@ function routeErrorResult(error) {
 }
 
 function renderRouteResolveError(error) {
-  const message = error.message || "Route could not be resolved.";
+  const message = publicRouteErrorMessage(error);
   const result = routeErrorResult(error);
   state.result = result;
   state.routeContextStations = [];
@@ -3397,7 +3408,7 @@ async function renderExplore(inputs, result, renderId) {
     stations = localNearbyStations(nearbyInputs, centre);
     if (!stations.length) {
       els.mapFallback.hidden = false;
-      els.mapFallback.textContent = `Nearby map unavailable: ${error.message}`;
+      els.mapFallback.textContent = publicApiErrorMessage(error, "nearby");
     }
   }
 
@@ -4736,5 +4747,27 @@ async function detectApi() {
 
 boot().catch((error) => {
   els.title.textContent = "Demo data failed to load";
-  els.reason.textContent = error.message;
+  els.reason.textContent = "Fuel Path could not load the demo. Refresh the page or try again shortly.";
 });
+
+function publicRouteErrorMessage(error) {
+  const message = String(error?.message || "");
+  if (/address|location|not found|no route/i.test(message)) {
+    return "Route not found. Check the addresses or choose a saved route.";
+  }
+  return "Route planning is temporarily unavailable. Check the addresses or choose a saved route.";
+}
+
+function publicApiErrorMessage(error, surface = "general") {
+  const message = String(error?.message || "");
+  if (surface === "nearby") {
+    if (/network|fetch|timeout|timed out/i.test(message)) {
+      return "Nearby prices could not refresh. Check your connection and try again.";
+    }
+    return "Nearby prices are temporarily unavailable. Try again or search another area.";
+  }
+  if (/network|fetch|timeout|timed out/i.test(message)) {
+    return "Fuel Path could not connect. Check your connection and try again.";
+  }
+  return "Fuel Path could not finish that request. Try again shortly.";
+}

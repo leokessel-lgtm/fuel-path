@@ -40,6 +40,7 @@ export function VehicleFuelCard({
   onAddVehicle,
   onFuelChange,
   onHomeChargingAccessChange,
+  onClearVehicleProfile,
   onRemoveVehicle,
   onSelectVehicle,
   onToggleEvConnector,
@@ -50,6 +51,7 @@ export function VehicleFuelCard({
   onAddVehicle: (vehicleEnergyType?: VehicleEnergyType) => void;
   onFuelChange: (fuel: FuelCode) => void;
   onHomeChargingAccessChange: (homeChargingAccess: HomeChargingAccess) => void;
+  onClearVehicleProfile: () => void;
   onRemoveVehicle: (vehicleId: string) => void;
   onSelectVehicle: (vehicleId: string) => void;
   onToggleEvConnector: (connector: EvConnector) => void;
@@ -64,6 +66,7 @@ export function VehicleFuelCard({
   const usesFuel = preferences.vehicleEnergyType !== "electric";
   const usesEvCharging = preferences.vehicleEnergyType === "electric";
   const canAddVehicle = preferences.vehicles.length < maxVehicleProfiles;
+  const hasVehicleDetails = Boolean(preferences.vehicleName.trim() || preferences.vehicleRego.trim());
 
   return (
     <View style={styles.card}>
@@ -249,6 +252,16 @@ export function VehicleFuelCard({
         </View>
       ) : null}
 
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ disabled: !hasVehicleDetails }}
+        disabled={!hasVehicleDetails}
+        onPress={onClearVehicleProfile}
+        style={[styles.removeButton, !hasVehicleDetails && styles.removeButtonDisabled]}
+      >
+        <Text style={[styles.removeButtonText, !hasVehicleDetails && styles.removeButtonTextDisabled]}>Clear current vehicle details</Text>
+      </Pressable>
+
       {preferences.vehicles.length > 1 ? (
         <Pressable
           accessibilityRole="button"
@@ -347,12 +360,10 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
   },
   title: {
-    ...typography.title,
+    ...typography.listTitle,
   },
   muted: {
-    color: colors.muted,
-    fontSize: typeScale.caption,
-    fontWeight: "400",
+    ...typography.metadata,
     lineHeight: 18,
   },
   activeBadge: {
@@ -362,9 +373,8 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs,
   },
   activeBadgeText: {
+    ...typography.badgeLabel,
     color: colors.greenDark,
-    fontSize: typeScale.micro,
-    fontWeight: "900",
     textTransform: "uppercase",
   },
   vehicleList: {
@@ -398,9 +408,8 @@ const styles = StyleSheet.create({
     borderColor: colors.green,
   },
   vehicleAvatarText: {
+    ...typography.compactButtonLabel,
     color: colors.ink,
-    fontSize: typeScale.caption,
-    fontWeight: "900",
   },
   vehicleAvatarTextSelected: {
     color: colors.white,
@@ -410,17 +419,13 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   vehicleRowTitle: {
-    color: colors.ink,
-    fontSize: typeScale.body,
-    fontWeight: "900",
+    ...typography.bodyStrong,
   },
   vehicleRowTitleSelected: {
     color: colors.white,
   },
   vehicleRowMeta: {
-    color: colors.muted,
-    fontSize: typeScale.caption,
-    fontWeight: "500",
+    ...typography.metadataStrong,
     marginTop: 2,
   },
   vehicleRowMetaSelected: {
@@ -431,7 +436,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   addButton: {
-    ...surfaces.floating,
+    ...surfaces.secondaryAction,
     alignItems: "center",
     borderRadius: radii.pill,
     flex: 1,
@@ -440,9 +445,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
   },
   addButtonText: {
+    ...typography.compactButtonLabel,
     color: colors.greenDark,
-    fontSize: typeScale.caption,
-    fontWeight: "900",
   },
   addButtonDisabled: {
     backgroundColor: colors.panelStrong,
@@ -452,9 +456,7 @@ const styles = StyleSheet.create({
     color: colors.mutedSoft,
   },
   limitText: {
-    color: colors.muted,
-    fontSize: typeScale.caption,
-    fontWeight: "600",
+    ...typography.metadataStrong,
   },
   divider: {
     backgroundColor: colors.line,
@@ -469,23 +471,16 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   sectionLabel: {
-    color: colors.greenDark,
-    fontSize: typeScale.micro,
-    fontWeight: "900",
-    letterSpacing: 0.4,
+    ...typography.sectionLabel,
     textTransform: "uppercase",
   },
   sectionHint: {
-    color: colors.muted,
-    fontSize: typeScale.caption,
-    fontWeight: "700",
+    ...typography.metadataStrong,
   },
   input: {
-    ...surfaces.softPanel,
-    borderRadius: radii.md,
-    color: colors.ink,
-    fontSize: typeScale.body,
-    fontWeight: "700",
+    ...surfaces.field,
+    ...typography.fieldText,
+    borderRadius: radii.control,
     minHeight: 44,
     paddingHorizontal: spacing.md,
   },
@@ -508,9 +503,8 @@ const styles = StyleSheet.create({
     borderColor: colors.black,
   },
   chipText: {
+    ...typography.compactButtonLabel,
     color: colors.ink,
-    fontSize: typeScale.caption,
-    fontWeight: "700",
   },
   chipTextSelected: {
     color: colors.white,
@@ -525,14 +519,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
   },
   advancedButtonText: {
+    ...typography.buttonLabel,
     color: colors.ink,
-    fontSize: typeScale.body,
-    fontWeight: "900",
   },
   advancedButtonMeta: {
-    color: colors.muted,
-    fontSize: typeScale.caption,
-    fontWeight: "700",
+    ...typography.metadataStrong,
   },
   advancedSection: {
     gap: spacing.sm,
@@ -542,9 +533,15 @@ const styles = StyleSheet.create({
     minHeight: 36,
     justifyContent: "center",
   },
+  removeButtonDisabled: {
+    opacity: 0.45,
+  },
   removeButtonText: {
     color: colors.red,
-    fontSize: typeScale.caption,
-    fontWeight: "800",
+    fontSize: typography.compactButtonLabel.fontSize,
+    fontWeight: typography.compactButtonLabel.fontWeight,
+  },
+  removeButtonTextDisabled: {
+    color: colors.muted,
   },
 });

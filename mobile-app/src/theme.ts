@@ -45,6 +45,7 @@ export const radii = {
   lg: 14,
   xl: 22,
   xxl: 28,
+  control: 22,
   pill: 999,
 };
 
@@ -69,19 +70,72 @@ export const typography = {
     fontSize: typeScale.title,
     fontWeight: "700" as const,
   },
+  listTitle: {
+    color: colors.ink,
+    fontSize: typeScale.lead,
+    fontWeight: "700" as const,
+  },
   bodyStrong: {
     color: colors.ink,
     fontSize: typeScale.body,
     fontWeight: "600" as const,
+  },
+  fieldText: {
+    color: colors.ink,
+    fontSize: typeScale.body,
+    fontWeight: "500" as const,
+  },
+  buttonLabel: {
+    fontSize: typeScale.body,
+    fontWeight: "700" as const,
+  },
+  compactButtonLabel: {
+    fontSize: typeScale.caption,
+    fontWeight: "700" as const,
+  },
+  sectionLabel: {
+    color: colors.greenDark,
+    fontSize: typeScale.micro,
+    fontWeight: "700" as const,
+    letterSpacing: 0.4,
+  },
+  badgeLabel: {
+    fontSize: typeScale.micro,
+    fontWeight: "700" as const,
+  },
+  metric: {
+    color: colors.greenDark,
+    fontSize: typeScale.title,
+    fontWeight: "800" as const,
   },
   bodyMuted: {
     color: colors.muted,
     fontSize: typeScale.caption,
     fontWeight: "400" as const,
   },
+  metadata: {
+    color: colors.muted,
+    fontSize: typeScale.caption,
+    fontWeight: "400" as const,
+  },
+  metadataStrong: {
+    color: colors.muted,
+    fontSize: typeScale.caption,
+    fontWeight: "500" as const,
+  },
 };
 
 export const surfaces = {
+  field: {
+    backgroundColor: colors.white,
+    borderColor: colors.line,
+    borderWidth: 1,
+  },
+  secondaryAction: {
+    backgroundColor: colors.white,
+    borderColor: colors.line,
+    borderWidth: 1,
+  },
   floating: {
     backgroundColor: "rgba(255, 255, 255, 0.96)",
     borderColor: colors.line,

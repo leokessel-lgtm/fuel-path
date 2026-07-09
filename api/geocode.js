@@ -1,4 +1,5 @@
 const { geocode, methodAllowed, numberParam, sendJson, stringParam } = require("./_backend");
+const { publicErrorMessage } = require("./_publicErrors");
 
 function diagnosticsEnabled() {
   return process.env.FUEL_PATH_GEOCODE_DIAGNOSTICS === "1";
@@ -67,7 +68,7 @@ module.exports = async function handler(req, res) {
       }));
     }
     sendJson(res, 404, {
-      error: error instanceof Error ? error.message : "No location found",
+      error: publicErrorMessage(error, "address"),
     });
   }
 };

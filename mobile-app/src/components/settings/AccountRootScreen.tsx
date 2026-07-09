@@ -5,6 +5,7 @@ import { styles } from "./settingsStyles";
 import {
   activeDiscountSummary,
   alertSettingsSummary,
+  navigationPreferenceSummary,
   placesSettingsSummary,
   SettingsSection,
   stationBrandSettingsSummary,
@@ -62,7 +63,7 @@ export function AccountRootScreen({
         <SettingsRow
           label="Support"
           onPress={() => onSelectSection("privacy")}
-          summary="Privacy, data and support notes"
+          summary={`${navigationPreferenceSummary(preferences)} | privacy and support`}
           title="Privacy & support"
         />
       </View>

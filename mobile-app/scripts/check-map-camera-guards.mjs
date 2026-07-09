@@ -30,22 +30,35 @@ const vehicleFuelCard = read("src/components/VehicleFuelCard.tsx");
 const accountDetailScreen = read("src/components/settings/AccountDetailScreen.tsx");
 const weeklyReportCard = read("src/components/WeeklyReportCard.tsx");
 const routeAddressSuggestionHook = read("src/hooks/useRouteAddressSuggestions.ts");
+const routeAlertsHook = read("src/hooks/useRouteAlerts.ts");
 const theme = read("src/theme.ts");
-const nearbyScreen = read("src/screens/NearbyScreen.tsx");
+const typographyDoc = read("../docs/typography-hierarchy.md");
+const routeRecommendationRules = read("../docs/route-recommendation-logic-rules.md");
+const nearbyScreen = readScreenSource("src/screens/NearbyScreen.tsx", "src/screens/NearbyScreen.viewmodel.tsx");
 const nearbyScreenUtils = read("src/screens/NearbyScreen.utils.ts");
 const nearbyResults = read("src/hooks/useNearbyResults.ts");
 const stationBrandFilterPill = read("src/components/StationBrandFilterPill.tsx");
 const stationBrandFilterOverride = read("src/hooks/useStationBrandFilterOverride.ts");
-const planScreen = read("src/screens/PlanScreen.tsx");
+const planScreen = readScreenSource("src/screens/PlanScreen.tsx", "src/screens/PlanScreen.viewmodel.tsx");
 const planRouteState = read("src/screens/PlanScreen.routeState.ts");
 const planScreenUtils = read("src/screens/PlanScreen.utils.ts");
 const accountScreen = read("src/screens/AccountScreen.tsx");
 const stationRow = read("src/components/StationRow.tsx");
 const brandBadge = read("src/components/BrandBadge.tsx");
+const brandAssets = read("src/data/brandAssets.ts");
+const androidMarkerOverlayDimensions = [
+  "bp.png",
+  "shell.png",
+  "caltex.png",
+  "eg-ampol.png",
+].map((filename) => readPngDimensions(`assets/brand-marker-overlays/${filename}`));
 const betaPrivacyCard = read("src/components/BetaPrivacyCard.tsx");
 const discountPrograms = read("src/data/discountPrograms.ts");
+const discountProgramAssets = read("src/data/discountProgramAssets.ts");
+const discountProgramBadge = read("src/components/DiscountProgramBadge.tsx");
 const discountRegistry = read("src/data/discountRegistry.generated.json");
 const fuelPathApi = read("src/api/fuelPathApi.ts");
+const userVisibleErrors = read("src/utils/userVisibleErrors.ts");
 const types = read("src/types.ts");
 const locationEvidence = read("src/utils/locationEvidence.ts");
 const routeCameraInsets = read("src/utils/routeCameraInsets.ts");
@@ -54,14 +67,29 @@ const recentLocationsStore = read("src/services/recentLocationsStore.ts");
 const savedCommutesStore = read("src/services/savedCommutesStore.ts");
 const backendAlerts = read("src/services/backendAlerts.ts");
 const routeNotifications = read("src/services/routeNotifications.ts");
+const currentLocation = read("src/services/currentLocation.ts");
 const pricing = read("src/utils/pricing.ts");
 const decisionEvidence = read("src/utils/decisionEvidence.ts");
 const packageJson = read("package.json");
 const planFieldSmoke = read("scripts/smoke-plan-fields.mjs");
+const nativeApiContracts = read("scripts/check-native-api-contracts.mjs");
 const androidMapSmoke = read("scripts/native-android-map-smoke.mjs");
+const androidLocalStandaloneBuild = read("scripts/build-android-local-standalone.mjs");
 const androidPreviewSmoke = read("scripts/native-android-preview-smoke.mjs");
 const androidPerformanceSummary = read("scripts/native-android-performance-summary.mjs");
+const androidPerformanceCoverage = read("scripts/native-android-performance-coverage.mjs");
+const androidNotificationReadiness = read("scripts/native-android-notification-readiness.mjs");
+const androidAlertSyncSmoke = read("scripts/native-android-alert-sync-smoke.mjs");
+const androidAlertDeliveryGate = read("scripts/native-android-alert-delivery-gate.mjs");
+const androidNavigationIntents = read("scripts/native-android-navigation-intents.mjs");
+const androidColdStartSmoke = read("scripts/native-android-cold-start-smoke.mjs");
+const routeNotificationScheduleStress = read("scripts/stress-route-notification-schedule.mjs");
 const androidMapsKeyFix = read("scripts/android-maps-key-fix-packet.mjs");
+const nativeValidationPreflight = read("scripts/native-validation-preflight.mjs");
+const nativeMapGeocodeParity = read("scripts/native-map-geocode-parity-check.mjs");
+const nativeEvidenceAudit = read("scripts/native-current-evidence-audit.mjs");
+const gradleWrapper = read("android/gradle/wrapper/gradle-wrapper.properties");
+const iosInfoPlist = read("ios/FuelPath/Info.plist");
 const routeScoring = read("../api/_routeScoring.js");
 
 const checks = [
@@ -98,15 +126,65 @@ const checks = [
     ok:
       nearbyScreen.includes("const { expandedSheetTop, nearbyCameraInsets, onTopControlsLayout } = useMeasuredControlBoundary();") &&
       nearbyScreen.includes("onLayout={onTopControlsLayout}") &&
+      nearbyScreen.includes("gap: spacing.xs") &&
+      nearbyScreen.includes("top: spacing.sm") &&
+      nearbyLocationSearch.includes("padding: spacing.xs") &&
+      nearbyLocationSearch.includes("paddingVertical: spacing.xs") &&
+      nearbyEvControls.includes("const energySelectorMinWidth = 214;") &&
+      nearbyEvControls.includes('alignSelf: "flex-start"') &&
+      nearbyEvControls.includes("minWidth: energySelectorMinWidth") &&
+      nearbyEvControls.includes("gap: spacing.lg") &&
       measuredControlBoundary.includes("topControlsBottom + spacing.xl") &&
       measuredControlBoundary.includes("bottom: 330"),
   },
   {
+    label: "map chrome uses the shared control corner radius",
+    ok:
+      theme.includes("control: 22") &&
+      nearbyLocationSearch.includes("borderRadius: radii.control") &&
+      planRouteEditorCard.includes("borderRadius: radii.control") &&
+      nearbyStationSheet.includes("borderRadius: radii.control") &&
+      nearbyCombinedPanel.includes("borderRadius: radii.control") &&
+      nearbyEvControls.includes("borderRadius: radii.control") &&
+      planRouteSheet.includes("borderRadius: radii.control"),
+  },
+  {
+    label: "typography hierarchy is tokenised and documented",
+    ok:
+      theme.includes("fieldText: {") &&
+      theme.includes("buttonLabel: {") &&
+      theme.includes("compactButtonLabel: {") &&
+      theme.includes("sectionLabel: {") &&
+      theme.includes("metric: {") &&
+      theme.includes("metadataStrong: {") &&
+      typographyDoc.includes("# Fuel Path Typography Hierarchy") &&
+      typographyDoc.includes("typography.fieldText") &&
+      typographyDoc.includes("typography.metric") &&
+      nearbyLocationSearch.includes("...typography.fieldText") &&
+      planRouteEditorCard.includes("...typography.fieldText") &&
+      nearbyEvControls.includes("...typography.buttonLabel") &&
+      stationRow.includes("...typography.metric") &&
+      nearbyStationSheet.includes("...typography.metric"),
+  },
+  {
     label: "nearby screen keeps current location as a separate map pin",
     ok:
-      nearbyScreen.includes("const [currentLocation, setCurrentLocation] = useState<MapPoint>();") &&
+      appShell.includes("const [currentLocation, setCurrentLocation] = useState<MapPoint>();") &&
+      appShell.includes("currentLocation={currentLocation}") &&
+      appShell.includes("onCurrentLocationChange={setCurrentLocation}") &&
       nearbyScreen.includes("setCurrentLocation(nextCentre);") &&
       nearbyScreen.includes("userLocation={currentLocation}"),
+  },
+  {
+    label: "native current location maps platform failures to safe recovery copy",
+    ok:
+      currentLocation.includes("async function nativeLocationPermission(requestPermission: boolean)") &&
+      currentLocation.includes("Location permission could not be checked.") &&
+      currentLocation.includes("async function safeLastKnownPosition()") &&
+      currentLocation.includes("return null;") &&
+      currentLocation.includes("async function safeCurrentPosition()") &&
+      currentLocation.includes("Current location is unavailable on this device right now.") &&
+      currentLocation.includes("Current location took too long. Try again near a window, or type a start address."),
   },
   {
     label: "web and native maps render a dedicated my-location pin",
@@ -218,19 +296,26 @@ const checks = [
       !stationRow.includes("Possible lower price, not guaranteed"),
   },
   {
-    label: "native station markers keep price caps but represent viewport overflow",
+    label: "native station markers keep web-parity price, logo tray and pointer",
     ok:
       nativeMap.includes("const defaultMarkerDensity = {") &&
       nativeMap.includes("maxPriceMarkers: 8,") &&
-      nativeMap.includes("maxDotMarkers: 18,") &&
       nativeMap.includes("markerGridSize: 240,") &&
       nativeMap.includes("compactMarkerGridSize: 128,") &&
+      nativeMap.includes("const tabletMarkerDensity = {") &&
+      nativeMap.includes("maxPriceMarkers: 20,") &&
+      nativeMap.includes("markerGridSize: 150,") &&
+      nativeMap.includes("compactMarkerGridSize: 110,") &&
       nativeMap.includes("const compactMarkerDensity = {") &&
       nativeMap.includes("maxPriceMarkers: 3,") &&
-      nativeMap.includes("maxDotMarkers: 8,") &&
       nativeMap.includes("markerGridSize: 390,") &&
       nativeMap.includes("compactMarkerGridSize: 230,") &&
-      nativeMap.includes("function nativeMarkerDensity(width: number)") &&
+      !nativeMap.includes("dotMarkers") &&
+      !nativeMap.includes("compactPin") &&
+      !nativeMap.includes("maxDotMarkers") &&
+      nativeMap.includes("nativeMarkerDensity(width, Platform.OS === \"ios\" && Platform.isPad)") &&
+      nativeMap.includes("function nativeMarkerDensity(width: number, isPad = false)") &&
+      nativeMap.includes("if (isPad || width >= 700) return tabletMarkerDensity;") &&
       nativeMap.includes("return width <= 430 ? compactMarkerDensity : defaultMarkerDensity;") &&
       nativeMap.includes("type ClusterMarker = {") &&
       nativeMap.includes("items: StationViewModel[];") &&
@@ -241,36 +326,92 @@ const checks = [
       nativeMap.includes("stationInRegion(item, region)") &&
       nativeMap.includes("clusterMarkerForItems") &&
       nativeMap.includes("clusterFitsInteractiveRegion(cluster, currentRegion, activeInsets)") &&
+      nativeMap.includes("regionForClusterZoom(cluster, currentRegion)") &&
+      nativeMap.includes("function regionForClusterZoom(") &&
+      nativeMap.includes("currentRegion.latitudeDelta * 0.55") &&
+      nativeMap.includes("currentRegion.longitudeDelta * 0.55") &&
+      nativeMap.includes("function boundsForCluster(cluster: ClusterMarker)") &&
       nativeMap.includes("styles.clusterPin") &&
       nativeMap.includes("styles.clusterCount") &&
+      nativeMap.includes("tracksViewChanges={Platform.OS === \"android\"}") &&
       nativeMap.includes("styles.pinBrand") &&
       nativeMap.includes("styles.pinPointer") &&
-      nativeMap.includes("borderTopColor: colors.white") &&
-      nativeMap.includes("borderTopWidth: 8") &&
-      nativeMap.includes('borderLeftColor: "transparent"') &&
-      nativeMap.includes("width: 54") &&
+      nativeMap.includes("<BrandBadge") &&
+      nativeMap.includes("Platform.OS === \"android\" ? null") &&
+      nativeMap.includes("brandStyle.markerIcon || brandStyle.icon") &&
+      nativeMap.includes("const nativeBrandIcon =") &&
+      nativeMap.includes("image={nativeBrandIcon}") &&
+      nativeMap.includes("anchor={{ x: 0.5, y: 1.35 }}") &&
+      nativeMap.includes("marker") &&
+      nativeMap.includes("station={item.station}") &&
+      nativeMap.includes("size={22}") &&
+      nativeMap.includes("zIndex={selected ? 700 : subdued ? 420 : 500}") &&
+      brandBadge.includes("const style = brandStyleForStation(station);") &&
+      brandBadge.includes("marker = false") &&
+      brandBadge.includes("const source = style.icon || (marker ? style.markerIcon : undefined);") &&
+      brandBadge.includes("const imageSize = Math.max(12, size - 4);") &&
+      brandBadge.includes("resizeMode=\"contain\"") &&
+      brandAssets.includes("markerIcon?: ImageSourcePropType;") &&
+      brandAssets.includes("markerIcon: require(\"../../assets/brand-marker-overlays/bp.png\")") &&
+      androidMarkerOverlayDimensions.every(
+        ({ width, height }) => width <= 20 && height <= 20,
+      ) &&
+      nativeMap.includes("backgroundColor: colors.greenDark") &&
+      nativeMap.includes("backgroundColor: \"transparent\"") &&
+      nativeMap.includes("borderRadius: radii.md") &&
       nativeMap.includes("height: 46") &&
+      nativeMap.includes("minWidth: 54") &&
+      nativeMap.includes("width: 54") &&
       nativeMap.includes("minHeight: 24") &&
-      nativeMap.includes("<BrandBadge station={item.station} size={22} />") &&
-      nativeMap.includes("const routeStationCameraPoints = stations.slice(0, routePriceMarkerLimit).map") &&
-      nativeMap.includes("return [...visibleRoutePoints, ...routeStationCameraPoints]") &&
-      brandBadge.includes('contentFit="contain"') &&
+      nativeMap.includes("size={22}") &&
+      nativeMap.includes("borderLeftWidth: 6") &&
+      nativeMap.includes("borderRightWidth: 6") &&
+      nativeMap.includes("borderTopWidth: 8") &&
+      nativeMap.includes("const routeStationCameraPoints = stations") &&
+      nativeMap.includes(".slice(0, routePriceMarkerLimit)") &&
+      nativeMap.includes("const routeChargerCameraPoints = prioritiseSelectedChargers(") &&
+      nativeMap.includes("selectedChargerId,") &&
+      nativeMap.includes(".slice(0, routeCameraChargerLimit)") &&
+      nativeMap.includes("routeStationCameraPoints,") &&
+      nativeMap.includes("routeChargerCameraPoints,") &&
       !nativeMap.includes("scale: 1.05") &&
-      nativeMap.includes("const subdued = Boolean(routeEndpoints && selectedStationCode && !selected);") &&
+      nativeMap.includes("const subdued = Boolean(") &&
+      nativeMap.includes("routeEndpoints && selectedStationCode && !selected") &&
       nativeMap.includes("subdued && styles.pinSubdued") &&
       nativeMap.includes("pinSubdued: {") &&
-      nativeMap.includes("opacity: 0.68") &&
+      !nativeMap.includes("opacity: 0.68") &&
       nativeMap.includes("transform: [{ scale: 0.94 }]") &&
       nativeMap.includes("backgroundColor: colors.greenDark") &&
       nativeMap.includes("pinSelected: {\n    borderColor: colors.black") &&
-      nativeMap.includes("pinPriceSelected: {\n    backgroundColor: colors.black") &&
+      nativeMap.includes("pinPriceSelected: {") &&
+      nativeMap.includes("backgroundColor: colors.black") &&
+      nativeMap.includes("color: colors.white") &&
       nativeMap.includes("const nearbyInitialRegionDelta = 0.035;") &&
       nativeMap.includes("const nearbyInitialMarkerRadiusKm = 4.2;") &&
       nativeMap.includes("regionForPoint(centre, nearbyInitialRegionDelta)") &&
       nativeMap.includes("nearbyCameraPointsForCentre(centre, nearbyInitialMarkerRadiusKm)") &&
-      nativeMap.indexOf("<Text style={[styles.pinPrice") <
-        nativeMap.indexOf("<View style={styles.pinBrand}>") &&
       nativeMap.includes("pinPointerSelected"),
+  },
+  {
+    label: "native route maps render selectable EV charger markers",
+    ok:
+      nativeMap.includes("chargers = emptyChargers") &&
+      nativeMap.includes("selectedChargerId") &&
+      nativeMap.includes("onSelectCharger") &&
+      nativeMap.includes("visibleChargers.map") &&
+      nativeMap.includes("prioritiseSelectedChargers(chargers, selectedChargerId)") &&
+      nativeMap.includes("accessibilityLabel={`Select charger ${charger.name}`}") &&
+      nativeMap.includes("onPress={() => onSelectCharger?.(charger.id)}") &&
+      nativeMap.includes("styles.evPin") &&
+      nativeMap.includes("styles.evPinSelected") &&
+      nativeMap.includes("lastSelectedChargerIdRef") &&
+      nativeMap.includes("!previousSelectedChargerId") &&
+      nativeMap.includes("previousSelectedChargerId === selectedChargerId") &&
+      nativeMap.includes("animateCamera") &&
+      nativeMap.includes("selected.lat") &&
+      nativeMap.includes("selected.lon") &&
+      webMap.includes("evChargerMarkerHtml") &&
+      webMap.includes("prioritiseSelectedChargers(chargers, selectedChargerId)"),
   },
   {
     label: "nearby cluster pill only drills into the map",
@@ -295,12 +436,15 @@ const checks = [
       fuelPathLogo.includes("styles.pinDot"),
   },
   {
-    label: "app shell uses dark icon-first bottom navigation",
+    label: "app shell uses compact labelled bottom navigation",
     ok:
-      appShell.includes("function TabIcon") &&
       appShell.includes("backgroundColor: colors.black") &&
-      appShell.includes("styles.tabIconShell") &&
-      appShell.includes("styles.nearbyPin") &&
+      appShell.includes('width: "92%"') &&
+      appShell.includes("maxWidth: 440") &&
+      appShell.includes("minHeight: 44") &&
+      appShell.includes("tabLabelSelected") &&
+      !appShell.includes("function TabIcon") &&
+      !appShell.includes("styles.tabIconShell") &&
       !appShell.includes("styles.tabHint"),
   },
   {
@@ -312,6 +456,8 @@ const checks = [
       appShell.includes("<Text maxFontSizeMultiplier={chromeTextScale} style={styles.vehicleIconText}>{vehicleInitials}</Text>") &&
       appShell.includes("<Text maxFontSizeMultiplier={chromeTextScale} numberOfLines={1} style={styles.vehiclePrimary}>") &&
       appShell.includes("<Text maxFontSizeMultiplier={chromeTextScale} numberOfLines={1} style={styles.vehicleSecondary}>") &&
+      appShell.includes("accessibilityLabel={tab.label}") &&
+      appShell.includes("aria-selected={selected}") &&
       appShell.includes("<Text maxFontSizeMultiplier={chromeTextScale} numberOfLines={1} style={[styles.tabLabel, selected && styles.tabLabelSelected]}>{tab.label}</Text>"),
   },
   {
@@ -320,8 +466,9 @@ const checks = [
       theme.includes('fontWeight: "400" as const') &&
       theme.includes('fontWeight: "600" as const') &&
       theme.includes('fontWeight: "700" as const') &&
-      appShell.includes('fontWeight: "500"') &&
       appShell.includes('fontWeight: "700"') &&
+      appShell.includes("fontSize: typeScale.caption") &&
+      appShell.includes("fontSize: typeScale.body") &&
       !appShell.includes('fontWeight: "900"'),
   },
   {
@@ -405,6 +552,12 @@ const checks = [
       nearbyStationSheet.includes("{selected && !sheetExpanded ? (") &&
       nearbyStationSheet.includes("sheetExpanded: {") &&
       nearbyStationSheet.includes("bottom: 8") &&
+      nearbyStationSheet.includes("maxHeight: 235") &&
+      nearbyStationSheet.includes("maxHeight: 172") &&
+      nearbyCombinedPanel.includes("maxHeight: 285") &&
+      nearbyCombinedPanel.includes("maxHeight: 180") &&
+      nearbyEvControls.includes("maxHeight: 275") &&
+      nearbyEvControls.includes("maxHeight: 180") &&
       !nearbyStationSheet.includes("selected,\n  sheetExpanded,"),
   },
   {
@@ -423,6 +576,15 @@ const checks = [
       nearbyStationSheet.includes("sheetDismissDragPx") &&
       nearbyStationSheet.includes("dy > sheetDismissDragPx") &&
       nearbyStationSheet.includes("if (selected && !sheetExpanded) onCloseSelectedStation();") &&
+      nearbyStationSheet.includes("paddingTop: spacing.xs") &&
+      nearbyStationSheet.includes("minHeight: 24") &&
+      nearbyStationSheet.includes("paddingVertical: 2") &&
+      nearbyCombinedPanel.includes("paddingTop: spacing.xs") &&
+      nearbyCombinedPanel.includes("minHeight: 24") &&
+      nearbyCombinedPanel.includes("paddingVertical: 2") &&
+      nearbyEvControls.includes("paddingTop: spacing.xs") &&
+      nearbyEvControls.includes("minHeight: 24") &&
+      nearbyEvControls.includes("paddingVertical: 2") &&
       nearbyStationSheet.includes('accessibilityRole="button"') &&
       nearbyStationSheet.includes("hitSlop={10}") &&
       nearbyStationSheet.includes('accessibilityLabel={sheetExpanded ? "Collapse station list" : "Expand station list"}'),
@@ -432,7 +594,12 @@ const checks = [
     ok:
       planScreen.includes("routeSheetMinimised") &&
       planScreen.includes("PlanRouteSheet") &&
-      planRouteSheet.includes("styles.sheetMinimised"),
+      planRouteSheet.includes("styles.sheetMinimised") &&
+      planRouteSheet.includes("height: 62") &&
+      planRouteSheet.includes("paddingVertical: spacing.xs") &&
+      planRouteEditorCard.includes("padding: spacing.xs") &&
+      planRouteEditorCard.includes("paddingVertical: spacing.xs") &&
+      planScreen.includes("topControlsOnly: {\n    top: spacing.sm"),
   },
   {
     label: "plan route map uses measured chrome insets",
@@ -493,12 +660,55 @@ const checks = [
     label: "plan navigation arrow carries route waypoint to final destination",
     ok:
       planRouteSheet.includes("openRouteDirectionsViaStop") &&
-      planRouteSheet.includes("openPlanStationDirections(best, routeEndpoints)") &&
-      planRouteSheet.includes("openPlanStationDirections(selected, routeEndpoints)") &&
+      planRouteSheet.includes("openPlanStationDirections(best, navigationApp, routeEndpoints)") &&
+      planRouteSheet.includes("openPlanStationDirections(selected, navigationApp, routeEndpoints)") &&
       planRouteSheet.includes("Navigate via ${best.station.name} to ${routeEndpoints.to.label}") &&
       planScreen.includes("routeEndpoints={routeData.endpoints}") &&
       nearbyScreenUtils.includes('waypoints: stopValue') &&
-      nearbyScreenUtils.includes('destination: destinationValue'),
+      nearbyScreenUtils.includes('destination: destinationValue') &&
+      nearbyScreenUtils.includes("Alert.alert(") &&
+      nearbyScreenUtils.includes("ActionSheetIOS.showActionSheetWithOptions") &&
+      nearbyScreenUtils.includes('title: "Navigate via fuel stop"') &&
+      nearbyScreenUtils.includes("appleMapsRouteViaStopUrl(origin, stop, destination)") &&
+      nearbyScreenUtils.includes("fallbackUrl: appleMapsUrl") &&
+      nearbyScreenUtils.includes('{ label: "Apple Maps", provider: "apple_maps", url: appleMapsUrl }') &&
+      nearbyScreenUtils.includes('{ label: "Waze to stop", provider: "waze"') &&
+      nearbyScreenUtils.includes('{ label: "Google Maps", provider: "google_maps"') &&
+      nearbyScreenUtils.includes('{ label: "Waze", provider: "waze"') &&
+      nearbyScreenUtils.includes('import * as IntentLauncher from "expo-intent-launcher";') &&
+      nearbyScreenUtils.includes("androidIntent: androidDeviceMapsIntent(geoUrl)") &&
+      nearbyScreenUtils.includes("androidIntent: androidGoogleMapsIntent(googleMapsUrl)") &&
+      nearbyScreenUtils.includes('label: "Maps"') &&
+      nearbyScreenUtils.includes('provider: "device_maps"') &&
+      nearbyScreenUtils.includes("url: geoUrl") &&
+      nearbyScreenUtils.includes("navigationApp !== \"ask\"") &&
+      nearbyScreenUtils.includes("provider === navigationApp") &&
+      nearbyScreenUtils.includes("async function openNavigationOption") &&
+      nearbyScreenUtils.includes("IntentLauncher.startActivityAsync(option.androidIntent.action") &&
+      nearbyScreenUtils.includes("packageName: option.androidIntent.packageName") &&
+      nearbyScreenUtils.includes("if (!option.fallbackUrl) throw error;") &&
+      nearbyScreenUtils.includes("if (Platform.OS === \"android\")") &&
+      nearbyScreenUtils.includes("function appleMapsRouteViaStopUrl") &&
+      nearbyScreenUtils.includes('params.append("daddr", coordinateParam(stop.lat, stop.lon))') &&
+      nearbyScreenUtils.includes('params.append("daddr", coordinateParam(destination.lat, destination.lon))') &&
+      nearbyScreenUtils.includes("function androidGoogleNavigationUrl") &&
+      nearbyScreenUtils.includes("google.navigation:q=${Number(lat)},${Number(lon)}&mode=d") &&
+      nearbyScreenUtils.includes('const ANDROID_GOOGLE_MAPS_PACKAGE = "com.google.android.apps.maps";') &&
+      nearbyScreenUtils.includes("function androidGoogleMapsIntent") &&
+      nearbyScreenUtils.includes("packageName: ANDROID_GOOGLE_MAPS_PACKAGE") &&
+      nearbyScreenUtils.includes("fallbackUrl: googleMapsUrl") &&
+      nearbyScreenUtils.includes('const ANDROID_WAZE_PACKAGE = "com.waze";') &&
+      nearbyScreenUtils.includes("function androidWazeUrl") &&
+      nearbyScreenUtils.includes("function androidWazeIntent") &&
+      nearbyScreenUtils.includes("packageName: ANDROID_WAZE_PACKAGE") &&
+      nearbyScreenUtils.includes("waze://?ll=${Number(lat)},${Number(lon)}&navigate=yes&utm_source=fuelpath") &&
+      nearbyScreenUtils.includes('Linking.canOpenURL("comgooglemapsurl://")') &&
+      nearbyScreenUtils.includes("comgooglemapsurl://${googleMapsUrl.replace") &&
+      nearbyScreenUtils.includes('Linking.canOpenURL("waze://")') &&
+      nearbyScreenUtils.includes("https://waze.com/ul?ll=${safeLat},${safeLon}&navigate=yes&utm_source=fuelpath") &&
+      iosInfoPlist.includes("<key>LSApplicationQueriesSchemes</key>") &&
+      iosInfoPlist.includes("<string>comgooglemapsurl</string>") &&
+      iosInfoPlist.includes("<string>waze</string>"),
   },
   {
     label: "plan returns to recommended stop after alternative detail",
@@ -514,7 +724,8 @@ const checks = [
       planScreen.includes("routeStarted,") &&
       planScreen.includes("const defaultPlanCentre: MapPoint") &&
       planScreen.includes('label: "Perth CBD WA 6000"') &&
-      planScreen.includes("showCentreMarker={Boolean(fromPoint)}") &&
+      planScreen.includes("showCentreMarker={Boolean(fromPoint) && !fromPointIsCurrentLocation}") &&
+      planScreen.includes("userLocation={fromPointIsCurrentLocation ? fromPoint : undefined}") &&
       planScreen.includes('dispatchRoute({ type: "start-loading" });') &&
       planRouteState.includes("routeStarted: false") &&
       planRouteState.includes("routeStarted: true") &&
@@ -568,18 +779,54 @@ const checks = [
       !decisionEvidencePanel.includes('label="After time"'),
   },
   {
-    label: "plan uses internal smart detour scoring without user decision controls",
+    label: "plan sends active vehicle and decision rule inputs without user decision controls",
     ok:
       routeScoring.includes("ASSUMED_ROUTE_FILL_LITRES = 40") &&
+      routeScoring.includes("function calculateRouteFillLitres({ tankLitres, tankPercent } = {})") &&
+      routeScoring.includes("tankSize * (1 - Math.min(100, Math.max(0, currentPercent)) / 100)") &&
       routeScoring.includes("SMART_MAX_DETOUR_MINUTES = 30") &&
       routeScoring.includes("smartDetourLimitMinutesForSaving") &&
       routeScoring.includes("savingsDetourLabel") &&
       routeScoring.includes("Small savings detour") &&
       routeScoring.includes("Strong savings detour") &&
-      !fuelPathApi.includes("minSavingDollars,") &&
-      !fuelPathApi.includes("maxDetourMinutes,") &&
-      !planScreen.includes("preferences.minSavingDollars") &&
-      !planScreen.includes("preferences.maxDetourMinutes") &&
+      fuelPathApi.includes("type RouteScoringPreferences = Pick<") &&
+      fuelPathApi.includes("const defaultRouteScoringTankPercent = 45;") &&
+      fuelPathApi.includes("const defaultRouteScoringReserveKm = 35;") &&
+      fuelPathApi.includes("function routeScoringInputs(") &&
+      fuelPathApi.includes("preferences: RouteScoringPreferences") &&
+      fuelPathApi.includes("tankLitres: overrides?.fuelTankLitres || vehicle.fuelTankLitres || preferences.fuelTankLitres || 55") &&
+      fuelPathApi.includes("tankPercent: defaultRouteScoringTankPercent") &&
+      fuelPathApi.includes("reserveKm: defaultRouteScoringReserveKm") &&
+      fuelPathApi.includes("minSavingDollars: preferences.minSavingDollars") &&
+      fuelPathApi.includes("maxDetourMinutes: preferences.maxDetourMinutes") &&
+      planScreen.includes("preferences.activeVehicleId") &&
+      planScreen.includes("preferences.fuelTankLitres") &&
+      planScreen.includes("preferences.minSavingDollars") &&
+      planScreen.includes("preferences.maxDetourMinutes") &&
+      fuelPathApi.includes('if (vehicle.vehicleEnergyType === "diesel") return 7.4;') &&
+      nativeApiContracts.includes("await planFuelRoute({") &&
+      nativeApiContracts.includes('assert.equal(call.url, "https://fuel-path.test/api/score");') &&
+      nativeApiContracts.includes("assert.equal(body.tankLitres, 72);") &&
+      nativeApiContracts.includes("assert.equal(body.tankPercent, 45);") &&
+      nativeApiContracts.includes("assert.equal(body.economy, 7.4);") &&
+      nativeApiContracts.includes("assert.equal(body.reserveKm, 35);") &&
+      nativeApiContracts.includes("assert.equal(body.minSavingDollars, 5);") &&
+      nativeApiContracts.includes("assert.equal(body.maxDetourMinutes, 8);") &&
+      nativeApiContracts.includes("assert.deepEqual(body.eligibleDiscounts") &&
+      nativeApiContracts.includes("assert.equal(body.brandFilter, true);") &&
+      nativeApiContracts.includes('assert.equal("route" in body, false);') &&
+      nativeApiContracts.includes("await checkSavedRouteAlertContract();") &&
+      nativeApiContracts.includes("const { syncSavedRouteAlert } = loadTsModule(backendAlertsSourcePath") &&
+      nativeApiContracts.includes("assert.equal(result.remoteDeliveryEnabled, false);") &&
+      nativeApiContracts.includes('assert.equal(alertFetchCalls[1].url, "https://fuel-path.test/api/saved-routes");') &&
+      nativeApiContracts.includes("assert.equal(body.vehicleId, \"vehicle-diesel\");") &&
+      nativeApiContracts.includes("assert.equal(body.vehicleEnergyType, \"diesel\");") &&
+      nativeApiContracts.includes("assert.equal(body.fuel, \"PDL\");") &&
+      nativeApiContracts.includes("assert.equal(body.tankPercent, 40);") &&
+      packageJson.includes('"test:native-api-contracts": "node scripts/check-native-api-contracts.mjs"') &&
+      packageJson.includes("npm run test:native-api-contracts && npm run test:map-camera") &&
+      planScreen.includes("preferences,\n        stationBrands: preferredStationBrands") &&
+      routeRecommendationRules.includes("Native live Plan requests must send the active vehicle tank size") &&
       !accountScreen.includes("DecisionRuleCard"),
   },
   {
@@ -627,7 +874,14 @@ const checks = [
       types.includes("vehicles: VehicleProfile[];") &&
       preferencesStore.includes("const vehicles = normaliseVehicleProfiles(preferences.vehicles, legacyVehicle);") &&
       preferencesStore.includes("fuelPolicyEnabled: false") &&
-      preferencesStore.includes("activeVehicleId: activeVehicle.id") &&
+      preferencesStore.includes('activeVehicleId: activeVehicle ? activeVehicle.id : ""') &&
+      appShell.includes('const [vehicleSwitcherOpen, setVehicleSwitcherOpen] = useState(false);') &&
+      appShell.includes('const vehicleTitle = activeVehicle') &&
+      appShell.includes('"Fuel only"') &&
+      appShell.includes("const handleSelectHeaderVehicle = (vehicleId: string)") &&
+      appShell.includes("updateFuel(preferences.fuel);") &&
+      appShell.includes("updateVehicleFuel") &&
+      routeRecommendationRules.includes("Manual fuel changes in Nearby or Plan clear the active vehicle context") &&
       vehicleFuelCard.includes("const maxVehicleProfiles = 5;") &&
       vehicleFuelCard.includes("preferences.vehicles.map") &&
       vehicleFuelCard.includes("onSelectVehicle(vehicle.id)") &&
@@ -736,21 +990,64 @@ const checks = [
       !backendAlerts.includes("email"),
   },
   {
+    label: "backend alert sync maps non-JSON responses to safe route-watch states",
+    ok:
+      backendAlerts.includes("const payload = await readAlertJson(response);") &&
+      backendAlerts.includes("async function readAlertJson(response: Response)") &&
+      backendAlerts.includes("const text = await response.text();") &&
+      backendAlerts.includes("JSON.parse(text)") &&
+      backendAlerts.includes("function normaliseAlertCapability(payload: unknown)") &&
+      backendAlerts.includes("expiresAtMs - ALERT_CAPABILITY_REFRESH_BUFFER_MS <= Date.now()") &&
+      backendAlerts.includes("await AsyncStorage.removeItem(ALERT_CAPABILITY_KEY);") &&
+      backendAlerts.includes("const capability = normaliseAlertCapability(payload);") &&
+      backendAlerts.includes("Route watch could not update. Your saved route is still on this device, so you can try again.") &&
+      backendAlerts.includes("Smart route watch could not update. Reminder state was kept.") &&
+      backendAlerts.includes("Route watch delete failed. Saved route was kept so you can retry.") &&
+      backendAlerts.includes("routeWatchRemoteDeliveryEnabled(savedRoute)") &&
+      backendAlerts.includes("Smart route watch was saved, but push delivery is not enabled for this build yet.") &&
+      backendAlerts.includes("pushDeliveryEnabled") &&
+      nativeApiContracts.includes("expired-capability-token") &&
+      nativeApiContracts.includes("assert.equal(expired.storage.has(\"fuel-path:alert-capability:v1\"), false);") &&
+      routeNotifications.includes("Smart route notifications are ready for this build.") &&
+      !backendAlerts.includes("Expo push delivery is disabled by environment gate.") &&
+      !backendAlerts.includes("response.json()"),
+  },
+  {
     label: "address lookup autocomplete errors stay out of the UI",
     ok:
       !fuelPathApi.includes("Address lookup is busy right now") &&
       fuelPathApi.includes("locationLookupErrorMessage") &&
-      fuelPathApi.includes("We couldn't check that address right now. Add suburb or postcode, or try again shortly.") &&
-      fuelPathApi.includes("We couldn't find that address. Try a fuller address, suburb or postcode.") &&
+      fuelPathApi.includes("addressLookupErrorMessage") &&
+      userVisibleErrors.includes("We could not check that address right now. Add suburb or postcode, or try again shortly.") &&
       routeAddressSuggestionHook.includes('setSuggestionsError("");') &&
       planScreen.includes("clearAddressSuggestionError();") &&
       nearbyScreen.includes('setLocationError("");'),
+  },
+  {
+    label: "mobile API client maps non-JSON responses to safe surface copy",
+    ok:
+      fuelPathApi.includes("const payload = await readJsonResponse(response);") &&
+      fuelPathApi.includes("async function readJsonResponse(response: Response)") &&
+      fuelPathApi.includes("const text = await response.text();") &&
+      fuelPathApi.includes("JSON.parse(text)") &&
+      fuelPathApi.includes("if (!payload)") &&
+      fuelPathApi.includes("apiErrorMessage(path, response.status || 502, null)") &&
+      !fuelPathApi.includes("const payload = await response.json();") &&
+      userVisibleErrors.includes("Route planning hit a temporary problem.") &&
+      userVisibleErrors.includes("Fuel Path could not refresh nearby prices.") &&
+      userVisibleErrors.includes("We could not check that address right now."),
   },
   {
     label: "partial street address lookup gives quiet locality guidance",
     ok:
       planScreen.includes("PlanRouteEditorCard") &&
       planRouteEditorCard.includes("AddressSuggestions") &&
+      !planRouteEditorCard.includes("NearbyEnergySelector") &&
+      planScreen.includes("NearbyEnergySelector") &&
+      planScreen.includes('eyebrow=""') &&
+      planScreen.includes("const handleAddressFieldBlur = (field: \"from\" | \"to\")") &&
+      planScreen.includes("fromSelectionSuppressRef.current") &&
+      planScreen.includes("toSelectionSuppressRef.current") &&
       routeAddressSuggestions.includes("addressLocalityHint") &&
       routeInputPrecision.includes("Add suburb or postcode to narrow the address.") &&
       routeInputPrecision.includes("Street found. Add suburb or postcode to choose the right area.") &&
@@ -768,8 +1065,6 @@ const checks = [
       routeInputPrecision.includes("Choose a destination suggestion, or add suburb or postcode before planning.") &&
       routeInputPrecision.includes("Choose a start suggestion to confirm this address.") &&
       routeInputPrecision.includes("Choose a destination suggestion to confirm this address.") &&
-      planScreen.includes('routeInputPrecisionHint("start", fromLabel)') &&
-      planScreen.includes('routeInputPrecisionHint("destination", toLabel)') &&
       planScreen.includes('routeInputPrecisionHint("start", from)') &&
       planScreen.includes('routeInputPrecisionHint("destination", to)') &&
       planScreen.includes("!routePrecisionHint") &&
@@ -811,7 +1106,7 @@ const checks = [
       locationEvidence.includes("Exact address") &&
       locationEvidence.includes("Near address match") &&
       locationEvidence.includes("Suburb/area") &&
-      locationEvidence.includes("External lookup") &&
+      locationEvidence.includes("Location lookup") &&
       locationEvidence.includes("Lookup limited") &&
       locationEvidence.includes("Needs confirmation") &&
       locationEvidence.includes("Street/road") &&
@@ -874,7 +1169,15 @@ const checks = [
       accountDetailScreen.includes("DiscountWalletCard") &&
       discountWalletCard.includes("onToggleDiscountRedemption") &&
       discountWalletCard.includes("onToggleDiscountRedemption: _onToggleDiscountRedemption") &&
-      discountWalletCard.includes("activeDirectDiscountPrograms"),
+      discountWalletCard.includes("activeDirectDiscountPrograms") &&
+      discountWalletCard.includes("<DiscountProgramBadge program={program} size={28} />") &&
+      discountProgramBadge.includes("renderToHardwareTextureAndroid") &&
+      discountProgramBadge.includes('contentFit="contain"') &&
+      discountProgramAssets.includes("discountProgramStyleFor") &&
+      discountProgramAssets.includes('"../../assets/discount-icons/everyday-rewards.png"') &&
+      discountProgramAssets.includes('"../../assets/discount-icons/flybuys.png"') &&
+      discountProgramAssets.includes('"../../assets/discount-icons/nrma.png"') &&
+      discountProgramAssets.includes('"../../assets/discount-icons/nab.png"'),
   },
   {
     label: "wallet separates pump confirmed and possible lower prices",
@@ -899,10 +1202,13 @@ const checks = [
     ok:
       discountPrograms.includes("discountRegistry.generated.json") &&
       discountPrograms.includes('program.discountType !== "direct_cpl"') &&
+      discountPrograms.includes("program.nextReviewAt < todayIsoDate()") &&
       discountRegistry.includes('"id": "everyday_rewards"') &&
       discountRegistry.includes('"id": "flybuys"') &&
+      !discountRegistry.includes('"id": "reddy_express_instore"') &&
       discountRegistry.includes('"id": "nrma_ampol"') &&
       discountRegistry.includes('"id": "rac_wa_caltex"') &&
+      discountRegistry.includes('"expiryDate": "2026-06-30"') &&
       discountRegistry.includes('"id": "linkt_7eleven"') &&
       !discountRegistry.includes('"id": "fleet_card"') &&
       !discountPrograms.toLowerCase().includes("oauth") &&
@@ -920,6 +1226,8 @@ const checks = [
       routeNotifications.includes("Smart route notifications need a development or preview build, not Expo Go.") &&
       routeNotifications.includes("Route alert permission is enabled on this validation build.") &&
       routeNotifications.includes("Smart route notifications are ready for this build.") &&
+      routeNotifications.includes("Could not check notification permission on this build. You can still save commutes.") &&
+      routeNotifications.includes("Could not request notification permission on this build. You can still save commutes.") &&
       savedRouteAlertsCard.includes('? "Permission enabled"') &&
       !savedRouteAlertsCard.includes('? "Alerts enabled"') &&
       !routeNotifications.includes("Push token ready.") &&
@@ -943,6 +1251,31 @@ const checks = [
       !planScreen.includes('"Alerts on"') &&
       !savedCommuteShortcuts.includes('"Alerts on"') &&
       savedRouteAlertsCard.includes('? "Watching"') &&
+      backendAlerts.includes("remoteDeliveryEnabled?: boolean;") &&
+      backendAlerts.includes("routeWatchRemoteDeliveryEnabled") &&
+      backendAlerts.includes("Smart route watch was saved, but push delivery is not enabled for this build yet.") &&
+      backendAlerts.indexOf("routeWatchRemoteDeliveryEnabled(savedRoute)") <
+        backendAlerts.indexOf("Smart route watch updated.") &&
+      routeAlertsHook.includes("function smartRouteDeliveryReady") &&
+      routeAlertsHook.includes('result.status === "synced" && result.remoteDeliveryEnabled !== false') &&
+      routeAlertsHook.includes("const backendSynced = smartRouteDeliveryReady(backendSync);") &&
+      !routeAlertsHook.includes('backendSync.status === "synced";') &&
+      routeNotifications.includes("Smart route notifications are ready for this build.") &&
+      routeNotifications.includes("Could not get this device push token.") &&
+      routeNotifications.includes("Enable notifications before smart route alerts can run.") &&
+      routeNotifications.includes("Smart route notifications need an EAS project id in the native build.") &&
+      routeNotifications.includes("Smart route notifications need a development or preview build, not Expo Go.") &&
+      routeNotifications.includes("getExpoRoutePushToken") &&
+      routeNotifications.includes("expoProjectId()") &&
+      routeNotifications.includes("remotePushUnavailableInExpoGo()") &&
+      routeNotifications.indexOf("await ensureRouteAlertChannel(Notifications);") <
+        routeNotifications.indexOf("Notifications.setNotificationHandler") &&
+      routeNotifications.indexOf("const token = await Notifications.getExpoPushTokenAsync({ projectId });") <
+        routeNotifications.indexOf("Smart route notifications are ready for this build.") &&
+      routeNotifications.includes("androidNotificationsUnavailableInExpoGo()") &&
+      routeNotifications.includes("ensureRouteAlertChannel") &&
+      routeNotifications.includes("ROUTE_ALERT_CHANNEL_ID") &&
+      routeNotifications.includes("Notifications.AndroidImportance.DEFAULT") &&
       decisionEvidence.includes("Fuel Path checks watched routes for useful savings") &&
       !decisionEvidence.includes("delivery still needs native push"),
   },
@@ -950,6 +1283,9 @@ const checks = [
     label: "Android map smoke captures native render and frame evidence",
     ok:
       packageJson.includes('"native:android-map-smoke": "node scripts/native-android-map-smoke.mjs"') &&
+      androidMapSmoke.includes("const scriptDir = dirname(fileURLToPath(import.meta.url));") &&
+      androidMapSmoke.includes('const appRoot = resolve(scriptDir, "..");') &&
+      androidMapSmoke.includes('const repoRoot = resolve(appRoot, "..");') &&
       androidMapSmoke.includes("Fuel_Path_Arm64_API_35") &&
       androidMapSmoke.includes("dumpsys\", \"gfxinfo\", \"host.exp.exponent\"") &&
       androidMapSmoke.includes("screencap") &&
@@ -962,6 +1298,10 @@ const checks = [
     ok:
       packageJson.includes('"native:android-preview-smoke": "node scripts/native-android-preview-smoke.mjs"') &&
       packageJson.includes('"native:android-performance-smoke": "node scripts/native-android-preview-smoke.mjs --require-physical --map-settle-ms 10000"') &&
+      androidPreviewSmoke.includes("const scriptDir = dirname(fileURLToPath(import.meta.url));") &&
+      androidPreviewSmoke.includes('const mobileRoot = resolve(scriptDir, "..");') &&
+      androidPreviewSmoke.includes('const repoRoot = resolve(mobileRoot, "..");') &&
+      androidPreviewSmoke.includes("function resolveInputPath(value)") &&
       androidPreviewSmoke.includes("com.fuelpath.app/.MainActivity") &&
       androidPreviewSmoke.includes("Physical Android device required for performance validation") &&
       androidPreviewSmoke.includes('"verify", "--print-certs"') &&
@@ -969,13 +1309,51 @@ const checks = [
       androidPreviewSmoke.includes("blankMapLikely") &&
       androidPreviewSmoke.includes("Google map tiles appear blank") &&
       androidPreviewSmoke.includes("Application credential header not valid") &&
+      androidPreviewSmoke.includes("renderSurfacePresent") &&
+      androidPreviewSmoke.includes("viewRootCount") &&
+      androidPreviewSmoke.includes("graphicsBufferCount") &&
+      androidPreviewSmoke.includes("graphicsBufferEstimateKb") &&
+      androidPreviewSmoke.includes("profileDataRows") &&
+      androidPreviewSmoke.includes("Frame timing is unavailable from gfxinfo") &&
+      androidPreviewSmoke.includes("Treat this as render evidence only") &&
+      androidPreviewSmoke.includes("Render surface present") &&
+      androidPreviewSmoke.includes('await tapLabel("Plan", "plan tab"') &&
+      androidPreviewSmoke.includes('await tapLabel("Nearby", "nearby tab"') &&
+      androidPreviewSmoke.includes('await tapLabel("Settings", "settings tab"') &&
+      androidPreviewSmoke.includes("function tapLabel(text, label, fallback)") &&
+      androidPreviewSmoke.includes("findNodeBoundsByText(readUiDump(), text)") &&
+      androidPreviewSmoke.includes("function findNodeBoundsByText(xml, text)") &&
+      androidPreviewSmoke.includes("function isMapCredentialWarningLine(line)") &&
+      androidPreviewSmoke.includes("PhFlagUpdateRegistry|Phenotype") &&
+      androidPreviewSmoke.includes("foreground recovery before ${name}") &&
+      androidPreviewSmoke.includes("function isPreviewAppVisible()") &&
       androidPreviewSmoke.includes("readDeviceDiagnostics") &&
       androidPreviewSmoke.includes("Android Preview APK Smoke"),
+  },
+  {
+    label: "Android local standalone build creates a no-Metro validation APK",
+    ok:
+      packageJson.includes('"native:android-local-standalone": "node scripts/build-android-local-standalone.mjs"') &&
+      androidLocalStandaloneBuild.includes('execFileSync("./gradlew", gradleArgs') &&
+      androidLocalStandaloneBuild.includes("FUEL_PATH_ANDROID_GOOGLE_MAPS_API_KEY is required") &&
+      androidLocalStandaloneBuild.includes("env.ANDROID_HOME") &&
+      androidLocalStandaloneBuild.includes("env.ANDROID_SDK_ROOT") &&
+      androidLocalStandaloneBuild.includes("https://fuel-path.vercel.app") &&
+      androidLocalStandaloneBuild.includes("const architecture = args.has(\"--all-architectures\") ? \"\" : \"arm64-v8a\";") &&
+      androidLocalStandaloneBuild.includes("const gradleArgs = [") &&
+      androidLocalStandaloneBuild.includes("`-PreactNativeArchitectures=${architecture}`") &&
+      androidLocalStandaloneBuild.includes("fuel-path-local-standalone-") &&
+      androidLocalStandaloneBuild.includes("app/build/outputs/apk/release/app-release.apk") &&
+      androidLocalStandaloneBuild.includes("Signing: local debug signing config for validation only"),
   },
   {
     label: "Android physical performance summary rejects emulator-only evidence",
     ok:
       packageJson.includes('"native:android-performance-summary": "node scripts/native-android-performance-summary.mjs"') &&
+      androidPerformanceSummary.includes("const scriptDir = dirname(fileURLToPath(import.meta.url));") &&
+      androidPerformanceSummary.includes('const mobileRoot = resolve(scriptDir, "..");') &&
+      androidPerformanceSummary.includes('const repoRoot = resolve(mobileRoot, "..");') &&
+      androidPerformanceSummary.includes("function resolveInputPath(value)") &&
       androidPerformanceSummary.includes('report.device.type !== "physical"') &&
       androidPerformanceSummary.includes("Source report is missing physical-device metadata") &&
       androidPerformanceSummary.includes("Source report is not from a physical Android device") &&
@@ -984,21 +1362,170 @@ const checks = [
       androidPerformanceSummary.includes("Android Physical Performance Summary"),
   },
   {
+    label: "Android performance coverage separates Pixel beta evidence from broad claims",
+    ok:
+      packageJson.includes('"native:android-performance-coverage": "node scripts/native-android-performance-coverage.mjs"') &&
+      androidPerformanceCoverage.includes("controlled_beta_only") &&
+      androidPerformanceCoverage.includes("broad_candidate") &&
+      androidPerformanceCoverage.includes("statSync(path).mtimeMs") &&
+      androidPerformanceCoverage.includes("--require-broad") &&
+      androidPerformanceCoverage.includes("Pixel 9 Pro or equivalent evidence is valid for controlled beta performance only.") &&
+      androidPerformanceCoverage.includes("Broad Android performance claims need at least one current passing physical run from a lower or mid-range Android class.") &&
+      nativeEvidenceAudit.includes("Android performance coverage") &&
+      nativeEvidenceAudit.includes("latestAndroidPerformanceCoverage"),
+  },
+  {
+    label: "Android notification readiness audits packaged permissions without writing routes",
+    ok:
+      packageJson.includes('"native:android-notification-readiness": "node scripts/native-android-notification-readiness.mjs"') &&
+      androidNotificationReadiness.includes("android.permission.POST_NOTIFICATIONS") &&
+      androidNotificationReadiness.includes("com.google.android.c2dm.permission.RECEIVE") &&
+      androidNotificationReadiness.includes("android.permission.RECEIVE_BOOT_COMPLETED") &&
+      androidNotificationReadiness.includes("EAS project id packaged for Expo push token") &&
+      androidNotificationReadiness.includes("Notification channel id configured in app config") &&
+      androidNotificationReadiness.includes("client-capability") &&
+      androidNotificationReadiness.includes("scoped token omitted from report") &&
+      androidNotificationReadiness.includes("dumpsys\", \"package\"") &&
+      androidNotificationReadiness.includes("android.permission.POST_NOTIFICATIONS") &&
+      androidNotificationReadiness.includes("dumpsys\", \"notification\", \"--noredact\"") &&
+      androidNotificationReadiness.includes("NotificationChannel{mId='route-alerts'") &&
+      androidNotificationReadiness.includes("mName=Saved route alerts") &&
+      androidNotificationReadiness.includes("Installed app has Android route-alerts notification channel") &&
+      androidNotificationReadiness.includes("Launch the installed app once so the channel can be created.") &&
+      androidNotificationReadiness.includes("this also verifies the Android `route-alerts` notification channel exists on-device") &&
+      androidNotificationReadiness.includes("It does not register a real Expo push token or prove a delivered push notification.") &&
+      androidNotificationReadiness.includes("Backend saved-route sync is covered separately by `npm run native:android-alert-sync-smoke`.") &&
+      androidNotificationReadiness.includes("Runtime permission and real Expo push-token creation still need an on-device flow after permission is granted."),
+  },
+  {
+    label: "Android alert sync smoke proves scoped backend route-watch contract and cleanup",
+    ok:
+      packageJson.includes('"native:android-alert-sync-smoke": "node scripts/native-android-alert-sync-smoke.mjs"') &&
+      androidAlertSyncSmoke.includes("/api/alerts?action=client-capability") &&
+      androidAlertSyncSmoke.includes("/api/push/register") &&
+      androidAlertSyncSmoke.includes("/api/saved-routes") &&
+      androidAlertSyncSmoke.includes("fakeExpoPushToken") &&
+      androidAlertSyncSmoke.includes("Temporary saved route watch cleanup succeeds") &&
+      androidAlertSyncSmoke.includes("Temporary saved route watch is absent after cleanup") &&
+      androidAlertSyncSmoke.includes("Scoped capability and push token values are intentionally omitted from this report."),
+  },
+  {
+    label: "Android alert delivery gate distinguishes backend sync from real push delivery",
+    ok:
+      packageJson.includes('"native:android-alert-delivery-gate": "node scripts/native-android-alert-delivery-gate.mjs"') &&
+      androidAlertDeliveryGate.includes("/api/alerts") &&
+      androidAlertDeliveryGate.includes("pushDeliveryEnabled") &&
+      androidAlertDeliveryGate.includes("blocked_by_environment") &&
+      androidAlertDeliveryGate.includes("--require-enabled") &&
+      androidAlertDeliveryGate.includes("It does not create a device Expo push token, send a notification, or inspect a physical notification tray.") &&
+      nativeEvidenceAudit.includes("Android alert delivery gate") &&
+      nativeEvidenceAudit.includes("latestAndroidAlertDeliveryGate") &&
+      nativeEvidenceAudit.includes("real delivered push-notification evidence"),
+  },
+  {
+    label: "Android navigation intents keep device maps native-first",
+    ok:
+      packageJson.includes('"native:android-navigation-intents": "node scripts/native-android-navigation-intents.mjs"') &&
+      androidNavigationIntents.includes("androidDeviceMapsIntent(geoUrl)") &&
+      androidNavigationIntents.includes("androidGoogleMapsIntent(googleMapsUrl)") &&
+      androidNavigationIntents.includes("androidGoogleNavigationUrl(safeLat, safeLon)") &&
+      androidNavigationIntents.includes("ANDROID_WAZE_PACKAGE") &&
+      androidNavigationIntents.includes("Apple Maps preference remains available on Android as web handoff") &&
+      androidNavigationIntents.includes("browser URL only when a native intent fails") &&
+      nativeEvidenceAudit.includes("Android navigation intents") &&
+      nativeEvidenceAudit.includes("latestAndroidNavigationIntents"),
+  },
+  {
     label: "native single-point map camera uses a bounded region instead of fit-to-one-point",
     ok:
       nativeMap.includes("cameraCoordinates.length === 1") &&
-      nativeMap.includes("animateToRegion(regionForPoint(cameraCoordinates[0]), 260)") &&
+      nativeMap.includes("regionForPoint(cameraCoordinates[0])") &&
       nativeMap.indexOf("cameraCoordinates.length === 1") < nativeMap.indexOf("fitToCoordinates"),
   },
   {
     label: "Android Maps key fix packet preserves exact package and fingerprint handoff",
     ok:
       packageJson.includes('"native:android-maps-key-fix": "node scripts/android-maps-key-fix-packet.mjs"') &&
+      androidMapsKeyFix.includes("const scriptDir = dirname(fileURLToPath(import.meta.url));") &&
+      androidMapsKeyFix.includes('const mobileRoot = resolve(scriptDir, "..");') &&
+      androidMapsKeyFix.includes('const repoRoot = resolve(mobileRoot, "..");') &&
+      androidMapsKeyFix.includes("function resolveInputPath(value)") &&
       androidMapsKeyFix.includes("Maps SDK for Android") &&
       androidMapsKeyFix.includes("sha1Fingerprint") &&
+      androidMapsKeyFix.includes('"android", "app", "build", "outputs", "apk", "debug", "app-debug.apk"') &&
+      androidMapsKeyFix.includes("androidStudioJavaHome") &&
       androidMapsKeyFix.includes("same embedded key") &&
       androidMapsKeyFix.includes("GoogleCertificatesRslt") &&
       androidMapsKeyFix.includes("developers.google.com/maps/documentation/android-sdk/get-api-key"),
+  },
+  {
+    label: "Android Gradle wrapper avoids current React Native Gradle 9 toolchain break",
+    ok:
+      gradleWrapper.includes("gradle-8.14.3-bin.zip") &&
+      nativeValidationPreflight.includes("Android Gradle wrapper stays on Expo-compatible Gradle 8") &&
+      nativeValidationPreflight.includes("Gradle 9 currently breaks the React Native toolchain resolver") &&
+      nativeValidationPreflight.includes("androidGradleWrapperIsCompatible"),
+  },
+  {
+    label: "native map/geocode parity checker keeps screenshot and XML evidence paired",
+    ok:
+      nativeMapGeocodeParity.includes("siblingScreenshotForXml(xmlPath)") &&
+      nativeMapGeocodeParity.includes("evidenceStem(screenshotPath) !== evidenceStem(xmlPath)") &&
+      nativeMapGeocodeParity.includes("screenshot/XML evidence must come from the same packet stem") &&
+      !nativeMapGeocodeParity.includes("/ev-route|route|plan|pixel/i"),
+  },
+  {
+    label: "native evidence audit is cwd-independent and honest about missing artefacts",
+    ok:
+      packageJson.includes('"native:evidence-audit": "node scripts/native-current-evidence-audit.mjs"') &&
+      nativeEvidenceAudit.includes("const scriptDir = path.dirname(fileURLToPath(import.meta.url));") &&
+      nativeEvidenceAudit.includes('const mobileRoot = path.resolve(scriptDir, "..");') &&
+      nativeEvidenceAudit.includes('const repoRoot = path.resolve(mobileRoot, "..");') &&
+      nativeEvidenceAudit.includes("const artifactsDirs = [") &&
+      nativeEvidenceAudit.includes('const localDebugApk = path.resolve(mobileRoot, "android/app/build/outputs/apk/debug/app-debug.apk");') &&
+      nativeEvidenceAudit.includes("const latestAndroidDebugApks = existsSync(localDebugApk) ? [localDebugApk] : [];") &&
+      nativeEvidenceAudit.includes("Android preview APK") &&
+      nativeEvidenceAudit.includes("Android local standalone APK") &&
+      nativeEvidenceAudit.includes("Android notification readiness") &&
+      nativeEvidenceAudit.includes("Android route-watch backend sync smoke") &&
+      nativeEvidenceAudit.includes("latestAndroidNotificationReadiness") &&
+      nativeEvidenceAudit.includes("latestAndroidAlertSync") &&
+      nativeEvidenceAudit.includes("fuel-path-local-standalone") &&
+      nativeEvidenceAudit.includes("Android debug APK") &&
+      nativeEvidenceAudit.includes('path.resolve(repoRoot, "native-artifacts")') &&
+      nativeEvidenceAudit.includes('path.resolve(mobileRoot, "native-artifacts")') &&
+      nativeEvidenceAudit.includes("A local Android debug APK is discoverable and hashable") &&
+      nativeEvidenceAudit.includes("No local native APK or iOS simulator tarball artefact is currently discoverable") &&
+      nativeEvidenceAudit.includes("Android notification readiness and route-watch backend sync evidence are separate from real delivered push-notification evidence."),
+  },
+  {
+    label: "Android cold-start and route-notification stress evidence are cwd-independent",
+    ok:
+      packageJson.includes('"native:android-cold-start-smoke": "node scripts/native-android-cold-start-smoke.mjs"') &&
+      packageJson.includes('"stress:route-notification-schedule": "node scripts/stress-route-notification-schedule.mjs"') &&
+      androidColdStartSmoke.includes("const scriptDir = path.dirname(fileURLToPath(import.meta.url));") &&
+      androidColdStartSmoke.includes('const mobileRoot = path.resolve(scriptDir, "..");') &&
+      androidColdStartSmoke.includes('const repoRoot = path.resolve(mobileRoot, "..");') &&
+      androidColdStartSmoke.includes("function resolveInputPath(value)") &&
+      androidColdStartSmoke.includes("const allowDebugArtifact = args.has(\"--allow-debug-artifact\")") &&
+      androidColdStartSmoke.includes("FUEL_PATH_ALLOW_DEBUG_COLD_START") &&
+      androidColdStartSmoke.includes("Preview or release APK artifact required") &&
+      androidColdStartSmoke.includes("Unable to load script") &&
+      androidColdStartSmoke.includes("packager does not seem to be running") &&
+      androidColdStartSmoke.includes("captureForegroundResume(timestamp, settleMs)") &&
+      androidColdStartSmoke.includes('adbCommand(["shell", "input", "keyevent", "3"])') &&
+      androidColdStartSmoke.includes("Foreground resume: ${resumeResult.status}") &&
+      androidColdStartSmoke.includes("android-cold-start-smoke-${stamp}-foreground-resume.png") &&
+      androidColdStartSmoke.includes("not a deep process-death restore test") &&
+      androidColdStartSmoke.includes('Status: ${failureLines.length ? "failed"') &&
+      androidColdStartSmoke.includes("function isMapCredentialWarningLine(line)") &&
+      androidColdStartSmoke.includes("## Map warning lines") &&
+      androidColdStartSmoke.includes('path.resolve(repoRoot, "native-artifacts")') &&
+      androidColdStartSmoke.includes('path.resolve(mobileRoot, "native-artifacts")') &&
+      androidColdStartSmoke.includes('const localDebugApk = path.resolve(mobileRoot, "android/app/build/outputs/apk/debug/app-debug.apk");') &&
+      routeNotificationScheduleStress.includes("const scriptDir = path.dirname(fileURLToPath(import.meta.url));") &&
+      routeNotificationScheduleStress.includes('const mobileRoot = path.resolve(scriptDir, "..");') &&
+      routeNotificationScheduleStress.includes('const repoRoot = path.resolve(mobileRoot, "..");'),
   },
 ];
 
@@ -1018,4 +1545,24 @@ function read(relativePath) {
 
 function countOccurrences(value, pattern) {
   return value.split(pattern).length - 1;
+}
+
+function readPngDimensions(relativePath) {
+  const buffer = fs.readFileSync(path.join(root, relativePath));
+  const pngSignature = "89504e470d0a1a0a";
+  if (buffer.subarray(0, 8).toString("hex") !== pngSignature) {
+    throw new Error(`${relativePath} is not a PNG file.`);
+  }
+  return {
+    width: buffer.readUInt32BE(16),
+    height: buffer.readUInt32BE(20),
+  };
+}
+
+function readScreenSource(defaultPath, viewModelPath) {
+  const viewModelSource = path.join(root, viewModelPath);
+  if (fs.existsSync(viewModelSource)) {
+    return fs.readFileSync(viewModelSource, "utf8");
+  }
+  return read(defaultPath);
 }

@@ -22,6 +22,7 @@ test("VIC normalisation maps reference fuel labels to canonical app fuel codes",
             { fuelType: "ULP", price: 204.5, updatedAt: "2026-06-25T08:22:00Z", isAvailable: true },
             { fuelType: "P95REF", price: 218.9, updatedAt: "2026-06-25T08:23:00Z", isAvailable: true },
             { fuelType: "DIE", price: 188.4, updatedAt: "2026-06-25T08:24:00Z", isAvailable: true },
+            { fuelType: "GAS", price: 107.9, updatedAt: "2026-06-25T08:25:00Z", isAvailable: true },
           ],
         },
       ],
@@ -32,6 +33,7 @@ test("VIC normalisation maps reference fuel labels to canonical app fuel codes",
         ["ULP", "Unleaded 91"],
         ["P95REF", "Premium Unleaded 95"],
         ["DIE", "DSL"],
+        ["GAS", "Liquefied Petroleum Gas"],
       ]),
     },
   );
@@ -44,7 +46,8 @@ test("VIC normalisation maps reference fuel labels to canonical app fuel codes",
   assert.equal(station.prices.U91, 204.5);
   assert.equal(station.prices.P95, 218.9);
   assert.equal(station.prices.DL, 188.4);
-  assert.equal(station.updatedAt, "2026-06-25T08:24:00.000Z");
+  assert.equal(station.prices.LPG, 107.9);
+  assert.equal(station.updatedAt, "2026-06-25T08:25:00.000Z");
 });
 
 test("VIC normalisation falls back to reference station metadata for thin price rows", () => {

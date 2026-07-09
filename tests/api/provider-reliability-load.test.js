@@ -152,7 +152,7 @@ test("mixed provider outage keeps healthy provider data and reports degraded sta
         assert.equal(data.degraded, true);
         assert.equal(data.providerHealth.nsw.status, "ok");
         assert.equal(data.providerHealth.qld.status, "unavailable");
-        assert.match(data.warning, /Some live fuel providers unavailable/);
+        assert.match(data.warning, /Some live price sources are temporarily unavailable/);
       } finally {
         mockFetch.restore();
       }

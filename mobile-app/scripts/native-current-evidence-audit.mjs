@@ -1,13 +1,23 @@
 #!/usr/bin/env node
 
 import { createHash } from "node:crypto";
-import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-const repoRoot = path.resolve(process.cwd(), "..");
-const artifactsDir = path.resolve(process.cwd(), "native-artifacts");
-const smokeDir = path.resolve(repoRoot, "tmp/native-smoke");
-const outDir = smokeDir;
+const scriptDir = path.dirname(fileURLToPath(import.meta.url));
+const mobileRoot = path.resolve(scriptDir, "..");
+const repoRoot = path.resolve(mobileRoot, "..");
+const artifactsDirs = [
+  path.resolve(repoRoot, "native-artifacts"),
+  path.resolve(mobileRoot, "native-artifacts"),
+];
+const localDebugApk = path.resolve(mobileRoot, "android/app/build/outputs/apk/debug/app-debug.apk");
+const smokeDirs = [
+  path.resolve(repoRoot, "tmp/native-smoke"),
+  path.resolve(mobileRoot, "tmp/native-smoke"),
+];
+const outDir = smokeDirs[0];
 const invalidEvidenceFiles = new Set([
   "ios-cold-start-smoke-2026-07-01T05-00-52.063Z.md",
   "ios-cold-start-smoke-2026-07-01T05-00-52.064Z.md",
@@ -27,6 +37,12 @@ function listFiles(dir, predicate) {
     .sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs);
 }
 
+function listFilesAcross(dirs, predicate) {
+  return dirs
+    .flatMap((dir) => listFiles(dir, predicate))
+    .sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs);
+}
+
 function sha256(file) {
   const hash = createHash("sha256");
   hash.update(readFileSync(file));
@@ -40,12 +56,42 @@ function fileRow(label, file) {
 }
 
 function latestReport(pattern) {
-  return listFiles(smokeDir, (file) => pattern.test(path.basename(file)))[0];
+  return listFilesAcross(smokeDirs, (file) => pattern.test(path.basename(file)))[0];
+}
+
+function latestReportAny(patterns) {
+  return listFilesAcross(smokeDirs, (file) => patterns.some((pattern) => pattern.test(path.basename(file))))[0];
+}
+
+function latestReportWhere(pattern, matcher) {
+  return listFilesAcross(smokeDirs, (file) => pattern.test(path.basename(file)))
+    .find((file) => {
+      try {
+        return matcher(readFileSync(file, "utf8"), file);
+      } catch {
+        return false;
+      }
+    });
 }
 
 function readReportSignals(file) {
   if (!file) return ["missing"];
   const text = readFileSync(file, "utf8");
+  if (path.extname(file).toLowerCase() === ".json") {
+    try {
+      const json = JSON.parse(text);
+      const signals = [];
+      if (json.status) signals.push(`Status: ${json.status}`);
+      if (Array.isArray(json.checks)) {
+        const passed = json.checks.filter((check) => check.status === "passed").length;
+        const failed = json.checks.filter((check) => check.status === "failed").length;
+        signals.push(`Checks: ${passed} passed, ${failed} failed`);
+      }
+      return signals.length ? signals.slice(0, 10) : ["JSON report present"];
+    } catch {
+      return ["JSON report present, but could not be parsed"];
+    }
+  }
   const signals = [];
   for (const line of text.split("\n")) {
     if (/^[-*]?\s*(Status|Result|Render status|Performance status|Frame summary|Map warning lines|Scenarios passed|Passed):/i.test(line.trim())) {
@@ -55,17 +101,47 @@ function readReportSignals(file) {
   return signals.slice(0, 10);
 }
 
-const latestAndroidApks = listFiles(artifactsDir, (file) => /fuel-path-preview-android.*\.apk$/.test(path.basename(file))).slice(0, 3);
-const latestIosTarballs = listFiles(artifactsDir, (file) => /fuel-path-ios-simulator.*\.tar\.gz$/.test(path.basename(file))).slice(0, 5);
-const latestAndroidPhone = latestReport(/^android-preview-smoke-.*\.md$/);
+mkdirSync(outDir, { recursive: true });
+
+const latestAndroidApks = listFilesAcross(artifactsDirs, (file) => /fuel-path-preview-android.*\.apk$/.test(path.basename(file))).slice(0, 3);
+const latestAndroidStandaloneApks = listFilesAcross(artifactsDirs, (file) => /fuel-path-local-standalone.*\.apk$/.test(path.basename(file))).slice(0, 3);
+const latestAndroidDebugApks = existsSync(localDebugApk) ? [localDebugApk] : [];
+const latestIosTarballs = listFilesAcross(artifactsDirs, (file) => /fuel-path-ios-simulator.*\.tar\.gz$/.test(path.basename(file))).slice(0, 5);
+const latestAndroidPhysicalPreview = latestReportWhere(/^android-preview-smoke-.*\.md$/, (text) => /Device:\s+physical\b/i.test(text));
+const latestAndroidPhysicalPerformancePass = latestReportWhere(/^android-preview-smoke-.*\.md$/, (text) =>
+  /Device:\s+physical\b/i.test(text) && /^Status:\s+passed\b/im.test(text)
+);
+const latestAndroidEmulatorPreview = latestReportWhere(/^android-preview-smoke-.*\.md$/, (text) => /Device:\s+emulator\b/i.test(text));
+const latestAndroidPhone = latestAndroidPhysicalPreview || latestReport(/^android-preview-smoke-.*\.md$/);
 const latestAndroidColdStart = latestReport(/^android-cold-start-smoke-.*\.md$/);
+const latestAndroidPerformanceCoverage = latestReport(/^android-performance-coverage-.*\.md$/);
+const latestAndroidNotificationReadiness = latestReport(/^android-notification-readiness-.*\.md$/);
+const latestAndroidAlertSync = latestReport(/^android-alert-sync-smoke-.*\.md$/);
+const latestAndroidAlertDeliveryGate = latestReport(/^android-alert-delivery-gate-.*\.md$/);
+const latestAndroidNavigationIntents = latestReport(/^android-navigation-intents-.*\.md$/);
+const latestRouteNotificationScheduleStress = latestReport(/^route-notification-schedule-stress-.*\.json$/);
+const latestAndroidEvRouteScreenshot = latestReportAny([
+  /^fuelpath-ev-route-pins-final-.*\.png$/,
+  /^fuelpath-ev-route-pins-framed-.*\.png$/,
+  /^android-pixel-ev-route-result-.*\.png$/,
+]);
+const latestAndroidEvRouteXml = latestReportAny([
+  /^fuelpath-ev-route-pins-final-.*\.xml$/,
+  /^fuelpath-ev-route-pins-framed-.*\.xml$/,
+  /^android-pixel-ev-route-result-.*\.xml$/,
+]);
 const latestIosValidation = latestReport(/^ios-validation-.*\.md$/);
-const latestIosColdStarts = listFiles(smokeDir, (file) =>
+const latestIosColdStarts = listFilesAcross(smokeDirs, (file) =>
   /^ios-cold-start-smoke-.*\.md$/.test(path.basename(file)) && !invalidEvidenceFiles.has(path.basename(file))
 ).slice(0, 5);
 
 const generatedAt = new Date().toISOString();
 const outFile = path.join(outDir, `native-current-evidence-audit-${generatedAt.replaceAll(":", "-")}.md`);
+const artefactInterpretation = latestAndroidApks.length || latestAndroidStandaloneApks.length || latestIosTarballs.length
+  ? "- Latest local standalone, preview or simulator native artefacts are discoverable and hashable."
+  : latestAndroidDebugApks.length
+    ? "- A local Android debug APK is discoverable and hashable, but no preview APK or iOS simulator tarball is present; release/build-artifact claims still need a fresh preview or simulator artefact."
+    : "- No local native APK or iOS simulator tarball artefact is currently discoverable; any build-artifact claim still needs a fresh artefact.";
 
 const lines = [
   `# Native current evidence audit - ${generatedAt}`,
@@ -76,22 +152,77 @@ const lines = [
   "",
   "| Item | Path | Size | SHA-256 |",
   "| --- | --- | ---: | --- |",
-  ...(latestAndroidApks.length ? latestAndroidApks.map((file, index) => fileRow(`Android APK ${index + 1}`, file)) : [fileRow("Android APK", null)]),
+  ...(latestAndroidApks.length ? latestAndroidApks.map((file, index) => fileRow(`Android preview APK ${index + 1}`, file)) : [fileRow("Android preview APK", null)]),
+  ...(latestAndroidStandaloneApks.length ? latestAndroidStandaloneApks.map((file, index) => fileRow(`Android local standalone APK ${index + 1}`, file)) : [fileRow("Android local standalone APK", null)]),
+  ...(latestAndroidDebugApks.length ? latestAndroidDebugApks.map((file) => fileRow("Android debug APK", file)) : [fileRow("Android debug APK", null)]),
   ...(latestIosTarballs.length ? latestIosTarballs.map((file, index) => fileRow(`iOS simulator tarball ${index + 1}`, file)) : [fileRow("iOS simulator tarball", null)]),
   "",
   "## Latest report signals",
   "",
-  "### Android preview smoke",
+  "### Android physical preview smoke",
   "",
   latestAndroidPhone ? `Report: \`${path.relative(repoRoot, latestAndroidPhone)}\`` : "Report: missing",
   "",
   ...readReportSignals(latestAndroidPhone).map((line) => `- ${line}`),
+  "",
+  "### Android physical performance-pass preview smoke",
+  "",
+  latestAndroidPhysicalPerformancePass ? `Report: \`${path.relative(repoRoot, latestAndroidPhysicalPerformancePass)}\`` : "Report: missing",
+  "",
+  ...readReportSignals(latestAndroidPhysicalPerformancePass).map((line) => `- ${line}`),
+  "",
+  "### Android emulator preview smoke",
+  "",
+  latestAndroidEmulatorPreview ? `Report: \`${path.relative(repoRoot, latestAndroidEmulatorPreview)}\`` : "Report: missing",
+  "",
+  ...readReportSignals(latestAndroidEmulatorPreview).map((line) => `- ${line}`),
   "",
   "### Android cold-start smoke",
   "",
   latestAndroidColdStart ? `Report: \`${path.relative(repoRoot, latestAndroidColdStart)}\`` : "Report: missing",
   "",
   ...readReportSignals(latestAndroidColdStart).map((line) => `- ${line}`),
+  "",
+  "### Android performance coverage",
+  "",
+  latestAndroidPerformanceCoverage ? `Report: \`${path.relative(repoRoot, latestAndroidPerformanceCoverage)}\`` : "Report: missing",
+  "",
+  ...readReportSignals(latestAndroidPerformanceCoverage).map((line) => `- ${line}`),
+  "",
+  "### Android notification readiness",
+  "",
+  latestAndroidNotificationReadiness ? `Report: \`${path.relative(repoRoot, latestAndroidNotificationReadiness)}\`` : "Report: missing",
+  "",
+  ...readReportSignals(latestAndroidNotificationReadiness).map((line) => `- ${line}`),
+  "",
+  "### Android route-watch backend sync smoke",
+  "",
+  latestAndroidAlertSync ? `Report: \`${path.relative(repoRoot, latestAndroidAlertSync)}\`` : "Report: missing",
+  "",
+  ...readReportSignals(latestAndroidAlertSync).map((line) => `- ${line}`),
+  "",
+  "### Android alert delivery gate",
+  "",
+  latestAndroidAlertDeliveryGate ? `Report: \`${path.relative(repoRoot, latestAndroidAlertDeliveryGate)}\`` : "Report: missing",
+  "",
+  ...readReportSignals(latestAndroidAlertDeliveryGate).map((line) => `- ${line}`),
+  "",
+  "### Android navigation intents",
+  "",
+  latestAndroidNavigationIntents ? `Report: \`${path.relative(repoRoot, latestAndroidNavigationIntents)}\`` : "Report: missing",
+  "",
+  ...readReportSignals(latestAndroidNavigationIntents).map((line) => `- ${line}`),
+  "",
+  "### Android route-notification schedule stress",
+  "",
+  latestRouteNotificationScheduleStress ? `Report: \`${path.relative(repoRoot, latestRouteNotificationScheduleStress)}\`` : "Report: missing",
+  "",
+  ...readReportSignals(latestRouteNotificationScheduleStress).map((line) => `- ${line}`),
+  "",
+  "### Android EV Plan route evidence",
+  "",
+  latestAndroidEvRouteScreenshot ? `Screenshot: \`${path.relative(repoRoot, latestAndroidEvRouteScreenshot)}\`` : "Screenshot: missing",
+  latestAndroidEvRouteXml ? `Accessibility dump: \`${path.relative(repoRoot, latestAndroidEvRouteXml)}\`` : "Accessibility dump: missing",
   "",
   "### iOS validation report",
   "",
@@ -115,8 +246,11 @@ const lines = [
   "",
   "## Brutal launch-readiness interpretation",
   "",
-  "- Latest local native artefacts are discoverable and hashable.",
-  "- This audit does not prove app-store readiness, notification permissions, Android physical-device performance or tablet UX quality.",
+  artefactInterpretation,
+  "- Source guards, typecheck and native parity scripts still need to be run for the current checkout before making code-quality claims; this report indexes evidence artefacts rather than executing every guard.",
+  "- Android notification readiness and route-watch backend sync evidence are separate from real delivered push-notification evidence.",
+  "- Android route schedule stress and EV route screenshots are now indexed when present, but they are still separate from lower-end Android performance and delivered push evidence.",
+  "- This audit does not prove app-store readiness, delivered notifications, Android tablet UX quality or lower-end Android performance.",
   "- If this report says a report is missing, the launch claim depending on that report is not evidence-ready.",
   "",
 ];

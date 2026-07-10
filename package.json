@@ -1,7 +1,8 @@
 {
   "private": true,
   "scripts": {
-    "test": "node --test --test-concurrency=1 tests/api/provider-routing.test.js tests/api/provider-terms-readiness.test.js tests/api/store-publishing-readiness.test.js tests/api/support-readiness.test.js tests/api/beta-readiness.test.js tests/api/route-quality-now.test.js tests/api/predictions.test.js tests/api/discount-registry.test.js",
+    "test": "node scripts/run-backend-tests.mjs",
+    "test:readiness": "node --test --test-concurrency=1 tests/api/provider-routing.test.js tests/api/provider-terms-readiness.test.js tests/api/store-publishing-readiness.test.js tests/api/support-readiness.test.js tests/api/beta-readiness.test.js tests/api/route-quality-now.test.js tests/api/predictions.test.js tests/api/discount-registry.test.js",
     "check:docs": "node scripts/check-docs.mjs",
     "test:docs": "node --test tests/api/docs-organisation.test.js tests/api/doc-context-budget.test.js",
     "measure:doc-context": "node scripts/measure-doc-context.mjs",

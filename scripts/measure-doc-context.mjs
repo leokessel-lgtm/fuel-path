@@ -1,9 +1,13 @@
 import { readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { resolve } from "node:path";
 
 const root = process.cwd();
 const configPath = resolve(root, process.argv[2] || "scripts/doc-context-profiles.json");
 const config = JSON.parse(readFileSync(configPath, "utf8"));
+const baseRef = process.env.FUEL_PATH_BASE_REF || "origin/main";
+const baseConfig = readBaseConfig(baseRef);
+const exceptions = readExceptions();
 const rows = Object.entries(config.profiles).map(([profile, files]) => measureProfile(profile, files));
 const failures = [];
 
@@ -20,6 +24,17 @@ for (const row of rows) {
 
 for (const profile of Object.keys(config.maxEstimatedTokens || {})) {
   if (!config.profiles[profile]) failures.push(`${profile}: ceiling has no profile`);
+}
+
+if (baseConfig) {
+  for (const [profile, ceiling] of Object.entries(config.maxEstimatedTokens || {})) {
+    const baseCeiling = Number(baseConfig.maxEstimatedTokens?.[profile]);
+    if (Number.isFinite(baseCeiling) && Number(ceiling) > baseCeiling && !hasException("doc-context", profile, baseCeiling, Number(ceiling))) {
+      failures.push(`${profile}: ceiling increased from base ${baseCeiling} to ${ceiling}`);
+    }
+  }
+} else {
+  console.log(`No documentation context baseline exists at ${baseRef}; current ceilings establish the initial baseline.`);
 }
 
 if (failures.length) {
@@ -44,4 +59,35 @@ function measureProfile(profile, files) {
 function lineCount(text) {
   if (!text) return 0;
   return text.split("\n").length - (text.endsWith("\n") ? 1 : 0);
+}
+
+function readBaseConfig(ref) {
+  try {
+    return JSON.parse(execFileSync("git", ["show", `${ref}:scripts/doc-context-profiles.json`], {
+      cwd: root,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }));
+  } catch {
+    return null;
+  }
+}
+
+function readExceptions() {
+  try {
+    return JSON.parse(readFileSync(resolve(root, "scripts/quality-baseline-exceptions.json"), "utf8")).exceptions || [];
+  } catch {
+    return [];
+  }
+}
+
+function hasException(scope, metric, from, to) {
+  const today = new Date().toISOString().slice(0, 10);
+  return exceptions.some((entry) => entry.scope === scope
+    && entry.metric === metric
+    && Number(entry.from) === from
+    && Number(entry.to) === to
+    && typeof entry.reason === "string" && entry.reason.trim().length >= 20
+    && typeof entry.approvedBy === "string" && /^@[^\s]+$/.test(entry.approvedBy)
+    && typeof entry.expires === "string" && entry.expires >= today);
 }

@@ -14,6 +14,8 @@ app currently beta-ready or store-ready without rerunning the relevant checks.
   and validation regime.
 - [`SUPPORT-RUNBOOK.md`](SUPPORT-RUNBOOK.md) defines support ownership, triage
   and escalation requirements.
+- [`repository-governance.md`](repository-governance.md) defines merge
+  protection, baseline exceptions, test quarantine and emergency bypass.
 
 ## Evidence boundaries
 

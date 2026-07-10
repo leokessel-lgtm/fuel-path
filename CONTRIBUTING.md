@@ -33,6 +33,10 @@ npm run check:docs
 npm test
 ```
 
+`npm test` discovers the backend test inventory and runs every non-quarantined
+file. Quarantines and their debt reasons are visible in
+`scripts/backend-test-manifest.json`; they are not evidence of passing coverage.
+
 For mobile source, dependency or asset changes, also run:
 
 ```sh
@@ -53,6 +57,9 @@ performance change before making `npm run verify` a universally green gate.
 Run the smallest relevant checks while developing, then the broader gates before
 publication. Live-provider, hosted and native checks require explicit evidence
 and are not implied by local unit-test success.
+
+Baseline exceptions and administrator emergency bypass are governed by
+[`docs/02-build-release/repository-governance.md`](docs/02-build-release/repository-governance.md).
 
 ## Pull requests
 

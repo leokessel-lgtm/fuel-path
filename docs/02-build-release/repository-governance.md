@@ -41,6 +41,9 @@ Known failing files are listed with reasons in
 evidence. New tests are included automatically. Removing a quarantine entry
 must make that file part of the required suite.
 
+Current state: all discovered backend test files are required; the quarantine
+manifest is empty.
+
 ## Emergency merge
 
 Administrator bypass is limited to an active security incident, production

@@ -1,5 +1,6 @@
 const { addressIndexStatus, searchAddressIndex } = require("./_addressIndex");
 const { additionalLocalGeocodeHints } = require("./_geocodeHints");
+const { broadAreaSuggestionLeavesSpecificQueryTerms, isBroadAreaSuggestion, normaliseSearchText, titleCase } = require("./_geocodeText");
 const { distanceKm } = require("./_geoMath");
 const { providerHealth, providerTimeoutMs, withProviderRetries } = require("./_providerRuntime");
 const {
@@ -621,10 +622,6 @@ function createGeocoder({ fetchJson, loadStationData }) {
     );
   }
 
-  function normaliseSearchText(value) {
-    return String(value || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
-  }
-
   function round(value, decimals = 0) {
     const factor = 10 ** decimals;
     return Math.round(Number(value) * factor) / factor;
@@ -966,10 +963,10 @@ function createGeocoder({ fetchJson, loadStationData }) {
       };
     }
     const addressLookupLimit = safeSearchContext ? Math.max(limit * 4, 20) : limit;
-    const rawAddressSuggestions = shouldSkipAddressIndex(query, addressIndex)
+    const rawAddressSuggestions = shouldSkipAddressIndex(query, addressIndex, safeSearchContext)
       ? []
       : await searchAddressIndex(query, addressLookupLimit, { searchContext: safeSearchContext });
-    const addressSuggestions = filterSafeAddressSuggestions(query, rawAddressSuggestions);
+    const addressSuggestions = filterSafeAddressSuggestions(query, rawAddressSuggestions, safeSearchContext);
     const strictAddressSuggestions = requiresExactAddress
       ? filterExactAddressSuggestionsForExactQuery(query, addressSuggestions)
       : addressSuggestions;
@@ -1144,6 +1141,7 @@ function createGeocoder({ fetchJson, loadStationData }) {
     if (requiresExactAddress && looksLikeAddressStreetQuery(query)) return false;
     if (!hasStrongLocalSuggestion(query, suggestions) && !hasStrongRegionalPoiSuggestion(query, suggestions)) return false;
     const top = suggestions[0];
+    if (isBroadAreaSuggestion(top) && broadAreaSuggestionLeavesSpecificQueryTerms(query, top)) return false;
     if (top?.provider === "fuel_path_hint") {
       return fastLocalAutocompleteTypes().has(String(top.type || ""));
     }
@@ -1199,8 +1197,8 @@ function createGeocoder({ fetchJson, loadStationData }) {
       });
   }
 
-  function filterSafeAddressSuggestions(query, suggestions) {
-    return suggestions.filter((item) => safeAddressSuggestion(query, item));
+  function filterSafeAddressSuggestions(query, suggestions, searchContext = null) {
+    return suggestions.filter((item) => safeAddressSuggestion(query, item, searchContext));
   }
 
   function exactAddressNeedleCandidates(query) {
@@ -1258,18 +1256,23 @@ function createGeocoder({ fetchJson, loadStationData }) {
     return normaliseSearchText(current);
   }
 
-  function safeAddressSuggestion(query, item) {
+  function safeAddressSuggestion(query, item, searchContext = null) {
     if (item?.provider !== "fuel_path_gnaf") return true;
     if (item?.matchType === "address_fuzzy") return true;
     const needle = normaliseSearchText(query);
     const label = normaliseSearchText(item?.label || "");
     if (!needle || !label) return false;
+    if (hasSensitiveAddressContext(query)) {
+      return addressLikeIntentMatch(query, item?.label) || addressLabelSubstantiallyStartsWithQuery(query, item?.label);
+    }
+    if ((item?.refineRequired || item?.matchType === "building_refine") && localSuggestionPrimaryName(item) === needle) return true;
+    if (searchContextBoost(item, searchContext) > 0 && addressLabelSubstantiallyStartsWithQuery(query, item?.label)) return true;
 
     if (isBroadLocalityOnlyQuery(query)) return false;
     if (hasPlaceIntent(needle)) {
       if (!addressLikeQuery(query) && !isPlaceWordAddressSignal(query)) return false;
       if (addressLikeQuery(query)) {
-        return addressLikeIntentMatch(query, item?.label);
+        return addressLikeIntentMatch(query, item?.label) || searchContextBoost(item, searchContext) > 0;
       }
       return addressLabelSubstantiallyStartsWithQuery(query, item?.label);
     }
@@ -1283,9 +1286,13 @@ function createGeocoder({ fetchJson, loadStationData }) {
     if (queryLocality && itemLocality && !localityMatches(queryLocality, itemLocality)) return false;
 
     if (isPostalAddressQuery(query)) return false;
-    if (isUnderSpecifiedStreetAddressQuery(query) && !queryLocality && !queryStateCode && !queryHasPostcode(query)) return false;
-    if (hasSensitiveAddressContext(query) && !addressLikeIntentMatch(query, item?.label) && !addressLabelSubstantiallyStartsWithQuery(query, item?.label)) return false;
-
+    if (
+      isUnderSpecifiedStreetAddressQuery(query) &&
+      !queryLocality &&
+      !queryStateCode &&
+      !queryHasPostcode(query) &&
+      searchContextBoost(item, searchContext) <= 0
+    ) return false;
     return true;
   }
 
@@ -1310,7 +1317,7 @@ function createGeocoder({ fetchJson, loadStationData }) {
     return Boolean(queryLocality && itemLocality && localityMatches(queryLocality, itemLocality));
   }
 
-  function shouldSkipAddressIndex(query, addressIndex) {
+  function shouldSkipAddressIndex(query, addressIndex, searchContext = null) {
     const queryStateCode = detectStateCode(query);
     const queryLocality = detectQueryLocality(query);
     const queryNeedle = normaliseSearchText(query);
@@ -1323,9 +1330,9 @@ function createGeocoder({ fetchJson, loadStationData }) {
     return (
       (hasSensitiveAddressContext(query) && !addressLikeQuery(query)) ||
       isPostalAddressQuery(query) ||
-      (isBroadLocalityOnlyQuery(query) && !hasUnitLikeSignal && !placeIntentSignal) ||
+      (isBroadLocalityOnlyQuery(query) && queryTokens.length <= (queryStateCode ? 3 : 2) && !hasUnitLikeSignal && !placeIntentSignal) ||
       (placeIntentSignal && queryTokens.length <= 2 && !addressLikeQuery(query) && !isPlaceWordAddressSignal(query) && !hasUnitLikeSignal) ||
-      (isUnderSpecifiedStreetAddressQuery(query) && !queryLocality && !queryStateCode && !queryHasPostcode(query))
+      (isUnderSpecifiedStreetAddressQuery(query) && !queryLocality && !queryStateCode && !queryHasPostcode(query) && !searchContext)
     );
   }
 
@@ -1634,6 +1641,9 @@ function createGeocoder({ fetchJson, loadStationData }) {
       score += 10;
     }
     if (regionalPoiNameMatch) score -= 75;
+    if (item?.provider === "fuel_path_gnaf" && refineRequired && localSuggestionPrimaryName(item) === needle) {
+      score -= 80;
+    }
     if (placeIntentMatches(needle, item)) score -= 14;
     if (hasPlaceIntent(needle) && isBroadAreaSuggestion(item) && !placeIntentMatches(needle, item)) score += 10;
     score -= searchContextBoost(item, searchContext);
@@ -1857,23 +1867,10 @@ function createGeocoder({ fetchJson, loadStationData }) {
     );
   }
 
-  function isBroadAreaSuggestion(item) {
-    return ["city", "suburb", "regional_town"].includes(item?.type);
-  }
-
   return {
     geocode,
     geocodeProviderStatus,
   };
-}
-
-function titleCase(value) {
-  return String(value || "")
-    .toLowerCase()
-    .replace(/\b[a-z]/g, (char) => char.toUpperCase())
-    .replace(/\bRd\b/g, "Road")
-    .replace(/\bSt\b/g, "Street")
-    .replace(/\bAve\b/g, "Avenue");
 }
 
 module.exports = {

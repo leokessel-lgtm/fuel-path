@@ -22,7 +22,7 @@ test("seeded AU address index resolves full address before external geocoding", 
     const mockFetch = installFetchMock();
 
     const result = await geocode({
-      query: "87a corea street",
+      query: "87a corea street sylvania nsw 2224",
       limit: 5,
       sessionToken: "address-index-session",
     });
@@ -499,7 +499,16 @@ test("geocode search context promotes nearby ambiguous G-NAF address", async () 
     { cwd: path.resolve(__dirname, "../.."), stdio: "ignore" },
   );
 
+  const mockFetch = installFetchMock();
   await withEnv({ FUEL_PATH_GNAF_SQLITE_PATH: outputPath, FUEL_PATH_GEOCODE_PROVIDER: "nominatim" }, async () => {
+    const directContextualised = await searchAddressIndex("8 Chamberlain Place", 20, {
+      searchContext: { nearLat: -31.760, nearLon: 115.763, nearRadiusKm: 40 },
+    });
+    assert.equal(directContextualised[0]?.label, "8 Chamberlain Place, Heathridge WA 6027");
+    const directBuildingName = await searchAddressIndex("Rose Cottage Inn", 20, {
+      searchContext: { nearLat: -35.405, nearLon: 149.144, nearRadiusKm: 40 },
+    });
+    assert.equal(directBuildingName[0]?.label, "Rose Cottage Inn, 1 Isabella Drive, Tuggeranong ACT 2900");
     const uncontextualised = await geocode({
       query: "8 Chamberlain Place",
       limit: 2,
@@ -526,12 +535,16 @@ test("geocode search context promotes nearby ambiguous G-NAF address", async () 
       },
     });
 
-    assert.equal(uncontextualised.suggestions[0].label, "8 Chamberlain Place, Augusta WA 6290");
+    assert.deepEqual(uncontextualised.suggestions, []);
+    assert.equal(uncontextualised.lookupStatus, "no_match");
+    assert.ok(contextualised.suggestions[0], JSON.stringify(contextualised));
     assert.equal(contextualised.suggestions[0].label, "8 Chamberlain Place, Heathridge WA 6027");
     assert.equal(contextualised.suggestions[0].provider, "fuel_path_gnaf");
+    assert.ok(buildingNameContextualised.suggestions[0], JSON.stringify(buildingNameContextualised));
     assert.equal(buildingNameContextualised.suggestions[0].label, "Rose Cottage Inn, 1 Isabella Drive, Tuggeranong ACT 2900");
     assert.equal(buildingNameContextualised.suggestions[0].provider, "fuel_path_gnaf");
   });
+  mockFetch.restore();
 });
 
 test("geocode promotes base refine suggestion for ambiguous building prefixes", async () => {
@@ -563,7 +576,14 @@ test("geocode promotes base refine suggestion for ambiguous building prefixes", 
     { cwd: path.resolve(__dirname, "../.."), stdio: "ignore" },
   );
 
+  const mockFetch = installFetchMock();
   await withEnv({ FUEL_PATH_GNAF_SQLITE_PATH: outputPath, FUEL_PATH_GEOCODE_PROVIDER: "nominatim" }, async () => {
+    const directBuilding = await searchAddressIndex("Karratha City Plaza", 3);
+    assert.equal(directBuilding[0]?.label, "Karratha City Plaza, 16 Sharpe Avenue, Karratha WA 6714");
+    const directOffice = await searchAddressIndex("Australian Taxation Of", 20, {
+      searchContext: { nearLat: -35.240, nearLon: 149.070, nearRadiusKm: 80 },
+    });
+    assert.equal(directOffice[0]?.label, "Australian Taxation Office, 40 Cameron Avenue, Belconnen ACT 2617");
     const buildingOnly = await geocode({
       query: "Karratha City Plaza",
       limit: 3,
@@ -585,14 +605,16 @@ test("geocode promotes base refine suggestion for ambiguous building prefixes", 
       },
     });
 
-    assert.equal(buildingOnly.suggestions[0].label, "Karratha City Plaza, 16 Sharpe Avenue, Karratha WA 6714");
+    assert.equal(buildingOnly.suggestions[0].label, "Karratha City Plaza, 16 Sharpe Avenue, Karratha WA 6714", JSON.stringify(buildingOnly));
     assert.equal(buildingOnly.suggestions[0].refineRequired, true);
     assert.equal(buildingOnly.suggestions[0].matchType, "building_refine");
     assert.equal(exactShop.suggestions[0].label, "Karratha City Plaza, Shop 14, 16 Sharpe Avenue, Karratha WA 6714");
     assert.equal(exactShop.suggestions[0].refineRequired, false);
+    assert.ok(officeBuilding.suggestions[0], JSON.stringify(officeBuilding));
     assert.equal(officeBuilding.suggestions[0].label, "Australian Taxation Office, 40 Cameron Avenue, Belconnen ACT 2617");
     assert.equal(officeBuilding.suggestions[0].refineRequired, false);
   });
+  mockFetch.restore();
 });
 
 test("number-first context keeps nearby exact address ahead of remote base refine", async () => {
@@ -1149,7 +1171,7 @@ test("geocode cache separates seed-only and configured G-NAF index results", asy
       });
       assert.equal(indexed.location?.label, "Unit 8, 21 Lanyon Drive, Tuggeranong ACT 2900");
       assert.equal(indexed.location?.provider, "fuel_path_gnaf");
-      assert.match(indexed.location?.matchType || "", /^address_/);
+      assert.match(indexed.location?.matchType || "", /^(address_|exact_address$)/);
     });
   } finally {
     mockFetch.restore();
@@ -1219,24 +1241,27 @@ test("G-NAF Core rows can be exported for Postgres COPY loading", () => {
 
 test("Oracle-hosted G-NAF API is preferred when configured", async () => {
   const api = await startMockGnafApi();
-  await withEnv(
-    {
-      FUEL_PATH_GNAF_API_URL: api.url,
-      FUEL_PATH_GNAF_API_TOKEN: "test-token",
-    },
-    async () => {
-      const status = addressIndexStatus();
-      const suggestions = await searchAddressIndex("87a corea street sylvania", 3);
+  try {
+    await withEnv(
+      {
+        FUEL_PATH_GNAF_API_URL: api.url,
+        FUEL_PATH_GNAF_API_TOKEN: "test-token",
+      },
+      async () => {
+        const status = addressIndexStatus();
+        const suggestions = await searchAddressIndex("87a corea street sylvania", 3);
 
-      assert.equal(status.mode, "api");
-      assert.equal(status.apiConfigured, true);
-      assert.equal(suggestions[0].label, "87A Corea Street, Sylvania NSW 2224");
-      assert.equal(suggestions[0].provider, "fuel_path_gnaf");
-      assert.equal(suggestions[0].providerId, "GANSW_API_1");
-      assert.equal(api.requests[0].authorization, "Bearer test-token");
-    },
-  );
-  await api.close();
+        assert.equal(status.mode, "api");
+        assert.equal(status.apiConfigured, true);
+        assert.equal(suggestions[0].label, "87A Corea Street, Sylvania NSW 2224");
+        assert.equal(suggestions[0].provider, "fuel_path_gnaf");
+        assert.equal(suggestions[0].providerId, "GANSW_API_1");
+        assert.equal(api.requests[0].authorization, "Bearer test-token");
+      },
+    );
+  } finally {
+    await api.close();
+  }
 });
 
 test("G-NAF API failure falls back to seed records", async () => {

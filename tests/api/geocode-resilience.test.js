@@ -24,11 +24,11 @@ test("validation geocode rate limits degrade without throwing", async () => {
     assert.equal(result.lookupStatus, "degraded");
     assert.equal(result.location, null);
     assert.deepEqual(result.suggestions, []);
-    assert.match(result.warning, /rate-limited/i);
+    assert.equal(result.warning, "Address lookup is temporarily busy. Try a fuller address, suburb or postcode.");
     assert.equal(result.degraded, true);
     assert.equal(result.cacheMode, "degraded");
     assert.equal(result.providerHealth.nominatim.status, "unavailable");
-    assert.match(result.providerHealth.nominatim.lastError, /rate-limited/i);
+    assert.equal(result.providerHealth.nominatim.lastError, "Address lookup is temporarily busy. Try a fuller address, suburb or postcode.");
     assert.equal(mockFetch.calls.length, 1);
 
     mockFetch.restore();
@@ -167,7 +167,7 @@ test("local geocode hints survive provider rate limiting", async () => {
     assert.equal(result.lookupStatus, "local_fallback");
     assert.equal(result.location.label, "Queen Street, Brisbane QLD 4000");
     assert.equal(result.suggestions[0].provider, "fuel_path_hint");
-    assert.match(result.warning, /rate-limited|cooling down/i);
+    assert.equal(result.warning, "Address lookup is temporarily busy. Try a fuller address, suburb or postcode.");
     assert.equal(result.degraded, true);
     assert.equal(result.cacheMode, "local_fallback");
     assert.equal(result.providerHealth.nominatim.status, "degraded");

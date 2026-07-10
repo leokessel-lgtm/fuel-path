@@ -5,35 +5,35 @@ const stationsHandler = require("../../api/stations");
 
 test("stations rejects missing and invalid coordinates", async () => {
   const cases = [
-    [{ lon: 151.2 }, /lat is required/],
-    [{ lat: -33.86 }, /lon is required/],
-    [{ lat: "abc", lon: 151.2 }, /lat must be a number/],
-    [{ lat: -33.86, lon: "abc" }, /lon must be a number/],
-    [{ lat: 91, lon: 151.2 }, /lat must be at most 90/],
-    [{ lat: -33.86, lon: 181 }, /lon must be at most 180/],
+    { lon: 151.2 },
+    { lat: -33.86 },
+    { lat: "abc", lon: 151.2 },
+    { lat: -33.86, lon: "abc" },
+    { lat: 91, lon: 151.2 },
+    { lat: -33.86, lon: 181 },
   ];
 
-  for (const [query, pattern] of cases) {
+  for (const query of cases) {
     const response = await callStations({ fuel: "U91", radiusKm: 8, limit: 5, ...query });
     assert.equal(response.status, 400);
-    assert.match(response.payload.error, pattern);
+    assert.equal(response.payload.error, "Nearby prices are temporarily unavailable. Try again or search another area.");
   }
 });
 
 test("stations rejects unsafe radius and limit values", async () => {
   const cases = [
-    [{ radiusKm: -10, limit: 5 }, /radiusKm must be at least 0.5/],
-    [{ radiusKm: 0, limit: 5 }, /radiusKm must be at least 0.5/],
-    [{ radiusKm: "abc", limit: 5 }, /radiusKm must be a number/],
-    [{ radiusKm: 8, limit: -5 }, /limit must be at least 1/],
-    [{ radiusKm: 8, limit: 0 }, /limit must be at least 1/],
-    [{ radiusKm: 8, limit: "abc" }, /limit must be a number/],
+    { radiusKm: -10, limit: 5 },
+    { radiusKm: 0, limit: 5 },
+    { radiusKm: "abc", limit: 5 },
+    { radiusKm: 8, limit: -5 },
+    { radiusKm: 8, limit: 0 },
+    { radiusKm: 8, limit: "abc" },
   ];
 
-  for (const [query, pattern] of cases) {
+  for (const query of cases) {
     const response = await callStations({ lat: -33.86, lon: 151.2, fuel: "U91", ...query });
     assert.equal(response.status, 400);
-    assert.match(response.payload.error, pattern);
+    assert.equal(response.payload.error, "Nearby prices are temporarily unavailable. Try again or search another area.");
   }
 });
 

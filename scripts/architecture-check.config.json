@@ -1,5 +1,5 @@
 {
-  "productionRoots": ["api", "mobile-app/src"],
+  "productionRoots": ["api", "mobile-app/src", "shared"],
   "defaultMaxLines": 800,
   "lineRatchetBaseRef": "origin/main",
   "lineLimitExceptions": {

@@ -11,7 +11,7 @@ const {
   stringParam,
 } = require("./_backend");
 const { publicErrorMessage } = require("./_publicErrors");
-const { boundedNumberParam, coordinateParam } = require("./domain/stationValidation");
+const { boundedNumberParam, coordinateParam } = require("../shared/stationValidation");
 
 module.exports = async function handler(req, res) {
   if (!methodAllowed(req, res)) return;

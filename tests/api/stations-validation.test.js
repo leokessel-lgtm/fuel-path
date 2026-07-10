@@ -2,7 +2,7 @@ const assert = require("node:assert/strict");
 const test = require("node:test");
 
 const stationsHandler = require("../../api/stations");
-const { boundedNumberParam, coordinateParam } = require("../../api/domain/stationValidation");
+const { boundedNumberParam, coordinateParam } = require("../../shared/stationValidation");
 
 test("station query domain validation preserves precise internal reasons", () => {
   const cases = [

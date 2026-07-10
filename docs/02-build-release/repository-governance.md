@@ -5,12 +5,12 @@ and emergency repository changes.
 
 ## Normal merge path
 
-Changes to `main` require the configured status checks, one approving review
-after the latest push and resolved conversations. Code-owner approval is not
-required. Administrators retain bypass only for an emergency.
+Changes to `main` require the configured status checks and resolved
+conversations. Approving reviews and code-owner approval are not required.
+Administrators retain bypass only for an emergency.
 
-The wildcard code owner is `@leokessel-lgtm`; ownership routes review context
-but does not add a separate approval gate.
+The wildcard code owner is `@leokessel-lgtm`; ownership supplies context but
+does not add an approval gate. Reviews remain available but optional.
 
 ## Ratcheting baselines
 

@@ -9,9 +9,9 @@ Changes to `main` require the configured status checks, one approving review,
 code-owner review, approval after the latest push and resolved conversations.
 Administrators retain bypass only for an emergency.
 
-The wildcard code owners must explicitly accept the ongoing responsibility.
-Repository write access alone is not acceptance. Until both owners confirm,
-review capacity is an open governance dependency.
+The wildcard code owner is `@leokessel-lgtm`. A pull request opened by the sole
+code owner cannot satisfy GitHub's independent code-owner approval requirement;
+normal merge capacity therefore requires adding another accepted code owner.
 
 ## Ratcheting baselines
 

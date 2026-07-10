@@ -107,6 +107,9 @@ const {
   normaliseNtReferencePayload,
 } = require("./_ntMyFuelProvider");
 const { loadLiveNtStations } = createMyFuelNtProvider({ decorateStation: stationWithDiscountRules });
+const productionRuntime = () => process.env.VERCEL_ENV === "production"
+  || process.env.NODE_ENV === "production"
+  || process.env.FUEL_PATH_PRODUCTION_HARDENING === "1";
 const { loadStationData } = createStationProviderService({
   sampleStations: () => sample.sampleStations({ includeFixtureFallback: true }),
   decorateStation: stationWithDiscountRules,
@@ -122,6 +125,15 @@ const { loadStationData } = createStationProviderService({
     nswAct: hasNswActUsageTermsConfirmed,
     tas: hasTasUsageTermsConfirmed,
   },
+  providerSourceIds: {
+    qld: "api_qld",
+    wa: "api_wa",
+    vic: "api_vic",
+    sa: "api_sa",
+    nt: "api_nt",
+    nsw: "api_nsw",
+    tas: "api_tas",
+  },
   providerLoaders: {
     qld: ({ forceRefresh }) => loadLiveQldStations({ forceRefresh }),
     wa: ({ forceRefresh, points, radiusKm, fuels }) => loadLiveWaStations({ forceRefresh, points, radiusKm, fuels }),
@@ -131,6 +143,8 @@ const { loadStationData } = createStationProviderService({
     nsw: ({ forceRefresh }) => loadLiveStations({ forceRefresh }),
     tas: ({ forceRefresh, points, radiusKm, fuels }) => loadLiveTasStations({ forceRefresh, points, radiusKm, fuels }),
   },
+  productionRuntime,
+  sampleSourceAllowed: () => process.env.FUEL_PATH_ALLOW_SAMPLE_SOURCE === "1" || !productionRuntime(),
 });
 const { geocode, geocodeProviderStatus } = createGeocoder({
   fetchJson,

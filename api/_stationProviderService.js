@@ -10,13 +10,10 @@ function createStationProviderService({
   hasAnyLiveCredentials,
   termsConfirmed,
   providerLoaders,
+  providerSourceIds,
+  sampleSourceAllowed,
   productionRuntime = defaultProductionRuntime,
 } = {}) {
-  function sampleSourceAllowed() {
-    if (process.env.FUEL_PATH_ALLOW_SAMPLE_SOURCE === "1") return true;
-    return !productionRuntime();
-  }
-
   function loadSampleStations() {
     return sampleStations().map(decorateStation);
   }
@@ -57,7 +54,7 @@ function createStationProviderService({
             enforceProviderTerms(provider);
             const loader = providerLoaders[provider];
             const live = loader ? await loader({ forceRefresh, points, radiusKm, fuels }) : undefined;
-            return { loadedProvider: live ? `api_${provider}` : "", live };
+            return { loadedProvider: live ? providerSourceIds[provider] : "", live };
           });
           return { provider, loadedProvider: result.loadedProvider, live: result.live, error: "" };
         } catch (error) {

@@ -73,7 +73,7 @@ Do not move to broader public release until:
   - **Mitigation:** Rerun `check-beta-readiness` with current evidence before any release promotion or public-readiness claim.
 
 ## What passed
-- `node scripts/check-beta-readiness.mjs --provider-terms-evidence-json PROVIDER-TERMS-EVIDENCE-2026-07-05.json --store-evidence-json STORE-PUBLISHING-EVIDENCE-2026-07-05.json --support-evidence-json SUPPORT-READINESS-EVIDENCE-2026-07-05.json` - ready, zero blockers.
+- `node scripts/check-beta-readiness.mjs --provider-terms-evidence-json docs/03-provider-data/evidence/PROVIDER-TERMS-EVIDENCE-2026-07-05.json --store-evidence-json STORE-PUBLISHING-EVIDENCE-2026-07-05.json --support-evidence-json SUPPORT-READINESS-EVIDENCE-2026-07-05.json` - ready, zero blockers.
 - `node --test --test-concurrency=1 tests/api/native-android-performance-summary.test.js tests/api/beta-readiness.test.js` - 36/36.
 - `node --test --test-concurrency=1 tests/api/provider-terms-readiness.test.js tests/api/store-publishing-readiness.test.js tests/api/support-readiness.test.js tests/api/beta-readiness.test.js` - 84/84.
 - Pixel 9 Pro physical Android smoke: `tmp/native-smoke/android-preview-smoke-2026-07-05T20-59-03-701Z.md` - passed.
@@ -93,7 +93,7 @@ Do not move to broader public release until:
   - `validate:ev-provider-trials -- --proxy` - pass.
 
 ## Evidence bundles
-- [Provider terms evidence](../PROVIDER-TERMS-EVIDENCE-2026-07-05.json)
+- [Provider terms evidence](03-provider-data/evidence/PROVIDER-TERMS-EVIDENCE-2026-07-05.json)
 - [Store publishing evidence](../STORE-PUBLISHING-EVIDENCE-2026-07-05.json)
 - [Support readiness evidence](../SUPPORT-READINESS-EVIDENCE-2026-07-05.json)
 - [Native validation notes](../mobile-app/NATIVE-VALIDATION.md)

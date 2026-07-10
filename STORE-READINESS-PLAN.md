@@ -67,7 +67,7 @@ npm run check:beta-readiness -- \
   --allow-blocked
 ```
 
-Use `STORE-PUBLISHING-EVIDENCE.template.json` as the starting shape. Keep final evidence private if it contains non-public operational details before store publication.
+Use `docs/templates/STORE-PUBLISHING-EVIDENCE.template.json` as the starting shape. Keep final evidence private if it contains non-public operational details before store publication.
 
 Direct-value route:
 

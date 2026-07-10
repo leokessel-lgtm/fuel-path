@@ -66,7 +66,7 @@ Verification:
 node --test tests/api/web-demo-safety.test.js
 cd mobile-app && npm test
 npm run check:secret-hygiene
-npm run check:beta-readiness -- --api-base https://fuel-path.vercel.app --store-evidence-json STORE-PUBLISHING-EVIDENCE.template.json --provider-terms-evidence-json PROVIDER-TERMS-EVIDENCE.template.json --allow-blocked
+npm run check:beta-readiness -- --api-base https://fuel-path.vercel.app --store-evidence-json docs/templates/STORE-PUBLISHING-EVIDENCE.template.json --provider-terms-evidence-json docs/templates/PROVIDER-TERMS-EVIDENCE.template.json --allow-blocked
 ```
 
 ## Backlog And Product-Hardening Slice

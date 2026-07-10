@@ -95,7 +95,7 @@ Park or narrow the B2B wedge if:
 Start from:
 
 ```text
-FLEET-LITE-SAVINGS-REPORT.template.md
+docs/templates/FLEET-LITE-SAVINGS-REPORT.template.md
 ```
 
 Fill it manually for the first operator. Build a generator only after the first report produces a follow-up or pilot signal.

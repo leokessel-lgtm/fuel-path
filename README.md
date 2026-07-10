@@ -15,10 +15,10 @@ The product direction is:
 mobile-app/   Expo / React Native app shell
 web-demo/     Local backend and web validation harness
 prototype/    Scoring scripts, sample data and local validation fixtures
-docs/*.md     Product, validation, provider and governance notes
+docs/         Product, validation, provider, evidence and governance notes
 ```
 
-Most project notes currently live as Markdown files at the repository root. They can move into `docs/` once the monorepo has settled.
+The documentation map lives in `docs/README.md`. It identifies current source-of-truth files, dated evidence, research, templates and archive candidates.
 
 ## Current Stabilisation Cut
 

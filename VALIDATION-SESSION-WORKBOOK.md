@@ -16,7 +16,7 @@ Synthetic dry run: see `SYNTHETIC-VALIDATION-SESSIONS.md`.
 
 Recruitment pack: see `VALIDATION-RECRUITMENT-PACK.md`.
 
-Structured results gate: copy `VALIDATION-RESULTS.template.json` to a dated results file, fill one anonymised row per real participant, then run:
+Structured results gate: copy `docs/templates/VALIDATION-RESULTS.template.json` to a dated results file, fill one anonymised row per real participant, then run:
 
 ```bash
 npm run check:validation-results -- --results-json VALIDATION-RESULTS-YYYY-MM-DD.json

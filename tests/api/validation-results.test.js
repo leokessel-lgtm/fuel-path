@@ -12,7 +12,7 @@ const ROOT = path.resolve(__dirname, "../..");
 test("validation results template stays blocked until real sessions are recorded", async () => {
   const { stdout } = await execFileAsync(
     process.execPath,
-    ["scripts/check-validation-results.mjs", "--results-json", "VALIDATION-RESULTS.template.json", "--allow-blocked"],
+    ["scripts/check-validation-results.mjs", "--results-json", "docs/templates/VALIDATION-RESULTS.template.json", "--allow-blocked"],
     { cwd: ROOT, timeout: 10_000 },
   );
   const payload = JSON.parse(stdout);

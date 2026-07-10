@@ -21,3 +21,5 @@ capacity proof.
 - A local load test does not prove provider permission or hosted readiness.
 - Keep the mobile bundle lean; keep provider credentials and heavy route work on
   the backend.
+- Context profiles are recommended measured reading sets. Tooling does not
+  automatically prevent a developer or agent from loading additional files.

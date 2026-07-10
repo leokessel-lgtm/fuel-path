@@ -37,16 +37,32 @@ test("architecture guard rejects production module growth", async (context) => {
   await expectFailure(fixture, "production module exceeds 2 lines: api/_large.js (3)");
 });
 
+test("architecture guard ratchets hotspot limits against the base ref", async (context) => {
+  const fixture = createSourceFixture(context);
+  const config = fixtureConfig();
+  config.lineLimitExceptions["api/_large.js"] = 5;
+  writeFixtureFile(fixture, "architecture-check.config.json", `${JSON.stringify(config, null, 2)}\n`);
+  writeFixtureFile(fixture, "api/_large.js", "one\ntwo\n");
+  await git(fixture, ["init"]);
+  await git(fixture, ["add", "."]);
+  await git(fixture, ["-c", "user.name=Fuel Path Test", "-c", "user.email=test@fuelpath.invalid", "commit", "-m", "baseline"]);
+  writeFixtureFile(fixture, "api/_large.js", "one\ntwo\nthree\n");
+  await git(fixture, ["add", "."]);
+  await expectFailure(fixture, "production module exceeds 2 lines: api/_large.js (3)", {
+    FUEL_PATH_ARCHITECTURE_BASE_REF: "HEAD",
+  });
+});
+
 test("architecture guard rejects public handler domain coupling", async (context) => {
   const fixture = await createFixture(context);
-  writeFixtureFile(fixture, "api/stations.js", 'require("./_provider");\n');
+  writeFixtureFile(fixture, "api/stations.js", 'require ( "./_provider" );\n');
   await git(fixture, ["add", "."]);
   await expectFailure(fixture, "public API handler imports disallowed internal module: api/stations.js -> ./_provider");
 });
 
 test("architecture guard rejects mobile lower-layer UI imports", async (context) => {
   const fixture = await createFixture(context);
-  writeFixtureFile(fixture, "mobile-app/src/services/store.ts", 'import { Card } from "../components/Card";\n');
+  writeFixtureFile(fixture, "mobile-app/src/services/store.ts", 'export { Card } from "../components/Card";\n');
   await git(fixture, ["add", "."]);
   await expectFailure(fixture, "mobile lower layer imports UI layer");
 });
@@ -91,15 +107,16 @@ function git(cwd, args) {
   return execFileAsync("git", args, { cwd, timeout: 10_000 });
 }
 
-function runChecker(fixture) {
+function runChecker(fixture, extraEnv = {}) {
   return execFileAsync(process.execPath, [CHECKER, "architecture-check.config.json"], {
     cwd: fixture,
+    env: { ...process.env, ...extraEnv },
     timeout: 10_000,
   });
 }
 
-async function expectFailure(fixture, expectedMessage) {
-  await assert.rejects(runChecker(fixture), (error) => {
+async function expectFailure(fixture, expectedMessage, extraEnv = {}) {
+  await assert.rejects(runChecker(fixture, extraEnv), (error) => {
     assert.match(error.stderr, new RegExp(escapeRegExp(expectedMessage)));
     return true;
   });

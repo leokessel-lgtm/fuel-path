@@ -14,5 +14,12 @@ once. Preserve public contracts and add focused tests before each split.
 | P1 | `api/status.js` | Public handler reads EV policy and provider observability directly | Export a complete status view from the composition boundary |
 | P2 | `NearbyEvControls.tsx` | Provider status, filtering and presentation share one component | Extract pure selection and display models |
 
-`npm run check:architecture` prevents these files from growing beyond their
-recorded baselines and applies a default ceiling to new production modules.
+With Git history available, `npm run check:architecture` ratchets listed hotspot
+limits against `origin/main`, so a file that shrinks cannot regrow to its older
+ceiling. Source-only environments without Git metadata enforce the recorded
+static ceilings. New production modules use the default ceiling.
+
+Dependency checks cover common static CommonJS/ES imports, re-exports and
+literal dynamic imports. They are a regression guard, not a complete semantic
+dependency graph; code review must still reject aliases or computed imports that
+cross the documented boundaries.

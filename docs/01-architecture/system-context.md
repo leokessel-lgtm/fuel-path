@@ -13,7 +13,12 @@
 
 ## Composition
 
-Public handlers validate HTTP input and call exports from `api/_backend.js`.
+Most public handlers validate HTTP input and call exports from
+`api/_backend.js`. Two current exceptions are explicit: `api/ev-chargers.js`
+directly composes EV adapters and policy modules, while `api/status.js` directly
+reads EV policy and provider observability. The architecture guard freezes those
+known static-import exceptions but does not describe them as the target design.
+
 `_backend.js` currently composes routing, geocoding, provider adapters, scoring,
 alerts and prediction storage. It is a composition root with residual domain
 logic, so reducing it is the first implementation refactor after this mapping PR.

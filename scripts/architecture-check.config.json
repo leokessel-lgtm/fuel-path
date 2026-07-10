@@ -1,6 +1,7 @@
 {
   "productionRoots": ["api", "mobile-app/src"],
   "defaultMaxLines": 1200,
+  "lineRatchetBaseRef": "origin/main",
   "lineLimitExceptions": {
     "api/_addressIndex.js": 1912,
     "api/_backend.js": 1619,

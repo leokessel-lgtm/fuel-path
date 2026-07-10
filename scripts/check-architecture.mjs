@@ -34,12 +34,17 @@ if (gitMetadataAvailable) {
 
 const productionFiles = config.productionRoots.flatMap((directory) => walk(resolve(root, directory)))
   .filter((path) => [".js", ".mjs", ".ts", ".tsx"].includes(extname(path)));
+const ratchetBaseRef = gitMetadataAvailable ? resolveRatchetBaseRef() : "";
 
 for (const absolutePath of productionFiles) {
   const path = repoPath(absolutePath);
   const source = readFileSync(absolutePath, "utf8");
-  const lineCount = source.split(/\r?\n/).length - (source.endsWith("\n") ? 1 : 0);
-  const limit = config.lineLimitExceptions[path] || config.defaultMaxLines;
+  const lineCount = sourceLineCount(source);
+  const configuredLimit = config.lineLimitExceptions[path] || config.defaultMaxLines;
+  const baselineLines = config.lineLimitExceptions[path] && ratchetBaseRef
+    ? linesAtRef(ratchetBaseRef, path)
+    : null;
+  const limit = baselineLines == null ? configuredLimit : Math.min(configuredLimit, baselineLines);
   if (lineCount > limit) issues.push(`production module exceeds ${limit} lines: ${path} (${lineCount})`);
 }
 
@@ -50,9 +55,9 @@ for (const path of productionPaths.filter((item) => /^api\/[^/_][^/]*\.js$/.test
     ...config.publicApiAllowedRequires,
     ...(config.publicApiRequireExceptions[path] || []),
   ]);
-  for (const match of source.matchAll(/require\(["']([^"']+)["']\)/g)) {
-    if (match[1].startsWith("./_") && !allowedRequires.has(match[1])) {
-      issues.push(`public API handler imports disallowed internal module: ${path} -> ${match[1]}`);
+  for (const target of moduleSpecifiers(source)) {
+    if (target.startsWith("./_") && !allowedRequires.has(target)) {
+      issues.push(`public API handler imports disallowed internal module: ${path} -> ${target}`);
     }
   }
 }
@@ -61,10 +66,10 @@ for (const directory of config.mobileLowerLayerRoots) {
   for (const absolutePath of walk(resolve(root, directory)).filter((path) => [".ts", ".tsx"].includes(extname(path)))) {
     const path = repoPath(absolutePath);
     const source = readFileSync(absolutePath, "utf8");
-    for (const match of source.matchAll(/from\s+["']([^"']+)["']/g)) {
-      const target = normaliseImportTarget(path, match[1]);
+    for (const moduleSpecifier of moduleSpecifiers(source)) {
+      const target = normaliseImportTarget(path, moduleSpecifier);
       if (config.mobileLowerLayerDisallowedImports.some((fragment) => target.includes(fragment))) {
-        issues.push(`mobile lower layer imports UI layer: ${path} -> ${match[1]}`);
+        issues.push(`mobile lower layer imports UI layer: ${path} -> ${moduleSpecifier}`);
       }
     }
   }
@@ -95,4 +100,54 @@ function normaliseImportTarget(sourcePath, target) {
   if (!target.startsWith(".")) return target;
   const sourceDirectory = sourcePath.slice(0, sourcePath.lastIndexOf("/"));
   return `/${repoPath(resolve(root, sourceDirectory, target))}`;
+}
+
+function sourceLineCount(source) {
+  return source.split(/\r?\n/).length - (source.endsWith("\n") ? 1 : 0);
+}
+
+function resolveRatchetBaseRef() {
+  const candidates = [
+    process.env.FUEL_PATH_ARCHITECTURE_BASE_REF,
+    config.lineRatchetBaseRef,
+    "HEAD^1",
+  ].filter(Boolean);
+  for (const candidate of candidates) {
+    try {
+      execFileSync("git", ["rev-parse", "--verify", `${candidate}^{commit}`], {
+        cwd: root,
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+      return candidate;
+    } catch {
+      // Try the next available baseline.
+    }
+  }
+  return "";
+}
+
+function linesAtRef(ref, path) {
+  try {
+    const source = execFileSync("git", ["show", `${ref}:${path}`], {
+      cwd: root,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    return sourceLineCount(source);
+  } catch {
+    return null;
+  }
+}
+
+function moduleSpecifiers(source) {
+  const specifiers = [];
+  const patterns = [
+    /require\s*\(\s*["']([^"']+)["']\s*\)/g,
+    /(?:import|export)\s+(?:[^"']*?\s+from\s+)?["']([^"']+)["']/g,
+    /import\s*\(\s*["']([^"']+)["']\s*\)/g,
+  ];
+  for (const pattern of patterns) {
+    for (const match of source.matchAll(pattern)) specifiers.push(match[1]);
+  }
+  return [...new Set(specifiers)];
 }

@@ -45,7 +45,9 @@ npm run budget:size
 The mobile bundle budget is currently red on `main` for the largest web chunk
 and total web JavaScript. Treat `budget:size` as a mandatory reported release
 gate: do not weaken it, do not claim a green mobile verification run, and do not
-increase either failing measurement. Restore the baseline in a dedicated
+increase either failing measurement. CI compares the build with
+`mobile-app/build-baselines/web-bundle.json`. Restore the stricter release
+budget in a dedicated
 performance change before making `npm run verify` a universally green gate.
 
 Run the smallest relevant checks while developing, then the broader gates before

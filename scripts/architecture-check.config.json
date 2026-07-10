@@ -1,14 +1,17 @@
 {
   "productionRoots": ["api", "mobile-app/src"],
-  "defaultMaxLines": 1200,
+  "defaultMaxLines": 800,
   "lineRatchetBaseRef": "origin/main",
   "lineLimitExceptions": {
     "api/_addressIndex.js": 1912,
     "api/_backend.js": 1619,
     "api/_geocode.js": 1881,
+    "api/_routeScoring.js": 846,
+    "mobile-app/src/components/NearbyEvControls.tsx": 1006,
     "mobile-app/src/components/PlanRouteSheet.tsx": 1591,
     "mobile-app/src/components/StationMap.native.tsx": 1246,
-    "mobile-app/src/components/StationMap.web.tsx": 1241
+    "mobile-app/src/components/StationMap.web.tsx": 1241,
+    "mobile-app/src/screens/PlanScreen.viewmodel.tsx": 827
   },
   "disallowedTrackedPathPatterns": [
     "(^|/)\\.DS_Store$",
@@ -18,7 +21,7 @@
     "^Users/",
     "^var/"
   ],
-  "publicApiAllowedRequires": ["./_backend", "./_publicErrors"],
+  "publicApiAllowedRequires": ["./_backend", "./_publicErrors", "../_backend", "../_publicErrors"],
   "publicApiRequireExceptions": {
     "api/ev-chargers.js": [
       "./_evApiNinjas",

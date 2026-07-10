@@ -60,6 +60,13 @@ test("architecture guard rejects public handler domain coupling", async (context
   await expectFailure(fixture, "public API handler imports disallowed internal module: api/stations.js -> ./_provider");
 });
 
+test("architecture guard rejects nested cron and push handler coupling", async (context) => {
+  const fixture = await createFixture(context);
+  writeFixtureFile(fixture, "api/cron/job.js", 'require("../_provider");\n');
+  await git(fixture, ["add", "."]);
+  await expectFailure(fixture, "public API handler imports disallowed internal module: api/cron/job.js -> ../_provider");
+});
+
 test("architecture guard rejects mobile lower-layer UI imports", async (context) => {
   const fixture = await createFixture(context);
   writeFixtureFile(fixture, "mobile-app/src/services/store.ts", 'export { Card } from "../components/Card";\n');
@@ -90,7 +97,7 @@ function fixtureConfig() {
     defaultMaxLines: 2,
     lineLimitExceptions: {},
     disallowedTrackedPathPatterns: ["^tmp/"],
-    publicApiAllowedRequires: ["./_backend", "./_publicErrors"],
+    publicApiAllowedRequires: ["./_backend", "./_publicErrors", "../_backend", "../_publicErrors"],
     publicApiRequireExceptions: {},
     mobileLowerLayerRoots: ["mobile-app/src/services", "mobile-app/src/utils"],
     mobileLowerLayerDisallowedImports: ["/components/", "/screens/"],

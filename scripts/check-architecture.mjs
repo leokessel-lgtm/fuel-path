@@ -49,14 +49,14 @@ for (const absolutePath of productionFiles) {
 }
 
 const productionPaths = productionFiles.map(repoPath);
-for (const path of productionPaths.filter((item) => /^api\/[^/_][^/]*\.js$/.test(item))) {
+for (const path of productionPaths.filter(isPublicApiHandler)) {
   const source = readFileSync(resolve(root, path), "utf8");
   const allowedRequires = new Set([
     ...config.publicApiAllowedRequires,
     ...(config.publicApiRequireExceptions[path] || []),
   ]);
   for (const target of moduleSpecifiers(source)) {
-    if (target.startsWith("./_") && !allowedRequires.has(target)) {
+    if (/^\.\.?\/_/.test(target) && !allowedRequires.has(target)) {
       issues.push(`public API handler imports disallowed internal module: ${path} -> ${target}`);
     }
   }
@@ -150,4 +150,9 @@ function moduleSpecifiers(source) {
     for (const match of source.matchAll(pattern)) specifiers.push(match[1]);
   }
   return [...new Set(specifiers)];
+}
+
+function isPublicApiHandler(path) {
+  return /^api\/[^/_][^/]*\.js$/.test(path)
+    || /^api\/(?:cron|push)\/[^/]+\.js$/.test(path);
 }

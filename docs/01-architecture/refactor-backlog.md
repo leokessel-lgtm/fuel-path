@@ -19,7 +19,10 @@ limits against `origin/main`, so a file that shrinks cannot regrow to its older
 ceiling. Source-only environments without Git metadata enforce the recorded
 static ceilings. New production modules use the default ceiling.
 
-Dependency checks cover common static CommonJS/ES imports, re-exports and
+The default new-module ceiling is 800 lines. Existing production modules above
+that threshold are explicit ratcheted exceptions rather than implicit approval.
+
+Dependency checks cover top-level, cron and push handlers plus common static CommonJS/ES imports, re-exports and
 literal dynamic imports. They are a regression guard, not a complete semantic
 dependency graph; code review must still reject aliases or computed imports that
 cross the documented boundaries.

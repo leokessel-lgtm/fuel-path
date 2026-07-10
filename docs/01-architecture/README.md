@@ -23,3 +23,4 @@ capacity proof.
   the backend.
 - Context profiles are recommended measured reading sets. Tooling does not
   automatically prevent a developer or agent from loading additional files.
+  Their committed ceilings are enforced by `npm run measure:doc-context` in CI.

@@ -1,5 +1,21 @@
 {
   "estimationMethod": "ceil(UTF-8 text characters / 4)",
+  "maxEstimatedTokens": {
+    "root_default": 250,
+    "mobile_app_default": 300,
+    "product_orientation": 2100,
+    "roadmap_first_orientation_comparator": 10000,
+    "provider_task": 3000,
+    "backend_api_task": 1400,
+    "geocode_task": 2100,
+    "traffic_scaling_task": 2300,
+    "mobile_plan_task": 800,
+    "mobile_map_task": 2100,
+    "alerts_task": 1400,
+    "release_readiness": 5000,
+    "route_change": 14000,
+    "full_catalog_audit": 7000
+  },
   "profiles": {
     "root_default": [
       "AGENTS.md"

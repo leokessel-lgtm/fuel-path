@@ -516,6 +516,10 @@ test("geocode search context ranks nearby addresses without authorising disclosu
       searchContext: { nearLat: -35.405, nearLon: 149.144, nearRadiusKm: 40 },
     });
     assert.equal(directBuildingName[0]?.label, "Rose Cottage Inn, 1 Isabella Drive, Tuggeranong ACT 2900");
+    const directSensitivePartial = await searchAddressIndex("Harbour Safe H", 20, {
+      searchContext: { nearLat: -35.405, nearLon: 149.145, nearRadiusKm: 40 },
+    });
+    assert.equal(directSensitivePartial[0]?.label, "Harbour Safe House, 10 Hidden Road, Tuggeranong ACT 2900");
     const uncontextualised = await geocode({
       query: "8 Chamberlain Place",
       limit: 2,

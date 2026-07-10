@@ -16,7 +16,7 @@ test("store publishing readiness blocks placeholder template evidence", async ()
     [
       "scripts/check-store-publishing-readiness.mjs",
       "--evidence-json",
-      "STORE-PUBLISHING-EVIDENCE.template.json",
+      "docs/templates/STORE-PUBLISHING-EVIDENCE.template.json",
       "--allow-blocked",
     ],
     { cwd: ROOT, timeout: 10_000 },

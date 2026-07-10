@@ -88,5 +88,5 @@ Next cleanup should be conservative:
 node --test tests/api/web-demo-safety.test.js
 npm run check:secret-hygiene
 cd mobile-app && npm test
-npm run check:beta-readiness -- --api-base https://fuel-path.vercel.app --store-evidence-json STORE-PUBLISHING-EVIDENCE.template.json --provider-terms-evidence-json PROVIDER-TERMS-EVIDENCE.template.json --allow-blocked
+npm run check:beta-readiness -- --api-base https://fuel-path.vercel.app --store-evidence-json docs/templates/STORE-PUBLISHING-EVIDENCE.template.json --provider-terms-evidence-json docs/templates/PROVIDER-TERMS-EVIDENCE.template.json --allow-blocked
 ```

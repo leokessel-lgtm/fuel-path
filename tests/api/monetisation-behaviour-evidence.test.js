@@ -15,7 +15,7 @@ test("monetisation behaviour template stays blocked until behaviour is recorded"
     [
       "scripts/check-monetisation-behaviour-evidence.mjs",
       "--evidence-json",
-      "MONETISATION-BEHAVIOUR-EVIDENCE.template.json",
+      "docs/templates/MONETISATION-BEHAVIOUR-EVIDENCE.template.json",
       "--allow-blocked",
     ],
     { cwd: ROOT, timeout: 10_000 },

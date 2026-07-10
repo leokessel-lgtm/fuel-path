@@ -52,7 +52,7 @@ maximumAcceptableDetourBand: 0, 0-2, 2-5, 5-10, 10+
 
 Minimum evidence before consumer monetisation:
 
-- 7 real participant sessions completed through `VALIDATION-RESULTS.template.json`.
+- 7 real participant sessions completed through `docs/templates/VALIDATION-RESULTS.template.json`.
 - At least 4 participants would change a real fuel decision or enable a useful route alert.
 - At least 3 commuter or high-frequency users create or want a saved commute or saved-route alert.
 - At least 3 users open or say they would open navigation from the recommendation.
@@ -75,7 +75,7 @@ MONETISATION-BEHAVIOUR-EVIDENCE-YYYY-MM-DD.json
 Start from:
 
 ```text
-MONETISATION-BEHAVIOUR-EVIDENCE.template.json
+docs/templates/MONETISATION-BEHAVIOUR-EVIDENCE.template.json
 ```
 
 ## UI/UX Changes Not Yet Approved

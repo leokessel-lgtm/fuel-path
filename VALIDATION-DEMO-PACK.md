@@ -19,7 +19,7 @@ The demo is not ready for public sharing until API.NSW confirms usage rights, ca
 
 Strategic reflection:
 
-- `STRATEGIC-REFLECTION.md`
+- `docs/05-research/STRATEGIC-REFLECTION.md`
 
 Session materials:
 

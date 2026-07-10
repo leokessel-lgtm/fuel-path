@@ -3,7 +3,7 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { dirname, isAbsolute, relative, resolve } from "node:path";
 
 const args = parseArgs(process.argv.slice(2));
-const resultsPath = args.resultsJson || "VALIDATION-RESULTS.template.json";
+const resultsPath = args.resultsJson || "docs/templates/VALIDATION-RESULTS.template.json";
 const resolvedResultsPath = resolve(resultsPath);
 const evidenceRoot = resolve(args.evidenceRoot || dirname(resolvedResultsPath));
 

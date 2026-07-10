@@ -9,7 +9,7 @@ const execFileAsync = promisify(execFile);
 const ROOT = path.resolve(__dirname, "../..");
 
 test("database platform review blocks the empty template", async () => {
-  const result = await runReview(["--evidence-json", "DATABASE-PLATFORM-REVIEW.template.json", "--allow-blocked"]);
+  const result = await runReview(["--evidence-json", "docs/templates/DATABASE-PLATFORM-REVIEW.template.json", "--allow-blocked"]);
 
   assert.equal(result.status, "blocked");
   assert.equal(result.blockers.includes("candidate_row_count_below_gnaf_threshold"), true);

@@ -3,7 +3,7 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { dirname, isAbsolute, relative, resolve } from "node:path";
 
 const args = parseArgs(process.argv.slice(2));
-const evidencePath = args.evidenceJson || "MONETISATION-BEHAVIOUR-EVIDENCE.template.json";
+const evidencePath = args.evidenceJson || "docs/templates/MONETISATION-BEHAVIOUR-EVIDENCE.template.json";
 const resolvedEvidencePath = resolve(evidencePath);
 const evidenceRoot = resolve(args.evidenceRoot || dirname(resolvedEvidencePath));
 

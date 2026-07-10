@@ -23,7 +23,7 @@ Do not mark privacy publication done, submit store listings or claim store readi
 Use concrete values. Manual confirmation flags are audit notes only and do not clear this gate.
 Preferred path:
 
-1. Copy `STORE-PUBLISHING-EVIDENCE.template.json` to a private or release-specific evidence file.
+1. Copy `docs/templates/STORE-PUBLISHING-EVIDENCE.template.json` to a private or release-specific evidence file.
 2. Fill in the final privacy contact, Fuel Path-owned public policy URL, Apple listing URL and Google Play listing URL.
 3. Fill in concrete release-review references for Apple App Privacy, Google Play Data Safety, provider limitations disclosure and support process. Use source artefacts, public URLs, ticket IDs or dated review notes. Do not use "done", "checked" or placeholder text.
 4. Set `reviewedAt` to the latest release review date. Store review evidence must be no older than 30 days by default when the gate runs.

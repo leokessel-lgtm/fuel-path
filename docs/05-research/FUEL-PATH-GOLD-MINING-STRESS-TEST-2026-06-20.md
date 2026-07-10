@@ -41,7 +41,7 @@ Local evidence:
 - `fuel-path-deep-international-research.md`
 - `FUEL-DISCOUNTS-AND-FLEET-CARDS.md`
 - `MAP-UX-COMPETITOR-FUNCTIONALITY.md`
-- `docs/fuelradar-competitor-analysis-2026-06-17.md`
+- `fuelradar-competitor-analysis-2026-06-17.md`
 
 Current web refresh:
 
@@ -284,4 +284,3 @@ I would downgrade or park the core idea if:
 4. Keep Discount Wallet manual and conservative.
 5. Keep fleet-lite to "approved stop plus weekly report" until a buyer asks for more.
 6. Defer payment, cashback, EV expansion, community price editing and broad prediction marketing.
-

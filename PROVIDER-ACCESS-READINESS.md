@@ -61,7 +61,7 @@ Release gate:
 npm run check:provider-terms -- --api-base https://fuel-path.vercel.app
 ```
 
-Use `--enforce-public-launch` when this check should fail the build or release step. Once any NSW/ACT, QLD or TAS terms flag is set, also pass a completed evidence file copied from `PROVIDER-TERMS-EVIDENCE.template.json`:
+Use `--enforce-public-launch` when this check should fail the build or release step. Once any NSW/ACT, QLD or TAS terms flag is set, also pass a completed evidence file copied from `docs/templates/PROVIDER-TERMS-EVIDENCE.template.json`:
 
 ```sh
 npm run check:provider-terms -- --api-base https://fuel-path.vercel.app --evidence-json PROVIDER-TERMS-EVIDENCE-YYYY-MM-DD.json --enforce-public-launch

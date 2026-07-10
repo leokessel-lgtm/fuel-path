@@ -38,7 +38,7 @@ were produced unless the relevant workflow has been re-run.
 | `VALIDATION-DEMO-PACK.md` | current-evidence | move later to `docs/04-validation-evidence/` | Demo support material for validation. | Check against current product before reuse. |
 | `VALIDATION-RECRUITMENT-PACK.md` | current-evidence | move later to `docs/04-validation-evidence/` | Recruiting material for validation. | May need privacy and consent review before reuse. |
 | `SYNTHETIC-VALIDATION-SESSIONS.md` | current-evidence | move later to `docs/04-validation-evidence/` | Synthetic validation notes. | Label as synthetic, not customer proof. |
-| `PROVIDER-TERMS-EVIDENCE-2026-07-05.json` | current-evidence | move later to `docs/03-provider-data/evidence/` | Dated provider terms evidence. | Evidence held, not blanket permission or legal approval. |
+| `docs/03-provider-data/evidence/PROVIDER-TERMS-EVIDENCE-2026-07-05.json` | current-evidence | keep in `docs/03-provider-data/evidence/` | Dated provider terms evidence. | Evidence held, not blanket permission or legal approval. |
 | `STORE-PUBLISHING-EVIDENCE-2026-07-05.json` | current-evidence | move later to `docs/02-build-release/evidence/` | Dated store publishing evidence. | Store readiness can drift with app, policy and listing changes. |
 | `SUPPORT-READINESS-EVIDENCE-2026-07-05.json` | current-evidence | move later to `docs/02-build-release/evidence/` | Dated support readiness evidence. | Support readiness should remain separate from store readiness. |
 | `docs/evidence/*.json` | current-evidence | keep in `docs/evidence/` for now | Raw evidence files for route, prediction and competitor checks. | Do not promote without checking dates and scripts. |
@@ -67,7 +67,7 @@ were produced unless the relevant workflow has been re-run.
 | `SA-FUEL-API-NOTES.md` | source-of-truth | move later to `docs/03-provider-data/` | SA fuel API implementation notes. | Provider terms and permission state remain separate. |
 | `API-NSW-SUPPORT-NOTE.md` | current-evidence | move later to `docs/03-provider-data/` | NSW support notes. | Do not treat as approval unless explicit. |
 | `API-NSW-UNBLOCK-PLAN.md` | source-of-truth | move later to `docs/03-provider-data/` | NSW unblock plan. | Needs current provider-status verification before action. |
-| `provider-terms-*.md` | current-evidence | move later to `docs/03-provider-data/evidence/` | Provider request and evidence notes by jurisdiction. | Keep request sent distinct from terms confirmed. |
+| `docs/03-provider-data/evidence/provider-terms-*.md` | current-evidence | keep in `docs/03-provider-data/evidence/` | Provider request and evidence notes by jurisdiction. | Keep request sent distinct from terms confirmed. |
 | `docs/provider-terms/*.md` | current-evidence | keep under provider terms evidence | Provider-specific terms acceptance evidence. | Private operational evidence unless explicitly prepared for public use. |
 | `docs/provider-store-readiness-summary-2026-07-05.md` | current-evidence | move later to `docs/03-provider-data/` | Provider/store readiness summary. | Avoid collapsing provider access and store release readiness. |
 
@@ -75,16 +75,16 @@ were produced unless the relevant workflow has been re-run.
 
 | Path | Bucket | Keep/move/archive/delete | Reason | Risk |
 | --- | --- | --- | --- | --- |
-| `fuel-path-market-research.md` | research | move later to `docs/05-research/` | Market research. | Market facts can drift and may need refresh before external use. |
-| `fuel-path-deep-international-research.md` | research | move later to `docs/05-research/` | International research. | Treat as research, not product commitment. |
-| `fuel-price-cycle-research.md` | research | move later to `docs/05-research/` | Fuel cycle research. | Refresh before current market claims. |
-| `FUEL-PATH-GOLD-MINING-STRESS-TEST-2026-06-20.md` | research | move later to `docs/05-research/` | Business model stress test. | Do not treat monetisation conclusions as validated demand. |
-| `MAP-UX-COMPETITOR-FUNCTIONALITY.md` | research | move later to `docs/05-research/` | Competitor UX research. | Competitor surfaces change. |
-| `docs/fuelradar-*.md` | research | move later to `docs/05-research/` | FuelRadar competitor and map comparison notes. | Keep separate from current release readiness. |
-| `FUEL-DISCOUNTS-AND-FLEET-CARDS.md` | research | move later to `docs/05-research/` | Discount and fleet-card research. | Commercial terms can change. |
-| `PRODUCT-IDEAS.md` | research | move later to `docs/05-research/` | Idea backlog and exploratory notes. | Avoid mixing with committed roadmap. |
-| `STRATEGIC-REFLECTION.md` | research | move later to `docs/05-research/` | Strategy reflection. | Opinionated, not evidence. |
-| `AUSTRALIAN-MAPPING-INFRASTRUCTURE-PARTNER-BRIEF.md` | research | move later to `docs/05-research/` | Partner-facing infrastructure brief. | Recheck claims before sharing externally. |
+| `docs/05-research/fuel-path-market-research.md` | research | keep in `docs/05-research/` | Market research. | Market facts can drift and may need refresh before external use. |
+| `docs/05-research/fuel-path-deep-international-research.md` | research | keep in `docs/05-research/` | International research. | Treat as research, not product commitment. |
+| `docs/05-research/fuel-price-cycle-research.md` | research | keep in `docs/05-research/` | Fuel cycle research. | Refresh before current market claims. |
+| `docs/05-research/FUEL-PATH-GOLD-MINING-STRESS-TEST-2026-06-20.md` | research | keep in `docs/05-research/` | Business model stress test. | Do not treat monetisation conclusions as validated demand. |
+| `docs/05-research/MAP-UX-COMPETITOR-FUNCTIONALITY.md` | research | keep in `docs/05-research/` | Competitor UX research. | Competitor surfaces change. |
+| `docs/05-research/fuelradar-*.md` | research | keep in `docs/05-research/` | FuelRadar competitor and map comparison notes. | Keep separate from current release readiness. |
+| `docs/05-research/FUEL-DISCOUNTS-AND-FLEET-CARDS.md` | research | keep in `docs/05-research/` | Discount and fleet-card research. | Commercial terms can change. |
+| `docs/05-research/PRODUCT-IDEAS.md` | research | keep in `docs/05-research/` | Idea backlog and exploratory notes. | Avoid mixing with committed roadmap. |
+| `docs/05-research/STRATEGIC-REFLECTION.md` | research | keep in `docs/05-research/` | Strategy reflection. | Opinionated, not evidence. |
+| `docs/05-research/AUSTRALIAN-MAPPING-INFRASTRUCTURE-PARTNER-BRIEF.md` | research | keep in `docs/05-research/` | Partner-facing infrastructure brief. | Recheck claims before sharing externally. |
 
 ## Architecture, design and app package docs
 
@@ -108,10 +108,10 @@ were produced unless the relevant workflow has been re-run.
 
 | Path | Bucket | Keep/move/archive/delete | Reason | Risk |
 | --- | --- | --- | --- | --- |
-| `*.template.json` | template | move later to `docs/templates/` or keep near owning workflow | Reusable evidence and review templates. | Do not confuse blank templates with evidence. |
-| `FLEET-LITE-SAVINGS-REPORT.template.md` | template | move later to `docs/templates/` | Reusable savings report template. | Savings wording must stay aligned with route logic rules. |
-| `FLEET-LITE-SAVINGS-REPORT.sample-2026-07-02.md` | template | move later to `docs/templates/` | Sample savings report. | Sample is not current customer evidence. |
-| `VALIDATION-RESULTS.template.json` | template | move later to `docs/templates/` | Validation results template. | Blank template only. |
+| `docs/templates/*.template.json` | template | keep in `docs/templates/` | Reusable evidence and review templates. | Do not confuse blank templates with evidence. |
+| `docs/templates/FLEET-LITE-SAVINGS-REPORT.template.md` | template | keep in `docs/templates/` | Reusable savings report template. | Savings wording must stay aligned with route logic rules. |
+| `docs/templates/FLEET-LITE-SAVINGS-REPORT.sample-2026-07-02.md` | template | keep in `docs/templates/` | Sample savings report. | Sample is not current customer evidence. |
+| `docs/templates/VALIDATION-RESULTS.template.json` | template | keep in `docs/templates/` | Validation results template. | Blank template only. |
 | `docs/evidence/route-example-driver-proof-template.json` | template | keep in `docs/evidence/` or move to templates later | Driver proof evidence template. | Template only, not proof. |
 
 ## Archive and scratch candidates

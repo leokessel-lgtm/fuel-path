@@ -1718,7 +1718,7 @@ test("store publishing evidence template keeps placeholder values blocked", asyn
       "--native-blocker-packet",
       nativeBlockerPacket,
       "--store-evidence-json",
-      "STORE-PUBLISHING-EVIDENCE.template.json",
+      "docs/templates/STORE-PUBLISHING-EVIDENCE.template.json",
       "--allow-blocked",
     ],
     { cwd: ROOT, timeout: 10_000 },

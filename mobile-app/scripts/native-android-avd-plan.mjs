@@ -14,7 +14,9 @@ const emulatorCommand = findAndroidTool("emulator", ["emulator", "emulator"]);
 const androidToolEnv = buildAndroidToolEnv();
 const existingAvds = readAndroidAvdConfigs();
 const installedPackages = listInstalledPackages();
-const hostArch = spawnSync("uname", ["-m"], { encoding: "utf8", timeout: 2_000 }).stdout.trim() || "unknown";
+const hostArch = process.env.FUEL_PATH_HOST_ARCH_FOR_TESTS
+  || spawnSync("uname", ["-m"], { encoding: "utf8", timeout: 2_000 }).stdout.trim()
+  || "unknown";
 const compatibleAvds = existingAvds.filter((avd) => isArm64Compatible(avd.abi));
 const commandLineToolsAvailable = Boolean(sdkManagerCommand && avdManagerCommand);
 const arm64ImageInstalled = installedPackages.some((line) => line.includes(SYSTEM_IMAGE));

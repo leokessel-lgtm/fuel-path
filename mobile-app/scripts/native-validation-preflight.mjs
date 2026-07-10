@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const args = new Set(process.argv.slice(2));
@@ -6,7 +6,9 @@ const strict = args.has("--strict");
 const appJson = readJson("app.json").expo;
 const packageJson = readJson("package.json");
 const appConfigSource = readFileSync(resolve("src/config.ts"), "utf8");
-const gradleWrapperSource = readFileSync(resolve("android/gradle/wrapper/gradle-wrapper.properties"), "utf8");
+const nativeGenerationContract = readJson("native-generation-contract.json");
+const gradleWrapperPath = resolve("android/gradle/wrapper/gradle-wrapper.properties");
+const gradleWrapperSource = existsSync(gradleWrapperPath) ? readFileSync(gradleWrapperPath, "utf8") : "";
 const env = process.env;
 
 const checks = [];
@@ -40,9 +42,16 @@ check("Android package configured", appJson.android?.package === "com.fuelpath.a
   detail: appJson.android?.package || "missing",
 });
 
-check("Android Gradle wrapper stays on Expo-compatible Gradle 8", androidGradleWrapperIsCompatible(), {
+check("Tracked native generation contract requires Expo-compatible Gradle 8", nativeGenerationContract.android?.gradleMajor === 8, {
   fail: true,
-  detail: "Use Gradle 8.x; Gradle 9 currently breaks the React Native toolchain resolver.",
+  detail: "Keep native-generation-contract.json on Gradle 8; Gradle 9 currently breaks the React Native toolchain resolver.",
+});
+
+check("Generated Android Gradle wrapper is available and matches the tracked contract", androidGradleWrapperIsCompatible(), {
+  fail: strict,
+  detail: gradleWrapperSource
+    ? `Regenerate Android with the verified Gradle ${nativeGenerationContract.android?.verifiedWrapperVersion} contract.`
+    : "Run Expo prebuild before strict native/device validation; generated android/ is intentionally ignored in clean worktrees.",
 });
 
 check("Route alert notification channel configured", notificationsPlugin()?.defaultChannel === "route-alerts", {
@@ -148,7 +157,8 @@ function installedNativeFallbackIsHttps() {
 }
 
 function androidGradleWrapperIsCompatible() {
-  return /distributionUrl=.*gradle-8\.\d+(?:\.\d+)?-bin\.zip/.test(gradleWrapperSource);
+  const expected = String(nativeGenerationContract.android?.verifiedWrapperVersion || "").replace(/\./g, "\\.");
+  return Boolean(gradleWrapperSource) && new RegExp(`distributionUrl=.*gradle-${expected}-bin\\.zip`).test(gradleWrapperSource);
 }
 
 function notificationsPlugin() {

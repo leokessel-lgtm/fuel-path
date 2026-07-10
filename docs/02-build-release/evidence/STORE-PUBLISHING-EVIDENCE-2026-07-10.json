@@ -1,0 +1,19 @@
+{
+  "privacyContact": "support@fuelpath.app",
+  "privacyPolicyUrl": "https://fuel-path.vercel.app/web-demo/privacy",
+  "privacyPolicySource": "web-demo/privacy.html",
+  "appStoreUrl": "",
+  "googlePlayUrl": "",
+  "privacyContactConfirmed": true,
+  "storeListingLinksConfirmed": false,
+  "applePrivacyReviewed": true,
+  "applePrivacyReviewReference": "STORE-DATA-SAFETY.md Apple App Privacy review 2026-07-05",
+  "googleDataSafetyReviewed": true,
+  "googleDataSafetyReviewReference": "STORE-DATA-SAFETY.md Google Data Safety review 2026-07-05",
+  "providerLimitationsDisclosed": false,
+  "providerLimitationsDisclosureReference": "",
+  "supportProcessReady": true,
+  "supportProcessReference": "docs/02-build-release/SUPPORT-RUNBOOK.md Support process reviewed and support contact confirmation 2026-07-05",
+  "reviewedAt": "2026-07-10",
+  "reviewer": "Leo Kesselring"
+}

@@ -704,7 +704,7 @@ Until Goal 1 validates, every new build item should answer yes to at least one o
 - Does it make the recommendation more trustworthy?
 - Does it make the map and ranked result easier to connect?
 - Does it improve whole-of-Australia capability without hiding regional limitations?
-- Does it include success metrics and break-it tests from `NATIONAL-TESTING-REGIME.md`?
+- Does it include success metrics and break-it tests from `docs/02-build-release/NATIONAL-TESTING-REGIME.md`?
 
 If not, park it.
 
@@ -731,7 +731,7 @@ A roadmap or backlog item is done only when:
 - stale untrusted-source, restricted or unsupported data cannot silently drive a confident recommendation
 - production smoke passes after deploy, when the change reaches production
 
-Use `NATIONAL-TESTING-REGIME.md` as the release gate for feature, integration and production checks.
+Use `docs/02-build-release/NATIONAL-TESTING-REGIME.md` as the release gate for feature, integration and production checks.
 
 ## Build Progress
 

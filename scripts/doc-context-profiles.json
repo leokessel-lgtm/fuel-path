@@ -24,6 +24,12 @@
       "docs/03-provider-data/README.md",
       "docs/03-provider-data/provider-readiness.md"
     ],
+    "release_readiness": [
+      "AGENTS.md",
+      "docs/README.md",
+      "docs/02-build-release/README.md",
+      "docs/02-build-release/STORE-READINESS-PLAN.md"
+    ],
     "route_change": [
       "AGENTS.md",
       "docs/README.md",

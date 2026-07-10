@@ -4,7 +4,7 @@ import { resolve } from "node:path";
 
 const args = parseArgs(process.argv.slice(2));
 const evidence = readEvidence();
-const runbookPath = args.runbook || evidence.runbook || "SUPPORT-RUNBOOK.md";
+const runbookPath = args.runbook || evidence.runbook || "docs/02-build-release/SUPPORT-RUNBOOK.md";
 const resolvedRunbook = resolve(runbookPath);
 const runbook = existsSync(resolvedRunbook) ? readFileSync(resolvedRunbook, "utf8") : "";
 const supportContact = textArg("support-contact", "FUEL_PATH_SUPPORT_CONTACT", evidence.supportContact);

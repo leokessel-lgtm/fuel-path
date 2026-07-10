@@ -184,4 +184,4 @@
 
 - Every new backlog item needs user story, success metrics and break-it test evidence.
 - Every implementation needs a backend or product decision rule, plus a UX surface that shows the rule outcome, limitation or blocked state.
-- Use `NATIONAL-TESTING-REGIME.md` for feature, integration, accessibility, performance and post-deploy checks.
+- Use `docs/02-build-release/NATIONAL-TESTING-REGIME.md` for feature, integration, accessibility, performance and post-deploy checks.

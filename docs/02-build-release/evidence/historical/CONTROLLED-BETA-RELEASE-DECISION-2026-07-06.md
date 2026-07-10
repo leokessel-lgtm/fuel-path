@@ -1,4 +1,8 @@
-# Controlled Beta Release Decision - refreshed 2026-07-06 (Australia)
+# Historical controlled beta release decision - 2026-07-06 (Australia)
+
+> Superseded on 2026-07-10. This records the earlier decision only and is not
+> current beta or store-readiness proof. See
+> [`../../CURRENT-RELEASE-DECISION.md`](../../CURRENT-RELEASE-DECISION.md).
 
 ## TL;DR
 Fuel Path is ready for a controlled real-user beta checkpoint. The current provider, store, support and native evidence gates pass together, and the previous native performance blocker has been cleared by a Pixel 9 Pro physical-device run.
@@ -73,7 +77,7 @@ Do not move to broader public release until:
   - **Mitigation:** Rerun `check-beta-readiness` with current evidence before any release promotion or public-readiness claim.
 
 ## What passed
-- `node scripts/check-beta-readiness.mjs --provider-terms-evidence-json docs/03-provider-data/evidence/PROVIDER-TERMS-EVIDENCE-2026-07-05.json --store-evidence-json STORE-PUBLISHING-EVIDENCE-2026-07-05.json --support-evidence-json SUPPORT-READINESS-EVIDENCE-2026-07-05.json` - ready, zero blockers.
+- `node scripts/check-beta-readiness.mjs --provider-terms-evidence-json docs/03-provider-data/evidence/PROVIDER-TERMS-EVIDENCE-2026-07-05.json --store-evidence-json docs/02-build-release/evidence/STORE-PUBLISHING-EVIDENCE-2026-07-05.json --support-evidence-json docs/02-build-release/evidence/SUPPORT-READINESS-EVIDENCE-2026-07-05.json` - ready, zero blockers at the time recorded.
 - `node --test --test-concurrency=1 tests/api/native-android-performance-summary.test.js tests/api/beta-readiness.test.js` - 36/36.
 - `node --test --test-concurrency=1 tests/api/provider-terms-readiness.test.js tests/api/store-publishing-readiness.test.js tests/api/support-readiness.test.js tests/api/beta-readiness.test.js` - 84/84.
 - Pixel 9 Pro physical Android smoke: `tmp/native-smoke/android-preview-smoke-2026-07-05T20-59-03-701Z.md` - passed.
@@ -93,15 +97,14 @@ Do not move to broader public release until:
   - `validate:ev-provider-trials -- --proxy` - pass.
 
 ## Evidence bundles
-- [Provider terms evidence](03-provider-data/evidence/PROVIDER-TERMS-EVIDENCE-2026-07-05.json)
-- [Store publishing evidence](../STORE-PUBLISHING-EVIDENCE-2026-07-05.json)
+- [Provider terms evidence](../../../03-provider-data/evidence/PROVIDER-TERMS-EVIDENCE-2026-07-05.json)
+- [Store publishing evidence](STORE-PUBLISHING-EVIDENCE-2026-07-05.json)
 - [Support readiness evidence](../SUPPORT-READINESS-EVIDENCE-2026-07-05.json)
-- [Native validation notes](../mobile-app/NATIVE-VALIDATION.md)
-- [Native launch readiness current state](native-launch-readiness-current-state-2026-07-01.md)
-- [production-like sample build](../tmp/production-like-sample-build-refresh-2026-07-03T06-52-40-717Z.json)
-- [production readiness pack](../tmp/production-readiness-pack-2026-07-03T06-48-55-253Z.json)
-- [production canary](../tmp/production-fuel-readiness-canary-2026-07-03T06-49-40-237Z.json)
-- [combined nearby rural+remote smoke](../tmp/combined-nearby-rural-remote-smoke-2026-07-03T06-51-16-389Z.json)
+- [Native validation notes](../../../../mobile-app/NATIVE-VALIDATION.md)
+- [Native launch readiness current state](../../../native-launch-readiness-current-state-2026-07-01.md)
+
+The original decision also referenced four local `tmp/` outputs. Those files
+were never tracked, so they are not preserved as repository evidence.
 
 ## Untested or excluded from this decision
 - Lower-end Android performance.

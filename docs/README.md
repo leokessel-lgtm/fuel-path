@@ -13,21 +13,23 @@ For the complete document classification and move backlog, see
 | Understand the product | [`current-product.md`](current-product.md) | The detailed roadmap or research only when the task needs that depth |
 | Change route recommendations, scoring or savings wording | [`route-recommendation-logic-rules.md`](route-recommendation-logic-rules.md) | Latest route evidence under [`evidence/`](evidence/) |
 | Work on provider integrations or access | [`03-provider-data/README.md`](03-provider-data/README.md) | Open only the relevant provider decision, implementation note or evidence file |
-| Assess beta or store readiness | [`STORE-READINESS-PLAN.md`](../STORE-READINESS-PLAN.md) and [`NATIONAL-TESTING-REGIME.md`](../NATIONAL-TESTING-REGIME.md) | Dated store, support, native and provider evidence |
+| Assess beta or store readiness | [`02-build-release/CURRENT-RELEASE-DECISION.md`](02-build-release/CURRENT-RELEASE-DECISION.md) and [`02-build-release/STORE-READINESS-PLAN.md`](02-build-release/STORE-READINESS-PLAN.md) | Dated store, support, native and provider evidence |
 | Work on the mobile app | [`mobile-app/README.md`](../mobile-app/README.md) and [`mobile-app/AGENTS.md`](../mobile-app/AGENTS.md) | [`mobile-app/NATIVE-VALIDATION.md`](../mobile-app/NATIVE-VALIDATION.md) when validation state matters |
 | Plan validation sessions | [`VALIDATION-SESSION-WORKBOOK.md`](../VALIDATION-SESSION-WORKBOOK.md) | Recruitment, demo and synthesis documents only for that workflow |
-| Run or change tests | [`NATIONAL-TESTING-REGIME.md`](../NATIONAL-TESTING-REGIME.md) | The closest test file and package script for the changed subsystem |
+| Run or change tests | [`02-build-release/NATIONAL-TESTING-REGIME.md`](02-build-release/NATIONAL-TESTING-REGIME.md) | The closest test file and package script for the changed subsystem |
 | Review architecture or performance | [`backend-hosting-v1.md`](backend-hosting-v1.md) or [`PERFORMANCE-GUARDRAILS.md`](../PERFORMANCE-GUARDRAILS.md), depending on scope | Dated benchmarks only when the claim needs evidence |
 
 ## Folder map
 
 ```text
 docs/
+  02-build-release/        current build, testing, support and release gates
   03-provider-data/        provider decisions, implementation and evidence
   05-research/             research, strategy and product learning
   brand-concepts/          exploratory brand concepts, not production assets
   evidence/                current generated evidence not yet grouped by topic
   templates/               blank and sample artefacts, never proof by themselves
+  archive/                 superseded material retained for audit history
   catalog.md               detailed classification and future move backlog
 ```
 

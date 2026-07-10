@@ -50,7 +50,7 @@ test("store publishing readiness rejects non-public policy URLs and placeholder 
     providerLimitationsDisclosed: true,
     providerLimitationsDisclosureReference: "App listing provider limitations copy reviewed 2026-06-20",
     supportProcessReady: true,
-    supportProcessReference: "SUPPORT-RUNBOOK.md support process review 2026-06-20",
+    supportProcessReference: "docs/02-build-release/SUPPORT-RUNBOOK.md support process review 2026-06-20",
     reviewedAt: "2026-06-20",
     reviewer: "Leo Kesselring",
   });
@@ -85,7 +85,7 @@ test("store publishing readiness rejects third-party hosted privacy policy URLs"
     providerLimitationsDisclosed: true,
     providerLimitationsDisclosureReference: "App listing provider limitations copy reviewed 2026-06-20",
     supportProcessReady: true,
-    supportProcessReference: "SUPPORT-RUNBOOK.md support process review 2026-06-20",
+    supportProcessReference: "docs/02-build-release/SUPPORT-RUNBOOK.md support process review 2026-06-20",
     reviewedAt: "2026-06-20",
     reviewer: "Leo Kesselring",
   });
@@ -118,7 +118,7 @@ test("store publishing readiness requires review metadata when release flags are
     providerLimitationsDisclosed: true,
     providerLimitationsDisclosureReference: "App listing provider limitations copy reviewed 2026-06-20",
     supportProcessReady: true,
-    supportProcessReference: "SUPPORT-RUNBOOK.md support process review 2026-06-20",
+    supportProcessReference: "docs/02-build-release/SUPPORT-RUNBOOK.md support process review 2026-06-20",
   });
 
   const { stdout } = await execFileAsync(
@@ -148,7 +148,7 @@ test("store publishing readiness rejects personal inboxes and generic reviewers"
     providerLimitationsDisclosed: true,
     providerLimitationsDisclosureReference: "App listing provider limitations copy reviewed 2026-06-20",
     supportProcessReady: true,
-    supportProcessReference: "SUPPORT-RUNBOOK.md support process review 2026-06-20",
+    supportProcessReference: "docs/02-build-release/SUPPORT-RUNBOOK.md support process review 2026-06-20",
     reviewedAt: "2026-06-20",
     reviewer: "release owner",
   });
@@ -180,7 +180,7 @@ test("store publishing readiness rejects generic public privacy contact URLs", a
     providerLimitationsDisclosed: true,
     providerLimitationsDisclosureReference: "App listing provider limitations copy reviewed 2026-06-20",
     supportProcessReady: true,
-    supportProcessReference: "SUPPORT-RUNBOOK.md support process review 2026-06-20",
+    supportProcessReference: "docs/02-build-release/SUPPORT-RUNBOOK.md support process review 2026-06-20",
     reviewedAt: "2026-06-20",
     reviewer: "Leo Kesselring",
   });
@@ -214,7 +214,7 @@ test("store publishing readiness accepts Fuel Path-owned privacy contact URLs", 
     providerLimitationsDisclosed: true,
     providerLimitationsDisclosureReference: "App listing provider limitations copy reviewed 2026-06-20",
     supportProcessReady: true,
-    supportProcessReference: "SUPPORT-RUNBOOK.md support process review 2026-06-20",
+    supportProcessReference: "docs/02-build-release/SUPPORT-RUNBOOK.md support process review 2026-06-20",
     reviewedAt: "2026-06-20",
     reviewer: "Leo Kesselring",
   });
@@ -387,7 +387,7 @@ test("store publishing readiness rejects stale release review evidence", async (
     providerLimitationsDisclosed: true,
     providerLimitationsDisclosureReference: "App listing provider limitations copy reviewed 2026-06-20",
     supportProcessReady: true,
-    supportProcessReference: "SUPPORT-RUNBOOK.md support process review 2026-06-20",
+    supportProcessReference: "docs/02-build-release/SUPPORT-RUNBOOK.md support process review 2026-06-20",
     reviewedAt: "2026-01-01",
     reviewer: "Leo Kesselring",
   });
@@ -420,7 +420,7 @@ test("store publishing readiness rejects future release review dates", async () 
     providerLimitationsDisclosed: true,
     providerLimitationsDisclosureReference: "App listing provider limitations copy reviewed 2026-06-20",
     supportProcessReady: true,
-    supportProcessReference: "SUPPORT-RUNBOOK.md support process review 2026-06-20",
+    supportProcessReference: "docs/02-build-release/SUPPORT-RUNBOOK.md support process review 2026-06-20",
     reviewedAt: "2099-01-01",
     reviewer: "Leo Kesselring",
   });
@@ -453,7 +453,7 @@ test("store publishing readiness rejects future-dated release review references"
     providerLimitationsDisclosed: true,
     providerLimitationsDisclosureReference: "App listing provider limitations copy reviewed 2099-01-01",
     supportProcessReady: true,
-    supportProcessReference: "SUPPORT-RUNBOOK.md support process review 2099-01-01",
+    supportProcessReference: "docs/02-build-release/SUPPORT-RUNBOOK.md support process review 2099-01-01",
     reviewedAt: "2026-06-20",
     reviewer: "Leo Kesselring",
   });
@@ -489,7 +489,7 @@ test("store publishing readiness rejects stale release review references", async
     providerLimitationsDisclosed: true,
     providerLimitationsDisclosureReference: "App listing provider limitations copy reviewed 2026-01-01",
     supportProcessReady: true,
-    supportProcessReference: "SUPPORT-RUNBOOK.md support process review 2026-01-01",
+    supportProcessReference: "docs/02-build-release/SUPPORT-RUNBOOK.md support process review 2026-01-01",
     reviewedAt: "2026-06-20",
     reviewer: "Leo Kesselring",
   });
@@ -525,7 +525,7 @@ test("store publishing readiness rejects missing markdown review sources", async
     providerLimitationsDisclosed: true,
     providerLimitationsDisclosureReference: "App listing provider limitations copy reviewed 2026-06-20",
     supportProcessReady: true,
-    supportProcessReference: "SUPPORT-RUNBOOK.md support process review 2026-06-20",
+    supportProcessReference: "docs/02-build-release/SUPPORT-RUNBOOK.md support process review 2026-06-20",
     reviewedAt: "2026-06-20",
     reviewer: "Leo Kesselring",
   });
@@ -566,7 +566,7 @@ test("store publishing readiness rejects markdown review sources with sensitive 
     providerLimitationsDisclosed: true,
     providerLimitationsDisclosureReference: "App listing provider limitations copy reviewed 2026-06-20",
     supportProcessReady: true,
-    supportProcessReference: "SUPPORT-RUNBOOK.md support process review 2026-06-20",
+    supportProcessReference: "docs/02-build-release/SUPPORT-RUNBOOK.md support process review 2026-06-20",
     reviewedAt: "2026-06-20",
     reviewer: "Leo Kesselring",
   });
@@ -597,7 +597,7 @@ test("store publishing readiness requires the privacy contact in the policy sour
     providerLimitationsDisclosed: true,
     providerLimitationsDisclosureReference: "App listing provider limitations copy reviewed 2026-06-20",
     supportProcessReady: true,
-    supportProcessReference: "SUPPORT-RUNBOOK.md support process review 2026-06-20",
+    supportProcessReference: "docs/02-build-release/SUPPORT-RUNBOOK.md support process review 2026-06-20",
     reviewedAt: "2026-06-20",
     reviewer: "Leo Kesselring",
   });
@@ -630,7 +630,7 @@ test("store publishing readiness rejects placeholder store listing identifiers",
     providerLimitationsDisclosed: true,
     providerLimitationsDisclosureReference: "App listing provider limitations copy reviewed 2026-06-20",
     supportProcessReady: true,
-    supportProcessReference: "SUPPORT-RUNBOOK.md support process review 2026-06-20",
+    supportProcessReference: "docs/02-build-release/SUPPORT-RUNBOOK.md support process review 2026-06-20",
     reviewedAt: "2026-06-20",
     reviewer: "Leo Kesselring",
   });
@@ -663,7 +663,7 @@ test("store publishing readiness rejects lookalike store listing hostnames", asy
     providerLimitationsDisclosed: true,
     providerLimitationsDisclosureReference: "App listing provider limitations copy reviewed 2026-06-20",
     supportProcessReady: true,
-    supportProcessReference: "SUPPORT-RUNBOOK.md support process review 2026-06-20",
+    supportProcessReference: "docs/02-build-release/SUPPORT-RUNBOOK.md support process review 2026-06-20",
     reviewedAt: "2026-06-20",
     reviewer: "Leo Kesselring",
   });
@@ -696,7 +696,7 @@ test("store publishing readiness requires Google Play package to match native co
     providerLimitationsDisclosed: true,
     providerLimitationsDisclosureReference: "App listing provider limitations copy reviewed 2026-06-20",
     supportProcessReady: true,
-    supportProcessReference: "SUPPORT-RUNBOOK.md support process review 2026-06-20",
+    supportProcessReference: "docs/02-build-release/SUPPORT-RUNBOOK.md support process review 2026-06-20",
     reviewedAt: "2026-06-20",
     reviewer: "Leo Kesselring",
   });
@@ -730,7 +730,7 @@ test("store publishing readiness requires App Store slug to match native config"
     providerLimitationsDisclosed: true,
     providerLimitationsDisclosureReference: "App listing provider limitations copy reviewed 2026-06-20",
     supportProcessReady: true,
-    supportProcessReference: "SUPPORT-RUNBOOK.md support process review 2026-06-20",
+    supportProcessReference: "docs/02-build-release/SUPPORT-RUNBOOK.md support process review 2026-06-20",
     reviewedAt: "2026-06-20",
     reviewer: "Leo Kesselring",
   });
@@ -764,7 +764,7 @@ test("store publishing readiness passes with concrete contact, listing links and
     providerLimitationsDisclosed: true,
     providerLimitationsDisclosureReference: "App listing provider limitations copy reviewed 2026-06-20",
     supportProcessReady: true,
-    supportProcessReference: "SUPPORT-RUNBOOK.md support process review 2026-06-20",
+    supportProcessReference: "docs/02-build-release/SUPPORT-RUNBOOK.md support process review 2026-06-20",
     reviewedAt: "2026-06-20",
     reviewer: "Leo Kesselring",
   });

@@ -433,7 +433,7 @@ The Plan Trip screen should stay compact and action-led:
 - Confirm whether the live web demo can be shared publicly after usage rights are confirmed.
 - Keep refining the validation demo from participant feedback.
 - Require every implementation to include a backend or product decision rule and a UX surface that shows the rule outcome, limitation or blocked state.
-- Apply the break-it testing regime in `NATIONAL-TESTING-REGIME.md` before closing new backlog items.
+- Apply the break-it testing regime in `docs/02-build-release/NATIONAL-TESTING-REGIME.md` before closing new backlog items.
 
 ### Completed In Demo
 

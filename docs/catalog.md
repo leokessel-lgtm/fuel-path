@@ -18,10 +18,11 @@ were produced unless the relevant workflow has been re-run.
 | `docs/context-budget.md` | current-evidence | keep in `docs/` | Reproducible repo-owned documentation context estimates. | Character-based estimate only; update when router profiles change. |
 | `docs/route-recommendation-logic-rules.md` | source-of-truth | keep in `docs/` | Route recommendation, scoring, rejection, detour, savings and Plan wording contract. | Must be updated in the same change as route logic or user-facing savings wording. |
 | `PROJECT-GOALS-ROADMAP.md` | source-of-truth | move later to `docs/00-product-vision/` | Product goals and roadmap framing. | Moving requires link checks from README and handoff notes. |
-| `STORE-READINESS-PLAN.md` | source-of-truth | move later to `docs/02-build-release/` | Current store readiness and release-gate state. | Do not collapse request sent, terms confirmed, quality-ready and beta-release-ready. |
-| `NATIONAL-TESTING-REGIME.md` | source-of-truth | move later to `docs/02-build-release/` | Validation and testing regime. | Keep separate from dated validation evidence. |
+| `docs/02-build-release/STORE-READINESS-PLAN.md` | source-of-truth | keep in `docs/02-build-release/` | Current store readiness and release-gate state. | Do not collapse request sent, terms confirmed, quality-ready and beta-release-ready. |
+| `docs/02-build-release/CURRENT-RELEASE-DECISION.md` | source-of-truth | keep in `docs/02-build-release/` | Current release decision and blocker summary. | Must be refreshed from the live gate before any release promotion. |
+| `docs/02-build-release/NATIONAL-TESTING-REGIME.md` | source-of-truth | keep in `docs/02-build-release/` | Validation and testing regime. | Keep separate from dated validation evidence. |
 | `docs/03-provider-data/provider-readiness.md` | source-of-truth | keep in `docs/03-provider-data/` | Current provider verification contract and state boundaries. | Runtime and evidence checks still need to be rerun for current claims. |
-| `SUPPORT-RUNBOOK.md` | source-of-truth | move later to `docs/02-build-release/` | Support workflow and operational response guidance. | Test fixtures may mirror it but are not the source of truth. |
+| `docs/02-build-release/SUPPORT-RUNBOOK.md` | source-of-truth | keep in `docs/02-build-release/` | Support workflow and operational response guidance. | Test fixtures may mirror it but are not the source of truth. |
 | `PRIVACY-POLICY.md` | source-of-truth | keep at root or move later to `docs/02-build-release/` | User-facing privacy policy. | Governance, privacy and store claims need source-backed review. |
 | `DATA-RETENTION-RULES.md` | source-of-truth | move later to `docs/02-build-release/` | Data retention rules and operating constraints. | Treat as policy-sensitive. |
 | `STORE-DATA-SAFETY.md` | source-of-truth | move later to `docs/02-build-release/` | Store data safety material. | Must align with privacy policy and store evidence. |
@@ -42,8 +43,8 @@ were produced unless the relevant workflow has been re-run.
 | `VALIDATION-RECRUITMENT-PACK.md` | current-evidence | move later to `docs/04-validation-evidence/` | Recruiting material for validation. | May need privacy and consent review before reuse. |
 | `SYNTHETIC-VALIDATION-SESSIONS.md` | current-evidence | move later to `docs/04-validation-evidence/` | Synthetic validation notes. | Label as synthetic, not customer proof. |
 | `docs/03-provider-data/evidence/PROVIDER-TERMS-EVIDENCE-2026-07-05.json` | current-evidence | keep in `docs/03-provider-data/evidence/` | Dated provider terms evidence. | Evidence held, not blanket permission or legal approval. |
-| `STORE-PUBLISHING-EVIDENCE-2026-07-05.json` | current-evidence | move later to `docs/02-build-release/evidence/` | Dated store publishing evidence. | Store readiness can drift with app, policy and listing changes. |
-| `SUPPORT-READINESS-EVIDENCE-2026-07-05.json` | current-evidence | move later to `docs/02-build-release/evidence/` | Dated support readiness evidence. | Support readiness should remain separate from store readiness. |
+| `docs/02-build-release/evidence/STORE-PUBLISHING-EVIDENCE-2026-07-10.json` | current-evidence | keep in `docs/02-build-release/evidence/` | Current blocked store publishing evidence. | Store readiness remains blocked until real listings and disclosure proof exist. |
+| `docs/02-build-release/evidence/SUPPORT-READINESS-EVIDENCE-2026-07-05.json` | current-evidence | keep in `docs/02-build-release/evidence/` | Dated support readiness evidence. | Support readiness should remain separate from store readiness. |
 | `docs/evidence/*.json` | current-evidence | keep in `docs/evidence/` for now | Raw evidence files for route, prediction and competitor checks. | Do not promote without checking dates and scripts. |
 | `docs/route-output-benchmark-user-testing-2026-07-09.md` | current-evidence | keep in `docs/` for now | Latest tracked route output benchmark note. | Benchmark result is date-bound. |
 | `docs/competitor-route-browser-pass-2026-07-09T03-55-48-052.md` | current-evidence | keep in `docs/` for now | Latest tracked competitor browser pass. | Browser observations can drift. |
@@ -53,7 +54,9 @@ were produced unless the relevant workflow has been re-run.
 | Path | Bucket | Keep/move/archive/delete | Reason | Risk |
 | --- | --- | --- | --- | --- |
 | `VALIDATION-PASS-2026-06-14.md` | historical-evidence | move later to `docs/04-validation-evidence/` | Older validation pass. | Do not cite as current readiness without rerun. |
-| `STORE-RELEASE-REVIEW-2026-06-20.md` | historical-evidence | move later to `docs/04-validation-evidence/` | Older store release review. | Superseded by later store readiness/evidence work. |
+| `docs/02-build-release/evidence/historical/STORE-RELEASE-REVIEW-2026-06-20.md` | historical-evidence | keep under release evidence history | Older store release review retained for context. | It is not the source for current store-readiness claims. |
+| `docs/02-build-release/evidence/historical/CONTROLLED-BETA-RELEASE-DECISION-2026-07-06.md` | historical-evidence | keep under release evidence history | Superseded controlled-beta GO decision. | Must not be used as current beta or store-readiness proof. |
+| `docs/02-build-release/evidence/historical/STORE-PUBLISHING-EVIDENCE-2026-07-05.json` | historical-evidence | preserve unchanged | Original store evidence later invalidated by 404 listing checks. | Audit history only; its readiness claims are not current. |
 | `docs/03-provider-data/evidence/historical/PROVIDER-TERMS-REVIEW-2026-06-20.md` | historical-evidence | keep as historical evidence | Older provider terms review. | Superseded by July evidence in some areas. |
 | `docs/*2026-06-*.md` | historical-evidence | keep in place for now, then move by topic | Dated June stress, architecture, GNAF, map and stabilisation notes. | Useful context, but not current proof. |
 | `docs/route-output-benchmark-user-testing-2026-07-03.md` | historical-evidence | keep near latest benchmark for now | Earlier route output benchmark. | Superseded by 2026-07-09 benchmark unless a specific regression history is needed. |
@@ -125,7 +128,7 @@ were produced unless the relevant workflow has been re-run.
 | `TODO.md` | archive | archive later after checking unresolved items | General task residue. | May contain still-useful loose ends. |
 | `mobile-app/CLAUDE.md` | archive | archive later if no longer used | Tool-specific guidance likely superseded by `AGENTS.md`. | Check external tooling before moving. |
 | `docs/03-provider-data/evidence/historical/PROVIDER-TERMS-EVIDENCE.2026-06-20.draft.json` | archive | keep as historical evidence | Draft superseded by later provider evidence. | Audit trail only, not current terms proof. |
-| `STORE-PUBLISHING-EVIDENCE.2026-06-20.draft.json` | archive | archive later | Draft superseded by later store evidence. | Keep if audit trail matters. |
+| `docs/archive/build-release/STORE-PUBLISHING-EVIDENCE.2026-06-20.draft.json` | archive | keep in `docs/archive/build-release/` | Draft superseded by later store evidence. | Keep if audit trail matters. |
 | `research/benchmark/output/*` | historical-evidence | keep under research output, consider archive index later | Generated benchmark outputs that are tracked. | Too many files for root-level discoverability. |
 | `tmp/*.json`, `tmp/*.md` | scratch | delete or ignore only after review | Local generated stress and smoke outputs are not tracked. | Some may contain useful recent evidence; promote intentionally before deletion. |
 | `.npm-cache/**`, `.vercel/**`, `public/build-version.json`, `public/metadata.json` | scratch | do not index as docs | Tooling/build state, not documentation. | Avoid accidental doc audits from local/generated folders. |

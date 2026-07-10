@@ -1,0 +1,9 @@
+# Default ownership until subsystem maintainers are added.
+* @leokessel-lgtm
+
+# High-risk contracts and release surfaces.
+/api/ @leokessel-lgtm
+/mobile-app/ @leokessel-lgtm
+/docs/02-build-release/ @leokessel-lgtm
+/docs/03-provider-data/evidence/ @leokessel-lgtm
+/docs/route-recommendation-logic-rules.md @leokessel-lgtm

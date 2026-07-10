@@ -24,6 +24,41 @@
       "docs/03-provider-data/README.md",
       "docs/03-provider-data/provider-readiness.md"
     ],
+    "backend_api_task": [
+      "AGENTS.md",
+      "api/AGENTS.md",
+      "docs/01-architecture/README.md",
+      "docs/01-architecture/system-context.md"
+    ],
+    "geocode_task": [
+      "AGENTS.md",
+      "api/AGENTS.md",
+      "docs/01-architecture/runtime-data-flow.md",
+      "docs/03-provider-data/implementation/ADDRESS-LOOKUP-PROVIDERS.md"
+    ],
+    "traffic_scaling_task": [
+      "AGENTS.md",
+      "api/AGENTS.md",
+      "docs/01-architecture/scaling-model.md",
+      "PERFORMANCE-GUARDRAILS.md"
+    ],
+    "mobile_plan_task": [
+      "AGENTS.md",
+      "mobile-app/AGENTS.md",
+      "docs/01-architecture/runtime-data-flow.md"
+    ],
+    "mobile_map_task": [
+      "AGENTS.md",
+      "mobile-app/AGENTS.md",
+      "docs/01-architecture/system-context.md",
+      "PERFORMANCE-GUARDRAILS.md"
+    ],
+    "alerts_task": [
+      "AGENTS.md",
+      "api/AGENTS.md",
+      "docs/01-architecture/runtime-data-flow.md",
+      "docs/01-architecture/provider-failure-boundaries.md"
+    ],
     "release_readiness": [
       "AGENTS.md",
       "docs/README.md",

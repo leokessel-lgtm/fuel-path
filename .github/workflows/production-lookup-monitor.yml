@@ -34,6 +34,11 @@ jobs:
       - name: Run POI autocomplete budget guard
         run: npm run test:poi-autocomplete-budget
 
+      - name: Run architecture and documentation guards
+        run: |
+          npm run check:architecture
+          npm run check:docs
+
       - name: Run production lookup monitor
         if: github.event_name != 'pull_request'
         run: npm run check:production-lookup-monitor -- --api-base https://fuel-path.vercel.app

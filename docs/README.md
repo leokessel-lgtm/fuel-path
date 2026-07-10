@@ -18,11 +18,13 @@ For the complete document classification and move backlog, see
 | Plan validation sessions | [`VALIDATION-SESSION-WORKBOOK.md`](../VALIDATION-SESSION-WORKBOOK.md) | Recruitment, demo and synthesis documents only for that workflow |
 | Run or change tests | [`02-build-release/NATIONAL-TESTING-REGIME.md`](02-build-release/NATIONAL-TESTING-REGIME.md) | The closest test file and package script for the changed subsystem |
 | Review architecture or performance | [`backend-hosting-v1.md`](backend-hosting-v1.md) or [`PERFORMANCE-GUARDRAILS.md`](../PERFORMANCE-GUARDRAILS.md), depending on scope | Dated benchmarks only when the claim needs evidence |
+| Understand or refactor runtime boundaries | [`01-architecture/README.md`](01-architecture/README.md) | The closest handler, module and regression tests only |
 
 ## Folder map
 
 ```text
 docs/
+  01-architecture/         runtime boundaries, data flow, scaling and refactor map
   02-build-release/        current build, testing, support and release gates
   03-provider-data/        provider decisions, implementation and evidence
   05-research/             research, strategy and product learning
@@ -47,3 +49,4 @@ docs/
 
 Run `npm run check:docs` after moving documentation or changing internal links.
 Run `npm run measure:doc-context` after changing task-router profile membership.
+Run `npm run check:architecture` after changing production module boundaries.

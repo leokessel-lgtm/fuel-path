@@ -1,0 +1,37 @@
+{
+  "productionRoots": ["api", "mobile-app/src"],
+  "defaultMaxLines": 1200,
+  "lineLimitExceptions": {
+    "api/_addressIndex.js": 1912,
+    "api/_backend.js": 1619,
+    "api/_geocode.js": 1881,
+    "mobile-app/src/components/PlanRouteSheet.tsx": 1591,
+    "mobile-app/src/components/StationMap.native.tsx": 1246,
+    "mobile-app/src/components/StationMap.web.tsx": 1241
+  },
+  "disallowedTrackedPathPatterns": [
+    "(^|/)\\.DS_Store$",
+    "^(tmp|output|dist|native-artifacts|node_modules|\\.npm-cache|\\.vercel)/",
+    "^mobile-app/(tmp|output|dist|native-artifacts|node_modules|\\.npm-cache|\\.vercel)/",
+    "^api/(tmp|output|dist|node_modules|\\.npm-cache|\\.vercel)/",
+    "^Users/",
+    "^var/"
+  ],
+  "publicApiAllowedRequires": ["./_backend", "./_publicErrors"],
+  "publicApiRequireExceptions": {
+    "api/ev-chargers.js": [
+      "./_evApiNinjas",
+      "./_evGooglePlaces",
+      "./_evLocalPrototypeDirectory",
+      "./_evProviderPolicy",
+      "./_evProviderState",
+      "./_evOpenWebNinja",
+      "./_evRouteFallback",
+      "./_evOpenChargeMap",
+      "./_evProviderTelemetry"
+    ],
+    "api/status.js": ["./_evProviderPolicy", "./_providerObservability"]
+  },
+  "mobileLowerLayerRoots": ["mobile-app/src/services", "mobile-app/src/utils"],
+  "mobileLowerLayerDisallowedImports": ["/components/", "/screens/"]
+}

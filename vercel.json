@@ -1,7 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "installCommand": "npm ci --cache .npm-cache && cd mobile-app && npm ci --cache ../.npm-cache",
-  "buildCommand": "npm run test:poi-autocomplete-budget && sh scripts/build-vercel-static.sh",
+  "buildCommand": "npm run check:architecture && npm run test:poi-autocomplete-budget && sh scripts/build-vercel-static.sh",
   "outputDirectory": "public",
   "cleanUrls": true,
   "rewrites": [

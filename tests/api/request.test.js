@@ -3,14 +3,13 @@ const test = require("node:test");
 
 const {
   boolParam,
-  fetchJson,
   methodAllowed,
   numberParam,
   setParam,
   stringParam,
-} = require("../../api/_http");
+} = require("../../api/_request");
 
-test("HTTP parameter helpers preserve scalar, array and fallback contracts", () => {
+test("request parameter helpers preserve scalar, array and fallback contracts", () => {
   assert.equal(numberParam(["12", "13"], 4), 12);
   assert.equal(numberParam("invalid", 4), 4);
   assert.equal(stringParam(["first", "second"], "fallback"), "first");
@@ -37,30 +36,6 @@ test("methodAllowed preserves local CORS, preflight and rejection responses", ()
   assert.deepEqual(rejected.payload, { error: "Method not allowed" });
 });
 
-test("fetchJson preserves provider request and error contracts", async () => {
-  const originalFetch = global.fetch;
-  const calls = [];
-  try {
-    global.fetch = async (url, options) => {
-      calls.push({ url, options });
-      return response({ ok: true }, 200);
-    };
-    assert.deepEqual(await fetchJson("https://provider.invalid/data", { data: { fuel: "U91" }, headers: { "X-Test": "yes" } }), { ok: true });
-    assert.equal(calls[0].options.method, "POST");
-    assert.equal(calls[0].options.headers["User-Agent"], "FuelPathHostedBackend/0.1");
-    assert.equal(calls[0].options.headers["Content-Type"], "application/json");
-    assert.equal(calls[0].options.body, JSON.stringify({ fuel: "U91" }));
-
-    global.fetch = async () => response({ error: { message: "quota" } }, 429);
-    await assert.rejects(fetchJson("https://provider.invalid/data"), /Provider returned 429: quota/);
-
-    global.fetch = async () => ({ ok: true, status: 200, statusText: "OK", text: async () => "not-json" });
-    await assert.rejects(fetchJson("https://provider.invalid/data"), /Provider returned non-JSON response: not-json/);
-  } finally {
-    global.fetch = originalFetch;
-  }
-});
-
 function responseDouble() {
   return {
     headers: {},
@@ -79,14 +54,5 @@ function responseDouble() {
       this.ended = true;
       return this;
     },
-  };
-}
-
-function response(payload, status) {
-  return {
-    ok: status >= 200 && status < 300,
-    status,
-    statusText: status === 200 ? "OK" : "Error",
-    text: async () => JSON.stringify(payload),
   };
 }

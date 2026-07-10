@@ -13,15 +13,15 @@ const {
   setPredictionStorageForTests,
 } = require("./_predictionStorage");
 const { providerHealth, singleFlight } = require("./_providerRuntime");
+const { fetchJson } = require("./_providerHttp");
 const {
   boolParam,
-  fetchJson,
   methodAllowed,
   numberParam,
   sendJson,
   setParam,
   stringParam,
-} = require("./_http");
+} = require("./_request");
 const {
   googleRoutesApiKey,
 } = require("./_providerCredentials");

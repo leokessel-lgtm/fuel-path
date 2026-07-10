@@ -118,7 +118,7 @@
 - [x] Apply for VIC Servo Saver Public API access and receive approval credentials.
 - [ ] Implement VIC Servo Saver adapter after approved schema is available.
 - [x] Add SA Fuel Pricing Information Scheme Direct API adapter behind server-side token configuration.
-- [x] Confirm TAS fuel data/API access path. Evidence: API.NSW Fuel API v2 states NSW and TAS support for reference, prices, nearby, location and new-prices endpoints; `PROVIDER-ACCESS-READINESS.md` records the validation ask.
+- [x] Confirm TAS fuel data/API access path. Evidence: API.NSW Fuel API v2 states NSW and TAS support for reference, prices, nearby, location and new-prices endpoints; `docs/03-provider-data/PROVIDER-ACCESS-READINESS.md` records the validation ask.
 - [x] Implement TAS FuelCheck adapter through API.NSW v2. Evidence: live payload/schema validation passed on 19 June 2026 with approved API.NSW credentials; Hobart nearby returned 40 TAS record hints; backend adapter smoke returned `api_tas` with 20 usable U91 stations; provider-routing tests cover TAS capability and mocked v2 nearby payloads.
 - [ ] Confirm NT MyFuel data/API access path and implement adapter after approved schema is available.
 - [x] Add saved commutes, notification permission flow and backend alert sync path for validation builds.

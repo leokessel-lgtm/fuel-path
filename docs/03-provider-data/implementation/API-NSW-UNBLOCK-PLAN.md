@@ -57,7 +57,7 @@ Leo action for any new or rotated app:
 
 Use the local template:
 
-- [prototype/.env.example](prototype/.env.example)
+- [prototype/.env.example](../../../prototype/.env.example)
 
 Create:
 
@@ -114,7 +114,7 @@ python3 prototype/scripts/validate_api_nsw.py \
 
 Then update:
 
-- `normalise_nsw_payload` in [score_route.py](prototype/scripts/score_route.py)
+- `normalise_nsw_payload` in [score_route.py](../../../prototype/scripts/score_route.py)
 - the web demo data connector
 
 ## Step 5: Decide The Live-Data Architecture
@@ -148,7 +148,7 @@ Avoid scraping or republishing FuelCheck, PetrolSpy or other third-party data un
 
 Standalone file:
 
-- [API-NSW-SUPPORT-NOTE.md](API-NSW-SUPPORT-NOTE.md)
+- [API-NSW-SUPPORT-NOTE.md](../evidence/API-NSW-SUPPORT-NOTE.md)
 
 ```text
 Hello API.NSW team,

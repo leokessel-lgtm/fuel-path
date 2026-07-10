@@ -49,6 +49,7 @@
     "build:web": "npm run sync:discounts && EXPO_PUBLIC_FUEL_PATH_API_BASE_URL=__SAME_ORIGIN__ npm_config_cache=.npm-cache npx expo export --platform web --output-dir dist",
     "budget:size": "node scripts/check-bundle-budget.mjs",
     "budget:web": "node scripts/check-bundle-budget.mjs --scope=web",
+    "budget:web:regression": "node scripts/check-web-bundle-regression.mjs",
     "budget:assets": "node scripts/check-bundle-budget.mjs --scope=assets",
     "budget:native": "node scripts/check-bundle-budget.mjs --scope=native",
     "arch:screens": "node scripts/check-screen-complexity.mjs",

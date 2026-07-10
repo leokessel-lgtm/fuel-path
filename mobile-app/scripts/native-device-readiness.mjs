@@ -180,7 +180,8 @@ function checkAndroidAvdHostCompatibility() {
     return;
   }
 
-  const hostArch = spawnSync("uname", ["-m"], { encoding: "utf8", timeout: 2_000 }).stdout.trim();
+  const hostArch = process.env.FUEL_PATH_HOST_ARCH_FOR_TESTS
+    || spawnSync("uname", ["-m"], { encoding: "utf8", timeout: 2_000 }).stdout.trim();
   const compatible = avds.filter((avd) => isAvdAbiCompatible(hostArch, avd.abi));
   checks.push({
     name: "Android AVD ABI compatible with host",

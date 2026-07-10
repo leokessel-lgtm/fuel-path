@@ -28,6 +28,7 @@ test("Android AVD plan blocks clearly when command-line tools are missing", asyn
         PATH: "/usr/bin:/bin",
         HOME: home,
         FUEL_PATH_ANDROID_SDK_ROOT_FOR_TESTS: sdk,
+        FUEL_PATH_HOST_ARCH_FOR_TESTS: "arm64",
       },
       timeout: 10_000,
     });
@@ -61,6 +62,7 @@ test("Android AVD plan is actionable when managers and ARM64 image are present",
       PATH: "/usr/bin:/bin",
       HOME: home,
       FUEL_PATH_ANDROID_SDK_ROOT_FOR_TESTS: sdk,
+      FUEL_PATH_HOST_ARCH_FOR_TESTS: "arm64",
     },
     timeout: 10_000,
   });
@@ -94,6 +96,7 @@ test("Android AVD plan passes when a compatible AVD already exists", async () =>
       PATH: "/usr/bin:/bin",
       HOME: home,
       FUEL_PATH_ANDROID_SDK_ROOT_FOR_TESTS: sdk,
+      FUEL_PATH_HOST_ARCH_FOR_TESTS: "arm64",
     },
     timeout: 10_000,
   });

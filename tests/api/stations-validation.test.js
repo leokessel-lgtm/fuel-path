@@ -2,6 +2,19 @@ const assert = require("node:assert/strict");
 const test = require("node:test");
 
 const stationsHandler = require("../../api/stations");
+const { boundedNumberParam, coordinateParam } = stationsHandler._test;
+
+test("station query domain validation preserves precise internal reasons", () => {
+  const cases = [
+    [() => coordinateParam(undefined, "lat", -90, 90), /lat is required/],
+    [() => coordinateParam("abc", "lat", -90, 90), /lat must be a number/],
+    [() => coordinateParam(91, "lat", -90, 90), /lat must be at most 90/],
+    [() => coordinateParam(181, "lon", -180, 180), /lon must be at most 180/],
+    [() => boundedNumberParam(0, "radiusKm", 8, { min: 0.5, max: 100 }), /radiusKm must be at least 0\.5/],
+    [() => boundedNumberParam("abc", "limit", 160, { min: 1, max: 420 }), /limit must be a number/],
+  ];
+  for (const [operation, expected] of cases) assert.throws(operation, expected);
+});
 
 test("stations rejects missing and invalid coordinates", async () => {
   const cases = [

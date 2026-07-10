@@ -21,6 +21,11 @@ This protects the user experience for searches like:
   additional specific terms, such as a building or venue name.
 - An under-specified street address remains hidden without locality context, but
   a G-NAF match inside the supplied nearby search context may be returned.
+- Nearby context authorises a G-NAF address only inside the configured radius;
+  the wider ranking boost is not an address-disclosure boundary.
+- Names indicating a refuge, shelter, safe house or other sensitive location do
+  not reveal a precise G-NAF address unless the query itself contains explicit
+  address intent.
 - An exact building-name prefix from G-NAF outranks a broad locality fallback;
   ambiguous base-building results remain marked for refinement.
 - Known local POI/station/gazetteer queries return immediately from local autocomplete data.

@@ -1,6 +1,6 @@
 const { addressIndexStatus, searchAddressIndex } = require("./_addressIndex");
 const { additionalLocalGeocodeHints } = require("./_geocodeHints");
-const { broadAreaSuggestionLeavesSpecificQueryTerms, isBroadAreaSuggestion, normaliseSearchText, titleCase } = require("./_geocodeText");
+const { broadAreaSuggestionLeavesSpecificQueryTerms, isBroadAreaSuggestion, isWithinSearchContext, normaliseSearchText, titleCase } = require("./_geocodeText");
 const { distanceKm } = require("./_geoMath");
 const { providerHealth, providerTimeoutMs, withProviderRetries } = require("./_providerRuntime");
 const {
@@ -1263,16 +1263,16 @@ function createGeocoder({ fetchJson, loadStationData }) {
     const label = normaliseSearchText(item?.label || "");
     if (!needle || !label) return false;
     if (hasSensitiveAddressContext(query)) {
-      return addressLikeIntentMatch(query, item?.label) || addressLabelSubstantiallyStartsWithQuery(query, item?.label);
+      return addressLikeQuery(query) && addressLikeIntentMatch(query, item?.label);
     }
     if ((item?.refineRequired || item?.matchType === "building_refine") && localSuggestionPrimaryName(item) === needle) return true;
-    if (searchContextBoost(item, searchContext) > 0 && addressLabelSubstantiallyStartsWithQuery(query, item?.label)) return true;
+    if (isWithinSearchContext(item, searchContext, distanceKm) && addressLabelSubstantiallyStartsWithQuery(query, item?.label)) return true;
 
     if (isBroadLocalityOnlyQuery(query)) return false;
     if (hasPlaceIntent(needle)) {
       if (!addressLikeQuery(query) && !isPlaceWordAddressSignal(query)) return false;
       if (addressLikeQuery(query)) {
-        return addressLikeIntentMatch(query, item?.label) || searchContextBoost(item, searchContext) > 0;
+        return addressLikeIntentMatch(query, item?.label) || isWithinSearchContext(item, searchContext, distanceKm);
       }
       return addressLabelSubstantiallyStartsWithQuery(query, item?.label);
     }
@@ -1291,7 +1291,7 @@ function createGeocoder({ fetchJson, loadStationData }) {
       !queryLocality &&
       !queryStateCode &&
       !queryHasPostcode(query) &&
-      searchContextBoost(item, searchContext) <= 0
+      !isWithinSearchContext(item, searchContext, distanceKm)
     ) return false;
     return true;
   }

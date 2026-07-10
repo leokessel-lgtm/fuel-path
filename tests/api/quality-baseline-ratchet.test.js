@@ -35,6 +35,19 @@ test("mobile web bundle baselines cannot increase above the merge base", (contex
   );
 });
 
+test("backend test quarantine cannot increase above the merge base", (context) => {
+  const fixture = gitFixture(context);
+  copyFile(fixture, "scripts/check-backend-test-quarantine.mjs");
+  writeBackendQuarantine(fixture, {});
+  commitAll(fixture, "baseline");
+  writeBackendQuarantine(fixture, { "tests/api/broken.test.js": "Known failure requiring a focused repair before merge." });
+
+  assert.throws(
+    () => run(process.execPath, ["scripts/check-backend-test-quarantine.mjs"], fixture, { FUEL_PATH_BASE_REF: "HEAD" }),
+    /quarantine increased from 0 to 1/,
+  );
+});
+
 function gitFixture(context) {
   const fixture = mkdtempSync(path.join(tmpdir(), "fuel-path-quality-ratchet-"));
   context.after(() => rmSync(fixture, { force: true, recursive: true }));
@@ -58,6 +71,10 @@ function writeBundleBaseline(fixture, value) {
     webLargestFileBytes: value,
     webJsTotalBytes: value,
   }, null, 2)}\n`);
+}
+
+function writeBackendQuarantine(fixture, quarantined) {
+  write(fixture, "scripts/backend-test-manifest.json", `${JSON.stringify({ quarantined }, null, 2)}\n`);
 }
 
 function copyFile(fixture, relativePath) {

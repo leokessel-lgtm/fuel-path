@@ -3,6 +3,9 @@ import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 
 const root = process.cwd();
+const quarantineCheck = spawnSync(process.execPath, ["scripts/check-backend-test-quarantine.mjs"], { cwd: root, stdio: "inherit" });
+if (quarantineCheck.error) throw quarantineCheck.error;
+if (quarantineCheck.status !== 0) process.exit(quarantineCheck.status ?? 1);
 const manifest = JSON.parse(readFileSync(resolve(root, "scripts/backend-test-manifest.json"), "utf8"));
 const quarantined = manifest.quarantined || {};
 const discovered = readdirSync(resolve(root, "tests/api"))

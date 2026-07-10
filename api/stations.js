@@ -218,3 +218,8 @@ function providerStatuses(providerHealth = {}) {
     ]),
   );
 }
+
+module.exports._test = {
+  boundedNumberParam,
+  coordinateParam,
+};

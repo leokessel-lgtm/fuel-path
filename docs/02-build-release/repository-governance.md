@@ -42,7 +42,8 @@ evidence. New tests are included automatically. Removing a quarantine entry
 must make that file part of the required suite.
 
 Current state: all discovered backend test files are required; the quarantine
-manifest is empty.
+manifest is empty. CI compares the quarantine count with the merge base and
+rejects any increase.
 
 ## Emergency merge
 

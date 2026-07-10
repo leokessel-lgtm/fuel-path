@@ -16,19 +16,31 @@ function isBroadAreaSuggestion(item) {
 }
 
 function broadAreaSuggestionLeavesSpecificQueryTerms(query, suggestion) {
-  const queryTokens = normaliseSearchText(query).split(" ").filter(Boolean);
+  const queryTokens = significantLocationTokens(query);
   if (queryTokens.length < 2) return false;
-  const labelTokens = new Set(
-    normaliseSearchText(suggestion?.label || "")
-      .split(" ")
-      .filter((token) => token && !/^\d{4}$/.test(token) && !/^(?:act|nsw|nt|qld|sa|tas|vic|wa)$/.test(token)),
-  );
+  const labelTokens = new Set(significantLocationTokens(suggestion?.label));
   return queryTokens.some((token) => !labelTokens.has(token));
+}
+
+function significantLocationTokens(value) {
+  return normaliseSearchText(value)
+    .split(" ")
+    .filter((token) => token && !/^\d{4}$/.test(token) && !/^(?:act|nsw|nt|qld|sa|tas|vic|wa)$/.test(token));
+}
+
+function isWithinSearchContext(item, searchContext, distanceBetween) {
+  if (!searchContext || item?.provider !== "fuel_path_gnaf") return false;
+  const lat = Number(item?.lat);
+  const lon = Number(item?.lon);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return false;
+  const distance = distanceBetween({ lat, lon }, { lat: searchContext.nearLat, lon: searchContext.nearLon });
+  return Number.isFinite(distance) && distance <= searchContext.nearRadiusKm;
 }
 
 module.exports = {
   broadAreaSuggestionLeavesSpecificQueryTerms,
   isBroadAreaSuggestion,
+  isWithinSearchContext,
   normaliseSearchText,
   titleCase,
 };

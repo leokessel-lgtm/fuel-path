@@ -122,7 +122,7 @@ For real address routing in local prototype mode, the browser calls the local se
 
 These endpoints proxy typed-address geocoding and route geometry for validation when the Google Maps Demo Key renders maps but does not permit Google Directions. `/api/geocode` supports provider adapters for Google Places, Mapbox, HERE, Geoapify and Nominatim. Production routing should use a properly configured and restricted paid Google Maps Platform key or another approved routing provider.
 
-See `../ADDRESS-LOOKUP-PROVIDERS.md` for provider env vars, fallback order and the Google Places suggest/resolve production note.
+See `../docs/03-provider-data/implementation/ADDRESS-LOOKUP-PROVIDERS.md` for provider env vars, fallback order and the Google Places suggest/resolve production note.
 
 The demo is intentionally cost-aware:
 
@@ -153,4 +153,4 @@ This is still a local prototype. Confirm API.NSW usage rights, caching rules, at
 Use:
 
 - `VALIDATION-DEMO-PACK.md`
-- `API-NSW-SUPPORT-NOTE.md`
+- `../docs/03-provider-data/evidence/API-NSW-SUPPORT-NOTE.md`

@@ -2,6 +2,11 @@
 
 Last updated: 20 June 2026, Australia/Sydney
 
+**Classification:** source-of-truth for the G-NAF-first address decision,
+licence constraints and acceptance principles. Hosting commands and readiness
+statements are dated implementation options. Current code supports hosted API,
+Postgres, SQLite and seed modes through `api/_addressIndex.js`.
+
 ## Decision
 
 Fuel Path should use **G-NAF Core** as the first national street-address lookup layer.

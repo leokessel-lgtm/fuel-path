@@ -120,7 +120,7 @@ Review metadata is freshness checked: stale release reviews report `store_review
 5. Confirm provider usage, caching, attribution and public-sharing terms are reflected in public copy.
 6. Confirm native location, notification, push-token and map behaviour on physical iOS and Android devices.
 7. Link the hosted policy from Apple App Store and Google Play listings.
-8. Confirm `SUPPORT-RUNBOOK.md` has a current owner, contact, review date and P0/P1/P2 handling path.
+8. Confirm `docs/02-build-release/SUPPORT-RUNBOOK.md` has a current owner, contact, review date and P0/P1/P2 handling path.
 
 ## Do Not Publish If
 

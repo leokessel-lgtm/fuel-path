@@ -364,7 +364,7 @@ Pause or pivot if:
 ## Current Best Next Move
 
 1. Rotate the API.NSW secret.
-2. Send `API-NSW-SUPPORT-NOTE.md`.
+2. Send `docs/03-provider-data/evidence/API-NSW-SUPPORT-NOTE.md`.
 3. Run validation sessions using `VALIDATION-DEMO-PACK.md`.
 4. Do not build new features until the first validation notes are captured.
 5. After validation, decide between:

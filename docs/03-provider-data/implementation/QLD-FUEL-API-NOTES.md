@@ -1,5 +1,9 @@
 # QLD Fuel Prices API Notes
 
+**Classification:** source-of-truth for the QLD adapter contract. Access email,
+row counts and validation results below are dated evidence, not current health
+or public-use permission.
+
 ## Access Status
 
 - Access email received from Fuel Prices Qld Support on 2026-06-16.

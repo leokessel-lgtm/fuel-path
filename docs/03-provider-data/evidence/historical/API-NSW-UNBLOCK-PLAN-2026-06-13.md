@@ -1,5 +1,10 @@
 # API.NSW Unblock Plan
 
+**Classification:** historical-evidence. Registered access and the adapter work
+described here were completed after this plan was written. Retain this document
+for the access trail; use current code, tests and provider evidence for present
+state.
+
 Last updated: 13 June 2026, Australia/Sydney
 
 ## TLDR
@@ -57,7 +62,7 @@ Leo action for any new or rotated app:
 
 Use the local template:
 
-- [prototype/.env.example](prototype/.env.example)
+- [prototype/.env.example](../../../../prototype/.env.example)
 
 Create:
 
@@ -114,7 +119,7 @@ python3 prototype/scripts/validate_api_nsw.py \
 
 Then update:
 
-- `normalise_nsw_payload` in [score_route.py](prototype/scripts/score_route.py)
+- `normalise_nsw_payload` in [score_route.py](../../../../prototype/scripts/score_route.py)
 - the web demo data connector
 
 ## Step 5: Decide The Live-Data Architecture
@@ -148,7 +153,7 @@ Avoid scraping or republishing FuelCheck, PetrolSpy or other third-party data un
 
 Standalone file:
 
-- [API-NSW-SUPPORT-NOTE.md](API-NSW-SUPPORT-NOTE.md)
+- [API-NSW-SUPPORT-NOTE.md](../API-NSW-SUPPORT-NOTE.md)
 
 ```text
 Hello API.NSW team,

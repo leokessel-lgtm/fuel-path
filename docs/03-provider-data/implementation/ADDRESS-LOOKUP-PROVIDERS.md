@@ -1,5 +1,9 @@
 # Address Lookup Providers
 
+**Classification:** source-of-truth for the current external-provider and
+fallback contract. Local G-NAF and hint layers run before the selected external
+provider; see `api/_geocode.js` and `api/_geocodeProviders.js`.
+
 ## Current State
 
 `/api/geocode` now has a backend provider adapter.
@@ -14,7 +18,9 @@ Supported providers:
 - `geoapify`
 - `nominatim`
 
-Default local validation remains `nominatim` unless `FUEL_PATH_GEOCODE_PROVIDER` is set.
+The default request mode is `auto`. In `auto`, local G-NAF and hint layers run
+first. The external fallback remains Nominatim unless paid fallback is explicitly
+enabled and its configured provider is available.
 
 ## Environment Variables
 
@@ -44,14 +50,14 @@ Provider aliases accepted by `/api/geocode?provider=`:
 
 ## Provider Order For `auto`
 
-When `provider=auto`, the backend chooses the first configured provider in this order:
+When `provider=auto`, the backend:
 
-1. Google Places
-2. Addressr
-3. Mapbox
-4. HERE
-5. Geoapify
-6. Nominatim
+1. searches local G-NAF, local hints, regional hints and station matches;
+2. uses the provider selected by `FUEL_PATH_PAID_GEOCODE_FALLBACK_PROVIDER` only
+   when paid fallback is explicitly enabled and that provider is configured;
+3. otherwise uses Nominatim as the validation fallback.
+
+It does not select a paid provider merely because a key exists.
 
 ## Addressr Note
 

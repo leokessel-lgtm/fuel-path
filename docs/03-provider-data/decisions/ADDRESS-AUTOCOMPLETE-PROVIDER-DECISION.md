@@ -2,6 +2,10 @@
 
 Last updated: 19 June 2026, Australia/Sydney
 
+**Classification:** source-of-truth for address-provider selection principles.
+The implementation-status section is a dated snapshot; verify current behaviour
+in `api/_geocode.js`, `api/_geocodeProviders.js` and `/api/status`.
+
 ## Decision
 
 Use a **backend-side Australian address index based on G-NAF** as the first lookup layer for street addresses.
@@ -64,7 +68,7 @@ The backend should:
 - expose a stable Fuel Path response shape to the app
 - preserve a Nominatim/local validation mode
 
-## Current Implementation State
+## Implementation Snapshot At 19 June 2026
 
 Done:
 

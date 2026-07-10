@@ -1,163 +1,49 @@
-# Fuel Path Documentation Index
+# Fuel Path documentation
 
-Last reviewed: 2026-07-09
+Start here, then open only the documents needed for the task. Dated reports are
+evidence for their recorded date, not proof of current readiness.
 
-This index is a first-pass map of the current documentation state. It does not
-make older evidence current. Treat dated reports as evidence for the date they
-were produced unless the relevant workflow has been re-run.
+For the complete document classification and move backlog, see
+[Documentation catalogue](catalog.md).
 
-## Current source-of-truth docs
+## Task router
 
-| Path | Bucket | Keep/move/archive/delete | Reason | Risk |
-| --- | --- | --- | --- | --- |
-| `README.md` | source-of-truth | keep at repo root | Primary repo overview and setup entry point. | Keep claims broad unless release state is reverified. |
-| `AGENTS.md` | source-of-truth | keep at repo root | Repo operating rules for Codex and Fuel Path changes. | Must stay visible at root. |
-| `docs/README.md` | source-of-truth | keep in `docs/` | Documentation map and audit guide. | Needs updates when docs are moved or promoted. |
-| `docs/route-recommendation-logic-rules.md` | source-of-truth | keep in `docs/` | Route recommendation, scoring, rejection, detour, savings and Plan wording contract. | Must be updated in the same change as route logic or user-facing savings wording. |
-| `PROJECT-GOALS-ROADMAP.md` | source-of-truth | move later to `docs/00-product-vision/` | Product goals and roadmap framing. | Moving requires link checks from README and handoff notes. |
-| `STORE-READINESS-PLAN.md` | source-of-truth | move later to `docs/02-build-release/` | Current store readiness and release-gate state. | Do not collapse request sent, terms confirmed, quality-ready and beta-release-ready. |
-| `NATIONAL-TESTING-REGIME.md` | source-of-truth | move later to `docs/02-build-release/` | Validation and testing regime. | Keep separate from dated validation evidence. |
-| `PROVIDER-ACCESS-READINESS.md` | source-of-truth | move later to `docs/03-provider-data/` | Provider access readiness state. | Provider permission evidence must stay distinct from implementation notes. |
-| `SUPPORT-RUNBOOK.md` | source-of-truth | move later to `docs/02-build-release/` | Support workflow and operational response guidance. | Test fixtures may mirror it but are not the source of truth. |
-| `PRIVACY-POLICY.md` | source-of-truth | keep at root or move later to `docs/02-build-release/` | User-facing privacy policy. | Governance, privacy and store claims need source-backed review. |
-| `DATA-RETENTION-RULES.md` | source-of-truth | move later to `docs/02-build-release/` | Data retention rules and operating constraints. | Treat as policy-sensitive. |
-| `STORE-DATA-SAFETY.md` | source-of-truth | move later to `docs/02-build-release/` | Store data safety material. | Must align with privacy policy and store evidence. |
-| `PERFORMANCE-GUARDRAILS.md` | source-of-truth | move later to `docs/01-architecture/` | Performance expectations and guardrails. | Keep benchmark claims evidence-dated. |
-| `mobile-app/NATIVE-VALIDATION.md` | source-of-truth | keep in `mobile-app/` | Native validation evidence and caveats for the app package. | Native state can drift quickly after app or dependency changes. |
-| `mobile-app/README.md` | source-of-truth | keep in `mobile-app/` | Mobile app setup and package-specific guidance. | Keep aligned with root README where setup overlaps. |
-| `mobile-app/AGENTS.md` | source-of-truth | keep in `mobile-app/` | Mobile-app-specific agent rules. | More specific than root `AGENTS.md` inside `mobile-app/`. |
+| Task | Read first | Read only when relevant |
+| --- | --- | --- |
+| Understand the product | [`current-product.md`](current-product.md) | The detailed roadmap or research only when the task needs that depth |
+| Change route recommendations, scoring or savings wording | [`route-recommendation-logic-rules.md`](route-recommendation-logic-rules.md) | Latest route evidence under [`evidence/`](evidence/) |
+| Work on provider integrations or access | [`03-provider-data/README.md`](03-provider-data/README.md) | Open only the relevant provider decision, implementation note or evidence file |
+| Assess beta or store readiness | [`02-build-release/CURRENT-RELEASE-DECISION.md`](02-build-release/CURRENT-RELEASE-DECISION.md) and [`02-build-release/STORE-READINESS-PLAN.md`](02-build-release/STORE-READINESS-PLAN.md) | Dated store, support, native and provider evidence |
+| Work on the mobile app | [`mobile-app/README.md`](../mobile-app/README.md) and [`mobile-app/AGENTS.md`](../mobile-app/AGENTS.md) | [`mobile-app/NATIVE-VALIDATION.md`](../mobile-app/NATIVE-VALIDATION.md) when validation state matters |
+| Plan validation sessions | [`VALIDATION-SESSION-WORKBOOK.md`](../VALIDATION-SESSION-WORKBOOK.md) | Recruitment, demo and synthesis documents only for that workflow |
+| Run or change tests | [`02-build-release/NATIONAL-TESTING-REGIME.md`](02-build-release/NATIONAL-TESTING-REGIME.md) | The closest test file and package script for the changed subsystem |
+| Review architecture or performance | [`backend-hosting-v1.md`](backend-hosting-v1.md) or [`PERFORMANCE-GUARDRAILS.md`](../PERFORMANCE-GUARDRAILS.md), depending on scope | Dated benchmarks only when the claim needs evidence |
 
-## Current evidence
-
-| Path | Bucket | Keep/move/archive/delete | Reason | Risk |
-| --- | --- | --- | --- | --- |
-| `BACKLOG-EVIDENCE-MATRIX.md` | current-evidence | move later to `docs/04-validation-evidence/` | Matrix of known evidence against backlog and readiness claims. | Needs active maintenance to avoid stale coverage claims. |
-| `GOAL-1-EVIDENCE-GATE.md` | current-evidence | move later to `docs/04-validation-evidence/` | Goal-specific evidence gate. | Dated or implicit claims should be checked before release use. |
-| `VALIDATION-SESSION-WORKBOOK.md` | current-evidence | move later to `docs/04-validation-evidence/` | Working validation workbook. | Keep separate from synthesised conclusions. |
-| `VALIDATION-SYNTHESIS.md` | current-evidence | move later to `docs/04-validation-evidence/` | Synthesised validation findings. | Generated synthesis is not source truth. |
-| `VALIDATION-DEMO-PACK.md` | current-evidence | move later to `docs/04-validation-evidence/` | Demo support material for validation. | Check against current product before reuse. |
-| `VALIDATION-RECRUITMENT-PACK.md` | current-evidence | move later to `docs/04-validation-evidence/` | Recruiting material for validation. | May need privacy and consent review before reuse. |
-| `SYNTHETIC-VALIDATION-SESSIONS.md` | current-evidence | move later to `docs/04-validation-evidence/` | Synthetic validation notes. | Label as synthetic, not customer proof. |
-| `docs/03-provider-data/evidence/PROVIDER-TERMS-EVIDENCE-2026-07-05.json` | current-evidence | keep in `docs/03-provider-data/evidence/` | Dated provider terms evidence. | Evidence held, not blanket permission or legal approval. |
-| `STORE-PUBLISHING-EVIDENCE-2026-07-05.json` | current-evidence | move later to `docs/02-build-release/evidence/` | Dated store publishing evidence. | Store readiness can drift with app, policy and listing changes. |
-| `SUPPORT-READINESS-EVIDENCE-2026-07-05.json` | current-evidence | move later to `docs/02-build-release/evidence/` | Dated support readiness evidence. | Support readiness should remain separate from store readiness. |
-| `docs/evidence/*.json` | current-evidence | keep in `docs/evidence/` for now | Raw evidence files for route, prediction and competitor checks. | Do not promote without checking dates and scripts. |
-| `docs/route-output-benchmark-user-testing-2026-07-09.md` | current-evidence | keep in `docs/` for now | Latest tracked route output benchmark note. | Benchmark result is date-bound. |
-| `docs/competitor-route-browser-pass-2026-07-09T03-55-48-052.md` | current-evidence | keep in `docs/` for now | Latest tracked competitor browser pass. | Browser observations can drift. |
-
-## Historical evidence and dated reports
-
-| Path | Bucket | Keep/move/archive/delete | Reason | Risk |
-| --- | --- | --- | --- | --- |
-| `VALIDATION-PASS-2026-06-14.md` | historical-evidence | move later to `docs/04-validation-evidence/` | Older validation pass. | Do not cite as current readiness without rerun. |
-| `STORE-RELEASE-REVIEW-2026-06-20.md` | historical-evidence | move later to `docs/04-validation-evidence/` | Older store release review. | Superseded by later store readiness/evidence work. |
-| `PROVIDER-TERMS-REVIEW-2026-06-20.md` | historical-evidence | move later to `docs/03-provider-data/` | Older provider terms review. | Superseded by July evidence in some areas. |
-| `docs/*2026-06-*.md` | historical-evidence | keep in place for now, then move by topic | Dated June stress, architecture, GNAF, map and stabilisation notes. | Useful context, but not current proof. |
-| `docs/route-output-benchmark-user-testing-2026-07-03.md` | historical-evidence | keep near latest benchmark for now | Earlier route output benchmark. | Superseded by 2026-07-09 benchmark unless a specific regression history is needed. |
-| `research/benchmark/output/*2026-06-23*` | historical-evidence | keep under `research/benchmark/output/` | Geocode benchmark outputs. | Large dated result set should not be treated as live performance. |
-
-## Provider data and implementation notes
-
-| Path | Bucket | Keep/move/archive/delete | Reason | Risk |
-| --- | --- | --- | --- | --- |
-| `ADDRESS-LOOKUP-PROVIDERS.md` | source-of-truth | move later to `docs/03-provider-data/` | Address lookup provider notes. | Keep implementation notes separate from permission evidence. |
-| `ADDRESS-AUTOCOMPLETE-PROVIDER-DECISION.md` | source-of-truth | move later to `docs/03-provider-data/` | Address autocomplete provider decision. | Check against current implementation before changing claims. |
-| `GNAF-NATIONAL-ADDRESS-INDEX.md` | source-of-truth | move later to `docs/03-provider-data/` | GNAF national address index direction. | Hosting and serving state can drift. |
-| `QLD-FUEL-API-NOTES.md` | source-of-truth | move later to `docs/03-provider-data/` | QLD fuel API implementation notes. | Provider terms and permission state remain separate. |
-| `SA-FUEL-API-NOTES.md` | source-of-truth | move later to `docs/03-provider-data/` | SA fuel API implementation notes. | Provider terms and permission state remain separate. |
-| `API-NSW-SUPPORT-NOTE.md` | current-evidence | move later to `docs/03-provider-data/` | NSW support notes. | Do not treat as approval unless explicit. |
-| `API-NSW-UNBLOCK-PLAN.md` | source-of-truth | move later to `docs/03-provider-data/` | NSW unblock plan. | Needs current provider-status verification before action. |
-| `docs/03-provider-data/evidence/provider-terms-*.md` | current-evidence | keep in `docs/03-provider-data/evidence/` | Provider request and evidence notes by jurisdiction. | Keep request sent distinct from terms confirmed. |
-| `docs/provider-terms/*.md` | current-evidence | keep under provider terms evidence | Provider-specific terms acceptance evidence. | Private operational evidence unless explicitly prepared for public use. |
-| `docs/provider-store-readiness-summary-2026-07-05.md` | current-evidence | move later to `docs/03-provider-data/` | Provider/store readiness summary. | Avoid collapsing provider access and store release readiness. |
-
-## Research, strategy and product learning
-
-| Path | Bucket | Keep/move/archive/delete | Reason | Risk |
-| --- | --- | --- | --- | --- |
-| `docs/05-research/fuel-path-market-research.md` | research | keep in `docs/05-research/` | Market research. | Market facts can drift and may need refresh before external use. |
-| `docs/05-research/fuel-path-deep-international-research.md` | research | keep in `docs/05-research/` | International research. | Treat as research, not product commitment. |
-| `docs/05-research/fuel-price-cycle-research.md` | research | keep in `docs/05-research/` | Fuel cycle research. | Refresh before current market claims. |
-| `docs/05-research/FUEL-PATH-GOLD-MINING-STRESS-TEST-2026-06-20.md` | research | keep in `docs/05-research/` | Business model stress test. | Do not treat monetisation conclusions as validated demand. |
-| `docs/05-research/MAP-UX-COMPETITOR-FUNCTIONALITY.md` | research | keep in `docs/05-research/` | Competitor UX research. | Competitor surfaces change. |
-| `docs/05-research/fuelradar-*.md` | research | keep in `docs/05-research/` | FuelRadar competitor and map comparison notes. | Keep separate from current release readiness. |
-| `docs/05-research/FUEL-DISCOUNTS-AND-FLEET-CARDS.md` | research | keep in `docs/05-research/` | Discount and fleet-card research. | Commercial terms can change. |
-| `docs/05-research/PRODUCT-IDEAS.md` | research | keep in `docs/05-research/` | Idea backlog and exploratory notes. | Avoid mixing with committed roadmap. |
-| `docs/05-research/STRATEGIC-REFLECTION.md` | research | keep in `docs/05-research/` | Strategy reflection. | Opinionated, not evidence. |
-| `docs/05-research/AUSTRALIAN-MAPPING-INFRASTRUCTURE-PARTNER-BRIEF.md` | research | keep in `docs/05-research/` | Partner-facing infrastructure brief. | Recheck claims before sharing externally. |
-
-## Architecture, design and app package docs
-
-| Path | Bucket | Keep/move/archive/delete | Reason | Risk |
-| --- | --- | --- | --- | --- |
-| `BACKEND-PUSH-SCHEDULER-DESIGN.md` | source-of-truth | move later to `docs/01-architecture/` | Backend push scheduler design. | Check implementation before treating as built. |
-| `ORACLE-ALWAYS-FREE-GNAF-HOSTING.md` | source-of-truth | move later to `docs/01-architecture/` | Oracle/GNAF hosting direction. | Hosting cost and capability claims can drift. |
-| `docs/backend-hosting-v1.md` | source-of-truth | move later to `docs/01-architecture/` | Backend hosting design. | Keep aligned with deployment config. |
-| `docs/oracle-gnaf-*.md` | source-of-truth | move later to `docs/01-architecture/` | Oracle GNAF architecture and operations notes. | Operational state must be reverified before release claims. |
-| `docs/poi-autocomplete-fast-path-rules.md` | source-of-truth | move later to `docs/01-architecture/` | POI autocomplete fast-path rules. | Needs update if lookup logic changes. |
-| `DESIGN-SYSTEM.md` | source-of-truth | move later to `docs/06-design-brand/` | Design system notes. | Keep production app assets separate from brand concepts. |
-| `docs/brand-concepts/README.md` | research | keep in `docs/brand-concepts/` | Brand concept archive/index. | Brand concepts are not production assets. |
-| `docs/typography-hierarchy.md` | source-of-truth | move later to `docs/06-design-brand/` | Typography hierarchy. | Needs visual validation when UI changes. |
-| `docs/ui-ux-stress-loop.md` | source-of-truth | move later to `docs/06-design-brand/` | UI/UX stress loop method. | Method doc, not proof of current pass. |
-| `mobile-app/ROUTE-EDITOR-BREAK-IT-TESTS.md` | current-evidence | keep in `mobile-app/` | Mobile route editor test notes. | Evidence may drift after route editor changes. |
-| `mobile-app/UI-AESTHETIC-IMPLEMENTATION-PLAN.md` | source-of-truth | keep in `mobile-app/` for now | Mobile UI implementation plan. | May become stale as implementation lands. |
-| `prototype/README.md` | archive | keep in `prototype/` | Prototype-specific notes. | Prototype docs should not imply production readiness. |
-| `web-demo/README.md` | source-of-truth | keep in `web-demo/` | Web demo package notes. | Demo behaviour may differ from mobile app. |
-
-## Templates and samples
-
-| Path | Bucket | Keep/move/archive/delete | Reason | Risk |
-| --- | --- | --- | --- | --- |
-| `docs/templates/*.template.json` | template | keep in `docs/templates/` | Reusable evidence and review templates. | Do not confuse blank templates with evidence. |
-| `docs/templates/FLEET-LITE-SAVINGS-REPORT.template.md` | template | keep in `docs/templates/` | Reusable savings report template. | Savings wording must stay aligned with route logic rules. |
-| `docs/templates/FLEET-LITE-SAVINGS-REPORT.sample-2026-07-02.md` | template | keep in `docs/templates/` | Sample savings report. | Sample is not current customer evidence. |
-| `docs/templates/VALIDATION-RESULTS.template.json` | template | keep in `docs/templates/` | Validation results template. | Blank template only. |
-| `docs/evidence/route-example-driver-proof-template.json` | template | keep in `docs/evidence/` or move to templates later | Driver proof evidence template. | Template only, not proof. |
-
-## Archive and scratch candidates
-
-| Path | Bucket | Keep/move/archive/delete | Reason | Risk |
-| --- | --- | --- | --- | --- |
-| `TODO.md` | archive | archive later after checking unresolved items | General task residue. | May contain still-useful loose ends. |
-| `mobile-app/CLAUDE.md` | archive | archive later if no longer used | Tool-specific guidance likely superseded by `AGENTS.md`. | Check external tooling before moving. |
-| `PROVIDER-TERMS-EVIDENCE.2026-06-20.draft.json` | archive | archive later | Draft superseded by later provider evidence. | Keep if audit trail matters. |
-| `STORE-PUBLISHING-EVIDENCE.2026-06-20.draft.json` | archive | archive later | Draft superseded by later store evidence. | Keep if audit trail matters. |
-| `research/benchmark/output/*` | historical-evidence | keep under research output, consider archive index later | Generated benchmark outputs that are tracked. | Too many files for root-level discoverability. |
-| `tmp/*.json`, `tmp/*.md` | scratch | delete or ignore only after review | Local generated stress and smoke outputs are not tracked. | Some may contain useful recent evidence; promote intentionally before deletion. |
-| `.npm-cache/**`, `.vercel/**`, `public/build-version.json`, `public/metadata.json` | scratch | do not index as docs | Tooling/build state, not documentation. | Avoid accidental doc audits from local/generated folders. |
-
-## Suggested target structure
-
-Use this structure for future moves once links and references are checked:
+## Folder map
 
 ```text
 docs/
-  00-product-vision/
-  01-architecture/
-  02-build-release/
-  03-provider-data/
-    evidence/
-  04-validation-evidence/
-  05-research/
-  06-design-brand/
-  evidence/
-  templates/
-  archive/
+  02-build-release/        current build, testing, support and release gates
+  03-provider-data/        provider decisions, implementation and evidence
+  05-research/             research, strategy and product learning
+  brand-concepts/          exploratory brand concepts, not production assets
+  evidence/                current generated evidence not yet grouped by topic
+  templates/               blank and sample artefacts, never proof by themselves
+  archive/                 superseded material retained for audit history
+  catalog.md               detailed classification and future move backlog
 ```
 
-Root-level docs should be limited to `README.md`, `AGENTS.md`, important
-policies that need root visibility, and short handoff files that are actively in
-use.
+## Reading rules
 
-## Promotion rules
-
-- Keep `docs/route-recommendation-logic-rules.md` in sync with route scoring,
-  rejection, ranking, savings, detour, discount and Plan wording changes.
+- Prefer current source-of-truth documents over dated evidence.
+- Read one task route first. Do not load the full catalogue or every evidence file by default.
 - Keep provider implementation notes separate from provider permission evidence.
-- Keep `request sent`, `terms confirmed`, `quality-ready` and
-  `beta-release-ready` as separate states.
-- Keep public/product-facing documents separate from private operational
-  evidence.
-- Keep brand concepts separate from production app assets.
-- Promote scratch output into `docs/evidence/` only when it has a clear owner,
-  date, command/source and release relevance.
+- Keep `request sent`, `terms confirmed`, `quality-ready` and `beta-release-ready` distinct.
+- Treat templates, samples, synthetic sessions and generated synthesis as non-primary evidence.
+- Update [`route-recommendation-logic-rules.md`](route-recommendation-logic-rules.md) whenever route scoring, rejection, ranking, detour, savings or Plan recommendation wording changes.
+- Use [`context-budget.md`](context-budget.md) for measured repo-owned context profiles; do not claim broad token savings from file moves alone.
+
+## Checks
+
+Run `npm run check:docs` after moving documentation or changing internal links.
+Run `npm run measure:doc-context` after changing task-router profile membership.

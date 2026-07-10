@@ -1,9 +1,9 @@
 {
-  "runbook": "SUPPORT-RUNBOOK.md",
+  "runbook": "docs/02-build-release/SUPPORT-RUNBOOK.md",
   "supportContact": "support@fuelpath.app",
   "supportOwner": "Leo Kesselring",
   "reviewedAt": "2026-07-05",
-  "reviewReference": "SUPPORT-RUNBOOK.md support process reviewed 2026-07-05",
+  "reviewReference": "docs/02-build-release/SUPPORT-RUNBOOK.md support process reviewed 2026-07-05",
   "notes": [
     "Support contact is the same monitored Fuel Path contact listed in the store publishing evidence and privacy policy.",
     "Support owner is the accountable release support owner for beta readiness review.",

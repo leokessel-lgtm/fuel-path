@@ -16,6 +16,13 @@ test("architecture guard accepts a bounded layered fixture", async (context) => 
   assert.match(stdout, /Architecture check passed/);
 });
 
+test("architecture guard keeps source checks active without Git metadata", async (context) => {
+  const fixture = createSourceFixture(context);
+  const { stdout, stderr } = await runChecker(fixture);
+  assert.match(stdout, /source tree without Git metadata/);
+  assert.match(stderr, /tracked-residue check skipped/);
+});
+
 test("architecture guard rejects tracked generated residue", async (context) => {
   const fixture = await createFixture(context);
   writeFixtureFile(fixture, "tmp/report.json", "{}\n");
@@ -45,14 +52,19 @@ test("architecture guard rejects mobile lower-layer UI imports", async (context)
 });
 
 async function createFixture(context) {
+  const fixture = createSourceFixture(context);
+  await git(fixture, ["init"]);
+  await git(fixture, ["add", "."]);
+  return fixture;
+}
+
+function createSourceFixture(context) {
   const fixture = mkdtempSync(path.join(tmpdir(), "fuel-path-architecture-"));
   context.after(() => rmSync(fixture, { force: true, recursive: true }));
   writeFixtureFile(fixture, "api/_backend.js", "module.exports = {};\n");
   writeFixtureFile(fixture, "api/status.js", 'require("./_backend");\n');
   writeFixtureFile(fixture, "mobile-app/src/services/store.ts", "export const value = 1;\n");
   writeFixtureFile(fixture, "architecture-check.config.json", `${JSON.stringify(fixtureConfig(), null, 2)}\n`);
-  await git(fixture, ["init"]);
-  await git(fixture, ["add", "."]);
   return fixture;
 }
 

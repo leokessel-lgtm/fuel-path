@@ -7,15 +7,29 @@ const configPath = resolve(process.argv[2] || "scripts/architecture-check.config
 const config = JSON.parse(readFileSync(configPath, "utf8"));
 const issues = [];
 
-const tracked = execFileSync("git", ["ls-files"], { cwd: root, encoding: "utf8" })
-  .split(/\r?\n/)
-  .filter(Boolean);
+let tracked = [];
+let gitMetadataAvailable = true;
+try {
+  tracked = execFileSync("git", ["ls-files"], {
+    cwd: root,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+  })
+    .split(/\r?\n/)
+    .filter(Boolean);
+} catch {
+  gitMetadataAvailable = false;
+}
 
-for (const patternText of config.disallowedTrackedPathPatterns) {
-  const pattern = new RegExp(patternText);
-  for (const path of tracked.filter((item) => pattern.test(item))) {
-    issues.push(`generated or machine-local path is tracked: ${path}`);
+if (gitMetadataAvailable) {
+  for (const patternText of config.disallowedTrackedPathPatterns) {
+    const pattern = new RegExp(patternText);
+    for (const path of tracked.filter((item) => pattern.test(item))) {
+      issues.push(`generated or machine-local path is tracked: ${path}`);
+    }
   }
+} else {
+  console.warn("Architecture check: Git metadata unavailable; tracked-residue check skipped.");
 }
 
 const productionFiles = config.productionRoots.flatMap((directory) => walk(resolve(root, directory)))
@@ -29,7 +43,8 @@ for (const absolutePath of productionFiles) {
   if (lineCount > limit) issues.push(`production module exceeds ${limit} lines: ${path} (${lineCount})`);
 }
 
-for (const path of tracked.filter((item) => /^api\/[^/_][^/]*\.js$/.test(item))) {
+const productionPaths = productionFiles.map(repoPath);
+for (const path of productionPaths.filter((item) => /^api\/[^/_][^/]*\.js$/.test(item))) {
   const source = readFileSync(resolve(root, path), "utf8");
   const allowedRequires = new Set([
     ...config.publicApiAllowedRequires,
@@ -61,7 +76,8 @@ if (issues.length) {
   process.exit(1);
 }
 
-console.log(`Architecture check passed: ${tracked.length} tracked files, ${productionFiles.length} production modules.`);
+const trackedSummary = gitMetadataAvailable ? `${tracked.length} tracked files` : "source tree without Git metadata";
+console.log(`Architecture check passed: ${trackedSummary}, ${productionFiles.length} production modules.`);
 
 function walk(directory) {
   if (!existsSync(directory)) return [];

@@ -21,7 +21,6 @@ module.exports = ({ config }) => ({
   ...baseConfig,
   plugins: [
     ...(baseConfig.plugins || []),
-    "expo-image",
     ...(androidGoogleMapsApiKey
       ? [["react-native-maps", { androidGoogleMapsApiKey }]]
       : []),

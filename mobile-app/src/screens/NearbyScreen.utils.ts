@@ -1,8 +1,8 @@
-import * as IntentLauncher from "expo-intent-launcher";
 import { ActionSheetIOS, Alert, Linking, Platform } from "react-native";
 
 import { AppPreferences, EvConnector, MapPoint, NavigationAppPreference } from "../types";
 import { NearbyMode } from "../components/NearbyEvControls";
+import { startAndroidIntent } from "../services/androidIntentLauncher";
 
 const ANDROID_VIEW_ACTION = "android.intent.action.VIEW";
 const ANDROID_GOOGLE_MAPS_PACKAGE = "com.google.android.apps.maps";
@@ -275,7 +275,7 @@ async function openNavigationOption(option: NavigationOption | undefined) {
   if (!option) return;
   try {
     if (Platform.OS === "android" && option.androidIntent) {
-      await IntentLauncher.startActivityAsync(option.androidIntent.action, {
+      await startAndroidIntent(option.androidIntent.action, {
         data: option.androidIntent.data,
         packageName: option.androidIntent.packageName,
       });

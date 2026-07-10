@@ -36,6 +36,8 @@ const typographyDoc = read("../docs/06-design-brand/typography-hierarchy.md");
 const routeRecommendationRules = read("../docs/route-recommendation-logic-rules.md");
 const nearbyScreen = readScreenSource("src/screens/NearbyScreen.tsx", "src/screens/NearbyScreen.viewmodel.tsx");
 const nearbyScreenUtils = read("src/screens/NearbyScreen.utils.ts");
+const androidIntentLauncher = read("src/services/androidIntentLauncher.ts");
+const androidIntentLauncherWeb = read("src/services/androidIntentLauncher.web.ts");
 const nearbyResults = read("src/hooks/useNearbyResults.ts");
 const stationBrandFilterPill = read("src/components/StationBrandFilterPill.tsx");
 const stationBrandFilterOverride = read("src/hooks/useStationBrandFilterOverride.ts");
@@ -675,7 +677,10 @@ const checks = [
       nearbyScreenUtils.includes('{ label: "Waze to stop", provider: "waze"') &&
       nearbyScreenUtils.includes('{ label: "Google Maps", provider: "google_maps"') &&
       nearbyScreenUtils.includes('{ label: "Waze", provider: "waze"') &&
-      nearbyScreenUtils.includes('import * as IntentLauncher from "expo-intent-launcher";') &&
+      nearbyScreenUtils.includes('import { startAndroidIntent } from "../services/androidIntentLauncher";') &&
+      androidIntentLauncher.includes('import * as IntentLauncher from "expo-intent-launcher";') &&
+      androidIntentLauncher.includes("IntentLauncher.startActivityAsync(action, options)") &&
+      !androidIntentLauncherWeb.includes("expo-intent-launcher") &&
       nearbyScreenUtils.includes("androidIntent: androidDeviceMapsIntent(geoUrl)") &&
       nearbyScreenUtils.includes("androidIntent: androidGoogleMapsIntent(googleMapsUrl)") &&
       nearbyScreenUtils.includes('label: "Maps"') &&
@@ -684,7 +689,7 @@ const checks = [
       nearbyScreenUtils.includes("navigationApp !== \"ask\"") &&
       nearbyScreenUtils.includes("provider === navigationApp") &&
       nearbyScreenUtils.includes("async function openNavigationOption") &&
-      nearbyScreenUtils.includes("IntentLauncher.startActivityAsync(option.androidIntent.action") &&
+      nearbyScreenUtils.includes("startAndroidIntent(option.androidIntent.action") &&
       nearbyScreenUtils.includes("packageName: option.androidIntent.packageName") &&
       nearbyScreenUtils.includes("if (!option.fallbackUrl) throw error;") &&
       nearbyScreenUtils.includes("if (Platform.OS === \"android\")") &&
@@ -1171,7 +1176,7 @@ const checks = [
       discountWalletCard.includes("activeDirectDiscountPrograms") &&
       discountWalletCard.includes("<DiscountProgramBadge program={program} size={28} />") &&
       discountProgramBadge.includes("renderToHardwareTextureAndroid") &&
-      discountProgramBadge.includes('contentFit="contain"') &&
+      discountProgramBadge.includes('resizeMode="contain"') &&
       discountProgramAssets.includes("discountProgramStyleFor") &&
       discountProgramAssets.includes('"../../assets/discount-icons/everyday-rewards.png"') &&
       discountProgramAssets.includes('"../../assets/discount-icons/flybuys.png"') &&

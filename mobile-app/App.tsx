@@ -1,18 +1,16 @@
-import { StatusBar } from "expo-status-bar";
-import { useEffect, useState } from "react";
+import { Component, Suspense, useEffect, useState, type ReactNode } from "react";
 import {
   BackHandler,
   Platform,
   Pressable,
+  StatusBar,
   StyleSheet,
   Text,
   View,
 } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 
-import { AccountScreen } from "./src/screens/AccountScreen";
-import { NearbyScreen } from "./src/screens/NearbyScreen";
-import { PlanScreen } from "./src/screens/PlanScreen";
+import { AccountScreen, NearbyScreen, PlanScreen, preloadAppScreen } from "./src/screens/AppScreens";
 import { FuelPathLogo } from "./src/components/FuelPathLogo";
 import { SettingsSection } from "./src/components/settings/settingsSections";
 import { useAppPreferences } from "./src/hooks/useAppPreferences";
@@ -185,7 +183,7 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <SafeAreaView edges={["top", "left", "right", "bottom"]} style={styles.safeArea}>
-        <StatusBar style="dark" />
+        <StatusBar barStyle="dark-content" />
         <View style={styles.appShell}>
         <View role="banner" style={styles.header}>
           <Pressable
@@ -288,6 +286,8 @@ export default function App() {
         ) : null}
 
         <View role="main" style={styles.content}>
+          <ScreenLoadBoundary>
+          <Suspense fallback={<ScreenLoadingState />}>
           {activeTab === "plan" ? (
             <PlanScreen
               preferences={preferences}
@@ -352,6 +352,8 @@ export default function App() {
               savedCommutes={savedCommutes}
             />
           ) : null}
+          </Suspense>
+          </ScreenLoadBoundary>
         </View>
 
         <View role="navigation">
@@ -367,6 +369,7 @@ export default function App() {
                   hitSlop={10}
                   key={tab.key}
                   onPress={() => handleTabPress(tab.key)}
+                  onHoverIn={() => preloadAppScreen(tab.key)}
                   style={[styles.tabButton, selected && styles.tabButtonSelected]}
                 >
                   <Text maxFontSizeMultiplier={chromeTextScale} numberOfLines={1} style={[styles.tabLabel, selected && styles.tabLabelSelected]}>{tab.label}</Text>
@@ -379,6 +382,41 @@ export default function App() {
       </SafeAreaView>
     </SafeAreaProvider>
   );
+}
+
+function ScreenLoadingState() {
+  return (
+    <View accessibilityLiveRegion="polite" style={styles.loadingState}>
+      <Text style={styles.loadingText}>Loading…</Text>
+    </View>
+  );
+}
+
+class ScreenLoadBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  render() {
+    if (!this.state.failed) return this.props.children;
+    return (
+      <View accessibilityLiveRegion="assertive" style={styles.loadingState}>
+        <Text style={styles.loadingText}>This screen could not load.</Text>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => {
+            if (Platform.OS === "web") window.location.reload();
+            else this.setState({ failed: false });
+          }}
+          style={styles.loadingRetry}
+        >
+          <Text style={styles.loadingRetryText}>Refresh</Text>
+        </Pressable>
+      </View>
+    );
+  }
 }
 
 function vehicleEnergyLabel(value: string) {
@@ -411,6 +449,26 @@ function vehicleProfileShortLabel(preferences: {
 }
 
 const styles = StyleSheet.create({
+  loadingState: {
+    alignItems: "center",
+    flex: 1,
+    justifyContent: "center",
+  },
+  loadingText: {
+    ...typography.metadata,
+    color: colors.muted,
+  },
+  loadingRetry: {
+    backgroundColor: colors.green,
+    borderRadius: radii.pill,
+    marginTop: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+  },
+  loadingRetryText: {
+    color: colors.white,
+    ...typography.buttonLabel,
+  },
   safeArea: {
     flex: 1,
     backgroundColor: colors.canvas,

@@ -416,7 +416,12 @@ function resolveReviewSourcePath(sourcePath) {
   if (isAbsolute(sourcePath)) return sourcePath;
   const fromEvidence = evidence.baseDir ? resolve(evidence.baseDir, sourcePath) : "";
   if (fromEvidence && existsSync(fromEvidence)) return fromEvidence;
-  return resolve(sourcePath);
+  const fromRoot = resolve(sourcePath);
+  if (existsSync(fromRoot)) return fromRoot;
+  const relocatedSourcePaths = {
+    "STORE-DATA-SAFETY.md": "docs/02-build-release/STORE-DATA-SAFETY.md",
+  };
+  return resolve(relocatedSourcePaths[sourcePath] || sourcePath);
 }
 
 function containsSensitiveEvidence(value) {

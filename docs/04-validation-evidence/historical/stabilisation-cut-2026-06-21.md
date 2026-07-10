@@ -10,7 +10,7 @@ stabilise/latest-local-build
 
 Use this branch as the latest local build branch while feature work is paused.
 
-The repo-level split between this stabilisation slice, backlog/product-hardening work and generated artefacts is recorded in `docs/repo-change-split-2026-06-21.md`.
+The repo-level split between this stabilisation slice, backlog/product-hardening work and generated artefacts is recorded in `docs/archive/repository/repo-change-split-2026-06-21.md`.
 
 ## Latest Local App Surface
 

@@ -88,7 +88,7 @@ Provider usage, caching, attribution and public-sharing rights must be confirmed
 
 ## Retention
 
-Fuel Path retention rules are documented in `DATA-RETENTION-RULES.md`.
+Fuel Path retention rules are documented in `docs/02-build-release/DATA-RETENTION-RULES.md`.
 
 Current retention rules include:
 

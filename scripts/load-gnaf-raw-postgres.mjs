@@ -86,7 +86,7 @@ if (requiresStateShardControls && !storageReviewAllowsStateShard(storageReviewPa
   throw new Error(
     [
       "Refusing an unbounded state-shard G-NAF load without a recorded staged-storage decision.",
-      "Pass --storage-review docs/gnaf-hosted-storage-review-2026-06-29.json or set FUEL_PATH_GNAF_STORAGE_REVIEW_JSON.",
+      "Pass --storage-review docs/03-provider-data/evidence/historical/gnaf/gnaf-hosted-storage-review-2026-06-29.json or set FUEL_PATH_GNAF_STORAGE_REVIEW_JSON.",
     ].join(" "),
   );
 }

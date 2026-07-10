@@ -14,6 +14,10 @@ app currently beta-ready or store-ready without rerunning the relevant checks.
   and validation regime.
 - [`SUPPORT-RUNBOOK.md`](SUPPORT-RUNBOOK.md) defines support ownership, triage
   and escalation requirements.
+- [`DATA-RETENTION-RULES.md`](DATA-RETENTION-RULES.md) records retention and
+  deletion constraints for local and backend data.
+- [`STORE-DATA-SAFETY.md`](STORE-DATA-SAFETY.md) records store disclosure
+  preparation and must remain aligned with the root privacy policy.
 - [`repository-governance.md`](repository-governance.md) defines merge
   protection, baseline exceptions, test quarantine and emergency bypass.
 
@@ -26,6 +30,8 @@ app currently beta-ready or store-ready without rerunning the relevant checks.
 - Historical release reviews live under [`evidence/historical/`](evidence/historical/).
 - Superseded drafts live under [`../archive/build-release/`](../archive/build-release/).
 - Provider permissions remain under [`../03-provider-data/evidence/`](../03-provider-data/evidence/).
+- The dated cross-provider/store summary remains under
+  [`../03-provider-data/provider-store-readiness-summary-2026-07-05.md`](../03-provider-data/provider-store-readiness-summary-2026-07-05.md).
 - Native validation remains in [`../../mobile-app/NATIVE-VALIDATION.md`](../../mobile-app/NATIVE-VALIDATION.md).
 
 Keep `request sent`, `terms confirmed`, `quality-ready` and

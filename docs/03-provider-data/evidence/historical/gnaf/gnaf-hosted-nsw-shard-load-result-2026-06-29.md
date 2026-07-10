@@ -11,7 +11,7 @@ The staged NSW hosted shard load proved the current Neon hosted target is not la
 ## Command
 
 ```bash
-npm run load:gnaf-raw-postgres -- --input data/gnaf/raw/g-naf_may26_allstates_gda2020_psv_1023.zip --states NSW --reset --skip-indexes --allow-state-shard --storage-review docs/gnaf-hosted-storage-review-2026-06-29.json --progress-json tmp/gnaf-raw-postgres-load-2026-06-29T02-52-32-960Z-NSW-shard.json --run-id 2026-06-29T02-52-32-960Z-NSW-shard
+npm run load:gnaf-raw-postgres -- --input data/gnaf/raw/g-naf_may26_allstates_gda2020_psv_1023.zip --states NSW --reset --skip-indexes --allow-state-shard --storage-review docs/03-provider-data/evidence/historical/gnaf/gnaf-hosted-storage-review-2026-06-29.json --progress-json tmp/gnaf-raw-postgres-load-2026-06-29T02-52-32-960Z-NSW-shard.json --run-id 2026-06-29T02-52-32-960Z-NSW-shard
 ```
 
 ## Evidence

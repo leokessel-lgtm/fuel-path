@@ -116,7 +116,7 @@ Review metadata is freshness checked: stale release reviews report `store_review
 1. Keep `web-demo/privacy.html` hosted at `https://fuel-path.vercel.app/web-demo/privacy`.
 2. Add the correct privacy contact method to `PRIVACY-POLICY.md` and the hosted page.
 3. Re-check the final production app build against `PRIVACY-POLICY.md`.
-4. Re-check Apple App Privacy and Google Play Data Safety answers against `STORE-DATA-SAFETY.md`.
+4. Re-check Apple App Privacy and Google Play Data Safety answers against `docs/02-build-release/STORE-DATA-SAFETY.md`.
 5. Confirm provider usage, caching, attribution and public-sharing terms are reflected in public copy.
 6. Confirm native location, notification, push-token and map behaviour on physical iOS and Android devices.
 7. Link the hosted policy from Apple App Store and Google Play listings.

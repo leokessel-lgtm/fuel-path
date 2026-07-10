@@ -212,7 +212,7 @@ Next recommendation:
 
 Follow-up artefact:
 
-- `docs/address-typeahead-prefix-experiment-2026-06-22.md`
+- `docs/03-provider-data/evidence/historical/lookup-experiments/address-typeahead-prefix-experiment-2026-06-22.md`
 - `tmp/address-typeahead-experiment-2026-06-22-typeahead-prefix-hybrid-700-rankfix.json`
 
 The experiment tested both options against 700 sampled address cases from the national SQLite.

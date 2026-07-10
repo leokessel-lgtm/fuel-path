@@ -41,7 +41,7 @@ feature expansion:
 
 For the detailed work queue, read [`TODO.md`](../TODO.md). For long-term goals
 and capability specifications, consult
-[`PROJECT-GOALS-ROADMAP.md`](../PROJECT-GOALS-ROADMAP.md) only when the task
+[`PROJECT-GOALS-ROADMAP.md`](00-product-vision/PROJECT-GOALS-ROADMAP.md) only when the task
 requires that depth.
 
 ## Claim and release boundaries

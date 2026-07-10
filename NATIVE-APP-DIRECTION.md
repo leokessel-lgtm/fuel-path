@@ -85,7 +85,7 @@ The recommended map/address stack is:
 - Address autocomplete decision: use Google Places Autocomplete (New) as the preferred production provider behind the Fuel Path backend. Keep Mapbox Search Box as the fallback candidate if Google pricing, terms or coverage prove unsuitable.
 - Current implementation: Plan Trip now passes session tokens through `/api/geocode` so the app contract is ready for production autocomplete billing, while Nominatim remains validation-only.
 
-The next product step is implementing the Google Places backend adapter after billing/API-key controls are approved, then validating native route-alert scheduling on iOS/Android and implementing the backend push scheduler design captured in `BACKEND-PUSH-SCHEDULER-DESIGN.md`.
+The next product step is implementing the Google Places backend adapter after billing/API-key controls are approved, then validating native route-alert scheduling on iOS/Android and implementing the backend push scheduler design captured in `docs/01-architecture/BACKEND-PUSH-SCHEDULER-DESIGN.md`.
 
 ## Performance Direction
 
@@ -97,4 +97,4 @@ Performance is now a standing product goal.
 - Keep price-cycle analysis, route scoring and broad data joins on the backend.
 - Set iOS and Android app-size baselines after the first EAS preview builds.
 
-See `PERFORMANCE-GUARDRAILS.md`.
+See `docs/01-architecture/PERFORMANCE-GUARDRAILS.md`.

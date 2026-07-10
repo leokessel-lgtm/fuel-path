@@ -50,7 +50,7 @@ const result = {
   blockers,
   nextAction: driverProofReady
     ? "Limit any first content test to a handful of route-example pages tied to proven route recommendations."
-    : "Run recruited-driver tests using docs/route-output-benchmark-user-testing-2026-07-03.md before building pages.",
+    : "Run recruited-driver tests using docs/04-validation-evidence/historical/route-output-benchmark-user-testing-2026-07-03.md before building pages.",
 };
 
 console.log(JSON.stringify(result, null, 2));

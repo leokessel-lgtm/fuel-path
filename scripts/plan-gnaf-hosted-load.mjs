@@ -226,7 +226,7 @@ function assess({ rawZip, sqlite, hosted, minAddressRows: minRows, storageReview
 
 function commandPlan(inputPath, storageReview, planRunId) {
   const input = path.relative(ROOT, inputPath);
-  const reviewPath = storageReview?.path || "docs/gnaf-hosted-storage-review-2026-06-29.json";
+  const reviewPath = storageReview?.path || "docs/03-provider-data/evidence/historical/gnaf/gnaf-hosted-storage-review-2026-06-29.json";
   const reviewArg = storageReview?.ok && storageReview.path ? ` --storage-review ${storageReview.path}` : "";
   const stagedReviewArg = reviewPath ? ` --storage-review ${reviewPath}` : "";
   const progressPath = `tmp/gnaf-raw-postgres-load-${planRunId}.json`;

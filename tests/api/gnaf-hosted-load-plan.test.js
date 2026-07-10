@@ -60,7 +60,7 @@ test("hosted G-NAF load plan requires explicit storage review before national lo
   assert.equal(result.payload.sqlite.count, 16);
   assert.equal(result.payload.sqlite.nationalReady, true);
   assert.equal(result.payload.assessment.warnings.includes("storage_review_not_confirmed"), true);
-  assert.match(result.report, /National load, after storage review/);
+  assert.match(result.report, /National load, after explicit full-load storage approval/);
 });
 
 test("hosted G-NAF load plan still requires hosted target evidence after storage review", async () => {

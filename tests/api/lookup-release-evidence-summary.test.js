@@ -307,9 +307,9 @@ test("lookup release evidence summary default resolver ignores named G-NAF load-
 });
 
 test("lookup release evidence summary default resolver only accepts hosted HTTP national benchmark evidence", async () => {
-  const fixture = writeFixtures({ currentReady: true, hosted: true });
-  const localModuleBenchmark = path.join(ROOT, "tmp", "geocode-hosted-national-benchmark-2099-02-03T04-05-06-007Z.json");
-  const hostedHttpBenchmark = path.join(ROOT, "tmp", "geocode-hosted-national-benchmark-2099-02-03T04-05-07-008Z.json");
+  const fixture = writeFixtures({ currentReady: true, hosted: true, planFieldStressEvidence: true });
+  const localModuleBenchmark = path.join(ROOT, "tmp", "geocode-hosted-national-benchmark-zzzz-2099-02-03T04-05-06-007Z.json");
+  const hostedHttpBenchmark = path.join(ROOT, "tmp", "geocode-hosted-national-benchmark-zzzz-2099-02-03T04-05-07-008Z.json");
 
   try {
     fs.writeFileSync(localModuleBenchmark, JSON.stringify(hostedNational({ mode: "module" }), null, 2));
@@ -319,6 +319,8 @@ test("lookup release evidence summary default resolver only accepts hosted HTTP 
       fixture.routeFields,
       "--plan-field-smoke",
       fixture.planFieldSmoke,
+      "--plan-field-stress",
+      fixture.planFieldStress,
       "--exact-readiness",
       fixture.exactReadiness,
       "--gnaf-load-plan",
@@ -344,6 +346,8 @@ test("lookup release evidence summary default resolver only accepts hosted HTTP 
       fixture.routeFields,
       "--plan-field-smoke",
       fixture.planFieldSmoke,
+      "--plan-field-stress",
+      fixture.planFieldStress,
       "--exact-readiness",
       fixture.exactReadiness,
       "--gnaf-load-plan",
@@ -455,8 +459,8 @@ function planFieldSmoke() {
     "state-only address context is not enough",
     "locality-qualified typed address still needs suggestion confirmation",
     "validation address rows are ranked above POI-like rows",
-    "validation rows show unconfirmed evidence",
-    "street fallback rows show street-only evidence",
+    "validation rows keep unconfirmed evidence hidden",
+    "street fallback rows keep street-only evidence hidden",
     "selecting confirmed From and To unlocks Plan route",
     "selected broad capital pair can submit route",
     "airport pair suggestions can submit route",
@@ -633,6 +637,14 @@ function hostedNational({ mode = "http" } = {}) {
           finalTopRate: 0.99,
           p90AnyChars: 9,
         },
+      },
+    },
+    coverage: {
+      requiredSlices: {
+        allStatesRepresented: true,
+        numericAddressLikeRows: 600,
+        ruralOrRemoteAddressRows: 80,
+        unitOrBuildingAddressRows: 20,
       },
     },
   };

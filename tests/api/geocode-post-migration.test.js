@@ -35,10 +35,10 @@ test("geocode response includes Cache-Control no-store private", async () => {
  assert.equal(response.headers["cache-control"], "no-store, private");
 });
 
-test("POST without q returns 404 error", async () => {
+test("POST without q returns public recovery guidance", async () => {
  const response = await callGeocode({ method: "POST", body: { limit: 3 } });
  assert.equal(response.status, 404);
- assert.match(response.payload.error, /q is required/);
+ assert.equal(response.payload.error, "Enter an address, suburb or postcode to search.");
 });
 
 test("PUT method returns 405", async () => {

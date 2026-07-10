@@ -17,6 +17,17 @@ This protects the user experience for searches like:
 ## Runtime rules
 
 - Exact numbered address and unit/building queries stay address-first.
+- A broad city or suburb match must not end local lookup when the query contains
+  additional specific terms, such as a building or venue name.
+- An under-specified street address remains hidden without locality, state or
+  postcode context.
+- Caller-supplied nearby context may rank already-safe suggestions, but never
+  authorises disclosure of an address that would otherwise be hidden.
+- Names indicating a refuge, shelter, safe house or other sensitive location do
+  not reveal a precise G-NAF address unless the query itself contains explicit
+  address intent.
+- An exact building-name prefix from G-NAF outranks a broad locality fallback;
+  ambiguous base-building results remain marked for refinement.
 - Known local POI/station/gazetteer queries return immediately from local autocomplete data.
 - Strong local POI/station/gazetteer queries must be checked before address-index status is loaded.
 - Hosted G-NAF lookup must not run before a strong local POI/station suggestion.

@@ -11,6 +11,7 @@ const {
   stringParam,
 } = require("./_backend");
 const { publicErrorMessage } = require("./_publicErrors");
+const { boundedNumberParam, coordinateParam } = require("../shared/stationValidation");
 
 module.exports = async function handler(req, res) {
   if (!methodAllowed(req, res)) return;
@@ -148,11 +149,6 @@ module.exports = async function handler(req, res) {
   }
 };
 
-function coordinateParam(value, name, min, max) {
-  if (value === undefined || value === null || value === "") throw new Error(`${name} is required`);
-  return boundedNumberParam(value, name, undefined, { min, max, clampMax: false });
-}
-
 function normaliseBrand(value) {
   return String(value || "").toLowerCase().replace(/&/g, "and").replace(/[^a-z0-9]+/g, "");
 }
@@ -194,16 +190,6 @@ function alternativeFuelOrder(requestedFuel) {
   if (fuel === "DL") return ["PDL", "U91", "P95", "P98", "E10", "LPG"];
   if (fuel === "PDL") return ["DL", "U91", "P95", "P98", "E10", "LPG"];
   return ["U91", "DL", "P95", "P98", "PDL", "E10", "LPG"];
-}
-
-function boundedNumberParam(value, name, fallback, { min, max, clampMax = true }) {
-  const raw = Array.isArray(value) ? value[0] : value;
-  if ((raw === undefined || raw === null || raw === "") && fallback !== undefined) return fallback;
-  const parsed = Number(raw);
-  if (!Number.isFinite(parsed)) throw new Error(`${name} must be a number`);
-  if (parsed < min) throw new Error(`${name} must be at least ${min}`);
-  if (!clampMax && parsed > max) throw new Error(`${name} must be at most ${max}`);
-  return Math.min(parsed, max);
 }
 
 function providerStatuses(providerHealth = {}) {

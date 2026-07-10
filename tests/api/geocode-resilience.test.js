@@ -7,6 +7,11 @@ const test = require("node:test");
 
 const { geocode } = require("../../api/_backend");
 
+const activeFetchMockRestorers = new Set();
+test.afterEach(() => {
+  for (const restore of [...activeFetchMockRestorers]) restore();
+});
+
 test("validation geocode rate limits degrade without throwing", async () => {
   await withGeocodeEnv({ FUEL_PATH_GEOCODE_PROVIDER: "nominatim" }, async () => {
     const mockFetch = installFetchMock(() =>
@@ -24,11 +29,11 @@ test("validation geocode rate limits degrade without throwing", async () => {
     assert.equal(result.lookupStatus, "degraded");
     assert.equal(result.location, null);
     assert.deepEqual(result.suggestions, []);
-    assert.match(result.warning, /rate-limited/i);
+    assert.equal(result.warning, "Address lookup is temporarily busy. Try a fuller address, suburb or postcode.");
     assert.equal(result.degraded, true);
     assert.equal(result.cacheMode, "degraded");
     assert.equal(result.providerHealth.nominatim.status, "unavailable");
-    assert.match(result.providerHealth.nominatim.lastError, /rate-limited/i);
+    assert.equal(result.providerHealth.nominatim.lastError, "Address lookup is temporarily busy. Try a fuller address, suburb or postcode.");
     assert.equal(mockFetch.calls.length, 1);
 
     mockFetch.restore();
@@ -167,7 +172,7 @@ test("local geocode hints survive provider rate limiting", async () => {
     assert.equal(result.lookupStatus, "local_fallback");
     assert.equal(result.location.label, "Queen Street, Brisbane QLD 4000");
     assert.equal(result.suggestions[0].provider, "fuel_path_hint");
-    assert.match(result.warning, /rate-limited|cooling down/i);
+    assert.equal(result.warning, "Address lookup is temporarily busy. Try a fuller address, suburb or postcode.");
     assert.equal(result.degraded, true);
     assert.equal(result.cacheMode, "local_fallback");
     assert.equal(result.providerHealth.nominatim.status, "degraded");
@@ -1390,15 +1395,22 @@ test("geocode cache trims oldest unique lookups when max entries is reached", as
 function installFetchMock(handler) {
   const originalFetch = global.fetch;
   const calls = [];
-  global.fetch = async (input, options = {}) => {
+  const mockedFetch = async (input, options = {}) => {
     calls.push({ input: String(input), options });
     return handler(input, options);
   };
+  global.fetch = mockedFetch;
+  let restored = false;
+  const restore = () => {
+    if (restored) return;
+    restored = true;
+    if (global.fetch === mockedFetch) global.fetch = originalFetch;
+    activeFetchMockRestorers.delete(restore);
+  };
+  activeFetchMockRestorers.add(restore);
   return {
     calls,
-    restore() {
-      global.fetch = originalFetch;
-    },
+    restore,
   };
 }
 

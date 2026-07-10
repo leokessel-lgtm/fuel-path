@@ -9,9 +9,9 @@ Changes to `main` require the configured status checks, one approving review,
 code-owner review, approval after the latest push and resolved conversations.
 Administrators retain bypass only for an emergency.
 
-The wildcard code owners must explicitly accept the ongoing responsibility.
-Repository write access alone is not acceptance. Until both owners confirm,
-review capacity is an open governance dependency.
+The wildcard code owner is `@leokessel-lgtm`. A pull request opened by the sole
+code owner cannot satisfy GitHub's independent code-owner approval requirement;
+normal merge capacity therefore requires adding another accepted code owner.
 
 ## Ratcheting baselines
 
@@ -40,6 +40,11 @@ Known failing files are listed with reasons in
 `scripts/backend-test-manifest.json`; this quarantine is test debt, not passing
 evidence. New tests are included automatically. Removing a quarantine entry
 must make that file part of the required suite.
+
+Current state: all discovered backend test files are required; the quarantine
+manifest is empty. CI compares the quarantine count with the merge base and
+rejects any increase. The check also fails when the merge-base manifest cannot
+be read; it never establishes an implicit baseline from the current branch.
 
 ## Emergency merge
 

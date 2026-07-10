@@ -5,7 +5,7 @@ once. Preserve public contracts and add focused tests before each split.
 
 | Priority | Module | Current concern | First safe extraction |
 | --- | --- | --- | --- |
-| P0 | `api/_backend.js` | Composition root still contains shared HTTP, cache and domain orchestration | Move generic HTTP/parameter utilities, then provider loading orchestration |
+| P0 | `api/_backend.js` | Composition root still contains provider loading, cache and domain orchestration | Follow [`backend-composition-root-map.md`](backend-composition-root-map.md): HTTP helpers are extracted; provider loading orchestration is next |
 | P0 | `api/_geocode.js` | Provider selection, caching, address index and response shaping remain coupled | Extract cache/policy orchestration behind existing geocode contract |
 | P0 | `api/_addressIndex.js` | Query parsing, storage access and ranking are one large unit | Extract query normalisation and ranking with existing fixtures |
 | P1 | `mobile-app/src/components/PlanRouteSheet.tsx` | Recommendation, evidence and action rendering are coupled | Extract result sections without changing wording or route rules |

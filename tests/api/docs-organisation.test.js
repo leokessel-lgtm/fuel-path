@@ -28,6 +28,19 @@ test("documentation checker rejects stale moved paths in TypeScript", async (con
   await expectCheckerFailure(fixture, "stale moved-path reference in src/reference.ts: OLD-PATH.md");
 });
 
+test("documentation checker rejects unregistered context profile documents", async (context) => {
+  const fixture = createFixture(context);
+  writeFixtureFile(fixture, "profiles.json", `${JSON.stringify({ profiles: { task: ["docs/unregistered.md"] } })}\n`);
+  writeFixtureFile(fixture, "docs/unregistered.md", "# Unregistered\n");
+  await expectCheckerFailure(fixture, "context profile document is not registered as required: task -> docs/unregistered.md");
+});
+
+test("documentation checker rejects a stale moved document at its old path", async (context) => {
+  const fixture = createFixture(context);
+  writeFixtureFile(fixture, "OLD.md", "# Old\n");
+  await expectCheckerFailure(fixture, "stale moved document still exists: OLD.md -> docs/README.md");
+});
+
 test("documentation checker rejects unapproved root Markdown", async (context) => {
   const fixture = createFixture(context);
   writeFixtureFile(fixture, "EXTRA.md", "# Unapproved root file\n");
@@ -48,12 +61,14 @@ function createFixture(context) {
   context.after(() => rmSync(fixture, { force: true, recursive: true }));
 
   const config = {
+    contextProfilesFile: "profiles.json",
     requiredDocuments: ["README.md", "docs/README.md", "docs/03-provider-data/README.md"],
     allowedRootMarkdown: ["README.md"],
     templateLabelTerms: ["template", "sample"],
     providerEvidenceDisallowedNamePatterns: ["API-NOTES", "PROVIDER-DECISION"],
     requiredProviderStates: ["request sent", "terms confirmed", "quality-ready", "beta-release-ready"],
     stalePathFragments: ["OLD-PATH.md"],
+    movedPaths: { "OLD.md": "docs/README.md" },
     textFileExtensions: [".json", ".md", ".ts"],
     textFileNames: [],
     excludedDirectoryNames: ["node_modules", "tmp"],
@@ -61,6 +76,7 @@ function createFixture(context) {
   };
 
   writeFixtureFile(fixture, "docs-check.config.json", `${JSON.stringify(config, null, 2)}\n`);
+  writeFixtureFile(fixture, "profiles.json", `${JSON.stringify({ profiles: { task: ["README.md", "docs/README.md"] } })}\n`);
   writeFixtureFile(fixture, "README.md", "# Fixture\n");
   writeFixtureFile(fixture, "docs/README.md", "# Docs\n");
   writeFixtureFile(

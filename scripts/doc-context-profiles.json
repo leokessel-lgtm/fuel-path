@@ -1,5 +1,20 @@
 {
   "estimationMethod": "ceil(UTF-8 text characters / 4)",
+  "minimumHeadroomPercent": 15,
+  "headroomProfiles": [
+    "product_orientation",
+    "provider_task",
+    "backend_api_task",
+    "release_readiness",
+    "full_catalog_audit"
+  ],
+  "requiredProfileFiles": {
+    "product_orientation": ["AGENTS.md", "docs/README.md", "docs/current-product.md"],
+    "provider_task": ["AGENTS.md", "docs/03-provider-data/README.md", "docs/03-provider-data/provider-readiness.md"],
+    "backend_api_task": ["AGENTS.md", "api/AGENTS.md", "docs/01-architecture/system-context.md"],
+    "release_readiness": ["AGENTS.md", "docs/README.md", "docs/02-build-release/release-readiness-guide.md", "docs/02-build-release/CURRENT-RELEASE-DECISION.md"],
+    "full_catalog_audit": ["AGENTS.md", "docs/catalog.md"]
+  },
   "maxEstimatedTokens": {
     "root_default": 250,
     "mobile_app_default": 300,
@@ -36,14 +51,12 @@
     ],
     "provider_task": [
       "AGENTS.md",
-      "docs/README.md",
       "docs/03-provider-data/README.md",
       "docs/03-provider-data/provider-readiness.md"
     ],
     "backend_api_task": [
       "AGENTS.md",
       "api/AGENTS.md",
-      "docs/01-architecture/README.md",
       "docs/01-architecture/system-context.md"
     ],
     "geocode_task": [
@@ -78,8 +91,8 @@
     "release_readiness": [
       "AGENTS.md",
       "docs/README.md",
-      "docs/02-build-release/README.md",
-      "docs/02-build-release/STORE-READINESS-PLAN.md"
+      "docs/02-build-release/release-readiness-guide.md",
+      "docs/02-build-release/CURRENT-RELEASE-DECISION.md"
     ],
     "route_change": [
       "AGENTS.md",
@@ -88,7 +101,6 @@
     ],
     "full_catalog_audit": [
       "AGENTS.md",
-      "docs/README.md",
       "docs/catalog.md"
     ]
   }

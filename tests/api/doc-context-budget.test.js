@@ -24,7 +24,31 @@ test("context budget fails when a profile exceeds its ceiling", async (context) 
   });
 });
 
-function createFixture(context, ceiling) {
+test("context budget fails when a protected profile loses growth headroom", async (context) => {
+  const fixture = createFixture(context, 1.1, { minimumHeadroomPercent: 15, headroomProfiles: ["small"] });
+  await assert.rejects(runChecker(fixture), (error) => {
+    assert.match(error.stderr, /small: 9\.1% headroom < 15%/);
+    return true;
+  });
+});
+
+test("context budget rejects headroom policy drift to an unknown profile", async (context) => {
+  const fixture = createFixture(context, 3, { minimumHeadroomPercent: 15, headroomProfiles: ["missing"] });
+  await assert.rejects(runChecker(fixture), (error) => {
+    assert.match(error.stderr, /missing: headroom policy has no profile/);
+    return true;
+  });
+});
+
+test("context budget rejects removing required guidance to create headroom", async (context) => {
+  const fixture = createFixture(context, 3, { requiredProfileFiles: { small: ["essential.md"] } });
+  await assert.rejects(runChecker(fixture), (error) => {
+    assert.match(error.stderr, /small: required context missing: essential\.md/);
+    return true;
+  });
+});
+
+function createFixture(context, ceiling, policy = {}) {
   const fixture = mkdtempSync(path.join(tmpdir(), "fuel-path-context-budget-"));
   context.after(() => rmSync(fixture, { force: true, recursive: true }));
   writeFixtureFile(fixture, "small.md", "test");
@@ -32,6 +56,7 @@ function createFixture(context, ceiling) {
     estimationMethod: "ceil(UTF-8 text characters / 4)",
     maxEstimatedTokens: { small: ceiling },
     profiles: { small: ["small.md"] },
+    ...policy,
   }, null, 2)}\n`);
   return fixture;
 }

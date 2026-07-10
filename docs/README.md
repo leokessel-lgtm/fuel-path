@@ -1,42 +1,22 @@
 # Fuel Path documentation
 
-Start here, then open only the documents needed for the task. Dated reports are
-evidence for their recorded date, not proof of current readiness.
-
-For the complete document classification and move backlog, see
-[Documentation catalogue](catalog.md).
+Start here, then open one task guide. Dated material is evidence for its date,
+not proof of current readiness. The [catalogue](catalog.md) is for audits, not
+routine work.
 
 ## Task router
 
 | Task | Read first | Read only when relevant |
 | --- | --- | --- |
-| Understand the product | [`current-product.md`](current-product.md) | The detailed roadmap or research only when the task needs that depth |
+| Understand the product | [`current-product.md`](current-product.md) | Detailed roadmap or research only when needed |
 | Change route recommendations, scoring or savings wording | [`route-recommendation-logic-rules.md`](route-recommendation-logic-rules.md) | Latest route evidence under [`evidence/`](evidence/) |
 | Work on provider integrations or access | [`03-provider-data/README.md`](03-provider-data/README.md) | Open only the relevant provider decision, implementation note or evidence file |
-| Assess beta or store readiness | [`02-build-release/CURRENT-RELEASE-DECISION.md`](02-build-release/CURRENT-RELEASE-DECISION.md) and [`02-build-release/STORE-READINESS-PLAN.md`](02-build-release/STORE-READINESS-PLAN.md) | Dated store, support, native and provider evidence |
+| Assess beta or store readiness | [`02-build-release/release-readiness-guide.md`](02-build-release/release-readiness-guide.md) | Current decision, gate plan and dated evidence as routed there |
 | Work on the mobile app | [`mobile-app/README.md`](../mobile-app/README.md) and [`mobile-app/AGENTS.md`](../mobile-app/AGENTS.md) | [`mobile-app/NATIVE-VALIDATION.md`](../mobile-app/NATIVE-VALIDATION.md) when validation state matters |
-| Plan validation sessions | [`04-validation-evidence/VALIDATION-SESSION-WORKBOOK.md`](04-validation-evidence/VALIDATION-SESSION-WORKBOOK.md) | Recruitment, demo and synthesis documents only for that workflow |
-| Run or change tests | [`02-build-release/NATIONAL-TESTING-REGIME.md`](02-build-release/NATIONAL-TESTING-REGIME.md) | The closest test file and package script for the changed subsystem |
-| Review architecture or performance | [`01-architecture/backend-hosting-v1.md`](01-architecture/backend-hosting-v1.md) or [`01-architecture/PERFORMANCE-GUARDRAILS.md`](01-architecture/PERFORMANCE-GUARDRAILS.md), depending on scope | Dated benchmarks only when the claim needs evidence |
+| Plan validation sessions | [`04-validation-evidence/VALIDATION-SESSION-WORKBOOK.md`](04-validation-evidence/VALIDATION-SESSION-WORKBOOK.md) | Recruitment and synthesis only for that workflow |
+| Run or change tests | [`02-build-release/NATIONAL-TESTING-REGIME.md`](02-build-release/NATIONAL-TESTING-REGIME.md) | Closest tests and package script |
+| Review architecture or performance | [`01-architecture/README.md`](01-architecture/README.md) | Follow its task route |
 | Understand or refactor runtime boundaries | [`01-architecture/README.md`](01-architecture/README.md) | The closest handler, module and regression tests only |
-
-## Folder map
-
-```text
-docs/
-  00-product-vision/       product goals and roadmap framing
-  01-architecture/         runtime boundaries, data flow, scaling and refactor map
-  02-build-release/        current build, testing, support and release gates
-  03-provider-data/        provider decisions, implementation and evidence
-  04-validation-evidence/ validation plans, workbooks, synthesis and evidence gates
-  05-research/             research, strategy and product learning
-  06-design-brand/         production design system, typography and UX methods
-  brand-concepts/          exploratory brand concepts, not production assets
-  evidence/                current generated evidence not yet grouped by topic
-  templates/               blank and sample artefacts, never proof by themselves
-  archive/                 superseded material retained for audit history
-  catalog.md               detailed classification and future move backlog
-```
 
 ## Reading rules
 
@@ -45,11 +25,11 @@ docs/
 - Keep provider implementation notes separate from provider permission evidence.
 - Keep `request sent`, `terms confirmed`, `quality-ready` and `beta-release-ready` distinct.
 - Treat templates, samples, synthetic sessions and generated synthesis as non-primary evidence.
+- Use the catalogue for full classification, folder boundaries and move history.
 - Update [`route-recommendation-logic-rules.md`](route-recommendation-logic-rules.md) whenever route scoring, rejection, ranking, detour, savings or Plan recommendation wording changes.
 - Use [`context-budget.md`](context-budget.md) for measured repo-owned context profiles; do not claim broad token savings from file moves alone.
 
 ## Checks
 
-Run `npm run check:docs` after moving documentation or changing internal links.
-Run `npm run measure:doc-context` after changing task-router profile membership.
-Run `npm run check:architecture` after changing production module boundaries.
+Run `npm run check:docs` after documentation changes and
+`npm run measure:doc-context` after router/profile changes.

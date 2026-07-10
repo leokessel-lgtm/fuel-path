@@ -17,6 +17,25 @@ for (const path of config.requiredDocuments) {
   if (!existsSync(resolve(root, path))) failures.push(`missing required document: ${path}`);
 }
 
+const requiredDocuments = new Set(config.requiredDocuments);
+if (config.contextProfilesFile) {
+  const profilesPath = resolve(root, config.contextProfilesFile);
+  if (!existsSync(profilesPath)) failures.push(`missing context profiles file: ${config.contextProfilesFile}`);
+  else {
+    const profileConfig = JSON.parse(readFileSync(profilesPath, "utf8"));
+    for (const [profile, paths] of Object.entries(profileConfig.profiles || {})) {
+      for (const path of paths) {
+        if (!requiredDocuments.has(path)) failures.push(`context profile document is not registered as required: ${profile} -> ${path}`);
+      }
+    }
+  }
+}
+
+for (const [oldPath, newPath] of Object.entries(config.movedPaths || {})) {
+  if (existsSync(resolve(root, oldPath))) failures.push(`stale moved document still exists: ${oldPath} -> ${newPath}`);
+  if (!existsSync(resolve(root, newPath))) failures.push(`moved document target is missing: ${oldPath} -> ${newPath}`);
+}
+
 for (const path of markdownFiles) {
   if (!path.includes("/") && !allowedRootMarkdown.has(path)) {
     failures.push(`unapproved root Markdown document: ${path}`);

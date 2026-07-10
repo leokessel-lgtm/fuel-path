@@ -1,51 +1,19 @@
-import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
-import { basename, dirname, resolve } from "node:path";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { basename, dirname, extname, relative, resolve, sep } from "node:path";
 
-const root = process.cwd();
-const markdownFiles = trackedFiles("*.md");
-const trackedDocumentFiles = trackedFiles("*.md", "*.json");
+const args = parseArgs(process.argv.slice(2));
+const root = resolve(args.root || process.cwd());
+const configPath = args.config ? resolve(args.config) : resolve(root, "scripts/docs-check.config.json");
+const config = JSON.parse(readFileSync(configPath, "utf8"));
+const allFiles = discoverFiles(root);
+const markdownFiles = allFiles.filter((path) => extname(path).toLowerCase() === ".md");
+const documentFiles = allFiles.filter((path) => [".md", ".json"].includes(extname(path).toLowerCase()));
+const relevantTextFiles = allFiles.filter(isRelevantTextPath);
 const failures = [];
 
-const requiredDocuments = [
-  "AGENTS.md",
-  "README.md",
-  "docs/README.md",
-  "docs/catalog.md",
-  "docs/route-recommendation-logic-rules.md",
-  "docs/03-provider-data/README.md",
-  "docs/03-provider-data/PROVIDER-ACCESS-READINESS.md",
-];
+const allowedRootMarkdown = new Set(config.allowedRootMarkdown);
 
-const allowedRootMarkdown = new Set([
-  "AGENTS.md",
-  "BACKEND-PUSH-SCHEDULER-DESIGN.md",
-  "BACKLOG-EVIDENCE-MATRIX.md",
-  "DATA-RETENTION-RULES.md",
-  "DESIGN-SYSTEM.md",
-  "GOAL-1-EVIDENCE-GATE.md",
-  "NATIONAL-TESTING-REGIME.md",
-  "NATIVE-APP-DIRECTION.md",
-  "ORACLE-ALWAYS-FREE-GNAF-HOSTING.md",
-  "PERFORMANCE-GUARDRAILS.md",
-  "PRIVACY-POLICY.md",
-  "PRIVACY-PUBLISHING-CHECKLIST.md",
-  "PROJECT-GOALS-ROADMAP.md",
-  "README.md",
-  "STORE-DATA-SAFETY.md",
-  "STORE-READINESS-PLAN.md",
-  "STORE-RELEASE-REVIEW-2026-06-20.md",
-  "SUPPORT-RUNBOOK.md",
-  "SYNTHETIC-VALIDATION-SESSIONS.md",
-  "TODO.md",
-  "VALIDATION-DEMO-PACK.md",
-  "VALIDATION-PASS-2026-06-14.md",
-  "VALIDATION-RECRUITMENT-PACK.md",
-  "VALIDATION-SESSION-WORKBOOK.md",
-  "VALIDATION-SYNTHESIS.md",
-]);
-
-for (const path of requiredDocuments) {
+for (const path of config.requiredDocuments) {
   if (!existsSync(resolve(root, path))) failures.push(`missing required document: ${path}`);
 }
 
@@ -63,17 +31,17 @@ for (const path of markdownFiles) {
   }
 }
 
-for (const path of trackedDocumentFiles) {
+for (const path of documentFiles) {
   if (path.startsWith("docs/templates/")) {
     const name = basename(path).toLowerCase();
-    if (!name.includes("template") && !name.includes("sample")) {
+    if (!config.templateLabelTerms.some((term) => name.includes(term))) {
       failures.push(`template folder contains an unlabelled artefact: ${path}`);
     }
   }
 
-  if (path.startsWith("docs/03-provider-data/evidence/")) {
+  if (path.startsWith("docs/03-provider-data/evidence/") && !path.startsWith("docs/03-provider-data/evidence/historical/")) {
     const name = basename(path);
-    if (/(?:API-NOTES|PROVIDER-DECISION|ADDRESS-LOOKUP|GNAF-NATIONAL-ADDRESS-INDEX|UNBLOCK-PLAN)/i.test(name)) {
+    if (config.providerEvidenceDisallowedNamePatterns.some((pattern) => name.toLowerCase().includes(pattern.toLowerCase()))) {
       failures.push(`provider implementation or decision file is under evidence: ${path}`);
     }
   }
@@ -82,20 +50,13 @@ for (const path of trackedDocumentFiles) {
 const providerIndexPath = resolve(root, "docs/03-provider-data/README.md");
 if (existsSync(providerIndexPath)) {
   const providerIndex = readFileSync(providerIndexPath, "utf8");
-  for (const state of ["request sent", "terms confirmed", "quality-ready", "beta-release-ready"]) {
+  for (const state of config.requiredProviderStates) {
     if (!providerIndex.includes(state)) failures.push(`provider index is missing readiness state: ${state}`);
   }
 }
 
-const stalePathFragments = [
-  "../ADDRESS-LOOKUP-PROVIDERS.md",
-  "../../../SA-FUEL-API-NOTES.md",
-  "docs/provider-terms/",
-  "../../provider-terms/",
-  "](API-NSW-SUPPORT-NOTE.md)",
-];
-
-for (const path of trackedDocumentFiles) {
+for (const path of relevantTextFiles) {
+  if (resolve(root, path) === configPath) continue;
   const fullPath = resolve(root, path);
   let text = "";
   try {
@@ -103,7 +64,7 @@ for (const path of trackedDocumentFiles) {
   } catch {
     continue;
   }
-  for (const fragment of stalePathFragments) {
+  for (const fragment of config.stalePathFragments) {
     if (text.includes(fragment)) failures.push(`stale moved-path reference in ${path}: ${fragment}`);
   }
 }
@@ -115,15 +76,36 @@ if (failures.length) {
 }
 
 console.log(
-  `Documentation check passed: ${markdownFiles.length} Markdown files, ${trackedDocumentFiles.length} tracked Markdown/JSON files.`,
+  `Documentation check passed: ${markdownFiles.length} Markdown files, ${documentFiles.length} Markdown/JSON files, ${relevantTextFiles.length} text files scanned for stale paths.`,
 );
 
-function trackedFiles(...patterns) {
-  const output = execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard", "-z", "--", ...patterns], {
-    cwd: root,
-    encoding: "utf8",
-  });
-  return output.split("\0").filter(Boolean);
+function discoverFiles(directory) {
+  const files = [];
+  walk(directory);
+  return files.sort();
+
+  function walk(currentDirectory) {
+    for (const entry of readdirSync(currentDirectory, { withFileTypes: true })) {
+      const absolutePath = resolve(currentDirectory, entry.name);
+      const repositoryPath = relative(root, absolutePath).split(sep).join("/");
+      if (entry.isSymbolicLink()) continue;
+      if (entry.isDirectory()) {
+        if (config.excludedDirectoryNames.includes(entry.name) || isExcludedPath(repositoryPath)) continue;
+        walk(absolutePath);
+        continue;
+      }
+      if (entry.isFile() && !isExcludedPath(repositoryPath)) files.push(repositoryPath);
+    }
+  }
+}
+
+function isExcludedPath(path) {
+  return config.excludedPaths.some((excludedPath) => path === excludedPath || path.startsWith(`${excludedPath}/`));
+}
+
+function isRelevantTextPath(path) {
+  const name = basename(path);
+  return config.textFileNames.includes(name) || config.textFileExtensions.includes(extname(path).toLowerCase());
 }
 
 function markdownTargets(text) {
@@ -148,4 +130,13 @@ function localLinkPath(rawTarget) {
   } catch {
     return target;
   }
+}
+
+function parseArgs(argv) {
+  const parsed = {};
+  for (let index = 0; index < argv.length; index += 1) {
+    if (argv[index] === "--root") parsed.root = argv[++index];
+    else if (argv[index] === "--config") parsed.config = argv[++index];
+  }
+  return parsed;
 }

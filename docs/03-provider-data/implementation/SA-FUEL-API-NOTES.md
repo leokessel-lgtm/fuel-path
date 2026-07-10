@@ -1,5 +1,9 @@
 # SA Fuel Pricing Information Scheme API Notes
 
+**Classification:** source-of-truth for the SA adapter contract. Access email
+and validation statements below are dated evidence, not current health or
+public-use permission.
+
 ## Access Status
 
 - Access email received from Fuel Prices SA Support on 2026-06-18.

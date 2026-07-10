@@ -15,11 +15,12 @@ were produced unless the relevant workflow has been re-run.
 | `AGENTS.md` | source-of-truth | keep at repo root | Repo operating rules for Codex and Fuel Path changes. | Must stay visible at root. |
 | `docs/README.md` | source-of-truth | keep in `docs/` | Concise task router and folder map. | Keep small so developers and Codex load only task-relevant context. |
 | `docs/catalog.md` | source-of-truth | keep in `docs/` | Detailed classification, risks and move backlog. | Audit reference only; do not load by default for implementation tasks. |
+| `docs/context-budget.md` | current-evidence | keep in `docs/` | Reproducible repo-owned documentation context estimates. | Character-based estimate only; update when router profiles change. |
 | `docs/route-recommendation-logic-rules.md` | source-of-truth | keep in `docs/` | Route recommendation, scoring, rejection, detour, savings and Plan wording contract. | Must be updated in the same change as route logic or user-facing savings wording. |
 | `PROJECT-GOALS-ROADMAP.md` | source-of-truth | move later to `docs/00-product-vision/` | Product goals and roadmap framing. | Moving requires link checks from README and handoff notes. |
 | `STORE-READINESS-PLAN.md` | source-of-truth | move later to `docs/02-build-release/` | Current store readiness and release-gate state. | Do not collapse request sent, terms confirmed, quality-ready and beta-release-ready. |
 | `NATIONAL-TESTING-REGIME.md` | source-of-truth | move later to `docs/02-build-release/` | Validation and testing regime. | Keep separate from dated validation evidence. |
-| `docs/03-provider-data/PROVIDER-ACCESS-READINESS.md` | source-of-truth | keep in `docs/03-provider-data/` | Provider access readiness state. | Provider permission evidence must stay distinct from implementation notes. |
+| `docs/03-provider-data/provider-readiness.md` | source-of-truth | keep in `docs/03-provider-data/` | Current provider verification contract and state boundaries. | Runtime and evidence checks still need to be rerun for current claims. |
 | `SUPPORT-RUNBOOK.md` | source-of-truth | move later to `docs/02-build-release/` | Support workflow and operational response guidance. | Test fixtures may mirror it but are not the source of truth. |
 | `PRIVACY-POLICY.md` | source-of-truth | keep at root or move later to `docs/02-build-release/` | User-facing privacy policy. | Governance, privacy and store claims need source-backed review. |
 | `DATA-RETENTION-RULES.md` | source-of-truth | move later to `docs/02-build-release/` | Data retention rules and operating constraints. | Treat as policy-sensitive. |
@@ -68,7 +69,8 @@ were produced unless the relevant workflow has been re-run.
 | `docs/03-provider-data/implementation/QLD-FUEL-API-NOTES.md` | source-of-truth | keep under provider implementation | QLD fuel API implementation notes. | Provider terms and permission state remain separate. |
 | `docs/03-provider-data/implementation/SA-FUEL-API-NOTES.md` | source-of-truth | keep under provider implementation | SA fuel API implementation notes. | Provider terms and permission state remain separate. |
 | `docs/03-provider-data/evidence/API-NSW-SUPPORT-NOTE.md` | current-evidence | keep under provider evidence | NSW support notes. | Do not treat as approval unless explicit. |
-| `docs/03-provider-data/implementation/API-NSW-UNBLOCK-PLAN.md` | source-of-truth | keep under provider implementation | NSW unblock plan. | Needs current provider-status verification before action. |
+| `docs/03-provider-data/evidence/historical/API-NSW-UNBLOCK-PLAN-2026-06-13.md` | historical-evidence | keep under historical provider evidence | Completed NSW access plan and dated findings. | Do not use as current adapter or permission state. |
+| `docs/03-provider-data/evidence/historical/PROVIDER-ACCESS-READINESS-2026-06-26.md` | historical-evidence | keep under historical provider evidence | Superseded provider readiness snapshot. | Predates later VIC, SA and NT implementation work. |
 | `docs/03-provider-data/evidence/provider-terms-*.md` | current-evidence | keep in `docs/03-provider-data/evidence/` | Provider request and evidence notes by jurisdiction. | Keep request sent distinct from terms confirmed. |
 | `docs/03-provider-data/evidence/service-victoria-servo-saver-terms-acceptance-2026-06-27.md` | current-evidence | keep under provider evidence | Provider-specific terms acceptance evidence. | Private operational evidence unless explicitly prepared for public use. |
 | `docs/provider-store-readiness-summary-2026-07-05.md` | current-evidence | move later to `docs/03-provider-data/` | Provider/store readiness summary. | Avoid collapsing provider access and store release readiness. |

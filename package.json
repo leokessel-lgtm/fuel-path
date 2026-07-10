@@ -1,8 +1,10 @@
 {
   "private": true,
   "scripts": {
-    "test": "node --test --test-concurrency=1 tests/api/docs-organisation.test.js tests/api/provider-routing.test.js tests/api/provider-terms-readiness.test.js tests/api/store-publishing-readiness.test.js tests/api/support-readiness.test.js tests/api/beta-readiness.test.js tests/api/route-quality-now.test.js tests/api/predictions.test.js tests/api/discount-registry.test.js",
+    "test": "node --test --test-concurrency=1 tests/api/provider-routing.test.js tests/api/provider-terms-readiness.test.js tests/api/store-publishing-readiness.test.js tests/api/support-readiness.test.js tests/api/beta-readiness.test.js tests/api/route-quality-now.test.js tests/api/predictions.test.js tests/api/discount-registry.test.js",
     "check:docs": "node scripts/check-docs.mjs",
+    "test:docs": "node --test tests/api/docs-organisation.test.js",
+    "measure:doc-context": "node scripts/measure-doc-context.mjs",
     "validate:tas-v2": "node scripts/validate-api-nsw-v2-tas.mjs",
     "validate:vic-servo-saver": "node scripts/validate-vic-servo-saver-smoke.mjs",
     "validate:vic-servo-saver:matrix": "node scripts/validate-vic-servo-saver-smoke.mjs --matrix",

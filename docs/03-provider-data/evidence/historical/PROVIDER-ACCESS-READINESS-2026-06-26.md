@@ -1,5 +1,9 @@
 # Provider Access Readiness
 
+**Classification:** historical-evidence. This snapshot was superseded by later
+VIC, SA and NT adapter work. Use `../../provider-readiness.md`, current code and
+the deployed `/api/status` response for present readiness.
+
 Last checked: 26 June 2026, Australia/Sydney.
 
 ## Summary

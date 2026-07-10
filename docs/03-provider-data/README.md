@@ -7,10 +7,10 @@ permission evidence. Do not infer release approval from technical availability.
 
 | Task | Read first | Then read |
 | --- | --- | --- |
-| Check current provider access or public-claim readiness | [`PROVIDER-ACCESS-READINESS.md`](PROVIDER-ACCESS-READINESS.md) | The matching file under [`evidence/`](evidence/) |
+| Check current provider access or public-claim readiness | [`provider-readiness.md`](provider-readiness.md) | The deployed `/api/status` response and matching file under [`evidence/`](evidence/) |
 | Change address lookup or autocomplete | [`decisions/ADDRESS-AUTOCOMPLETE-PROVIDER-DECISION.md`](decisions/ADDRESS-AUTOCOMPLETE-PROVIDER-DECISION.md) | [`implementation/ADDRESS-LOOKUP-PROVIDERS.md`](implementation/ADDRESS-LOOKUP-PROVIDERS.md) and the relevant tests |
 | Work on G-NAF | [`decisions/GNAF-NATIONAL-ADDRESS-INDEX.md`](decisions/GNAF-NATIONAL-ADDRESS-INDEX.md) | The specific hosting or benchmark evidence needed for the task |
-| Work on API.NSW access | [`implementation/API-NSW-UNBLOCK-PLAN.md`](implementation/API-NSW-UNBLOCK-PLAN.md) | API.NSW request and response evidence only when required |
+| Review the earlier API.NSW access work | [`evidence/historical/API-NSW-UNBLOCK-PLAN-2026-06-13.md`](evidence/historical/API-NSW-UNBLOCK-PLAN-2026-06-13.md) | Treat it as dated history, then verify current code and evidence |
 | Work on QLD or SA adapters | The matching note under [`implementation/`](implementation/) | Permission evidence remains under [`evidence/`](evidence/) |
 
 ## Boundaries
@@ -41,6 +41,19 @@ These states are independent. Do not promote one state into another.
 
 `evidence/historical/` preserves superseded drafts and older reviews. They are
 audit history, not current proof.
+
+## Classification of detailed provider documents
+
+| Document | Bucket | Current scope |
+| --- | --- | --- |
+| `provider-readiness.md` | source-of-truth | Verification method and state boundaries, not a readiness snapshot |
+| `decisions/ADDRESS-AUTOCOMPLETE-PROVIDER-DECISION.md` | source-of-truth | Address-provider selection principles; implementation snapshot is dated |
+| `decisions/GNAF-NATIONAL-ADDRESS-INDEX.md` | source-of-truth | G-NAF-first decision and constraints; direct-hosting instructions are a dated implementation option |
+| `implementation/ADDRESS-LOOKUP-PROVIDERS.md` | source-of-truth | Current external-provider configuration and fallback contract |
+| `implementation/QLD-FUEL-API-NOTES.md` | source-of-truth | QLD adapter contract; recorded row counts are dated evidence |
+| `implementation/SA-FUEL-API-NOTES.md` | source-of-truth | SA adapter contract; access correspondence remains evidence |
+| `evidence/historical/PROVIDER-ACCESS-READINESS-2026-06-26.md` | historical-evidence | Superseded readiness snapshot |
+| `evidence/historical/API-NSW-UNBLOCK-PLAN-2026-06-13.md` | historical-evidence | Completed access plan and dated technical findings |
 
 ## Verification
 

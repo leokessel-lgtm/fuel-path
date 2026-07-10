@@ -1,0 +1,38 @@
+{
+  "estimationMethod": "ceil(UTF-8 text characters / 4)",
+  "profiles": {
+    "root_default": [
+      "AGENTS.md"
+    ],
+    "mobile_app_default": [
+      "AGENTS.md",
+      "mobile-app/AGENTS.md"
+    ],
+    "product_orientation": [
+      "AGENTS.md",
+      "docs/README.md",
+      "docs/current-product.md"
+    ],
+    "roadmap_first_orientation_comparator": [
+      "AGENTS.md",
+      "docs/README.md",
+      "PROJECT-GOALS-ROADMAP.md"
+    ],
+    "provider_task": [
+      "AGENTS.md",
+      "docs/README.md",
+      "docs/03-provider-data/README.md",
+      "docs/03-provider-data/provider-readiness.md"
+    ],
+    "route_change": [
+      "AGENTS.md",
+      "docs/README.md",
+      "docs/route-recommendation-logic-rules.md"
+    ],
+    "full_catalog_audit": [
+      "AGENTS.md",
+      "docs/README.md",
+      "docs/catalog.md"
+    ]
+  }
+}

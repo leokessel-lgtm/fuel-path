@@ -9,8 +9,7 @@ function createStationProviderService({
   pointInProviderCoverage,
   hasAnyLiveCredentials,
   termsConfirmed,
-  providerLoaders,
-  providerSourceIds,
+  providerRegistry,
   sampleSourceAllowed,
   productionRuntime = defaultProductionRuntime,
 } = {}) {
@@ -20,6 +19,7 @@ function createStationProviderService({
 
   async function loadLiveStationsForArea({ forceRefresh = false, points = [], radiusKm = 0, providers: requestedProviders, fuels = [] } = {}) {
     const providers = requestedProviders || liveProviderKeysForArea(points, radiusKm);
+    validateSelectedProviders(providers);
     const regionCapabilities = capabilitiesForPoints(points);
     if (!providers.length) {
       return {
@@ -52,9 +52,9 @@ function createStationProviderService({
         try {
           const result = await singleFlight(liveProviderFlightKey(provider, { forceRefresh, points, radiusKm, fuels }), async () => {
             enforceProviderTerms(provider);
-            const loader = providerLoaders[provider];
-            const live = loader ? await loader({ forceRefresh, points, radiusKm, fuels }) : undefined;
-            return { loadedProvider: live ? providerSourceIds[provider] : "", live };
+            const registration = providerRegistry[provider];
+            const live = await registration.load({ forceRefresh, points, radiusKm, fuels });
+            return { loadedProvider: live ? registration.sourceId : "", live };
           });
           return { provider, loadedProvider: result.loadedProvider, live: result.live, error: "" };
         } catch (error) {
@@ -132,6 +132,7 @@ function createStationProviderService({
     try {
       return await loadLiveStationsForArea({ forceRefresh, points, radiusKm, fuels, providers: requestedProvider ? [requestedProvider] : undefined });
     } catch (error) {
+      if (error?.name === "ProviderConfigurationError") throw error;
       const message = error instanceof Error ? error.message : String(error);
       if (!sampleSourceAllowed()) {
         const provider = requestedProvider || "live";
@@ -187,7 +188,25 @@ function createStationProviderService({
     if (provider === "tas" && !termsConfirmed.tas()) throw new Error("TAS FuelCheck public usage, caching and attribution terms are not confirmed.");
   }
 
+  function validateSelectedProviders(providers) {
+    for (const provider of providers) {
+      const registration = providerRegistry?.[provider];
+      if (!registration || typeof registration.load !== "function") {
+        throw providerConfigurationError(`Selected provider ${provider} has no configured loader.`);
+      }
+      if (typeof registration.sourceId !== "string" || !registration.sourceId.trim()) {
+        throw providerConfigurationError(`Selected provider ${provider} has no configured source ID.`);
+      }
+    }
+  }
+
   return { loadStationData };
+}
+
+function providerConfigurationError(message) {
+  const error = new Error(message);
+  error.name = "ProviderConfigurationError";
+  return error;
 }
 
 function liveProviderFlightKey(provider, { forceRefresh = false, points = [], radiusKm = 0, fuels = [] } = {}) {

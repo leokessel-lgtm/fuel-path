@@ -16,6 +16,7 @@ const { singleFlight } = require("./_providerRuntime");
 const { fetchJson } = require("./_providerHttp");
 const { createStationDecorator } = require("./_stationDiscounts");
 const { createStationProviderService } = require("./_stationProviderService");
+const { createStationProviderRegistry } = require("./_stationProviderRegistry");
 const {
   boolParam,
   methodAllowed,
@@ -125,24 +126,10 @@ const { loadStationData } = createStationProviderService({
     nswAct: hasNswActUsageTermsConfirmed,
     tas: hasTasUsageTermsConfirmed,
   },
-  providerSourceIds: {
-    qld: "api_qld",
-    wa: "api_wa",
-    vic: "api_vic",
-    sa: "api_sa",
-    nt: "api_nt",
-    nsw: "api_nsw",
-    tas: "api_tas",
-  },
-  providerLoaders: {
-    qld: ({ forceRefresh }) => loadLiveQldStations({ forceRefresh }),
-    wa: ({ forceRefresh, points, radiusKm, fuels }) => loadLiveWaStations({ forceRefresh, points, radiusKm, fuels }),
-    vic: ({ forceRefresh }) => loadLiveVicStations({ forceRefresh }),
-    sa: ({ forceRefresh }) => loadLiveSaStations({ forceRefresh }),
-    nt: ({ forceRefresh, points, radiusKm, fuels }) => loadLiveNtStations({ forceRefresh, points, radiusKm, fuels }),
-    nsw: ({ forceRefresh }) => loadLiveStations({ forceRefresh }),
-    tas: ({ forceRefresh, points, radiusKm, fuels }) => loadLiveTasStations({ forceRefresh, points, radiusKm, fuels }),
-  },
+  providerRegistry: createStationProviderRegistry({
+    loadLiveQldStations, loadLiveWaStations, loadLiveVicStations, loadLiveSaStations,
+    loadLiveNtStations, loadLiveStations, loadLiveTasStations,
+  }),
   productionRuntime,
   sampleSourceAllowed: () => process.env.FUEL_PATH_ALLOW_SAMPLE_SOURCE === "1" || !productionRuntime(),
 });

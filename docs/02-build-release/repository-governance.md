@@ -5,13 +5,12 @@ and emergency repository changes.
 
 ## Normal merge path
 
-Changes to `main` require the configured status checks, one approving review,
-code-owner review, approval after the latest push and resolved conversations.
+Changes to `main` require the configured status checks and resolved
+conversations. Approving reviews and code-owner approval are not required.
 Administrators retain bypass only for an emergency.
 
-The wildcard code owner is `@leokessel-lgtm`. A pull request opened by the sole
-code owner cannot satisfy GitHub's independent code-owner approval requirement;
-normal merge capacity therefore requires adding another accepted code owner.
+The wildcard code owner is `@leokessel-lgtm`; ownership supplies context but
+does not add an approval gate. Reviews remain available but optional.
 
 ## Ratcheting baselines
 

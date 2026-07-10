@@ -1,8 +1,6 @@
 # Fuel Path architecture
 
-Use this folder to understand runtime boundaries before changing production
-code. These documents describe current implementation, not future approval or
-capacity proof.
+Current runtime boundaries only. They do not prove approval or capacity.
 
 ## Read by task
 
@@ -12,7 +10,7 @@ capacity proof.
 | Provider or failure handling | [`provider-failure-boundaries.md`](provider-failure-boundaries.md) | `docs/03-provider-data/README.md` and provider tests |
 | Request, cache or storage change | [`runtime-data-flow.md`](runtime-data-flow.md) | Status contracts, storage adapters and load tests |
 | Traffic or capacity work | [`scaling-model.md`](scaling-model.md) | `PERFORMANCE-GUARDRAILS.md` and hosted evidence |
-| Refactor planning | [`refactor-backlog.md`](refactor-backlog.md) | Module-size report from `npm run check:architecture` |
+| Refactor planning | [`backend-composition-root-map.md`](backend-composition-root-map.md) | [`refactor-backlog.md`](refactor-backlog.md) and architecture checks |
 
 ## Rules
 

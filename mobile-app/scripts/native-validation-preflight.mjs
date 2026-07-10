@@ -42,7 +42,7 @@ check("Android package configured", appJson.android?.package === "com.fuelpath.a
   detail: appJson.android?.package || "missing",
 });
 
-check("Tracked native generation contract requires Expo-compatible Gradle 8", nativeGenerationContract.android?.gradleMajor === 8, {
+check("Tracked native generation contract requires Expo-compatible Gradle 8", nativeGenerationContract.android?.supportedGradleMajor === 8, {
   fail: true,
   detail: "Keep native-generation-contract.json on Gradle 8; Gradle 9 currently breaks the React Native toolchain resolver.",
 });
@@ -50,7 +50,7 @@ check("Tracked native generation contract requires Expo-compatible Gradle 8", na
 check("Generated Android Gradle wrapper is available and matches the tracked contract", androidGradleWrapperIsCompatible(), {
   fail: strict,
   detail: gradleWrapperSource
-    ? `Regenerate Android with the verified Gradle ${nativeGenerationContract.android?.verifiedWrapperVersion} contract.`
+    ? `Regenerate Android with supported Gradle ${nativeGenerationContract.android?.supportedGradleMajor}.x.`
     : "Run Expo prebuild before strict native/device validation; generated android/ is intentionally ignored in clean worktrees.",
 });
 
@@ -157,8 +157,9 @@ function installedNativeFallbackIsHttps() {
 }
 
 function androidGradleWrapperIsCompatible() {
-  const expected = String(nativeGenerationContract.android?.verifiedWrapperVersion || "").replace(/\./g, "\\.");
-  return Boolean(gradleWrapperSource) && new RegExp(`distributionUrl=.*gradle-${expected}-bin\\.zip`).test(gradleWrapperSource);
+  const expectedMajor = Number(nativeGenerationContract.android?.supportedGradleMajor);
+  return Boolean(gradleWrapperSource) && Number.isInteger(expectedMajor)
+    && new RegExp(`distributionUrl=.*gradle-${expectedMajor}\\.\\d+(?:\\.\\d+)?-bin\\.zip`).test(gradleWrapperSource);
 }
 
 function notificationsPlugin() {

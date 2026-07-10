@@ -4,6 +4,7 @@ on:
   pull_request:
     branches:
       - main
+      - 'codex/**'
   push:
     branches:
       - main
@@ -52,6 +53,10 @@ jobs:
       - name: Install mobile dependencies
         working-directory: mobile-app
         run: npm ci --cache ../.npm-cache
+
+      - name: Run mobile source and contract suite
+        working-directory: mobile-app
+        run: npm test
 
       - name: Build web app for bundle comparison
         working-directory: mobile-app

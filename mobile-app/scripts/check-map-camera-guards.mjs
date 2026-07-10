@@ -707,9 +707,7 @@ const checks = [
       nearbyScreenUtils.includes('Linking.canOpenURL("waze://")') &&
       nearbyScreenUtils.includes("https://waze.com/ul?ll=${safeLat},${safeLon}&navigate=yes&utm_source=fuelpath") &&
       appConfig.expo.ios.infoPlist.LSApplicationQueriesSchemes.includes("comgooglemapsurl") &&
-      appConfig.expo.ios.infoPlist.LSApplicationQueriesSchemes.includes("waze") &&
-      nativeGenerationContract.ios.applicationQuerySchemes.includes("comgooglemapsurl") &&
-      nativeGenerationContract.ios.applicationQuerySchemes.includes("waze"),
+      appConfig.expo.ios.infoPlist.LSApplicationQueriesSchemes.includes("waze"),
   },
   {
     label: "plan returns to recommended stop after alternative detail",
@@ -1462,8 +1460,7 @@ const checks = [
   {
     label: "Android Gradle wrapper avoids current React Native Gradle 9 toolchain break",
     ok:
-      nativeGenerationContract.android.gradleMajor === 8 &&
-      nativeGenerationContract.android.verifiedWrapperVersion === "8.14.3" &&
+      nativeGenerationContract.android.supportedGradleMajor === 8 &&
       nativeValidationPreflight.includes("Tracked native generation contract requires Expo-compatible Gradle 8") &&
       nativeValidationPreflight.includes("Generated Android Gradle wrapper is available and matches the tracked contract") &&
       nativeValidationPreflight.includes("Gradle 9 currently breaks the React Native toolchain resolver") &&

@@ -83,7 +83,7 @@
     "baseline:eas": "node scripts/record-preview-baseline.mjs",
     "perf:deps": "npm ls --depth=0",
     "test:map-camera": "node scripts/check-map-camera-guards.mjs",
-    "test:source-contracts": "node --test ../tests/mobile/map-marker-state-guard.test.js ../tests/mobile/plan-autocomplete-session-guard.test.js",
+    "test:source-contracts": "node --test ../tests/mobile/map-marker-state-guard.test.js ../tests/mobile/plan-autocomplete-session-guard.test.js ../tests/mobile/native-validation-preflight.test.js",
     "test:native-api-contracts": "node scripts/check-native-api-contracts.mjs",
     "test:settings-ux": "node scripts/check-settings-ux-guards.mjs",
     "test:route-evidence-copy": "node scripts/check-route-evidence-copy-guards.mjs",

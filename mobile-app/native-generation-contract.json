@@ -1,12 +1,5 @@
 {
   "android": {
-    "gradleMajor": 8,
-    "verifiedWrapperVersion": "8.14.3"
-  },
-  "ios": {
-    "applicationQuerySchemes": [
-      "comgooglemapsurl",
-      "waze"
-    ]
+    "supportedGradleMajor": 8
   }
 }

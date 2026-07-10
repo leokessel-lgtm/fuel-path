@@ -10,8 +10,8 @@ const base = readBaseManifest(baseRef);
 const currentCount = Object.keys(current.quarantined || {}).length;
 
 if (!base) {
-  console.log(`No backend quarantine baseline exists at ${baseRef}; current count ${currentCount} establishes the baseline.`);
-  process.exit(0);
+  console.error(`Backend quarantine baseline is unavailable at ${baseRef}; refusing to establish an implicit baseline.`);
+  process.exit(1);
 }
 
 const baseCount = Object.keys(base.quarantined || {}).length;

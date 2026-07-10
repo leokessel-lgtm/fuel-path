@@ -17,6 +17,11 @@ const {
 } = require("../../api/_addressIndex");
 const { geocode } = require("../../api/_backend");
 
+const activeFetchMockRestorers = new Set();
+test.afterEach(() => {
+  for (const restore of [...activeFetchMockRestorers]) restore();
+});
+
 test("seeded AU address index resolves full address before external geocoding", async () => {
   await withEnv({ FUEL_PATH_GEOCODE_PROVIDER: "nominatim" }, async () => {
     const mockFetch = installFetchMock();
@@ -470,7 +475,7 @@ test("hybrid typeahead avoids same-street wrong locality and preserves exact uni
   });
 });
 
-test("geocode search context promotes nearby ambiguous G-NAF address", async () => {
+test("geocode search context ranks nearby addresses without authorising disclosure", async () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-gnaf-context-rank-"));
   const inputPath = path.join(tempDir, "GNAF_CORE.psv");
   const outputPath = path.join(tempDir, "gnaf-context-rank.sqlite");
@@ -556,6 +561,16 @@ test("geocode search context promotes nearby ambiguous G-NAF address", async () 
         nearRadiusKm: 40,
       },
     });
+    const sensitivePartialName = await geocode({
+      query: "Harbour Safe H",
+      limit: 2,
+      sessionToken: "sensitive-partial-name-context",
+      searchContext: {
+        nearLat: -35.405,
+        nearLon: 149.145,
+        nearRadiusKm: 40,
+      },
+    });
     const sensitiveExactAddress = await geocode({
       query: "10 Hidden Road Tuggeranong ACT 2900",
       limit: 2,
@@ -564,15 +579,13 @@ test("geocode search context promotes nearby ambiguous G-NAF address", async () 
 
     assert.deepEqual(uncontextualised.suggestions, []);
     assert.equal(uncontextualised.lookupStatus, "no_match");
-    assert.ok(contextualised.suggestions[0], JSON.stringify(contextualised));
-    assert.equal(contextualised.suggestions[0].label, "8 Chamberlain Place, Heathridge WA 6027");
-    assert.equal(contextualised.suggestions[0].provider, "fuel_path_gnaf");
+    assert.deepEqual(contextualised.suggestions, []);
+    assert.equal(contextualised.lookupStatus, "no_match");
     assert.deepEqual(outsideRadius.suggestions, []);
     assert.equal(outsideRadius.lookupStatus, "no_match");
-    assert.ok(buildingNameContextualised.suggestions[0], JSON.stringify(buildingNameContextualised));
-    assert.equal(buildingNameContextualised.suggestions[0].label, "Rose Cottage Inn, 1 Isabella Drive, Tuggeranong ACT 2900");
-    assert.equal(buildingNameContextualised.suggestions[0].provider, "fuel_path_gnaf");
+    assert.deepEqual(buildingNameContextualised.suggestions, []);
     assert.deepEqual(sensitiveName.suggestions, []);
+    assert.deepEqual(sensitivePartialName.suggestions, []);
     assert.equal(sensitiveExactAddress.suggestions[0]?.label, "Harbour Safe House, 10 Hidden Road, Tuggeranong ACT 2900");
     });
   } finally {
@@ -629,7 +642,7 @@ test("geocode promotes base refine suggestion for ambiguous building prefixes", 
       sessionToken: "building-refine-shop",
     });
     const officeBuilding = await geocode({
-      query: "Australian Taxation Of",
+      query: "Australian Taxation Office",
       limit: 3,
       sessionToken: "building-refine-office-word",
       searchContext: {
@@ -1321,7 +1334,7 @@ test("G-NAF API failure falls back to seed records", async () => {
 function installFetchMock() {
   const originalFetch = global.fetch;
   const calls = [];
-  global.fetch = async (input, options = {}) => {
+  const mockedFetch = async (input, options = {}) => {
     calls.push({ input: String(input), options });
     return {
       ok: false,
@@ -1332,11 +1345,18 @@ function installFetchMock() {
       },
     };
   };
+  global.fetch = mockedFetch;
+  let restored = false;
+  const restore = () => {
+    if (restored) return;
+    restored = true;
+    if (global.fetch === mockedFetch) global.fetch = originalFetch;
+    activeFetchMockRestorers.delete(restore);
+  };
+  activeFetchMockRestorers.add(restore);
   return {
     calls,
-    restore() {
-      global.fetch = originalFetch;
-    },
+    restore,
   };
 }
 

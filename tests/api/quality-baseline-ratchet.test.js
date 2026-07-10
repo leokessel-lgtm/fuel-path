@@ -48,6 +48,17 @@ test("backend test quarantine cannot increase above the merge base", (context) =
   );
 });
 
+test("backend test quarantine ratchet fails closed when the merge base is unavailable", (context) => {
+  const fixture = gitFixture(context);
+  copyFile(fixture, "scripts/check-backend-test-quarantine.mjs");
+  writeBackendQuarantine(fixture, {});
+
+  assert.throws(
+    () => run(process.execPath, ["scripts/check-backend-test-quarantine.mjs"], fixture, { FUEL_PATH_BASE_REF: "missing/base" }),
+    /baseline is unavailable.*refusing to establish an implicit baseline/,
+  );
+});
+
 function gitFixture(context) {
   const fixture = mkdtempSync(path.join(tmpdir(), "fuel-path-quality-ratchet-"));
   context.after(() => rmSync(fixture, { force: true, recursive: true }));

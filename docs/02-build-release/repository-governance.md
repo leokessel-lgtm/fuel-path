@@ -43,7 +43,8 @@ must make that file part of the required suite.
 
 Current state: all discovered backend test files are required; the quarantine
 manifest is empty. CI compares the quarantine count with the merge base and
-rejects any increase.
+rejects any increase. The check also fails when the merge-base manifest cannot
+be read; it never establishes an implicit baseline from the current branch.
 
 ## Emergency merge
 

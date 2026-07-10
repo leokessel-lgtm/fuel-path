@@ -7,6 +7,11 @@ const {
   setGeocodeQuotaStorageForTests,
 } = require("../../api/_geocodeQuotaStorage");
 
+const activeFetchMockRestorers = new Set();
+test.afterEach(() => {
+  for (const restore of [...activeFetchMockRestorers]) restore();
+});
+
 const GOOGLE_ENV_KEYS = [
   "FUEL_PATH_GOOGLE_MAPS_API_KEY",
   "GOOGLE_MAPS_API_KEY",
@@ -622,7 +627,7 @@ function installGoogleMockFetch() {
   const calls = [];
   const unexpectedCalls = [];
 
-  global.fetch = async (input, options = {}) => {
+  const mockedFetch = async (input, options = {}) => {
     const url = new URL(String(input));
     const call = {
       host: url.hostname,
@@ -734,20 +739,18 @@ function installGoogleMockFetch() {
     unexpectedCalls.push(call);
     return jsonResponse({ error: { message: `Unexpected mocked URL ${url.href}` } }, 500);
   };
+  global.fetch = mockedFetch;
 
-  return {
+  return trackedFetchMock(originalFetch, mockedFetch, {
     calls,
     unexpectedCalls,
-    restore() {
-      global.fetch = originalFetch;
-    },
-  };
+  });
 }
 
 function installGoogleEmptyHereMockFetch() {
   const originalFetch = global.fetch;
   const calls = [];
-  global.fetch = async (input, options = {}) => {
+  const mockedFetch = async (input, options = {}) => {
     const url = new URL(String(input));
     const call = {
       host: url.hostname,
@@ -774,18 +777,16 @@ function installGoogleEmptyHereMockFetch() {
     }
     return jsonResponse({ error: { message: `Unexpected mocked URL ${url.href}` } }, 500);
   };
-  return {
+  global.fetch = mockedFetch;
+  return trackedFetchMock(originalFetch, mockedFetch, {
     calls,
-    restore() {
-      global.fetch = originalFetch;
-    },
-  };
+  });
 }
 
 function installMalformedGoogleFetch() {
   const originalFetch = global.fetch;
   const calls = [];
-  global.fetch = async (input, options = {}) => {
+  const mockedFetch = async (input, options = {}) => {
     const url = new URL(String(input));
     calls.push({
       host: url.hostname,
@@ -794,12 +795,22 @@ function installMalformedGoogleFetch() {
     });
     return jsonResponse({ suggestions: [{ placePrediction: {} }, { bad: "shape" }] });
   };
-  return {
+  global.fetch = mockedFetch;
+  return trackedFetchMock(originalFetch, mockedFetch, {
     calls,
-    restore() {
-      global.fetch = originalFetch;
-    },
+  });
+}
+
+function trackedFetchMock(originalFetch, mockedFetch, details) {
+  let restored = false;
+  const restore = () => {
+    if (restored) return;
+    restored = true;
+    if (global.fetch === mockedFetch) global.fetch = originalFetch;
+    activeFetchMockRestorers.delete(restore);
   };
+  activeFetchMockRestorers.add(restore);
+  return { ...details, restore };
 }
 
 function jsonResponse(payload, status = 200) {

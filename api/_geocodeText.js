@@ -25,22 +25,12 @@ function broadAreaSuggestionLeavesSpecificQueryTerms(query, suggestion) {
 function significantLocationTokens(value) {
   return normaliseSearchText(value)
     .split(" ")
-    .filter((token) => token && !/^\d{4}$/.test(token) && !/^(?:act|nsw|nt|qld|sa|tas|vic|wa)$/.test(token));
-}
-
-function isWithinSearchContext(item, searchContext, distanceBetween) {
-  if (!searchContext || item?.provider !== "fuel_path_gnaf") return false;
-  const lat = Number(item?.lat);
-  const lon = Number(item?.lon);
-  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return false;
-  const distance = distanceBetween({ lat, lon }, { lat: searchContext.nearLat, lon: searchContext.nearLon });
-  return Number.isFinite(distance) && distance <= searchContext.nearRadiusKm;
+    .filter((token) => token && !/^(?:act|nsw|nt|qld|sa|tas|vic|wa)$/.test(token));
 }
 
 module.exports = {
   broadAreaSuggestionLeavesSpecificQueryTerms,
   isBroadAreaSuggestion,
-  isWithinSearchContext,
   normaliseSearchText,
   titleCase,
 };

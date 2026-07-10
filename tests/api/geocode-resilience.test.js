@@ -7,6 +7,11 @@ const test = require("node:test");
 
 const { geocode } = require("../../api/_backend");
 
+const activeFetchMockRestorers = new Set();
+test.afterEach(() => {
+  for (const restore of [...activeFetchMockRestorers]) restore();
+});
+
 test("validation geocode rate limits degrade without throwing", async () => {
   await withGeocodeEnv({ FUEL_PATH_GEOCODE_PROVIDER: "nominatim" }, async () => {
     const mockFetch = installFetchMock(() =>
@@ -1390,15 +1395,22 @@ test("geocode cache trims oldest unique lookups when max entries is reached", as
 function installFetchMock(handler) {
   const originalFetch = global.fetch;
   const calls = [];
-  global.fetch = async (input, options = {}) => {
+  const mockedFetch = async (input, options = {}) => {
     calls.push({ input: String(input), options });
     return handler(input, options);
   };
+  global.fetch = mockedFetch;
+  let restored = false;
+  const restore = () => {
+    if (restored) return;
+    restored = true;
+    if (global.fetch === mockedFetch) global.fetch = originalFetch;
+    activeFetchMockRestorers.delete(restore);
+  };
+  activeFetchMockRestorers.add(restore);
   return {
     calls,
-    restore() {
-      global.fetch = originalFetch;
-    },
+    restore,
   };
 }
 

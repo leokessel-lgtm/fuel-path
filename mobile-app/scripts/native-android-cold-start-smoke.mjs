@@ -248,7 +248,12 @@ async function captureForegroundResume(stamp, waitMs) {
 
 function command(binary, commandArgs, options = {}) {
   return {
-    stdout: execFileSync(binary, commandArgs, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], ...options }),
+    stdout: execFileSync(binary, commandArgs, {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+      maxBuffer: 16 * 1024 * 1024,
+      ...options,
+    }),
   };
 }
 

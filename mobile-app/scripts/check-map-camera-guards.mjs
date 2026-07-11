@@ -1339,6 +1339,8 @@ const checks = [
     ok:
       packageJson.includes('"native:android-local-standalone": "node scripts/build-android-local-standalone.mjs"') &&
       androidLocalStandaloneBuild.includes('execFileSync("./gradlew", gradleArgs') &&
+      androidLocalStandaloneBuild.includes("enforceSupportedGradleWrapper()") &&
+      androidLocalStandaloneBuild.includes("gradle-8.14.3-bin.zip") &&
       androidLocalStandaloneBuild.includes("FUEL_PATH_ANDROID_GOOGLE_MAPS_API_KEY is required") &&
       androidLocalStandaloneBuild.includes("env.ANDROID_HOME") &&
       androidLocalStandaloneBuild.includes("env.ANDROID_SDK_ROOT") &&
@@ -1512,6 +1514,7 @@ const checks = [
       androidColdStartSmoke.includes('const mobileRoot = path.resolve(scriptDir, "..");') &&
       androidColdStartSmoke.includes('const repoRoot = path.resolve(mobileRoot, "..");') &&
       androidColdStartSmoke.includes("function resolveInputPath(value)") &&
+      androidColdStartSmoke.includes("maxBuffer: 16 * 1024 * 1024") &&
       androidColdStartSmoke.includes("const allowDebugArtifact = args.has(\"--allow-debug-artifact\")") &&
       androidColdStartSmoke.includes("FUEL_PATH_ALLOW_DEBUG_COLD_START") &&
       androidColdStartSmoke.includes("Preview or release APK artifact required") &&

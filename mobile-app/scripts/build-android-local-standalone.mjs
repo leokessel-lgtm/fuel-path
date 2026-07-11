@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { execFileSync } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -18,6 +18,8 @@ const architectureLabel = architecture || "universal";
 const outputName = `fuel-path-local-standalone-${architectureLabel}-${timestamp}.apk`;
 const outputPath = resolve(artifactsDir, outputName);
 const releaseApk = resolve(androidRoot, "app/build/outputs/apk/release/app-release.apk");
+const gradleWrapper = resolve(androidRoot, "gradle/wrapper/gradle-wrapper.properties");
+const nativeGenerationContract = JSON.parse(readFileSync(resolve(mobileRoot, "native-generation-contract.json"), "utf8"));
 const env = {
   ...process.env,
 };
@@ -53,6 +55,7 @@ env.PATH = [
 ].filter(Boolean).join(":");
 
 mkdirSync(artifactsDir, { recursive: true });
+enforceSupportedGradleWrapper();
 
 const gradleArgs = [
   "assembleRelease",
@@ -79,6 +82,21 @@ console.log(`Architecture: ${architecture || "all configured architectures"}`);
 console.log(`Size: ${sizeMb.toFixed(2)} MB`);
 console.log(`SHA-256: ${sha256}`);
 console.log("Signing: local debug signing config for validation only, not store release signing.");
+
+function enforceSupportedGradleWrapper() {
+  if (!existsSync(gradleWrapper)) fail("Generate Android with Expo prebuild before building a local standalone APK.");
+  const supportedMajor = Number(nativeGenerationContract.android?.supportedGradleMajor);
+  if (supportedMajor !== 8) fail(`Unsupported tracked Gradle major: ${supportedMajor || "missing"}.`);
+  const source = readFileSync(gradleWrapper, "utf8");
+  if (/distributionUrl=.*gradle-8\.\d+(?:\.\d+)?-bin\.zip/.test(source)) return;
+  const updated = source.replace(
+    /distributionUrl=.*gradle-[^\r\n]+-bin\.zip/,
+    "distributionUrl=https\\://services.gradle.org/distributions/gradle-8.14.3-bin.zip",
+  );
+  if (updated === source) fail("Could not align the generated Gradle wrapper with the tracked Gradle 8 contract.");
+  writeFileSync(gradleWrapper, updated);
+  console.log("Aligned generated Android wrapper to tracked Gradle 8.14.3 contract.");
+}
 
 function loadEnvFile(path, target) {
   if (!existsSync(path)) return;

@@ -12,6 +12,7 @@ const ROOT = path.resolve(__dirname, "../..");
 test("iOS validation report passes with target and screen evidence", async () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-ios-validation-"));
   const screenshots = writeScreenshots(tmp);
+  const appBundle = writeAppBundle(tmp);
 
   const { stdout } = await execFileAsync(
     process.execPath,
@@ -23,6 +24,8 @@ test("iOS validation report passes with target and screen evidence", async () =>
       "iOS 18.5",
       "--output-dir",
       tmp,
+      "--source-commit", "abc1234",
+      "--app-bundle", appBundle,
       "--plan-screenshot",
       screenshots.plan,
       "--nearby-screenshot",
@@ -39,6 +42,7 @@ test("iOS validation report passes with target and screen evidence", async () =>
 test("iOS validation report blocks without complete screen evidence", async () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-ios-validation-"));
   const screenshots = writeScreenshots(tmp);
+  const appBundle = writeAppBundle(tmp);
 
   let error;
   try {
@@ -52,6 +56,8 @@ test("iOS validation report blocks without complete screen evidence", async () =
         "iOS 18.5",
         "--output-dir",
         tmp,
+        "--source-commit", "abc1234",
+        "--app-bundle", appBundle,
         "--plan-screenshot",
         screenshots.plan,
         "--nearby-screenshot",
@@ -71,6 +77,7 @@ test("iOS validation report blocks without complete screen evidence", async () =
 test("iOS validation report blocks runtime failure lines", async () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-ios-validation-"));
   const screenshots = writeScreenshots(tmp);
+  const appBundle = writeAppBundle(tmp);
   const failureLog = path.join(tmp, "ios.log");
   fs.writeFileSync(failureLog, "Unhandled JS Exception: route screen failed\n");
 
@@ -86,6 +93,8 @@ test("iOS validation report blocks runtime failure lines", async () => {
         "iOS 18.5",
         "--output-dir",
         tmp,
+        "--source-commit", "abc1234",
+        "--app-bundle", appBundle,
         "--plan-screenshot",
         screenshots.plan,
         "--nearby-screenshot",
@@ -105,14 +114,42 @@ test("iOS validation report blocks runtime failure lines", async () => {
   assert.match(error.stderr, /Runtime failure lines were captured: 1/);
 });
 
+test("iOS validation report blocks duplicate rendered screenshot content", async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-ios-validation-"));
+  const screenshots = writeScreenshots(tmp);
+  const appBundle = writeAppBundle(tmp);
+  fs.copyFileSync(screenshots.plan, screenshots.nearby);
+
+  await assert.rejects(
+    execFileAsync(process.execPath, [
+      "mobile-app/scripts/native-ios-validation-report.mjs",
+      "--simulator-name", "iPhone 16",
+      "--simulator-runtime", "iOS 18.5",
+      "--output-dir", tmp,
+      "--source-commit", "abc1234",
+      "--app-bundle", appBundle,
+      "--plan-screenshot", screenshots.plan,
+      "--nearby-screenshot", screenshots.nearby,
+      "--account-screenshot", screenshots.account,
+    ], { cwd: ROOT, timeout: 10_000 }),
+    /distinct rendered evidence/,
+  );
+});
+
 function writeScreenshots(tmp) {
   const screenshots = {
     plan: path.join(tmp, "ios-plan.png"),
     nearby: path.join(tmp, "ios-nearby.png"),
     account: path.join(tmp, "ios-account.png"),
   };
-  for (const screenshot of Object.values(screenshots)) {
-    fs.writeFileSync(screenshot, "screenshot evidence");
+  for (const [screen, screenshot] of Object.entries(screenshots)) {
+    fs.writeFileSync(screenshot, `screenshot evidence for ${screen}`);
   }
   return screenshots;
+}
+
+function writeAppBundle(tmp) {
+  const bundle = path.join(tmp, "FuelPath.app");
+  fs.mkdirSync(bundle);
+  return bundle;
 }

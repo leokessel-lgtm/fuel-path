@@ -42,6 +42,10 @@ const nearbyResults = read("src/hooks/useNearbyResults.ts");
 const stationBrandFilterPill = read("src/components/StationBrandFilterPill.tsx");
 const stationBrandFilterOverride = read("src/hooks/useStationBrandFilterOverride.ts");
 const planScreen = readScreenSource("src/screens/PlanScreen.tsx", "src/screens/PlanScreen.viewmodel.tsx");
+const beginAddressFieldSelectionSource = planScreen.slice(
+  planScreen.indexOf("const beginAddressFieldSelection"),
+  planScreen.indexOf("const handleAddressFieldBlur"),
+);
 const planRouteState = read("src/screens/PlanScreen.routeState.ts");
 const planScreenUtils = read("src/screens/PlanScreen.utils.ts");
 const accountScreen = read("src/screens/AccountScreen.tsx");
@@ -1080,6 +1084,16 @@ const checks = [
       fuelPathApi.includes('point.sourceLabel === "Suburb/area"'),
   },
   {
+    label: "Plan address suggestion press does not rerender before selection",
+    ok:
+      planScreen.includes('const beginAddressFieldSelection = (field: "from" | "to") => {') &&
+      !beginAddressFieldSelectionSource.includes("markRouteEdited()") &&
+      !beginAddressFieldSelectionSource.includes("setActiveAddressField(field)") &&
+      !beginAddressFieldSelectionSource.includes("reopenRouteEditor()") &&
+      routeAddressSuggestions.includes("onPressIn={onSelectStart}") &&
+      routeAddressSuggestions.includes("onPress={() => onSelect(point)}"),
+  },
+  {
     label: "plan field browser smoke covers rendered precision states",
     ok:
       packageJson.includes('"smoke:plan-fields": "node scripts/smoke-plan-fields.mjs"') &&
@@ -1339,6 +1353,8 @@ const checks = [
     ok:
       packageJson.includes('"native:android-local-standalone": "node scripts/build-android-local-standalone.mjs"') &&
       androidLocalStandaloneBuild.includes('execFileSync("./gradlew", gradleArgs') &&
+      androidLocalStandaloneBuild.includes("enforceSupportedGradleWrapper()") &&
+      androidLocalStandaloneBuild.includes("gradle-8.14.3-bin.zip") &&
       androidLocalStandaloneBuild.includes("FUEL_PATH_ANDROID_GOOGLE_MAPS_API_KEY is required") &&
       androidLocalStandaloneBuild.includes("env.ANDROID_HOME") &&
       androidLocalStandaloneBuild.includes("env.ANDROID_SDK_ROOT") &&
@@ -1512,6 +1528,7 @@ const checks = [
       androidColdStartSmoke.includes('const mobileRoot = path.resolve(scriptDir, "..");') &&
       androidColdStartSmoke.includes('const repoRoot = path.resolve(mobileRoot, "..");') &&
       androidColdStartSmoke.includes("function resolveInputPath(value)") &&
+      androidColdStartSmoke.includes("maxBuffer: 16 * 1024 * 1024") &&
       androidColdStartSmoke.includes("const allowDebugArtifact = args.has(\"--allow-debug-artifact\")") &&
       androidColdStartSmoke.includes("FUEL_PATH_ALLOW_DEBUG_COLD_START") &&
       androidColdStartSmoke.includes("Preview or release APK artifact required") &&

@@ -1,11 +1,14 @@
 const fs = require("node:fs");
 const path = require("node:path");
+const { createAddressRanking } = require("./_addressRanking");
+const { normaliseAddressText, normaliseSearchContext } = require("./_addressQuery");
 
 const ROOT = path.resolve(__dirname, "..");
 const DEFAULT_SEED_PATH = path.join(ROOT, "prototype", "data", "gnaf-addresses.seed.json");
 
 let seedRecordsCache = null;
 let sqliteCache = null;
+const { addressIndexRank, scoreRecord, significantAddressTokens } = createAddressRanking({ normaliseAddressText });
 
 function addressIndexStatus() {
   const sqlitePath = configuredSqlitePath();
@@ -28,14 +31,6 @@ function addressIndexStatus() {
     attribution:
       "G-NAF © Geoscape Australia licensed by the Commonwealth of Australia under the Open G-NAF End User Licence Agreement.",
   };
-}
-
-function normaliseSearchContext(value = {}) {
-  if (!value) return null;
-  const lat = Number(value.nearLat);
-  const lon = Number(value.nearLon);
-  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
-  return { nearLat: lat, nearLon: lon };
 }
 
 async function searchAddressIndex(query, limit = 5, options = {}) {
@@ -1249,36 +1244,6 @@ function houseNumbersCompatible(queryNumber, rowNumber) {
   return queryParts[1] === rowParts[1];
 }
 
-function scoreRecord(record, needle) {
-  const texts = [record.searchText, normaliseAddressText(record.label), ...(record.aliases || [])]
-    .filter(Boolean)
-    .map(normaliseAddressText);
-  let bestScore = 0;
-  let matchType = "";
-  for (const text of texts) {
-    if (needle === text) {
-      bestScore = Math.max(bestScore, 1000);
-      matchType = "exact_address";
-      continue;
-    }
-    if (text.startsWith(needle)) {
-      bestScore = Math.max(bestScore, 900);
-      matchType ||= "address_prefix";
-      continue;
-    }
-    if (text.includes(needle)) {
-      bestScore = Math.max(bestScore, 760);
-      matchType ||= "address_contains";
-      continue;
-    }
-    if (needle.includes(text) && text.length >= 8) {
-      bestScore = Math.max(bestScore, 680);
-      matchType ||= "address_alias";
-    }
-  }
-  return bestScore ? { record, score: bestScore, matchType } : null;
-}
-
 function addressRecordToSuggestion(record, matchType, score) {
   const display = addressDisplayMetadata(record, matchType);
   return {
@@ -1700,57 +1665,6 @@ function localityTokenMatch(left, right) {
   return left === right || left.includes(right) || right.includes(left);
 }
 
-function addressIndexRank(candidate, needle) {
-  const { row, matchType } = candidate;
-  const label = normaliseAddressText(row?.label);
-  const text = normaliseAddressText(row?.search_text);
-  const key = normaliseAddressText(row?.search_key);
-  const base = normaliseAddressText(row?.base_key);
-  if (matchType === "exact_address") return 1000;
-  if (label.startsWith(needle)) return 960;
-  if (key && key.startsWith(needle)) return 950;
-  if (base && base.startsWith(needle)) return 940;
-  if (text.startsWith(needle)) return 930;
-  if (matchType === "address_contains") return 760;
-  const queryTokens = significantAddressTokens(needle);
-  const rowTokens = new Set(significantAddressTokens(`${row?.search_text || ""} ${row?.label || ""}`));
-  const overlap = queryTokens.filter((token) => rowTokens.has(token)).length;
-  return 500 + overlap;
-}
-
-function significantAddressTokens(value) {
-  const stopwords = new Set([
-    "act",
-    "australia",
-    "avenue",
-    "ave",
-    "drive",
-    "dr",
-    "highway",
-    "hwy",
-    "lane",
-    "ln",
-    "new",
-    "nsw",
-    "nt",
-    "place",
-    "pl",
-    "qld",
-    "road",
-    "rd",
-    "sa",
-    "street",
-    "st",
-    "tas",
-    "unit",
-    "vic",
-    "wa",
-  ]);
-  return normaliseAddressText(value)
-    .split(/\s+/)
-    .filter((token) => token.length > 1 && !stopwords.has(token));
-}
-
 function apiMatchType(row, needle) {
   return sqliteMatchType({ label: row?.label, search_text: row?.search_text || row?.searchText }, needle);
 }
@@ -1793,33 +1707,6 @@ function addressDisplayMetadata(record, matchType) {
 
 function escapeFtsTerm(value) {
   return String(value).replace(/["']/g, " ").replace(/[^\p{L}\p{N}_-]+/gu, " ").trim();
-}
-
-function normaliseAddressText(value) {
-  const expanded = String(value || "")
-    .toLowerCase()
-    .replace(/\bbvd\b/g, "boulevard")
-    .replace(/\bblvd\b/g, "boulevard")
-    .replace(/\bcct\b/g, "circuit")
-    .replace(/\bcnr\b/g, "corner")
-    .replace(/\bcr\b/g, "crescent")
-    .replace(/\bcres\b/g, "crescent")
-    .replace(/\bct\b/g, "court")
-    .replace(/\bst\b/g, "street")
-    .replace(/\brd\b/g, "road")
-    .replace(/\bave\b/g, "avenue")
-    .replace(/\bdr\b/g, "drive")
-    .replace(/\besp\b/g, "esplanade")
-    .replace(/\bhwy\b/g, "highway")
-    .replace(/\bmt\b/g, "mount")
-    .replace(/\bpkwy\b/g, "parkway")
-    .replace(/\bpwy\b/g, "parkway")
-    .replace(/\bpde\b/g, "parade")
-    .replace(/\bpl\b/g, "place")
-    .replace(/\bln\b/g, "lane")
-    .replace(/\bsq\b/g, "square")
-    .replace(/\btce\b/g, "terrace");
-  return expanded.replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
 }
 
 function addressSearchNeedles(rawQuery) {

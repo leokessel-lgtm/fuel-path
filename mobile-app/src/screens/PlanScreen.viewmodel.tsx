@@ -362,7 +362,6 @@ export function PlanScreenLogic({
   };
 
   const beginAddressFieldSelection = (field: "from" | "to") => {
-    markRouteEdited();
     if (field === "from") {
       if (fromSelectionSuppressTimerRef.current) {
         clearTimeout(fromSelectionSuppressTimerRef.current);
@@ -380,8 +379,6 @@ export function PlanScreenLogic({
         toSelectionSuppressRef.current = false;
       }, 250);
     }
-    setActiveAddressField(field);
-    reopenRouteEditor();
   };
 
   const handleAddressFieldBlur = (field: "from" | "to") => {

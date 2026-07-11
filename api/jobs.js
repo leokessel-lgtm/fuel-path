@@ -1,4 +1,5 @@
 const {
+  alertsAdminWriteAuthorised,
   alertsStatus,
   alertsWriteAuthorised,
   boolParam,
@@ -56,9 +57,9 @@ async function evaluateRouteAlerts(req, res) {
 }
 
 async function checkPushReceiptsJob(req, res) {
-  if (!methodAllowed(req, res, ["POST"])) return;
+  if (!methodAllowed(req, res, ["GET", "POST"])) return;
 
-  if (!cronAuthorised(req) && !alertsWriteAuthorised(req)) {
+  if (!cronAuthorised(req) && !alertsWriteAuthorised(req) && !alertsAdminWriteAuthorised(req)) {
     sendJson(res, 401, {
       error: "Push receipt job requires CRON_SECRET or ALERTS_WRITE_TOKEN authorisation.",
       alerts: await alertsStatus(),

@@ -1,4 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -59,6 +60,7 @@ try {
   const logcat = adbCommand(["logcat", "-d", "-t", "1000"]);
   const gfxinfo = adbCommand(["shell", "dumpsys", "gfxinfo", packageName]);
   const certificate = readApkCertificate();
+  const artifactSha256 = createHash("sha256").update(readFileSync(artifact)).digest("hex");
   const deviceDiagnostics = readDeviceDiagnostics();
   const logPath = join(outputRoot, `android-preview-smoke-${timestamp}.logcat.txt`);
   const gfxPath = join(outputRoot, `android-preview-smoke-${timestamp}.gfxinfo.txt`);
@@ -88,6 +90,7 @@ try {
     artifact,
     artifactName: basename(artifact),
     certificate,
+    artifactSha256,
     mapSettleMs,
     deviceDiagnostics,
     screenshots,
@@ -270,14 +273,22 @@ async function capture(name) {
     throw new Error(`Could not capture ${name}: Fuel Path is not foreground.`);
   }
   const path = join(outputRoot, `android-preview-smoke-${timestamp}-${name}.png`);
-  const result = adbSpawnSync(["exec-out", "screencap", "-p"], {
-    encoding: "buffer",
-    maxBuffer: 8 * 1024 * 1024,
-  });
-  if (result.status !== 0 || result.stdout.length < 1024) {
-    throw new Error(`Could not capture ${name}: ${result.error?.message || result.stderr.toString() || "empty screencap"}`);
+  let lastResult;
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    lastResult = adbSpawnSync(["exec-out", "screencap", "-p"], {
+      encoding: "buffer",
+      maxBuffer: 8 * 1024 * 1024,
+    });
+    if (lastResult.status !== 0 || lastResult.stdout.length < 1024) break;
+    writeFileSync(path, lastResult.stdout);
+    const integrity = screenshotEdgeIntegrity(readPng(path));
+    marks.push({ name: `${name} screenshot integrity attempt`, attempt, ...integrity });
+    if (integrity.screenshotIntegrityReady) break;
+    await wait(1_500);
   }
-  writeFileSync(path, result.stdout);
+  if (lastResult?.status !== 0 || !lastResult || lastResult.stdout.length < 1024) {
+    throw new Error(`Could not capture ${name}: ${lastResult?.error?.message || lastResult?.stderr?.toString() || "empty screencap"}`);
+  }
   screenshots.push(path);
 }
 
@@ -384,7 +395,10 @@ function escapeRegExp(value) {
 function readApkCertificate() {
   const apksigner = latestTool("build-tools", "apksigner");
   if (!apksigner) return { error: "apksigner not found" };
-  const javaHome = process.env.JAVA_HOME || join(repoRoot, "var", "tooling", "java", "jdk-21.0.11+10", "Contents", "Home");
+  const androidStudioJavaHome = "/Applications/Android Studio.app/Contents/jbr/Contents/Home";
+  const javaHome = process.env.JAVA_HOME || (existsSync(androidStudioJavaHome)
+    ? androidStudioJavaHome
+    : join(repoRoot, "var", "tooling", "java", "jdk-21.0.11+10", "Contents", "Home"));
   const result = spawnSync(apksigner, ["verify", "--print-certs", artifact], {
     encoding: "utf8",
     env: { ...process.env, JAVA_HOME: javaHome },
@@ -427,6 +441,10 @@ function buildAttentionItems(frameSummary, mapWarningLines, mapTileSummaries) {
   const blankSummaries = mapTileSummaries.filter((summary) => summary.blankMapLikely);
   if (blankSummaries.length) {
     attentionItems.push(`Google map tiles appear blank in ${blankSummaries.length}/${mapTileSummaries.length} map screenshots; first colour ratio ${blankSummaries[0].colourRatio}, detail buckets ${blankSummaries[0].detailBuckets}.`);
+  }
+  const incompleteScreens = mapTileSummaries.filter((summary) => summary.screenshotIntegrityReady === false);
+  if (incompleteScreens.length) {
+    attentionItems.push(`Screenshot integrity failed in ${incompleteScreens.length}/${mapTileSummaries.length} map captures; black or clipped edge bands exceed the allowed threshold.`);
   }
   if (frameSummary.totalFrames < 30) {
     attentionItems.push(frameSummary.renderSurfacePresent
@@ -487,8 +505,9 @@ function writeReport(result) {
     `Artifact: ${result.artifactName}`,
     `Package: ${result.packageName}`,
     `Device: ${result.device.type} ${result.device.serial}`,
-    `SHA-1: ${result.certificate.sha1 || "unknown"}`,
-    `SHA-256: ${result.certificate.sha256 || "unknown"}`,
+    `Signing certificate SHA-1: ${result.certificate.sha1 || "unknown"}`,
+    `Signing certificate SHA-256: ${result.certificate.sha256 || "unknown"}`,
+    `APK SHA-256: ${result.artifactSha256}`,
     `Map settle: ${result.mapSettleMs} ms`,
     "",
     "## Frame Summary",
@@ -517,7 +536,7 @@ function writeReport(result) {
     "",
     ...result.mapTileSummaries.map(
       (summary) =>
-        `- ${basename(summary.screenshot)}: blank=${summary.blankMapLikely}, colour=${summary.colourRatio}, buckets=${summary.detailBuckets}`,
+        `- ${basename(summary.screenshot)}: blank=${summary.blankMapLikely}, integrity=${summary.screenshotIntegrityReady}, blackEdges=${summary.blackEdgeRatio}, colour=${summary.colourRatio}, buckets=${summary.detailBuckets}`,
     ),
     "",
     "## Device Diagnostics",
@@ -580,8 +599,10 @@ function analyseMapScreenshot(path) {
 
     const colourRatio = sampleCount ? Number((colourPixels / sampleCount).toFixed(4)) : 0;
     const detailBuckets = buckets.size;
+    const edge = screenshotEdgeIntegrity(png);
     return {
       blankMapLikely: colourRatio < 0.015 && detailBuckets < 28,
+      ...edge,
       colourRatio,
       detailBuckets,
       sampleCount,
@@ -592,6 +613,26 @@ function analyseMapScreenshot(path) {
       error: error.message,
     };
   }
+}
+
+function screenshotEdgeIntegrity(png) {
+  const topEnd = Math.max(1, Math.floor(png.height * 0.12));
+  const rightStart = Math.floor(png.width * 0.94);
+  let black = 0;
+  let sampled = 0;
+  for (let y = 0; y < png.height; y += 6) {
+    for (let x = 0; x < png.width; x += 6) {
+      if (y >= topEnd && x < rightStart) continue;
+      const index = (y * png.width + x) * 4;
+      if (
+        png.data[index + 3] < 250 ||
+        (png.data[index] < 8 && png.data[index + 1] < 8 && png.data[index + 2] < 8)
+      ) black += 1;
+      sampled += 1;
+    }
+  }
+  const blackEdgeRatio = sampled ? Number((black / sampled).toFixed(4)) : 1;
+  return { screenshotIntegrityReady: blackEdgeRatio < 0.2, blackEdgeRatio };
 }
 
 function readPng(path) {

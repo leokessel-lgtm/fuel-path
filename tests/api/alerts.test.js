@@ -98,7 +98,7 @@ test("saved-route alert foundation stores route, device and sendable evaluation"
       },
     }, headers);
     const routes = await callSavedRoutes("GET", { userId: "user-test" });
-    const evaluations = await callAlerts("GET", { mode: "evaluations", routeId: route.id });
+    const evaluations = await callAlerts("GET", { mode: "evaluations", routeId: route.id }, {}, headers);
 
     assert.equal(saved.status, 202);
     assert.equal(saved.payload.route.alertEnabled, true);
@@ -116,6 +116,35 @@ test("saved-route alert foundation stores route, device and sendable evaluation"
     setAlertStorageForTests(null);
     if (original === undefined) delete process.env.ALERTS_WRITE_TOKEN;
     else process.env.ALERTS_WRITE_TOKEN = original;
+  }
+});
+
+test("alert record listings require the operator token and never accept validation credentials", async () => {
+  const originalWrite = process.env.ALERTS_WRITE_TOKEN;
+  const originalValidation = process.env.ALERTS_VALIDATION_TOKEN;
+  process.env.ALERTS_WRITE_TOKEN = "operator-token";
+  process.env.ALERTS_VALIDATION_TOKEN = "validation-token";
+  const store = memoryDurableStore();
+  setAlertStorageForTests(store);
+  try {
+    await store.upsertPushDevice(device);
+    const publicRead = await callAlerts("GET", { mode: "devices" });
+    const validationRead = await callAlerts("GET", { mode: "devices" }, {}, {
+      authorization: "Bearer validation-token",
+    });
+    const operatorRead = await callAlerts("GET", { mode: "devices" }, {}, {
+      authorization: "Bearer operator-token",
+    });
+    assert.equal(publicRead.status, 401);
+    assert.equal(validationRead.status, 401);
+    assert.equal(operatorRead.status, 200);
+    assert.equal(operatorRead.payload.devices.length, 1);
+  } finally {
+    setAlertStorageForTests(null);
+    if (originalWrite === undefined) delete process.env.ALERTS_WRITE_TOKEN;
+    else process.env.ALERTS_WRITE_TOKEN = originalWrite;
+    if (originalValidation === undefined) delete process.env.ALERTS_VALIDATION_TOKEN;
+    else process.env.ALERTS_VALIDATION_TOKEN = originalValidation;
   }
 });
 
@@ -644,8 +673,10 @@ test("scheduled evaluator keeps a saved route quiet for 72 hours after an alert"
 test("Expo push delivery persists tickets only when delivery gate is enabled", async () => {
   const originalToken = process.env.ALERTS_WRITE_TOKEN;
   const originalDelivery = process.env.EXPO_PUSH_DELIVERY_ENABLED;
+  const originalAllowlist = process.env.EXPO_PUSH_BETA_USER_IDS;
   process.env.ALERTS_WRITE_TOKEN = "alert-token";
   process.env.EXPO_PUSH_DELIVERY_ENABLED = "1";
+  process.env.EXPO_PUSH_BETA_USER_IDS = route.userId;
   const store = memoryDurableStore();
   setAlertStorageForTests(store);
   setExpoPushClientForTests({
@@ -693,14 +724,70 @@ test("Expo push delivery persists tickets only when delivery gate is enabled", a
     else process.env.ALERTS_WRITE_TOKEN = originalToken;
     if (originalDelivery === undefined) delete process.env.EXPO_PUSH_DELIVERY_ENABLED;
     else process.env.EXPO_PUSH_DELIVERY_ENABLED = originalDelivery;
+    if (originalAllowlist === undefined) delete process.env.EXPO_PUSH_BETA_USER_IDS;
+    else process.env.EXPO_PUSH_BETA_USER_IDS = originalAllowlist;
+  }
+});
+
+test("validation delivery sends to one stored device without enabling global push", async () => {
+  const originalToken = process.env.ALERTS_WRITE_TOKEN;
+  const originalValidation = process.env.EXPO_PUSH_VALIDATION_ENABLED;
+  const originalDelivery = process.env.EXPO_PUSH_DELIVERY_ENABLED;
+  process.env.ALERTS_WRITE_TOKEN = "alert-token";
+  process.env.EXPO_PUSH_VALIDATION_ENABLED = "1";
+  delete process.env.EXPO_PUSH_DELIVERY_ENABLED;
+  const store = memoryDurableStore();
+  setAlertStorageForTests(store);
+  let sentMessages = [];
+  setExpoPushClientForTests({
+    async sendExpoPushMessages(messages) {
+      sentMessages = messages;
+      return [{ status: "ok", id: "validation-ticket", to: messages[0].to }];
+    },
+  });
+
+  try {
+    const headers = { authorization: "Bearer alert-token" };
+    await callSavedRoutes("POST", {}, route, headers);
+    await callPushRegister(device, headers);
+    const denied = await callAlerts("POST", { action: "validation-delivery" }, {
+      routeId: route.id,
+      userId: route.userId,
+      deviceId: device.deviceId,
+    });
+    const accepted = await callAlerts("POST", { action: "validation-delivery" }, {
+      routeId: route.id,
+      userId: route.userId,
+      deviceId: device.deviceId,
+    }, headers);
+
+    assert.equal(denied.status, 401);
+    assert.equal(accepted.status, 202);
+    assert.equal(accepted.payload.deliveryStatus, "sent_to_expo");
+    assert.equal(accepted.payload.ticketAccepted, true);
+    assert.equal(sentMessages.length, 1);
+    assert.equal(sentMessages[0].to, device.expoPushToken);
+    assert.equal(store.routes[0].lastAlertSentAt, undefined);
+    assert.equal(process.env.EXPO_PUSH_DELIVERY_ENABLED, undefined);
+  } finally {
+    setAlertStorageForTests(null);
+    setExpoPushClientForTests(null);
+    if (originalToken === undefined) delete process.env.ALERTS_WRITE_TOKEN;
+    else process.env.ALERTS_WRITE_TOKEN = originalToken;
+    if (originalValidation === undefined) delete process.env.EXPO_PUSH_VALIDATION_ENABLED;
+    else process.env.EXPO_PUSH_VALIDATION_ENABLED = originalValidation;
+    if (originalDelivery === undefined) delete process.env.EXPO_PUSH_DELIVERY_ENABLED;
+    else process.env.EXPO_PUSH_DELIVERY_ENABLED = originalDelivery;
   }
 });
 
 test("scheduled evaluator is idempotent across cron overlap and retry", async () => {
   const originalCron = process.env.CRON_SECRET;
   const originalDelivery = process.env.EXPO_PUSH_DELIVERY_ENABLED;
+  const originalAllowlist = process.env.EXPO_PUSH_BETA_USER_IDS;
   process.env.CRON_SECRET = "cron-token";
   process.env.EXPO_PUSH_DELIVERY_ENABLED = "1";
+  process.env.EXPO_PUSH_BETA_USER_IDS = route.userId;
   const store = memoryDurableStore();
   let sendCount = 0;
   setAlertStorageForTests(store);
@@ -756,6 +843,8 @@ test("scheduled evaluator is idempotent across cron overlap and retry", async ()
     else process.env.CRON_SECRET = originalCron;
     if (originalDelivery === undefined) delete process.env.EXPO_PUSH_DELIVERY_ENABLED;
     else process.env.EXPO_PUSH_DELIVERY_ENABLED = originalDelivery;
+    if (originalAllowlist === undefined) delete process.env.EXPO_PUSH_BETA_USER_IDS;
+    else process.env.EXPO_PUSH_BETA_USER_IDS = originalAllowlist;
   }
 });
 

@@ -5,9 +5,9 @@ once. Preserve public contracts and add focused tests before each split.
 
 | Priority | Module | Current concern | First safe extraction |
 | --- | --- | --- | --- |
-| P0 | `api/_backend.js` | Composition root still contains prediction and retention domain orchestration | Follow [`backend-composition-root-map.md`](backend-composition-root-map.md): request, provider HTTP and provider loading are extracted; prediction status and signals are next |
-| P0 | `api/_geocode.js` | Provider selection, caching, address index and response shaping remain coupled | Extract cache/policy orchestration behind existing geocode contract |
-| P0 | `api/_addressIndex.js` | Query parsing, storage access and ranking are one large unit | Extract query normalisation and ranking with existing fixtures |
+| P0 | `api/_backend.js` | Composition root is reduced to wiring, thin request-domain helpers and compatibility exports | Keep the 300-line boundary ratcheted and reject domain logic regrowth |
+| P0 | `api/_geocode.js` | Provider selection, address index and response shaping remain coupled; cache and failure policy are extracted | Extract provider execution adapters behind the existing geocode contract |
+| P0 | `api/_addressIndex.js` | Storage access remains coupled; query normalisation and ranking are extracted | Extract SQLite, Postgres and API storage adapters with existing fixtures |
 | P1 | `mobile-app/src/components/PlanRouteSheet.tsx` | Recommendation, evidence and action rendering are coupled | Extract result sections without changing wording or route rules |
 | P1 | `StationMap.native.tsx` and `StationMap.web.tsx` | Camera, markers, selection and platform rendering are large | Extract shared map selection/camera state; keep renderers platform-specific |
 | P1 | `api/ev-chargers.js` | Public handler directly composes multiple EV adapters and policy modules | Move EV orchestration behind one internal contract |

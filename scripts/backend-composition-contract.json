@@ -1,5 +1,7 @@
 {
   "backendExports": [
+    "alertsAdminWriteAuthorised",
+    "alertRecordsReadAuthorised",
     "alertsStatus",
     "alertsWriteAuthorised",
     "alertsWriteSecurity",
@@ -73,6 +75,7 @@
     "setPredictionStorageForTests",
     "stationPayload",
     "stringParam",
+    "validateSavedRouteAlertDelivery",
     "waFuelWatchRequestPlan",
     "waRegionPlanForArea",
     "waTomorrowPriceAvailable"

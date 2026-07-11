@@ -1,9 +1,12 @@
 const {
   alertsStatus,
+  alertsAdminWriteAuthorised,
+  alertRecordsReadAuthorised,
   alertsWriteAuthorised,
   alertsWriteSecurity,
   deleteBackendSavedRoute,
   evaluateSavedRouteAlert,
+  validateSavedRouteAlertDelivery,
   issueAlertClientCapability,
   listBackendAlertEvaluations,
   listBackendPushDevices,
@@ -26,6 +29,10 @@ module.exports = async function handler(req, res) {
   try {
     if (req.method === "GET") {
       const mode = stringParam(req.query.mode, "status");
+      if (["routes", "devices", "evaluations"].includes(mode) && !alertRecordsReadAuthorised(req)) {
+        sendJson(res, 401, { error: "Alert records require operator authorisation." });
+        return;
+      }
       if (mode === "routes") {
         sendJson(
           res,
@@ -70,6 +77,16 @@ module.exports = async function handler(req, res) {
     if (action === "client-capability") {
       const capability = issueAlertClientCapability(req.body || {});
       sendJson(res, capability.accepted ? 202 : 403, capability);
+      return;
+    }
+
+    if (action === "validation-delivery") {
+      if (!alertsAdminWriteAuthorised(req)) {
+        sendJson(res, 401, { error: "Validation delivery is not authorised." });
+        return;
+      }
+      const result = await validateSavedRouteAlertDelivery(req.body || {});
+      sendJson(res, result.accepted ? 202 : 409, result);
       return;
     }
 

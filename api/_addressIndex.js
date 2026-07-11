@@ -1,6 +1,6 @@
 const { createAddressRanking } = require("./_addressRanking");
 const { normaliseAddressText, normaliseSearchContext } = require("./_addressQuery");
-const { createAddressStorageAdapters } = require("./_addressStorageAdapters");
+const { createAddressStorageAdapters } = require("./_addressStorageAdapters"); const { planTypeaheadAddressQuery, planUnitAddressQuery } = require("./_addressQueryPlanning");
 
 const { addressIndexRank, scoreRecord, significantAddressTokens } = createAddressRanking({ normaliseAddressText });
 const {
@@ -258,18 +258,18 @@ function searchSqliteIndex(needle, limit, searchContext = null, rawNeedle = null
 }
 
 function searchSqliteHybridIndex(database, needle, limit, searchContext = null, rawNeedle = null) {
-  const leadingUnitSlash = queryLeadingUnitSlashNumbers(needle, rawNeedle);
-  if (queryContainsUnitLikeToken(needle) || leadingUnitSlash) {
+  if (queryContainsUnitLikeToken(needle) || queryLeadingUnitSlashNumbers(needle, rawNeedle)) {
     const unitLotIntent = queryUnitLotIntent(needle);
     const unitRangePrefixReady = unitLikeRangeQueryReadyForExactPrefix(needle);
     const forceTypeaheadForUnitBuilding = shouldUseRebuiltTypeaheadForUnitOrBuildingQuery(needle, searchContext, rawNeedle);
-    if (!unitLikeQueryReadyForTypeahead(needle) && !unitRangePrefixReady) return [];
+    const unitPlan = planUnitAddressQuery({ hasUnitIntent: true, typeaheadReady: unitLikeQueryReadyForTypeahead(needle), exactPrefixReady: unitRangePrefixReady, startsWithUnitToken: unitLikeQueryStartsWithUnitToken(needle), forceTypeahead: forceTypeaheadForUnitBuilding });
+    if (!unitPlan.allowed) return [];
     const exactUnitRows = searchSqliteExactUnitEntries(database, needle, limit);
     const safeExactUnitRows = filterRowsForUnitLotIntent(exactUnitRows, unitLotIntent);
     const safeExactUnitRowsForIntent = filterRowsForLeadingUnitSlashIntent(safeExactUnitRows, needle, rawNeedle);
     if (safeExactUnitRowsForIntent.length) return hybridRowsToSuggestions(safeExactUnitRowsForIntent, needle, 960, rawNeedle);
-    if (unitLikeQueryStartsWithUnitToken(needle)) {
-      if (unitRangePrefixReady && !unitLikeQueryReadyForTypeahead(needle)) {
+    if (unitPlan.startsWithUnitToken) {
+      if (unitPlan.exactPrefixOnly) {
         const exactPrefixRows = searchSqlitePrefixEntries(database, needle, limit, searchContext, {
           includeTokenBoundaryPrefix: true,
           minPrefixLength: 12,
@@ -342,19 +342,19 @@ function searchSqliteHybridIndex(database, needle, limit, searchContext = null, 
       rawNeedle,
     );
   }
+  const embeddedAddressCoreNeedle = !/^\d/.test(needle) ? embeddedNumberFirstAddressCoreNeedle(needle) : ""; const typeaheadPlan = planTypeaheadAddressQuery({ startsWithNumber: /^\d/.test(needle), startsWithLot: queryStartsWithLotLikeToken(needle), embeddedAddressCore: embeddedAddressCoreNeedle });
   if (!/^\d/.test(needle)) {
-    if (queryStartsWithLotLikeToken(needle)) {
+    if (typeaheadPlan.prefix && !typeaheadPlan.prefixNeedle) {
       const prefixRows = searchSqlitePrefixEntries(database, needle, limit, searchContext);
       if (prefixRows.length && (!prefixRowsAmbiguous(prefixRows) || shouldUseContextualAmbiguousPrefixRows(needle, searchContext))) {
         return hybridRowsToSuggestions(prefixRows, needle, 950, rawNeedle);
       }
     }
-    const embeddedAddressCoreNeedle = embeddedNumberFirstAddressCoreNeedle(needle);
-    if (embeddedAddressCoreNeedle) {
-      const prefixRows = searchSqlitePrefixEntries(database, embeddedAddressCoreNeedle, limit, searchContext, {
-        minPrefixLength: 8,
+    if (typeaheadPlan.prefixNeedle) {
+      const prefixRows = searchSqlitePrefixEntries(database, typeaheadPlan.prefixNeedle, limit, searchContext, {
+        minPrefixLength: typeaheadPlan.minPrefixLength,
       }, rawNeedle);
-      if (prefixRows.length && (!prefixRowsAmbiguous(prefixRows) || shouldUseContextualAmbiguousPrefixRows(embeddedAddressCoreNeedle, searchContext))) {
+      if (prefixRows.length && (!prefixRowsAmbiguous(prefixRows) || shouldUseContextualAmbiguousPrefixRows(typeaheadPlan.prefixNeedle, searchContext))) {
         return hybridRowsToSuggestions(prefixRows, needle, 950, rawNeedle);
       }
     }

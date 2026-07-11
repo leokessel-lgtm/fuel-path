@@ -11,7 +11,10 @@ const {
   fetchApiSuggestions,
   loadSeedRecords,
   openSqliteIndex,
-  postgresClient,
+  queryPostgresAddresses,
+  sqliteAll,
+  sqliteAllOrThrow,
+  sqliteGet,
 } = createAddressStorageAdapters();
 
 function addressIndexStatus() {
@@ -182,55 +185,11 @@ async function searchApiIndex(rawQuery, needle, limit) {
 }
 
 async function searchPostgresIndex(needle, limit) {
-  const sql = postgresClient();
-  if (!sql) return [];
-  try {
-    const queryState = detectQueryStateCode(needle);
-    const rows = queryState
-      ? await sql`
-        SELECT id, label, lat, lon, state, postcode, accuracy, search_text
-        FROM fuel_path_gnaf_addresses
-        WHERE state = ${queryState}
-          AND (
-            search_text LIKE ${`${needle}%`}
-            OR search_text LIKE ${`% ${needle}%`}
-            OR search_text % ${needle}
-          )
-        ORDER BY
-          CASE
-            WHEN search_text = ${needle} THEN 0
-            WHEN search_text LIKE ${`${needle}%`} THEN 1
-            WHEN search_text LIKE ${`% ${needle}%`} THEN 2
-            ELSE 3
-          END,
-          similarity(search_text, ${needle}) DESC,
-          LENGTH(label)
-        LIMIT ${Math.max(1, Math.min(Number(limit) || 5, 20))}
-      `
-      : await sql`
-        SELECT id, label, lat, lon, state, postcode, accuracy, search_text
-        FROM fuel_path_gnaf_addresses
-        WHERE search_text LIKE ${`${needle}%`}
-          OR search_text LIKE ${`% ${needle}%`}
-          OR search_text % ${needle}
-        ORDER BY
-          CASE
-            WHEN search_text = ${needle} THEN 0
-            WHEN search_text LIKE ${`${needle}%`} THEN 1
-            WHEN search_text LIKE ${`% ${needle}%`} THEN 2
-            ELSE 3
-          END,
-          similarity(search_text, ${needle}) DESC,
-          LENGTH(label)
-        LIMIT ${Math.max(1, Math.min(Number(limit) || 5, 20))}
-      `;
-    return rows
-      .map((row) => ({ row, matchType: postgresMatchType(row, needle) }))
-      .filter(({ row, matchType }) => addressMatchQualityPass(row, needle, matchType, rawNeedle))
-      .map(({ row, matchType }) => addressRecordToSuggestion(row, matchType, 1000));
-  } catch {
-    return [];
-  }
+  const rows = await queryPostgresAddresses(needle, limit, detectQueryStateCode(needle));
+  return rows
+    .map((row) => ({ row, matchType: postgresMatchType(row, needle) }))
+    .filter(({ row, matchType }) => addressMatchQualityPass(row, needle, matchType, needle))
+    .map(({ row, matchType }) => addressRecordToSuggestion(row, matchType, 1000));
 }
 
 function searchSeedIndex(needle, limit) {
@@ -264,15 +223,14 @@ function searchSqliteIndex(needle, limit, searchContext = null, rawNeedle = null
   try {
     const ftsQuery = terms.map((term) => `${escapeFtsTerm(term)}*`).join(" ");
     const expandedLimit = Math.max(Math.min(Number(limit) || 5, 20) * 8, 40);
-    const statement = database.prepare(`
+    const rows = sqliteAllOrThrow(database, `
       SELECT ${sqliteAddressSelect(database)}
       FROM ${ftsTable}
       WHERE ${ftsTable} MATCH ?
       ORDER BY rank
       LIMIT ?
-    `);
-    return statement
-      .all(ftsQuery, expandedLimit)
+    `, ftsQuery, expandedLimit);
+    return rows
       .map((row) => ({ row, matchType: sqliteMatchType(row, needle) }))
       .filter(({ row, matchType }) => addressMatchQualityPass(row, needle, matchType))
       .sort((left, right) => addressIndexRank(right, needle) - addressIndexRank(left, needle) || left.row.label.length - right.row.label.length)
@@ -281,15 +239,14 @@ function searchSqliteIndex(needle, limit, searchContext = null, rawNeedle = null
   } catch {
     try {
       const fallbackSearchColumn = sqliteSchemaColumns(database, "addresses").has("search_text") ? "search_text" : "label";
-      const statement = database.prepare(`
+      const rows = sqliteAll(database, `
         SELECT ${sqliteAddressSelect(database)}
         FROM addresses
         WHERE ${fallbackSearchColumn} LIKE ?
         ORDER BY LENGTH(label)
         LIMIT ?
-      `);
-      return statement
-        .all(`%${needle}%`, limit)
+      `, `%${needle}%`, limit);
+      return rows
         .map((row) => ({ row, matchType: sqliteMatchType(row, needle) }))
         .filter(({ row, matchType }) => addressMatchQualityPass(row, needle, matchType, rawNeedle))
         .sort((left, right) => addressIndexRank(right, needle) - addressIndexRank(left, needle) || left.row.label.length - right.row.label.length)
@@ -620,7 +577,7 @@ function searchSqlitePrefixEntries(database, needle, limit, searchContext = null
   const cappedLimit = Math.max(1, Math.min(Number(limit) || 5, 20));
   const run = (prefix) => {
     if (searchContext) {
-      return database.prepare(`
+      return sqliteAll(database, `
         SELECT
           e.entry_id,
           e.entry_type,
@@ -651,7 +608,7 @@ function searchSqlitePrefixEntries(database, needle, limit, searchContext = null
           LENGTH(a.label),
           a.label
         LIMIT ?
-      `).all(
+      `,
         prefix,
         searchContext.nearLat,
         searchContext.nearLat,
@@ -660,7 +617,7 @@ function searchSqlitePrefixEntries(database, needle, limit, searchContext = null
         cappedLimit,
       );
     }
-    return database.prepare(`
+    return sqliteAll(database, `
       SELECT
         e.entry_id,
         e.entry_type,
@@ -687,7 +644,7 @@ function searchSqlitePrefixEntries(database, needle, limit, searchContext = null
       WHERE p.prefix = ?
       ORDER BY e.rank_weight DESC, LENGTH(a.label), a.label
       LIMIT ?
-    `).all(prefix, cappedLimit);
+    `, prefix, cappedLimit);
   };
   for (const prefix of [...new Set(prefixes)]) {
     const rows = prioritizeUnitIntentRows(run(prefix), unitIntent, needle);
@@ -741,7 +698,7 @@ function searchSqliteTypeaheadEntries(database, needle, limit, searchContext = n
         `% ${needle}%`,
         Math.max(1, Math.min(Number(limit) || 5, 20)),
       ];
-  const rows = database.prepare(`
+  const rows = sqliteAll(database, `
     SELECT
       e.entry_id,
       e.entry_type,
@@ -778,7 +735,7 @@ function searchSqliteTypeaheadEntries(database, needle, limit, searchContext = n
       LENGTH(a.label),
       a.label
       LIMIT ?
-  `).all(...params);
+  `, ...params);
 
   return prioritizeUnitIntentRows(rows, unitIntent, needle);
 }
@@ -815,7 +772,7 @@ function searchSqliteBaseRefinePrefixEntries(database, needle, limit, searchCont
   const cappedLimit = Math.max(1, Math.min(Number(limit) || 5, 20));
   const run = (prefix) => {
     if (searchContext) {
-      return database.prepare(`
+      return sqliteAll(database, `
         SELECT
           e.entry_id,
           e.entry_type,
@@ -845,7 +802,7 @@ function searchSqliteBaseRefinePrefixEntries(database, needle, limit, searchCont
           LENGTH(a.label),
           a.label
         LIMIT ?
-      `).all(
+      `,
         prefix,
         searchContext.nearLat,
         searchContext.nearLat,
@@ -854,7 +811,7 @@ function searchSqliteBaseRefinePrefixEntries(database, needle, limit, searchCont
         cappedLimit,
       );
     }
-    return database.prepare(`
+    return sqliteAll(database, `
       SELECT
         e.entry_id,
         e.entry_type,
@@ -880,7 +837,7 @@ function searchSqliteBaseRefinePrefixEntries(database, needle, limit, searchCont
       WHERE p.prefix = ? AND e.entry_type = 'base_refine'
       ORDER BY e.rank_weight DESC, LENGTH(a.label), a.label
       LIMIT ?
-    `).all(prefix, cappedLimit);
+    `, prefix, cappedLimit);
   };
   for (const prefix of prefixes) {
     const rows = run(prefix);
@@ -892,7 +849,7 @@ function searchSqliteBaseRefinePrefixEntries(database, needle, limit, searchCont
 function searchSqliteExactUnitEntriesForBases(database, baseSignatures, unit, limit) {
   const rows = [];
   const seen = new Set();
-  const statement = database.prepare(`
+  const query = `
     SELECT
       e.entry_id,
       e.entry_type,
@@ -920,9 +877,9 @@ function searchSqliteExactUnitEntriesForBases(database, baseSignatures, unit, li
       AND e.unit <> ''
     ORDER BY e.rank_weight DESC, LENGTH(a.label), a.label
     LIMIT ?
-  `);
+  `;
   for (const baseSignature of baseSignatures) {
-    for (const row of statement.all(baseSignature, unit, Math.max(1, Math.min(Number(limit) || 5, 20)))) {
+    for (const row of sqliteAll(database, query, baseSignature, unit, Math.max(1, Math.min(Number(limit) || 5, 20)))) {
       const key = row.address_id || row.entry_id;
       if (seen.has(key)) continue;
       seen.add(key);
@@ -1286,7 +1243,7 @@ function sqliteAddressSelect(database) {
 function sqliteSchemaColumns(database, table) {
   const cacheKey = `${configuredSqlitePath()}:${table}`;
   if (sqliteSchemaColumns.cache?.key === cacheKey) return sqliteSchemaColumns.cache.columns;
-  const rows = database.prepare(`PRAGMA table_info(${table})`).all();
+  const rows = sqliteAll(database, `PRAGMA table_info(${table})`);
   const columns = new Set(rows.map((row) => String(row.name)));
   sqliteSchemaColumns.cache = { key: cacheKey, columns };
   return columns;
@@ -1302,7 +1259,7 @@ function sqliteTableExists(database, table) {
   const cacheKey = `${configuredSqlitePath()}:${table}`;
   if (!sqliteTableExists.cache) sqliteTableExists.cache = new Map();
   if (sqliteTableExists.cache.has(cacheKey)) return sqliteTableExists.cache.get(cacheKey);
-  const row = database.prepare("SELECT name FROM sqlite_master WHERE type IN ('table', 'view') AND name = ?").get(table);
+  const row = sqliteGet(database, "SELECT name FROM sqlite_master WHERE type IN ('table', 'view') AND name = ?", table);
   const exists = Boolean(row?.name);
   sqliteTableExists.cache.set(cacheKey, exists);
   return exists;
@@ -1312,7 +1269,7 @@ function sqliteIndexExists(database, indexName) {
   const cacheKey = `${configuredSqlitePath()}:${indexName}`;
   if (!sqliteIndexExists.cache) sqliteIndexExists.cache = new Map();
   if (sqliteIndexExists.cache.has(cacheKey)) return sqliteIndexExists.cache.get(cacheKey);
-  const row = database.prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND name = ?").get(indexName);
+  const row = sqliteGet(database, "SELECT name FROM sqlite_master WHERE type = 'index' AND name = ?", indexName);
   const exists = Boolean(row?.name);
   sqliteIndexExists.cache.set(cacheKey, exists);
   return exists;

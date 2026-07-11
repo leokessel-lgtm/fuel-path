@@ -27,11 +27,11 @@ every deployment must retain the Hobby-plan ceiling of 12 serverless functions.
 | Outbound provider transport | `api/_providerHttp.js` | `fetch`, timeouts and provider responses | Extracted and injected through `_backend.js` |
 | Station discount decoration | `api/_stationDiscounts.js` | discount registry and current date | Extracted as a pure injected decorator |
 | Station provider loading | `api/_stationProviderService.js` | capabilities, provider adapters, cache and single-flight | Extracted as an injected provider-loading service |
-| Prediction status and signals | `api/_predictionService.js`, `api/_predictionReadiness.js` and `api/_predictionSecurity.js` | prediction storage, capability state and token policy | Extracted behind injected domain, readiness and write-security contracts |
-| Prediction collection and backtesting | `api/_predictionService.js` | station loading, storage, time and market configuration | Extracted and re-exported through `_backend.js` |
+| Prediction status and signals | thin `api/_predictionService.js` facade, `api/_predictionMarketPolicy.js`, `api/_predictionReadiness.js` and `api/_predictionSecurity.js` | prediction storage, market policy, capability state and token policy | Extracted behind injected policy, readiness and write-security contracts |
+| Prediction collection and backtesting | `api/_predictionCollectionService.js` and `api/_predictionBacktestService.js` | station loading, storage, time and market configuration | Collection orchestration and record validation/persistence are separated and re-exported through `_backend.js` |
 | Retention and write authorisation | `api/_retentionService.js` and `api/_securityPolicy.js` | alert storage, prediction storage and environment secrets | Extracted; compatibility exports remain wired through `_backend.js` |
 | Geocode cache | `api/_geocodeCache.js` | in-memory expiry and bounded eviction | Extracted; provider fallback policy remains in `_geocode.js` |
-| Address lookup | `api/_addressQuery.js`, `api/_addressRanking.js` and `api/_addressStorageAdapters.js` | normalisation, scoring, API transport, SQLite and Postgres connections | Query policy and storage connections are extracted; result shaping and SQL query orchestration remain in `_addressIndex.js` |
+| Address lookup | `api/_addressQuery.js`, `api/_addressRanking.js` and `api/_addressStorageAdapters.js` | normalisation, scoring, API transport, SQLite and Postgres connections/query execution | Storage execution is adapter-bound; query planning and result shaping remain in `_addressIndex.js` |
 | Compatibility exports | final `module.exports` block | all slices | Preserve names until every consumer migrates deliberately |
 
 ## Public consumers

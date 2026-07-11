@@ -90,7 +90,7 @@ test("prediction write security is isolated and denies missing durable tokens", 
   }
 });
 
-test("address API adapter clamps limits and never leaks its token into output", async () => {
+test("address API adapter clamps limits and returns suggestions without credentials", async () => {
   const previous = {
     url: process.env.FUEL_PATH_GNAF_API_URL,
     token: process.env.FUEL_PATH_GNAF_API_TOKEN,
@@ -105,7 +105,9 @@ test("address API adapter clamps limits and never leaks its token into output", 
     },
   });
   try {
-    assert.deepEqual(await adapters.fetchApiSuggestions("Sydney", 99), [{ label: "Sydney NSW" }]);
+    const suggestions = await adapters.fetchApiSuggestions("Sydney", 99);
+    assert.deepEqual(suggestions, [{ label: "Sydney NSW" }]);
+    assert.doesNotMatch(JSON.stringify(suggestions), /secret-test-token/);
     assert.equal(new URL(request.url).searchParams.get("limit"), "20");
     assert.equal(request.options.headers.Authorization, "Bearer secret-test-token");
   } finally {

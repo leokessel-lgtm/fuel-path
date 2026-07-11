@@ -8,8 +8,8 @@ public handler changes its backend dependency.
 ## Current boundary
 
 `api/_backend.js` remains the wiring point for routing, geocoding, fuel
-providers, scoring and alerts, but still owns prediction-domain logic. Retention
-orchestration and shared token policy are extracted. Run
+providers, scoring and alerts. Prediction, retention and shared token policy are
+now extracted behind injected services. Run
 `npm run check:backend-composition` for its current export, consumer and line
 measurements. The committed contract fails when those boundaries drift.
 
@@ -27,8 +27,8 @@ every deployment must retain the Hobby-plan ceiling of 12 serverless functions.
 | Outbound provider transport | `api/_providerHttp.js` | `fetch`, timeouts and provider responses | Extracted and injected through `_backend.js` |
 | Station discount decoration | `api/_stationDiscounts.js` | discount registry and current date | Extracted as a pure injected decorator |
 | Station provider loading | `api/_stationProviderService.js` | capabilities, provider adapters, cache and single-flight | Extracted as an injected provider-loading service |
-| Prediction status and signals | `predictionStatus` through `normaliseCycleMarket` | prediction storage and capability state | Move behind a prediction service contract |
-| Prediction collection and backtesting | `recordPredictionBacktest` through `listPredictionBacktests` | station loading, storage, time and market configuration | Move behind the same prediction service |
+| Prediction status and signals | `api/_predictionService.js` and `api/_predictionReadiness.js` | prediction storage and capability state | Extracted behind an injected service contract |
+| Prediction collection and backtesting | `api/_predictionService.js` | station loading, storage, time and market configuration | Extracted and re-exported through `_backend.js` |
 | Retention and write authorisation | `api/_retentionService.js` and `api/_securityPolicy.js` | alert storage, prediction storage and environment secrets | Extracted; compatibility exports remain wired through `_backend.js` |
 | Geocode cache | `api/_geocodeCache.js` | in-memory expiry and bounded eviction | Extracted; provider fallback policy remains in `_geocode.js` |
 | Address ranking | `api/_addressRanking.js` | pure scoring and significant-token ranking | Extracted; storage/query orchestration remains in `_addressIndex.js` |

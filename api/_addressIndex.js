@@ -1,6 +1,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { createAddressRanking } = require("./_addressRanking");
+const { normaliseAddressText, normaliseSearchContext } = require("./_addressQuery");
 
 const ROOT = path.resolve(__dirname, "..");
 const DEFAULT_SEED_PATH = path.join(ROOT, "prototype", "data", "gnaf-addresses.seed.json");
@@ -30,14 +31,6 @@ function addressIndexStatus() {
     attribution:
       "G-NAF © Geoscape Australia licensed by the Commonwealth of Australia under the Open G-NAF End User Licence Agreement.",
   };
-}
-
-function normaliseSearchContext(value = {}) {
-  if (!value) return null;
-  const lat = Number(value.nearLat);
-  const lon = Number(value.nearLon);
-  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
-  return { nearLat: lat, nearLon: lon };
 }
 
 async function searchAddressIndex(query, limit = 5, options = {}) {
@@ -1714,33 +1707,6 @@ function addressDisplayMetadata(record, matchType) {
 
 function escapeFtsTerm(value) {
   return String(value).replace(/["']/g, " ").replace(/[^\p{L}\p{N}_-]+/gu, " ").trim();
-}
-
-function normaliseAddressText(value) {
-  const expanded = String(value || "")
-    .toLowerCase()
-    .replace(/\bbvd\b/g, "boulevard")
-    .replace(/\bblvd\b/g, "boulevard")
-    .replace(/\bcct\b/g, "circuit")
-    .replace(/\bcnr\b/g, "corner")
-    .replace(/\bcr\b/g, "crescent")
-    .replace(/\bcres\b/g, "crescent")
-    .replace(/\bct\b/g, "court")
-    .replace(/\bst\b/g, "street")
-    .replace(/\brd\b/g, "road")
-    .replace(/\bave\b/g, "avenue")
-    .replace(/\bdr\b/g, "drive")
-    .replace(/\besp\b/g, "esplanade")
-    .replace(/\bhwy\b/g, "highway")
-    .replace(/\bmt\b/g, "mount")
-    .replace(/\bpkwy\b/g, "parkway")
-    .replace(/\bpwy\b/g, "parkway")
-    .replace(/\bpde\b/g, "parade")
-    .replace(/\bpl\b/g, "place")
-    .replace(/\bln\b/g, "lane")
-    .replace(/\bsq\b/g, "square")
-    .replace(/\btce\b/g, "terrace");
-  return expanded.replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
 }
 
 function addressSearchNeedles(rawQuery) {

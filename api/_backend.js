@@ -113,6 +113,7 @@ const {
   alertsStatus,
   alertsWriteAuthorised,
   alertsAdminWriteAuthorised,
+  alertRecordsReadAuthorised,
   alertsWriteSecurity,
   checkPushReceipts,
   cronAuthorised,
@@ -1455,7 +1456,6 @@ function positiveInteger(value, fallback) {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
 }
-
 function isoDateTime(value) {
   const parsed = new Date(value || new Date().toISOString());
   return Number.isNaN(parsed.getTime()) ? new Date().toISOString() : parsed.toISOString();
@@ -1463,6 +1463,7 @@ function isoDateTime(value) {
 
 module.exports = {
   alertsAdminWriteAuthorised,
+  alertRecordsReadAuthorised,
   alertsWriteAuthorised,
   alertsWriteSecurity,
   alertsStatus,

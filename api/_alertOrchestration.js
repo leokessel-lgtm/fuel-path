@@ -195,6 +195,15 @@ function createAlertOrchestration({ buildRoute, capabilitiesForPoints, loadStati
     return supplied === expectedToken;
   }
 
+  function alertRecordsReadAuthorised(req = {}) {
+    if (!process.env.ALERTS_WRITE_TOKEN) return false;
+    const headers = req.headers || {};
+    const auth = headers.authorization || headers.Authorization || "";
+    const direct = headers["x-fuel-path-alerts-token"] || headers["X-Fuel-Path-Alerts-Token"] || "";
+    const supplied = String(auth).replace(/^Bearer\s+/i, "").trim() || String(direct).trim();
+    return supplied === process.env.ALERTS_WRITE_TOKEN;
+  }
+
   function issueAlertClientCapability({ userId = "", deviceId = "" } = {}) {
     const security = alertsWriteSecurity();
     if (!security.clientTokenEnabled || !security.clientCapabilityConfigured) {
@@ -681,6 +690,7 @@ function createAlertOrchestration({ buildRoute, capabilitiesForPoints, loadStati
 
   return {
     alertsAdminWriteAuthorised,
+    alertRecordsReadAuthorised,
     alertsStatus,
     alertsWriteAuthorised,
     alertsWriteSecurity,

@@ -98,7 +98,7 @@ test("saved-route alert foundation stores route, device and sendable evaluation"
       },
     }, headers);
     const routes = await callSavedRoutes("GET", { userId: "user-test" });
-    const evaluations = await callAlerts("GET", { mode: "evaluations", routeId: route.id });
+    const evaluations = await callAlerts("GET", { mode: "evaluations", routeId: route.id }, {}, headers);
 
     assert.equal(saved.status, 202);
     assert.equal(saved.payload.route.alertEnabled, true);
@@ -116,6 +116,35 @@ test("saved-route alert foundation stores route, device and sendable evaluation"
     setAlertStorageForTests(null);
     if (original === undefined) delete process.env.ALERTS_WRITE_TOKEN;
     else process.env.ALERTS_WRITE_TOKEN = original;
+  }
+});
+
+test("alert record listings require the operator token and never accept validation credentials", async () => {
+  const originalWrite = process.env.ALERTS_WRITE_TOKEN;
+  const originalValidation = process.env.ALERTS_VALIDATION_TOKEN;
+  process.env.ALERTS_WRITE_TOKEN = "operator-token";
+  process.env.ALERTS_VALIDATION_TOKEN = "validation-token";
+  const store = memoryDurableStore();
+  setAlertStorageForTests(store);
+  try {
+    await store.upsertPushDevice(device);
+    const publicRead = await callAlerts("GET", { mode: "devices" });
+    const validationRead = await callAlerts("GET", { mode: "devices" }, {}, {
+      authorization: "Bearer validation-token",
+    });
+    const operatorRead = await callAlerts("GET", { mode: "devices" }, {}, {
+      authorization: "Bearer operator-token",
+    });
+    assert.equal(publicRead.status, 401);
+    assert.equal(validationRead.status, 401);
+    assert.equal(operatorRead.status, 200);
+    assert.equal(operatorRead.payload.devices.length, 1);
+  } finally {
+    setAlertStorageForTests(null);
+    if (originalWrite === undefined) delete process.env.ALERTS_WRITE_TOKEN;
+    else process.env.ALERTS_WRITE_TOKEN = originalWrite;
+    if (originalValidation === undefined) delete process.env.ALERTS_VALIDATION_TOKEN;
+    else process.env.ALERTS_VALIDATION_TOKEN = originalValidation;
   }
 });
 

@@ -1,6 +1,7 @@
 {
   "backendExports": [
     "alertsAdminWriteAuthorised",
+    "alertRecordsReadAuthorised",
     "alertsStatus",
     "alertsWriteAuthorised",
     "alertsWriteSecurity",

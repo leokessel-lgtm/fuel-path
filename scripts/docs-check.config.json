@@ -1,6 +1,9 @@
 {
+  "contextProfilesFile": "scripts/doc-context-profiles.json",
   "requiredDocuments": [
     "AGENTS.md",
+    "api/AGENTS.md",
+    "mobile-app/AGENTS.md",
     "README.md",
     "CONTRIBUTING.md",
     "docs/README.md",
@@ -21,6 +24,7 @@
     "docs/01-architecture/ORACLE-ALWAYS-FREE-GNAF-HOSTING.md",
     "docs/01-architecture/backend-hosting-v1.md",
     "docs/02-build-release/README.md",
+    "docs/02-build-release/release-readiness-guide.md",
     "docs/02-build-release/CURRENT-RELEASE-DECISION.md",
     "docs/02-build-release/STORE-READINESS-PLAN.md",
     "docs/02-build-release/NATIONAL-TESTING-REGIME.md",
@@ -37,6 +41,7 @@
     "docs/archive/build-release/STORE-PUBLISHING-EVIDENCE.2026-06-20.draft.json",
     "docs/03-provider-data/README.md",
     "docs/03-provider-data/provider-readiness.md",
+    "docs/03-provider-data/implementation/ADDRESS-LOOKUP-PROVIDERS.md",
     "docs/04-validation-evidence/README.md",
     "docs/04-validation-evidence/BACKLOG-EVIDENCE-MATRIX.md",
     "docs/04-validation-evidence/VALIDATION-SESSION-WORKBOOK.md",
@@ -93,6 +98,11 @@
     "docs/route-output-benchmark-user-testing-2026-07-03.md",
     "docs/gnaf-hosted-storage-review-2026-06-29.json"
   ],
+  "movedPaths": {
+    "STORE-READINESS-PLAN.md": "docs/02-build-release/STORE-READINESS-PLAN.md",
+    "NATIONAL-TESTING-REGIME.md": "docs/02-build-release/NATIONAL-TESTING-REGIME.md",
+    "SUPPORT-RUNBOOK.md": "docs/02-build-release/SUPPORT-RUNBOOK.md"
+  },
   "textFileExtensions": [
     ".css",
     ".gradle",

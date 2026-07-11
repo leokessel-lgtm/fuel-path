@@ -1,4 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -42,6 +43,8 @@ function buildReport() {
 
   return {
     platform: "ios",
+    sourceCommit: argumentValue("--source-commit"),
+    appBundle: argumentValue("--app-bundle"),
     simulator: target("simulator"),
     device: target("device"),
     renderedScreens: requiredScreens.map((screen) => ({
@@ -79,11 +82,25 @@ function validationBlockers(report) {
     const item = screens.find((candidate) => String(candidate.name || candidate.screen || "").toLowerCase() === screen);
     return !item?.screenshot || !existsSync(resolve(item.screenshot));
   });
+  const screenshotPaths = screens
+    .map((screen) => screen.screenshot ? resolve(screen.screenshot) : "")
+    .filter(Boolean);
+  const duplicateScreenshots = new Set(screenshotPaths).size !== screenshotPaths.length;
+  const screenshotHashes = screenshotPaths
+    .filter((path) => existsSync(path))
+    .map((path) => createHash("sha256").update(readFileSync(path)).digest("hex"));
+  const duplicateScreenshotContent = new Set(screenshotHashes).size !== screenshotHashes.length;
+  const androidNamedScreenshots = screenshotPaths.filter((path) => /(?:android|pixel)/i.test(basename(path)));
   return [
     ...(String(report.platform || "").toLowerCase() !== "ios" ? ["Report platform must be ios."] : []),
     ...(!report.simulator?.name && !report.device?.name ? ["Report needs a simulator or device target name."] : []),
+    ...(!report.sourceCommit ? ["Report needs the validated source commit."] : []),
+    ...(!report.appBundle || !existsSync(resolve(report.appBundle)) ? ["Report needs an existing iOS app bundle."] : []),
     ...(missingScreens.length ? [`Missing rendered screens: ${missingScreens.join(", ")}.`] : []),
     ...(missingScreenshots.length ? [`Missing screenshot evidence: ${missingScreenshots.join(", ")}.`] : []),
+    ...(duplicateScreenshots ? ["Plan, Nearby and Account must use distinct screenshot files."] : []),
+    ...(duplicateScreenshotContent ? ["Plan, Nearby and Account screenshots must contain distinct rendered evidence."] : []),
+    ...(androidNamedScreenshots.length ? ["iOS evidence cannot reference Android or Pixel-named screenshots."] : []),
     ...((report.failureLines || []).length ? [`Runtime failure lines were captured: ${report.failureLines.length}.`] : []),
   ];
 }

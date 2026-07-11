@@ -41,6 +41,12 @@ for (const check of checks) {
 }
 
 if (failed.length) {
+  const largestJavaScript = listFiles(path.join(root, "dist"))
+    .filter((file) => file.file.endsWith(".js"))
+    .sort((left, right) => right.size - left.size)
+    .slice(0, 5);
+  console.error("Largest JavaScript files:");
+  for (const file of largestJavaScript) console.error(`- ${formatBytes(file.size)} ${relative(file.file)}`);
   console.error(`${budgetLabel(scope)} failed: ${failed.map((check) => check.label).join(", ")}`);
   process.exit(1);
 }

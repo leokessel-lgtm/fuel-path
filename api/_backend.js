@@ -12,8 +12,11 @@ const {
   purgePredictionBacktests,
   setPredictionStorageForTests,
 } = require("./_predictionStorage");
-const { providerHealth, singleFlight } = require("./_providerRuntime");
+const { singleFlight } = require("./_providerRuntime");
 const { fetchJson } = require("./_providerHttp");
+const { createStationDecorator } = require("./_stationDiscounts");
+const { createStationProviderService } = require("./_stationProviderService");
+const { createStationProviderRegistry } = require("./_stationProviderRegistry");
 const {
   boolParam,
   methodAllowed,
@@ -57,7 +60,6 @@ const {
   pointInAct,
   pointInNt,
   pointInProviderCoverage,
-  pointInQld,
   pointInSa,
   pointInTas,
   pointInVic,
@@ -78,6 +80,7 @@ const { buildRoute, routeProviderStatus } = createRouting({
   fetchJson,
   googleRoutesApiKey,
 });
+const stationWithDiscountRules = createStationDecorator({ discountRules: DISCOUNT_RULES });
 const {
   loadLiveWaStations,
   normaliseWaFuelWatchPayloads,
@@ -105,6 +108,31 @@ const {
   normaliseNtReferencePayload,
 } = require("./_ntMyFuelProvider");
 const { loadLiveNtStations } = createMyFuelNtProvider({ decorateStation: stationWithDiscountRules });
+const productionRuntime = () => process.env.VERCEL_ENV === "production"
+  || process.env.NODE_ENV === "production"
+  || process.env.FUEL_PATH_PRODUCTION_HARDENING === "1";
+const { loadStationData } = createStationProviderService({
+  sampleStations: () => sample.sampleStations({ includeFixtureFallback: true }),
+  decorateStation: stationWithDiscountRules,
+  singleFlight,
+  liveProviderKeysForArea,
+  capabilitiesForPoints,
+  capabilityWarning,
+  primaryCapability,
+  pointInProviderCoverage,
+  hasAnyLiveCredentials,
+  termsConfirmed: {
+    qld: hasQldUsageTermsConfirmed,
+    nswAct: hasNswActUsageTermsConfirmed,
+    tas: hasTasUsageTermsConfirmed,
+  },
+  providerRegistry: createStationProviderRegistry({
+    loadLiveQldStations, loadLiveWaStations, loadLiveVicStations, loadLiveSaStations,
+    loadLiveNtStations, loadLiveStations, loadLiveTasStations,
+  }),
+  productionRuntime,
+  sampleSourceAllowed: () => process.env.FUEL_PATH_ALLOW_SAMPLE_SOURCE === "1" || !productionRuntime(),
+});
 const { geocode, geocodeProviderStatus } = createGeocoder({
   fetchJson,
   loadStationData,
@@ -133,15 +161,6 @@ const {
   scoreRoute,
 });
 
-function productionRuntime() {
-  return process.env.VERCEL_ENV === "production" || process.env.NODE_ENV === "production" || process.env.FUEL_PATH_PRODUCTION_HARDENING === "1";
-}
-
-function sampleSourceAllowed() {
-  if (process.env.FUEL_PATH_ALLOW_SAMPLE_SOURCE === "1") return true;
-  return !productionRuntime();
-}
-
 function cacheSeconds() {
   return Math.max(60, Number(process.env.FUEL_PATH_LIVE_CACHE_SECONDS || DEFAULT_CACHE_SECONDS));
 }
@@ -149,343 +168,6 @@ function cacheSeconds() {
 function round(value, decimals = 0) {
   const factor = 10 ** decimals;
   return Math.round(Number(value) * factor) / factor;
-}
-
-function stationBrandText(station) {
-  return `${station.brand || ""} ${station.name || ""}`.toLowerCase();
-}
-
-function stationWithDiscountRules(station) {
-  const byId = new Map();
-  for (const item of station.discounts || []) {
-    if (item?.id) byId.set(String(item.id), { ...item });
-  }
-  const text = stationBrandText(station);
-  for (const rule of DISCOUNT_RULES) {
-    if (!isActiveDirectDiscountRule(rule)) continue;
-    if (rule.brandIncludes.some((needle) => text.includes(needle))) {
-      byId.set(rule.id, {
-        id: rule.id,
-        label: rule.label,
-        centsPerLitre: rule.centsPerLitre,
-        fuelTypeCentsPerLitre: rule.fuelTypeCentsPerLitre,
-        maxLitresPerTransaction: rule.maxLitresPerTransaction,
-        maxTransactionsPer24h: rule.maxTransactionsPer24h,
-        excludedFuelTypes: rule.excludedFuelTypes,
-        excludedStates: rule.excludedStates,
-        includedStates: rule.includedStates,
-        notStackableWith: rule.notStackableWith,
-        requiresBarcode: rule.requiresBarcode,
-        participatingStationScope: rule.participatingStationScope,
-        sourceUrl: rule.sourceUrl,
-        inferred: true,
-      });
-    }
-  }
-  return { ...station, discounts: [...byId.values()] };
-}
-
-function isActiveDirectDiscountRule(rule) {
-  if (rule.discountType !== "direct_cpl") return false;
-  if (Number(rule.centsPerLitre || 0) <= 0) return false;
-  if (rule.nextReviewAt < todayIsoDate()) return false;
-  if (!rule.expiryDate) return true;
-  return rule.expiryDate >= todayIsoDate();
-}
-
-function todayIsoDate() {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function loadSampleStations() {
-  return sample.sampleStations({ includeFixtureFallback: true }).map(stationWithDiscountRules);
-}
-
-async function loadLiveStationsForArea({ forceRefresh = false, points = [], radiusKm = 0, providers: requestedProviders, fuels = [] } = {}) {
-  const providers = requestedProviders || liveProviderKeysForArea(points, radiusKm);
-  const regionCapabilities = capabilitiesForPoints(points);
-  if (!providers.length) {
-    return {
-      stations: [],
-      source: "unsupported_region",
-      provider: "unsupported_region",
-      capability: primaryCapability(regionCapabilities),
-      regionCapabilities,
-      cacheHit: false,
-      cacheAgeSeconds: 0,
-      cacheMode: "none",
-      degraded: false,
-      providerHealth: {},
-      warning: capabilityWarning(regionCapabilities),
-    };
-  }
-  const stations = [];
-  const loadedProviders = [];
-  const errors = [];
-  const warnings = [];
-  const providerHealthMap = {};
-  const cacheModes = new Set();
-  let cacheHit = true;
-  let maxCacheAgeSeconds = 0;
-  let degraded = false;
-
-  const providerResults = await Promise.all(
-    providers.map(async (provider) => {
-      try {
-        const result = await singleFlight(liveProviderFlightKey(provider, { forceRefresh, points, radiusKm, fuels }), async () => {
-          let live;
-          let loadedProvider = "";
-          if (provider === "qld") {
-            if (productionRuntime() && !hasQldUsageTermsConfirmed()) {
-              throw new Error("QLD Fuel Prices public usage, caching and attribution terms are not confirmed.");
-            }
-            live = await loadLiveQldStations({ forceRefresh });
-            loadedProvider = "api_qld";
-          } else if (provider === "wa") {
-            live = await loadLiveWaStations({ forceRefresh, points, radiusKm, fuels });
-            loadedProvider = "api_wa";
-          } else if (provider === "vic") {
-            live = await loadLiveVicStations({ forceRefresh });
-            loadedProvider = "api_vic";
-          } else if (provider === "sa") {
-            live = await loadLiveSaStations({ forceRefresh });
-            loadedProvider = "api_sa";
-          } else if (provider === "nt") {
-            live = await loadLiveNtStations({ forceRefresh, points, radiusKm, fuels });
-            loadedProvider = "api_nt";
-          } else if (provider === "nsw") {
-            if (productionRuntime() && !hasNswActUsageTermsConfirmed()) {
-              throw new Error("FuelCheck NSW/ACT public usage, caching and attribution terms are not confirmed.");
-            }
-            live = await loadLiveStations({ forceRefresh });
-            loadedProvider = "api_nsw";
-          } else if (provider === "tas") {
-            if (productionRuntime() && !hasTasUsageTermsConfirmed()) {
-              throw new Error("TAS FuelCheck public usage, caching and attribution terms are not confirmed.");
-            }
-            live = await loadLiveTasStations({ forceRefresh, points, radiusKm, fuels });
-            loadedProvider = "api_tas";
-          }
-          return { loadedProvider, live };
-        });
-        return { provider, loadedProvider: result.loadedProvider, live: result.live, error: "" };
-      } catch (error) {
-        return { provider, loadedProvider: "", live: null, error: error instanceof Error ? error.message : String(error) };
-      }
-    }),
-  );
-
-  for (const result of providerResults) {
-    const { provider, loadedProvider, live, error } = result;
-    if (error) {
-      errors.push(`${provider}: ${error}`);
-      providerHealthMap[provider] = {
-        status: "unavailable",
-        cacheMode: "none",
-        cacheAgeSeconds: null,
-        lastError: error,
-        warning: "",
-      };
-      cacheHit = false;
-      degraded = true;
-      continue;
-    }
-    try {
-      if (!live) continue;
-      if (loadedProvider) loadedProviders.push(loadedProvider);
-      stations.push(...live.stations);
-      Object.assign(providerHealthMap, live.providerHealth || {});
-      if (live.warning) warnings.push(live.warning);
-      if (live.cacheMode) cacheModes.add(live.cacheMode);
-      cacheHit = cacheHit && Boolean(live.cacheHit);
-      if (Number.isFinite(Number(live.cacheAgeSeconds))) {
-        maxCacheAgeSeconds = Math.max(maxCacheAgeSeconds, Number(live.cacheAgeSeconds));
-      }
-      degraded = degraded || Boolean(live.degraded || live.error || live.warning);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      errors.push(`${provider}: ${message}`);
-      providerHealthMap[provider] = {
-        status: "unavailable",
-        cacheMode: "none",
-        cacheAgeSeconds: null,
-        lastError: message,
-        warning: "",
-      };
-      cacheHit = false;
-      degraded = true;
-    }
-  }
-  if (!stations.length && !loadedProviders.length) throw new Error(errors.join("; ") || "Live prices are not available for this area yet.");
-  const byCode = new Map();
-  for (const station of stations) byCode.set(String(station.stationCode), station);
-  const cacheMode = cacheModes.has("stale") ? "stale" : cacheModes.has("refreshed") ? "refreshed" : cacheModes.has("fresh") ? "fresh" : "none";
-  return {
-    stations: [...byCode.values()],
-    source: loadedProviders.join("+") || "live",
-    provider: loadedProviders.join("+") || "live",
-    capability: primaryCapability(regionCapabilities),
-    regionCapabilities,
-    cacheHit,
-    cacheAgeSeconds: cacheHit ? maxCacheAgeSeconds : 0,
-    cacheMode,
-    degraded,
-    providerHealth: providerHealthMap,
-    warning: [...warnings, ...(errors.length ? ["Some live price sources are temporarily unavailable. Confirm prices before driving."] : [])].join(" "),
-  };
-}
-
-function liveProviderFlightKey(provider, { forceRefresh = false, points = [], radiusKm = 0, fuels = [] } = {}) {
-  const pointKey = (points || [])
-    .map((point) => `${Number(point.lat || 0).toFixed(2)},${Number(point.lon || 0).toFixed(2)}`)
-    .join("|");
-  const fuelKey = (fuels || []).map(String).sort().join(",");
-  return ["live-provider", provider, forceRefresh ? "refresh" : "cached", Math.round(Number(radiusKm || 0)), fuelKey, pointKey].join(":");
-}
-
-async function loadStationData({ requestedSource = "auto", forceRefresh = false, points = [], radiusKm = 0, fuels = [] } = {}) {
-  const source = resolveSource(requestedSource);
-  if (source === "sample") {
-    const regionCapabilities = capabilitiesForPoints(points);
-    if (!sampleSourceAllowed()) {
-      return {
-        source: "sample_disabled",
-        provider: "public_demo_snapshot",
-        capability: "fallback",
-        regionCapabilities,
-        stations: [],
-        cacheHit: false,
-        cacheAgeSeconds: null,
-        cacheMode: "disabled",
-        degraded: true,
-        providerHealth: {
-          sample: {
-            status: "disabled",
-            cacheMode: "disabled",
-            cacheAgeSeconds: null,
-            lastError: "",
-            warning: "Demo fallback is disabled in production.",
-          },
-        },
-        warning: "Demo fallback is disabled in production; no sample prices were returned.",
-      };
-    }
-    return {
-      source: "sample",
-      provider: "public_demo_snapshot",
-      capability: "fallback",
-      regionCapabilities,
-      stations: loadSampleStations(),
-      cacheHit: true,
-      cacheAgeSeconds: null,
-      cacheMode: "sample",
-      degraded: true,
-      providerHealth: {
-        sample: {
-          status: "degraded",
-          cacheMode: "sample",
-          cacheAgeSeconds: null,
-          lastError: "",
-          warning: "Demo data is not live fuel pricing.",
-        },
-      },
-      warning: points.length ? capabilityWarning(regionCapabilities.map((item) => ({ ...item, capability: "fallback" }))) : "",
-    };
-  }
-
-  const requestedProvider = providerFromSource(source);
-  if (requestedProvider && points.length && !points.some((point) => pointInProviderCoverage(requestedProvider, point))) {
-    const regionCapabilities = capabilitiesForPoints(points);
-    return {
-      stations: [],
-      source: "unsupported_region",
-      provider: requestedProvider,
-      capability: primaryCapability(regionCapabilities),
-      regionCapabilities,
-      cacheHit: false,
-      cacheAgeSeconds: 0,
-      cacheMode: "none",
-      degraded: true,
-      providerHealth: {
-        [requestedProvider]: {
-          status: "unsupported_region",
-          cacheMode: "none",
-          cacheAgeSeconds: null,
-          lastError: "",
-          warning: `Requested ${requestedProvider.toUpperCase()} fuel provider does not cover this area.`,
-        },
-      },
-      warning: `Requested ${requestedProvider.toUpperCase()} fuel provider does not cover this area.`,
-    };
-  }
-
-  try {
-    return await loadLiveStationsForArea({
-      forceRefresh,
-      points,
-      radiusKm,
-      fuels,
-      providers: requestedProvider ? [requestedProvider] : undefined,
-    });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    if (!sampleSourceAllowed()) {
-      return {
-        source: "live_unavailable",
-        provider: requestedProvider || "live",
-        capability: primaryCapability(capabilitiesForPoints(points)),
-        regionCapabilities: capabilitiesForPoints(points),
-        stations: [],
-        cacheHit: false,
-        cacheAgeSeconds: 0,
-        cacheMode: "none",
-        degraded: true,
-        providerHealth: {
-          [requestedProvider || "live"]: {
-            status: "unavailable",
-            cacheMode: "none",
-            cacheAgeSeconds: null,
-            lastError: message,
-            warning: "",
-          },
-        },
-        warning: `Live fuel provider unavailable: ${message}`,
-      };
-    }
-    return {
-      source: "sample_fallback",
-      provider: "public_demo_snapshot",
-      capability: "fallback",
-      regionCapabilities: capabilitiesForPoints(points),
-      stations: loadSampleStations(),
-      cacheHit: true,
-      cacheAgeSeconds: null,
-      cacheMode: "sample_fallback",
-      degraded: true,
-      providerHealth: {
-        sample: {
-          status: "degraded",
-          cacheMode: "sample_fallback",
-          cacheAgeSeconds: null,
-          lastError: message,
-          warning: "Live provider failed; serving demo fallback outside production.",
-        },
-      },
-      warning: `Live fuel provider unavailable: ${message}`,
-    };
-  }
-}
-
-function resolveSource(source) {
-  const value = source === "auto" || !source ? (hasAnyLiveCredentials() || !sampleSourceAllowed() ? "live" : "sample") : source;
-  if (!["live", "sample", "nsw", "qld", "wa", "vic", "sa", "tas", "nt"].includes(value)) {
-    throw new Error("source must be live, sample, nsw, qld, wa, vic, sa, tas, nt or auto");
-  }
-  return value;
-}
-
-function providerFromSource(source) {
-  return ["nsw", "qld", "wa", "vic", "sa", "tas", "nt"].includes(source) ? source : "";
 }
 
 function pointFromQuery(req, prefix) {

@@ -31,12 +31,12 @@ Defer broad road-trip mode, payment, cashback, partner integrations, EV charging
 Local evidence:
 
 - `PRODUCT-IDEAS.md`
-- `PROJECT-GOALS-ROADMAP.md`
+- `docs/00-product-vision/PROJECT-GOALS-ROADMAP.md`
 - `TODO.md`
-- `BACKLOG-EVIDENCE-MATRIX.md`
-- `VALIDATION-SYNTHESIS.md`
-- `VALIDATION-PASS-2026-06-14.md`
-- `SYNTHETIC-VALIDATION-SESSIONS.md`
+- `docs/04-validation-evidence/BACKLOG-EVIDENCE-MATRIX.md`
+- `docs/04-validation-evidence/VALIDATION-SYNTHESIS.md`
+- `docs/04-validation-evidence/VALIDATION-PASS-2026-06-14.md`
+- `docs/04-validation-evidence/SYNTHETIC-VALIDATION-SESSIONS.md`
 - `fuel-path-market-research.md`
 - `fuel-path-deep-international-research.md`
 - `FUEL-DISCOUNTS-AND-FLEET-CARDS.md`

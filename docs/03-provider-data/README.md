@@ -12,6 +12,7 @@ permission evidence. Do not infer release approval from technical availability.
 | Work on G-NAF | [`decisions/GNAF-NATIONAL-ADDRESS-INDEX.md`](decisions/GNAF-NATIONAL-ADDRESS-INDEX.md) | The specific hosting or benchmark evidence needed for the task |
 | Review the earlier API.NSW access work | [`evidence/historical/API-NSW-UNBLOCK-PLAN-2026-06-13.md`](evidence/historical/API-NSW-UNBLOCK-PLAN-2026-06-13.md) | Treat it as dated history, then verify current code and evidence |
 | Work on QLD or SA adapters | The matching note under [`implementation/`](implementation/) | Permission evidence remains under [`evidence/`](evidence/) |
+| Review cross-provider/store evidence | [`provider-store-readiness-summary-2026-07-05.md`](provider-store-readiness-summary-2026-07-05.md) | Verify its date against current runtime and release gates |
 
 ## Boundaries
 
@@ -41,6 +42,9 @@ These states are independent. Do not promote one state into another.
 
 `evidence/historical/` preserves superseded drafts and older reviews. They are
 audit history, not current proof.
+
+- `evidence/historical/gnaf/` contains dated hosting, storage and load evidence.
+- `evidence/historical/lookup-experiments/` contains dated address lookup experiments.
 
 ## Classification of detailed provider documents
 

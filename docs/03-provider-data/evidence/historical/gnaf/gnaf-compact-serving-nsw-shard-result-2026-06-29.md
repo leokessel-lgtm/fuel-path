@@ -11,7 +11,7 @@ The compact serving-index trial also hit the current Neon project size limit bef
 ## Command
 
 ```bash
-npm run load:gnaf-compact-postgres -- --input data/gnaf/raw/g-naf_may26_allstates_gda2020_psv_1023.zip --states NSW --reset --skip-indexes --allow-compact-state-shard --storage-review docs/gnaf-compact-serving-storage-review-2026-06-29.json --progress-json tmp/gnaf-compact-serving-load-NSW-shard-2026-06-29.json --run-id compact-NSW-shard-2026-06-29
+npm run load:gnaf-compact-postgres -- --input data/gnaf/raw/g-naf_may26_allstates_gda2020_psv_1023.zip --states NSW --reset --skip-indexes --allow-compact-state-shard --storage-review docs/03-provider-data/evidence/historical/gnaf/gnaf-compact-serving-storage-review-2026-06-29.json --progress-json tmp/gnaf-compact-serving-load-NSW-shard-2026-06-29.json --run-id compact-NSW-shard-2026-06-29
 ```
 
 ## Evidence

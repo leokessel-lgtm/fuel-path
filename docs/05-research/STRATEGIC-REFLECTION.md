@@ -365,7 +365,7 @@ Pause or pivot if:
 
 1. Rotate the API.NSW secret.
 2. Send `docs/03-provider-data/evidence/API-NSW-SUPPORT-NOTE.md`.
-3. Run validation sessions using `VALIDATION-DEMO-PACK.md`.
+3. Run validation sessions using `docs/04-validation-evidence/VALIDATION-DEMO-PACK.md`.
 4. Do not build new features until the first validation notes are captured.
 5. After validation, decide between:
    - mobile MVP design

@@ -3,7 +3,7 @@
   "decision": "neon_staged_validation_full_national_not_approved",
   "date": "2026-06-29",
   "target": "neon",
-  "sourceDocument": "docs/gnaf-hosted-storage-decision-2026-06-29.md",
+  "sourceDocument": "docs/03-provider-data/evidence/historical/gnaf/gnaf-hosted-storage-decision-2026-06-29.md",
   "currentEvidence": {
     "localSqliteGb": 41.83,
     "localRows": 16900638,
@@ -26,7 +26,7 @@
     "expectedRows": 5206855,
     "failure": "could not extend file because project size limit (512 MB) has been exceeded",
     "progressFile": "tmp/gnaf-raw-postgres-load-2026-06-29T02-52-32-960Z-NSW-shard.json",
-    "resultFile": "docs/gnaf-hosted-nsw-shard-load-result-2026-06-29.md"
+    "resultFile": "docs/03-provider-data/evidence/historical/gnaf/gnaf-hosted-nsw-shard-load-result-2026-06-29.md"
   },
   "rollback": {
     "status": "completed",

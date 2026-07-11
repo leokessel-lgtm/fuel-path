@@ -32,7 +32,7 @@
     "roadmap_first_orientation_comparator": [
       "AGENTS.md",
       "docs/README.md",
-      "PROJECT-GOALS-ROADMAP.md"
+      "docs/00-product-vision/PROJECT-GOALS-ROADMAP.md"
     ],
     "provider_task": [
       "AGENTS.md",
@@ -56,7 +56,7 @@
       "AGENTS.md",
       "api/AGENTS.md",
       "docs/01-architecture/scaling-model.md",
-      "PERFORMANCE-GUARDRAILS.md"
+      "docs/01-architecture/PERFORMANCE-GUARDRAILS.md"
     ],
     "mobile_plan_task": [
       "AGENTS.md",
@@ -67,7 +67,7 @@
       "AGENTS.md",
       "mobile-app/AGENTS.md",
       "docs/01-architecture/system-context.md",
-      "PERFORMANCE-GUARDRAILS.md"
+      "docs/01-architecture/PERFORMANCE-GUARDRAILS.md"
     ],
     "alerts_task": [
       "AGENTS.md",

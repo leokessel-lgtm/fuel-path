@@ -41,7 +41,7 @@ Why NSW:
 Command:
 
 ```bash
-npm run load:gnaf-raw-postgres -- --input data/gnaf/raw/g-naf_may26_allstates_gda2020_psv_1023.zip --states NSW --reset --skip-indexes --allow-state-shard --storage-review docs/gnaf-hosted-storage-review-2026-06-29.json --progress-json tmp/gnaf-raw-postgres-load-NSW-shard.json --run-id NSW-shard
+npm run load:gnaf-raw-postgres -- --input data/gnaf/raw/g-naf_may26_allstates_gda2020_psv_1023.zip --states NSW --reset --skip-indexes --allow-state-shard --storage-review docs/03-provider-data/evidence/historical/gnaf/gnaf-hosted-storage-review-2026-06-29.json --progress-json tmp/gnaf-raw-postgres-load-NSW-shard.json --run-id NSW-shard
 npm run load:gnaf-raw-postgres -- --setup-only --create-indexes
 npm run check:gnaf-hosted:readiness
 ```
@@ -128,7 +128,7 @@ The NSW shard load was attempted with the approved staged command and failed bef
 
 Evidence:
 
-- Result file: `docs/gnaf-hosted-nsw-shard-load-result-2026-06-29.md`
+- Result file: `docs/03-provider-data/evidence/historical/gnaf/gnaf-hosted-nsw-shard-load-result-2026-06-29.md`
 - Progress file: `tmp/gnaf-raw-postgres-load-2026-06-29T02-52-32-960Z-NSW-shard.json`
 - Rows loaded before failure: `1,655,000`
 - Error: `could not extend file because project size limit (512 MB) has been exceeded`
@@ -146,11 +146,11 @@ Decision:
 - Do not run national load.
 - Do not run hosted 900-case benchmark.
 - Do not immediately upgrade storage just to repeat the raw-table load.
-- Trial the compact serving index first: `docs/gnaf-compact-serving-index-plan-2026-06-29.md`.
+- Trial the compact serving index first: `docs/03-provider-data/evidence/historical/gnaf/gnaf-compact-serving-index-plan-2026-06-29.md`.
 - Fix storage tier or architecture only after compact NSW storage evidence is held.
 
 Compact result:
 
 - Compact NSW also failed on the current Neon project after `1,588,000` rows.
-- Result file: `docs/gnaf-compact-serving-nsw-shard-result-2026-06-29.md`
+- Result file: `docs/03-provider-data/evidence/historical/gnaf/gnaf-compact-serving-nsw-shard-result-2026-06-29.md`
 - The next action is storage architecture selection, not another load retry on the current target.

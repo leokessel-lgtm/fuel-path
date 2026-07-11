@@ -21,7 +21,7 @@ The NSW state-shard load was attempted and failed because the current Neon proje
 
 Evidence:
 
-- Result file: `docs/gnaf-hosted-nsw-shard-load-result-2026-06-29.md`
+- Result file: `docs/03-provider-data/evidence/historical/gnaf/gnaf-hosted-nsw-shard-load-result-2026-06-29.md`
 - Rows loaded before failure: `1,655,000`
 - Expected NSW rows: `5,206,855`
 - Failure: `could not extend file because project size limit (512 MB) has been exceeded`
@@ -34,7 +34,7 @@ Updated decision:
 - Public exact-address claims remain blocked.
 - Next storage decision must approve a larger Neon tier or a replacement architecture before another hosted write attempt.
 - The failed partial shard load was rolled back to the indexed 80,000-row preview posture.
-- Recommended next step is not an immediate paid upgrade. Build and trial the compact serving index documented in `docs/gnaf-compact-serving-index-plan-2026-06-29.md`.
+- Recommended next step is not an immediate paid upgrade. Build and trial the compact serving index documented in `docs/03-provider-data/evidence/historical/gnaf/gnaf-compact-serving-index-plan-2026-06-29.md`.
 - Compact serving-index NSW trial also failed on the current Neon project limit after `1,588,000` rows. Current target should not be retried for hosted G-NAF without a storage tier or architecture change.
 
 ## Current evidence

@@ -137,7 +137,7 @@ This includes:
 - native map performance
 - binary-size and startup-time baselines before store release
 
-Performance is a release metric, not a polish task. See `PERFORMANCE-GUARDRAILS.md`.
+Performance is a release metric, not a polish task. See `../01-architecture/PERFORMANCE-GUARDRAILS.md`.
 
 ### Goal 4: Prediction And Cycle Guidance
 
@@ -774,7 +774,7 @@ Applied map-first design-system pass:
 - removed visible route-status text from Plan
 - tightened native-app typography and introduced a primary fuel-green brand colour
 - added supermarket and toll organisation wallet options, including Linkt Rewards, Linkt bonus and E-Toll context
-- captured the design direction in `DESIGN-SYSTEM.md`
+- captured the design direction in `../06-design-brand/DESIGN-SYSTEM.md`
 
 Added map camera and interaction confidence as a Goal 1 objective after research into Google Maps, Uber, Mapbox, Waze and Apple Maps patterns:
 
@@ -807,4 +807,4 @@ Added performance as a standing product goal:
 - capped saved commutes at 20 routes until user research proves a higher limit
 - kept heavy alert intelligence positioned for backend push rather than phone-side polling
 
-See `VALIDATION-PASS-2026-06-14.md`.
+See `../04-validation-evidence/VALIDATION-PASS-2026-06-14.md`.

@@ -14,7 +14,7 @@ The compact NSW trial also failed on the current Neon project size limit.
 
 Evidence:
 
-- Result file: `docs/gnaf-compact-serving-nsw-shard-result-2026-06-29.md`
+- Result file: `docs/03-provider-data/evidence/historical/gnaf/gnaf-compact-serving-nsw-shard-result-2026-06-29.md`
 - Progress file: `tmp/gnaf-compact-serving-load-NSW-shard-2026-06-29.json`
 - Rows loaded before failure: `1,588,000`
 - Error: `could not extend file because project size limit (512 MB) has been exceeded`
@@ -67,7 +67,7 @@ Upgrading before compacting risks paying for a database shape we already know is
 Run a compact NSW shard trial only:
 
 ```bash
-npm run load:gnaf-compact-postgres -- --input data/gnaf/raw/g-naf_may26_allstates_gda2020_psv_1023.zip --states NSW --reset --skip-indexes --allow-compact-state-shard --storage-review docs/gnaf-compact-serving-storage-review-2026-06-29.json --progress-json tmp/gnaf-compact-serving-load-NSW-shard.json --run-id compact-NSW-shard
+npm run load:gnaf-compact-postgres -- --input data/gnaf/raw/g-naf_may26_allstates_gda2020_psv_1023.zip --states NSW --reset --skip-indexes --allow-compact-state-shard --storage-review docs/03-provider-data/evidence/historical/gnaf/gnaf-compact-serving-storage-review-2026-06-29.json --progress-json tmp/gnaf-compact-serving-load-NSW-shard.json --run-id compact-NSW-shard
 npm run load:gnaf-compact-postgres -- --setup-only --create-indexes
 ```
 

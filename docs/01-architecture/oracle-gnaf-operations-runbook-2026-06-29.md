@@ -6,7 +6,7 @@ Date: 2026-06-29
 
 This runbook covers the non-blocking operational work around the live Oracle-hosted G-NAF service.
 
-It does not replace the readiness gates in `docs/oracle-gnaf-live-architecture-2026-06-29.md`. Those gates remain the source of truth for whether production can make exact-address lookup claims.
+It does not replace the readiness gates in `docs/01-architecture/oracle-gnaf-live-architecture-2026-06-29.md`. Those gates remain the source of truth for whether production can make exact-address lookup claims.
 
 ## Current operating posture
 

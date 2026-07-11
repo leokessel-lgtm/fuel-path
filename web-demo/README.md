@@ -152,5 +152,5 @@ This is still a local prototype. Confirm API.NSW usage rights, caching rules, at
 
 Use:
 
-- `VALIDATION-DEMO-PACK.md`
+- `docs/04-validation-evidence/VALIDATION-DEMO-PACK.md`
 - `../docs/03-provider-data/evidence/API-NSW-SUPPORT-NOTE.md`

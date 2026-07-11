@@ -43,8 +43,8 @@ Files in scope:
 
 - `.gitignore`
 - `README.md`
-- `docs/stabilisation-cut-2026-06-21.md`
-- `docs/repo-change-split-2026-06-21.md`
+- `docs/04-validation-evidence/historical/stabilisation-cut-2026-06-21.md`
+- `docs/archive/repository/repo-change-split-2026-06-21.md`
 - `mobile-app/NATIVE-VALIDATION.md`
 - `web-demo/README.md`
 - `web-demo/app.js`

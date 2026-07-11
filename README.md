@@ -46,8 +46,8 @@ http://localhost:4175/web-demo/
 
 The web demo is still useful for route, price-marker and provider validation, but it is not the latest app shell.
 
-Stabilisation notes live in `docs/stabilisation-cut-2026-06-21.md`.
-The current repo split between stabilisation, backlog and generated artefacts is recorded in `docs/repo-change-split-2026-06-21.md`.
+Historical stabilisation notes live in `docs/04-validation-evidence/historical/stabilisation-cut-2026-06-21.md`.
+The historical repo split between stabilisation, backlog and generated artefacts is recorded in `docs/archive/repository/repo-change-split-2026-06-21.md`.
 
 ## Local Run
 

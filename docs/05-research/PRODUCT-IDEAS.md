@@ -36,7 +36,7 @@ The project is now anchored on four differentiators:
 3. **Smart Saved-Route Alerts:** prompt users around saved routes, timing, tank context and valid price signals.
 4. **Prediction And Cycle Guidance:** show timing guidance only where it is evidence-gated and back-tested.
 
-The active build priority is Goal 1 as a national capability. See [Project goals and roadmap](../../PROJECT-GOALS-ROADMAP.md).
+The active build priority is Goal 1 as a national capability. See [Project goals and roadmap](../00-product-vision/PROJECT-GOALS-ROADMAP.md).
 
 ## Adopted Build Direction
 
@@ -488,7 +488,7 @@ The Plan Trip screen should stay compact and action-led:
 
 ## Evidence Links
 
-- [Project goals and roadmap](../../PROJECT-GOALS-ROADMAP.md)
+- [Project goals and roadmap](../00-product-vision/PROJECT-GOALS-ROADMAP.md)
 - [Market research](fuel-path-market-research.md)
 - [Deep international research](fuel-path-deep-international-research.md)
 - [Fuel price cycle research](fuel-price-cycle-research.md)

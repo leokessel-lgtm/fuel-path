@@ -15,19 +15,22 @@ For the complete document classification and move backlog, see
 | Work on provider integrations or access | [`03-provider-data/README.md`](03-provider-data/README.md) | Open only the relevant provider decision, implementation note or evidence file |
 | Assess beta or store readiness | [`02-build-release/CURRENT-RELEASE-DECISION.md`](02-build-release/CURRENT-RELEASE-DECISION.md) and [`02-build-release/STORE-READINESS-PLAN.md`](02-build-release/STORE-READINESS-PLAN.md) | Dated store, support, native and provider evidence |
 | Work on the mobile app | [`mobile-app/README.md`](../mobile-app/README.md) and [`mobile-app/AGENTS.md`](../mobile-app/AGENTS.md) | [`mobile-app/NATIVE-VALIDATION.md`](../mobile-app/NATIVE-VALIDATION.md) when validation state matters |
-| Plan validation sessions | [`VALIDATION-SESSION-WORKBOOK.md`](../VALIDATION-SESSION-WORKBOOK.md) | Recruitment, demo and synthesis documents only for that workflow |
+| Plan validation sessions | [`04-validation-evidence/VALIDATION-SESSION-WORKBOOK.md`](04-validation-evidence/VALIDATION-SESSION-WORKBOOK.md) | Recruitment, demo and synthesis documents only for that workflow |
 | Run or change tests | [`02-build-release/NATIONAL-TESTING-REGIME.md`](02-build-release/NATIONAL-TESTING-REGIME.md) | The closest test file and package script for the changed subsystem |
-| Review architecture or performance | [`backend-hosting-v1.md`](backend-hosting-v1.md) or [`PERFORMANCE-GUARDRAILS.md`](../PERFORMANCE-GUARDRAILS.md), depending on scope | Dated benchmarks only when the claim needs evidence |
+| Review architecture or performance | [`01-architecture/backend-hosting-v1.md`](01-architecture/backend-hosting-v1.md) or [`01-architecture/PERFORMANCE-GUARDRAILS.md`](01-architecture/PERFORMANCE-GUARDRAILS.md), depending on scope | Dated benchmarks only when the claim needs evidence |
 | Understand or refactor runtime boundaries | [`01-architecture/README.md`](01-architecture/README.md) | The closest handler, module and regression tests only |
 
 ## Folder map
 
 ```text
 docs/
+  00-product-vision/       product goals and roadmap framing
   01-architecture/         runtime boundaries, data flow, scaling and refactor map
   02-build-release/        current build, testing, support and release gates
   03-provider-data/        provider decisions, implementation and evidence
+  04-validation-evidence/ validation plans, workbooks, synthesis and evidence gates
   05-research/             research, strategy and product learning
+  06-design-brand/         production design system, typography and UX methods
   brand-concepts/          exploratory brand concepts, not production assets
   evidence/                current generated evidence not yet grouped by topic
   templates/               blank and sample artefacts, never proof by themselves

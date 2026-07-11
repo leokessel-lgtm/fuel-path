@@ -53,7 +53,7 @@ Not allowed:
 Use this pack for recruited-driver testing:
 
 ```text
-docs/route-output-benchmark-user-testing-2026-07-03.md
+docs/04-validation-evidence/historical/route-output-benchmark-user-testing-2026-07-03.md
 ```
 
 Use this JSON shape for the gate input:

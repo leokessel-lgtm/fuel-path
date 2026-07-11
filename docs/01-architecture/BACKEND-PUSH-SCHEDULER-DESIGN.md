@@ -97,11 +97,15 @@ Send through Expo Push Service first, because the mobile app already uses Expo N
 
 Backend should:
 
+- require both the global delivery gate and an explicit internal-beta user allowlist before normal delivery
 - chunk notifications
 - persist push tickets
 - check receipts after the recommended delay
 - mark invalid tokens inactive
 - retry only transient failures
+
+The validation-only delivery path must not inherit or update a saved route's normal alert cooldown.
+On Vercel Hobby, cron jobs are limited to daily cadence. A 5 to 15 minute commuter-alert schedule therefore requires an approved Vercel Pro upgrade or an approved external scheduler before normal delivery can be considered operationally ready.
 
 ### 5. Suppression
 

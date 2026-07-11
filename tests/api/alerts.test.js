@@ -644,8 +644,10 @@ test("scheduled evaluator keeps a saved route quiet for 72 hours after an alert"
 test("Expo push delivery persists tickets only when delivery gate is enabled", async () => {
   const originalToken = process.env.ALERTS_WRITE_TOKEN;
   const originalDelivery = process.env.EXPO_PUSH_DELIVERY_ENABLED;
+  const originalAllowlist = process.env.EXPO_PUSH_BETA_USER_IDS;
   process.env.ALERTS_WRITE_TOKEN = "alert-token";
   process.env.EXPO_PUSH_DELIVERY_ENABLED = "1";
+  process.env.EXPO_PUSH_BETA_USER_IDS = route.userId;
   const store = memoryDurableStore();
   setAlertStorageForTests(store);
   setExpoPushClientForTests({
@@ -693,6 +695,8 @@ test("Expo push delivery persists tickets only when delivery gate is enabled", a
     else process.env.ALERTS_WRITE_TOKEN = originalToken;
     if (originalDelivery === undefined) delete process.env.EXPO_PUSH_DELIVERY_ENABLED;
     else process.env.EXPO_PUSH_DELIVERY_ENABLED = originalDelivery;
+    if (originalAllowlist === undefined) delete process.env.EXPO_PUSH_BETA_USER_IDS;
+    else process.env.EXPO_PUSH_BETA_USER_IDS = originalAllowlist;
   }
 });
 
@@ -734,6 +738,7 @@ test("validation delivery sends to one stored device without enabling global pus
     assert.equal(accepted.payload.ticketAccepted, true);
     assert.equal(sentMessages.length, 1);
     assert.equal(sentMessages[0].to, device.expoPushToken);
+    assert.equal(store.routes[0].lastAlertSentAt, undefined);
     assert.equal(process.env.EXPO_PUSH_DELIVERY_ENABLED, undefined);
   } finally {
     setAlertStorageForTests(null);
@@ -750,8 +755,10 @@ test("validation delivery sends to one stored device without enabling global pus
 test("scheduled evaluator is idempotent across cron overlap and retry", async () => {
   const originalCron = process.env.CRON_SECRET;
   const originalDelivery = process.env.EXPO_PUSH_DELIVERY_ENABLED;
+  const originalAllowlist = process.env.EXPO_PUSH_BETA_USER_IDS;
   process.env.CRON_SECRET = "cron-token";
   process.env.EXPO_PUSH_DELIVERY_ENABLED = "1";
+  process.env.EXPO_PUSH_BETA_USER_IDS = route.userId;
   const store = memoryDurableStore();
   let sendCount = 0;
   setAlertStorageForTests(store);
@@ -807,6 +814,8 @@ test("scheduled evaluator is idempotent across cron overlap and retry", async ()
     else process.env.CRON_SECRET = originalCron;
     if (originalDelivery === undefined) delete process.env.EXPO_PUSH_DELIVERY_ENABLED;
     else process.env.EXPO_PUSH_DELIVERY_ENABLED = originalDelivery;
+    if (originalAllowlist === undefined) delete process.env.EXPO_PUSH_BETA_USER_IDS;
+    else process.env.EXPO_PUSH_BETA_USER_IDS = originalAllowlist;
   }
 });
 

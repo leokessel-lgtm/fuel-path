@@ -104,8 +104,13 @@ function createAlertOrchestration({ buildRoute, capabilitiesForPoints, loadStati
     };
   }
 
-  function alertPushDeliveryEnabled() {
-    return process.env.EXPO_PUSH_DELIVERY_ENABLED === "1";
+  function alertPushDeliveryEnabled(userId = "") {
+    if (process.env.EXPO_PUSH_DELIVERY_ENABLED !== "1") return false;
+    const allowedUserIds = String(process.env.EXPO_PUSH_BETA_USER_IDS || "")
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean);
+    return userId ? allowedUserIds.includes(userId) : allowedUserIds.length > 0;
   }
 
   async function alertCycleSignalStatus() {
@@ -327,7 +332,7 @@ function createAlertOrchestration({ buildRoute, capabilitiesForPoints, loadStati
     assertDurableAlertStorage();
     const route = normaliseBackendSavedRoute(input.route || input);
     const devices = input.devices || (await listPushDevices({ userId: route.userId, status: "active", limit: 20 }));
-    const pushDeliveryEnabled = alertPushDeliveryEnabled();
+    const pushDeliveryEnabled = alertPushDeliveryEnabled(route.userId);
     const evaluation = buildSavedRouteAlertEvaluation({
       route,
       devices,
@@ -372,8 +377,9 @@ function createAlertOrchestration({ buildRoute, capabilitiesForPoints, loadStati
       return { accepted: false, deliveryStatus: "validation_target_not_found" };
     }
     const now = new Date().toISOString();
+    const validationRoute = { ...route, lastAlertSentAt: "" };
     const evaluation = buildSavedRouteAlertEvaluation({
-      route,
+      route: validationRoute,
       devices: [device],
       candidate: {
         stationCode: "validation-only",
@@ -395,7 +401,13 @@ function createAlertOrchestration({ buildRoute, capabilitiesForPoints, loadStati
     if (recordedEvaluation?._alreadyRecorded) {
       return { accepted: false, deliveryStatus: "skipped_duplicate_evaluation" };
     }
-    const delivery = await deliverSavedRouteAlert({ route, devices: [device], evaluation, pushDeliveryEnabled: true });
+    const delivery = await deliverSavedRouteAlert({
+      route: validationRoute,
+      devices: [device],
+      evaluation,
+      pushDeliveryEnabled: true,
+      recordLastAlert: false,
+    });
     return {
       accepted: delivery.deliveryStatus === "sent_to_expo",
       deliveryStatus: delivery.deliveryStatus,
@@ -404,7 +416,13 @@ function createAlertOrchestration({ buildRoute, capabilitiesForPoints, loadStati
     };
   }
 
-  async function deliverSavedRouteAlert({ route, devices = [], evaluation, pushDeliveryEnabled } = {}) {
+  async function deliverSavedRouteAlert({
+    route,
+    devices = [],
+    evaluation,
+    pushDeliveryEnabled,
+    recordLastAlert = true,
+  } = {}) {
     if (evaluation.status !== "send_alert") return { deliveryStatus: "not_applicable" };
     if (!pushDeliveryEnabled) return { deliveryStatus: "not_sent_push_provider_disabled" };
 
@@ -447,7 +465,7 @@ function createAlertOrchestration({ buildRoute, capabilitiesForPoints, loadStati
       const pushTicketId = okTickets.map((ticket) => ticket.id).join(",");
       evaluation.pushTicketId = pushTicketId;
       await updateRouteAlertDelivery({ evaluationId: evaluation.id, pushTicketId });
-      await updateSavedRouteLastAlert(route.id, evaluation.evaluatedAt);
+      if (recordLastAlert) await updateSavedRouteLastAlert(route.id, evaluation.evaluatedAt);
       return { deliveryStatus: "sent_to_expo", pushTickets: tickets };
     } catch (error) {
       await updateRouteAlertDelivery({

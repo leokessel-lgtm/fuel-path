@@ -24,6 +24,10 @@
       "schedule": "0 21 * * *"
     },
     {
+      "path": "/api/internal/jobs/check-push-receipts",
+      "schedule": "30 21 * * *"
+    },
+    {
       "path": "/api/cron/geocode-health",
       "schedule": "0 7 * * *"
     },

@@ -3,14 +3,14 @@ const { readFileSync } = require("node:fs");
 const { join } = require("node:path");
 const test = require("node:test");
 
-const repoRoot = process.cwd();
+const repoRoot = join(__dirname, "../..");
 const hookSource = readFileSync(
   join(repoRoot, "mobile-app/src/hooks/useRouteAddressSuggestions.ts"),
   "utf8",
 );
-const planScreenSource = readFileSync(
-  join(repoRoot, "mobile-app/src/screens/PlanScreen.tsx"),
-  "utf8",
+const planScreenSource = readScreenSource(
+  "mobile-app/src/screens/PlanScreen.tsx",
+  "mobile-app/src/screens/PlanScreen.viewmodel.tsx",
 );
 
 test("Plan autocomplete keeps provider sessions field-scoped and commit-bounded", () => {
@@ -27,3 +27,12 @@ test("Plan autocomplete keeps provider sessions field-scoped and commit-bounded"
   assert.match(planScreenSource, /resetAddressSessionToken\("from"\);[\s\S]*resetAddressSessionToken\("to"\);/);
   assert.match(planScreenSource, /resetAddressSessionToken\(field\)/);
 });
+
+function readScreenSource(defaultPath, viewModelPath) {
+  try {
+    return readFileSync(join(repoRoot, viewModelPath), "utf8");
+  } catch (error) {
+    if (error?.code !== "ENOENT") throw error;
+    return readFileSync(join(repoRoot, defaultPath), "utf8");
+  }
+}

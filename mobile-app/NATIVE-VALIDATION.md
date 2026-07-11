@@ -54,6 +54,26 @@ The key should be restricted to:
 
 ## Local Preflight
 
+### Clean-worktree verification
+
+Generated `android/` and `ios/` folders are intentionally ignored. Routine
+`npm test` validates tracked Expo configuration and
+`native-generation-contract.json` rather than requiring generated native files.
+It also runs mobile source-contract tests from either the repository root or
+`mobile-app/`.
+
+Run the non-strict preflight before generating native projects:
+
+```sh
+node scripts/native-validation-preflight.mjs
+```
+
+An absent generated Android Gradle wrapper is a warning in non-strict source
+verification. Strict preflight remains fail-closed and requires the generated
+wrapper, native environment values and device-build configuration. Run Expo
+prebuild or the intended EAS build preparation before strict native validation.
+Neither clean-worktree tests nor non-strict preflight are device evidence.
+
 From `mobile-app/`, the plain preflight command uses the EAS preview environment because the alert capability secret and Android Maps key are stored as sensitive EAS variables:
 
 ```sh

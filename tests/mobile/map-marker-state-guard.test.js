@@ -3,7 +3,7 @@ const { readFileSync } = require("node:fs");
 const { join } = require("node:path");
 const test = require("node:test");
 
-const repoRoot = process.cwd();
+const repoRoot = join(__dirname, "../..");
 const nativeMapSource = readFileSync(
   join(repoRoot, "mobile-app/src/components/StationMap.tsx"),
   "utf8",

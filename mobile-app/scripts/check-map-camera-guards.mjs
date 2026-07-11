@@ -71,6 +71,8 @@ const currentLocation = read("src/services/currentLocation.ts");
 const pricing = read("src/utils/pricing.ts");
 const decisionEvidence = read("src/utils/decisionEvidence.ts");
 const packageJson = read("package.json");
+const appConfig = JSON.parse(read("app.json"));
+const nativeGenerationContract = JSON.parse(read("native-generation-contract.json"));
 const planFieldSmoke = read("scripts/smoke-plan-fields.mjs");
 const nativeApiContracts = read("scripts/check-native-api-contracts.mjs");
 const androidMapSmoke = read("scripts/native-android-map-smoke.mjs");
@@ -88,8 +90,6 @@ const androidMapsKeyFix = read("scripts/android-maps-key-fix-packet.mjs");
 const nativeValidationPreflight = read("scripts/native-validation-preflight.mjs");
 const nativeMapGeocodeParity = read("scripts/native-map-geocode-parity-check.mjs");
 const nativeEvidenceAudit = read("scripts/native-current-evidence-audit.mjs");
-const gradleWrapper = read("android/gradle/wrapper/gradle-wrapper.properties");
-const iosInfoPlist = read("ios/FuelPath/Info.plist");
 const routeScoring = read("../api/_routeScoring.js");
 
 const checks = [
@@ -706,9 +706,8 @@ const checks = [
       nearbyScreenUtils.includes("comgooglemapsurl://${googleMapsUrl.replace") &&
       nearbyScreenUtils.includes('Linking.canOpenURL("waze://")') &&
       nearbyScreenUtils.includes("https://waze.com/ul?ll=${safeLat},${safeLon}&navigate=yes&utm_source=fuelpath") &&
-      iosInfoPlist.includes("<key>LSApplicationQueriesSchemes</key>") &&
-      iosInfoPlist.includes("<string>comgooglemapsurl</string>") &&
-      iosInfoPlist.includes("<string>waze</string>"),
+      appConfig.expo.ios.infoPlist.LSApplicationQueriesSchemes.includes("comgooglemapsurl") &&
+      appConfig.expo.ios.infoPlist.LSApplicationQueriesSchemes.includes("waze"),
   },
   {
     label: "plan returns to recommended stop after alternative detail",
@@ -1461,8 +1460,9 @@ const checks = [
   {
     label: "Android Gradle wrapper avoids current React Native Gradle 9 toolchain break",
     ok:
-      gradleWrapper.includes("gradle-8.14.3-bin.zip") &&
-      nativeValidationPreflight.includes("Android Gradle wrapper stays on Expo-compatible Gradle 8") &&
+      nativeGenerationContract.android.supportedGradleMajor === 8 &&
+      nativeValidationPreflight.includes("Tracked native generation contract requires Expo-compatible Gradle 8") &&
+      nativeValidationPreflight.includes("Generated Android Gradle wrapper is available and matches the tracked contract") &&
       nativeValidationPreflight.includes("Gradle 9 currently breaks the React Native toolchain resolver") &&
       nativeValidationPreflight.includes("androidGradleWrapperIsCompatible"),
   },

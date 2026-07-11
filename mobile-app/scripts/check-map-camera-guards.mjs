@@ -42,6 +42,10 @@ const nearbyResults = read("src/hooks/useNearbyResults.ts");
 const stationBrandFilterPill = read("src/components/StationBrandFilterPill.tsx");
 const stationBrandFilterOverride = read("src/hooks/useStationBrandFilterOverride.ts");
 const planScreen = readScreenSource("src/screens/PlanScreen.tsx", "src/screens/PlanScreen.viewmodel.tsx");
+const beginAddressFieldSelectionSource = planScreen.slice(
+  planScreen.indexOf("const beginAddressFieldSelection"),
+  planScreen.indexOf("const handleAddressFieldBlur"),
+);
 const planRouteState = read("src/screens/PlanScreen.routeState.ts");
 const planScreenUtils = read("src/screens/PlanScreen.utils.ts");
 const accountScreen = read("src/screens/AccountScreen.tsx");
@@ -1078,6 +1082,16 @@ const checks = [
       fuelPathApi.includes('point.sourceLabel === "Needs confirmation"') &&
       fuelPathApi.includes('point.sourceLabel === "Street/road"') &&
       fuelPathApi.includes('point.sourceLabel === "Suburb/area"'),
+  },
+  {
+    label: "Plan address suggestion press does not rerender before selection",
+    ok:
+      planScreen.includes('const beginAddressFieldSelection = (field: "from" | "to") => {') &&
+      !beginAddressFieldSelectionSource.includes("markRouteEdited()") &&
+      !beginAddressFieldSelectionSource.includes("setActiveAddressField(field)") &&
+      !beginAddressFieldSelectionSource.includes("reopenRouteEditor()") &&
+      routeAddressSuggestions.includes("onPressIn={onSelectStart}") &&
+      routeAddressSuggestions.includes("onPress={() => onSelect(point)}"),
   },
   {
     label: "plan field browser smoke covers rendered precision states",

@@ -25,10 +25,8 @@ const {
 } = require("./_geocodeQuotaStorage");
 const { REGION_ORDER } = require("./_capabilities");
 const { regionalLocalGeocode } = require("./_regionalGeocodeHints");
+const { createGeocodeCache } = require("./_geocodeCache");
 
-const GEOCODE_CACHE_SECONDS = 60 * 60 * 6;
-const GEOCODE_DEGRADED_CACHE_SECONDS = 60;
-const GEOCODE_CACHE_MAX_ENTRIES = 500;
 const NOMINATIM_RATE_LIMIT_BACKOFF_MS = 60 * 1000;
 
 function createGeocoder({ fetchJson, loadStationData }) {
@@ -266,7 +264,7 @@ function createGeocoder({ fetchJson, loadStationData }) {
 
   const ALL_LOCAL_GEOCODE_HINTS = [...LOCAL_GEOCODE_HINTS, ...additionalLocalGeocodeHints()];
   const LIVE_GEOCODE_REGION_CODES = ["NSW", "ACT", "QLD", "WA", "SA"];
-  const geocodeCache = new Map();
+  const geocodeCache = createGeocodeCache();
   let nominatimBlockedUntilMs = 0;
 
   const STREET_QUERY_PATTERN = /^(.+\b(?:street|st|road|rd|avenue|ave|drive|dr|parade|pde|place|pl|lane|ln|way|crescent|cres)\b)\b.*$/i;
@@ -1428,36 +1426,11 @@ function createGeocoder({ fetchJson, loadStationData }) {
   }
 
   function readGeocodeCache(key) {
-    const entry = geocodeCache.get(key);
-    if (!entry) return null;
-    if (Date.now() > entry.expiresAt) {
-      geocodeCache.delete(key);
-      return null;
-    }
-    return entry.payload;
+    return geocodeCache.read(key);
   }
 
   function writeGeocodeCache(key, payload, durable) {
-    geocodeCache.set(key, {
-      expiresAt: Date.now() + (durable ? GEOCODE_CACHE_SECONDS : GEOCODE_DEGRADED_CACHE_SECONDS) * 1000,
-      payload,
-    });
-    trimGeocodeCache();
-  }
-
-  function trimGeocodeCache() {
-    const maxEntries = geocodeCacheMaxEntries();
-    while (geocodeCache.size > maxEntries) {
-      const oldestKey = geocodeCache.keys().next().value;
-      if (!oldestKey) break;
-      geocodeCache.delete(oldestKey);
-    }
-  }
-
-  function geocodeCacheMaxEntries() {
-    const parsed = Number(process.env.FUEL_PATH_GEOCODE_CACHE_MAX_ENTRIES);
-    if (!Number.isFinite(parsed)) return GEOCODE_CACHE_MAX_ENTRIES;
-    return Math.max(1, Math.min(5000, Math.round(parsed)));
+    geocodeCache.write(key, payload, durable);
   }
 
   function geocodeCacheMode(lookupStatus) {

@@ -14,6 +14,8 @@ const {
 } = require("./_predictionStorage");
 const { singleFlight } = require("./_providerRuntime");
 const { fetchJson } = require("./_providerHttp");
+const { tokenAuthorised, tokenSecurity } = require("./_securityPolicy");
+const { createRetentionService } = require("./_retentionService");
 const { createStationDecorator } = require("./_stationDiscounts");
 const { createStationProviderService } = require("./_stationProviderService");
 const { createStationProviderRegistry } = require("./_stationProviderRegistry");
@@ -70,12 +72,6 @@ const { createRouting } = require("./_routing");
 
 const DEFAULT_CACHE_SECONDS = 300;
 const PREDICTION_BACKTEST_MAX_RECORDS = 500;
-const RETENTION_DEFAULTS = {
-  inactiveDeviceDays: 90,
-  disabledRouteDays: 90,
-  alertEvaluationDays: 180,
-  predictionBacktestDays: 365,
-};
 const { buildRoute, routeProviderStatus } = createRouting({
   fetchJson,
   googleRoutesApiKey,
@@ -162,6 +158,11 @@ const {
   loadStationData,
   predictionStatus,
   scoreRoute,
+});
+const { retentionCleanupAuthorised, runRetentionCleanup } = createRetentionService({
+  purgeAlertRetention,
+  purgePredictionBacktests,
+  cronAuthorised,
 });
 
 function cacheSeconds() {
@@ -1049,75 +1050,19 @@ async function listPredictionBacktests({ region = "", fuel = "", limit = 50 } = 
 }
 
 function predictionWriteSecurity() {
-  const tokenConfigured = Boolean(process.env.PREDICTION_BACKTEST_WRITE_TOKEN);
   const storage = predictionStorageStatus({ maxRecords: PREDICTION_BACKTEST_MAX_RECORDS });
-  const tokenRequired = tokenConfigured || Boolean(storage.durable);
-  return {
-    tokenConfigured,
-    tokenRequired,
-    writeEnabled: !tokenRequired || tokenConfigured,
-    acceptedHeaders: ["Authorization: Bearer <token>", "X-Fuel-Path-Prediction-Token"],
-  };
+  return tokenSecurity({
+    expected: process.env.PREDICTION_BACKTEST_WRITE_TOKEN,
+    storageDurable: storage.durable,
+    directHeader: "X-Fuel-Path-Prediction-Token",
+  });
 }
 
 function predictionWriteAuthorised(req = {}) {
   const security = predictionWriteSecurity();
   if (!security.tokenRequired) return true;
   if (!security.tokenConfigured) return false;
-  const expected = process.env.PREDICTION_BACKTEST_WRITE_TOKEN;
-  const headers = req.headers || {};
-  const auth = headers.authorization || headers.Authorization || "";
-  const direct = headers["x-fuel-path-prediction-token"] || headers["X-Fuel-Path-Prediction-Token"] || "";
-  const bearer = String(auth).replace(/^Bearer\s+/i, "").trim();
-  return bearer === expected || String(direct).trim() === expected;
-}
-
-async function runRetentionCleanup({
-  now = new Date().toISOString(),
-  dryRun = false,
-  inactiveDeviceDays = RETENTION_DEFAULTS.inactiveDeviceDays,
-  disabledRouteDays = RETENTION_DEFAULTS.disabledRouteDays,
-  alertEvaluationDays = RETENTION_DEFAULTS.alertEvaluationDays,
-  predictionBacktestDays = RETENTION_DEFAULTS.predictionBacktestDays,
-} = {}) {
-  const safeNow = isoDateTime(now);
-  const policy = {
-    inactiveDeviceDays: positiveInteger(inactiveDeviceDays, RETENTION_DEFAULTS.inactiveDeviceDays),
-    disabledRouteDays: positiveInteger(disabledRouteDays, RETENTION_DEFAULTS.disabledRouteDays),
-    alertEvaluationDays: positiveInteger(alertEvaluationDays, RETENTION_DEFAULTS.alertEvaluationDays),
-    predictionBacktestDays: positiveInteger(predictionBacktestDays, RETENTION_DEFAULTS.predictionBacktestDays),
-  };
-  const [alerts, predictions] = await Promise.all([
-    purgeAlertRetention({
-      now: safeNow,
-      dryRun,
-      inactiveDeviceDays: policy.inactiveDeviceDays,
-      disabledRouteDays: policy.disabledRouteDays,
-      evaluationDays: policy.alertEvaluationDays,
-    }),
-    purgePredictionBacktests({
-      now: safeNow,
-      dryRun,
-      olderThanDays: policy.predictionBacktestDays,
-    }),
-  ]);
-  return {
-    accepted: true,
-    dryRun: Boolean(dryRun),
-    now: safeNow,
-    policy,
-    alerts,
-    predictions,
-  };
-}
-function retentionCleanupAuthorised(req = {}) {
-  if (cronAuthorised(req)) return true;
-  if (!process.env.ALERTS_WRITE_TOKEN) return false;
-  const headers = req.headers || {};
-  const auth = headers.authorization || headers.Authorization || "";
-  const direct = headers["x-fuel-path-alerts-token"] || headers["X-Fuel-Path-Alerts-Token"] || "";
-  const bearer = String(auth).replace(/^Bearer\s+/i, "").trim();
-  return (bearer || String(direct).trim()) === process.env.ALERTS_WRITE_TOKEN;
+  return tokenAuthorised(req, process.env.PREDICTION_BACKTEST_WRITE_TOKEN, "x-fuel-path-prediction-token");
 }
 function normaliseDateOnly(value) {
   const text = String(value || "").trim();
@@ -1133,10 +1078,6 @@ function optionalNumber(value) {
 function normaliseDirection(value) {
   const direction = String(value || "unknown").trim().toLowerCase();
   return ["up", "down", "flat", "unknown"].includes(direction) ? direction : "unknown";
-}
-function positiveInteger(value, fallback) {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
 }
 function isoDateTime(value) {
   const parsed = new Date(value || new Date().toISOString());

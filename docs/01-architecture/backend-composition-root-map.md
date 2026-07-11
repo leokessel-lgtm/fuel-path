@@ -8,8 +8,8 @@ public handler changes its backend dependency.
 ## Current boundary
 
 `api/_backend.js` remains the wiring point for routing, geocoding, fuel
-providers, scoring and alerts, but still owns prediction-domain logic and
-retention orchestration. Run
+providers, scoring and alerts, but still owns prediction-domain logic. Retention
+orchestration and shared token policy are extracted. Run
 `npm run check:backend-composition` for its current export, consumer and line
 measurements. The committed contract fails when those boundaries drift.
 
@@ -29,7 +29,9 @@ every deployment must retain the Hobby-plan ceiling of 12 serverless functions.
 | Station provider loading | `api/_stationProviderService.js` | capabilities, provider adapters, cache and single-flight | Extracted as an injected provider-loading service |
 | Prediction status and signals | `predictionStatus` through `normaliseCycleMarket` | prediction storage and capability state | Move behind a prediction service contract |
 | Prediction collection and backtesting | `recordPredictionBacktest` through `listPredictionBacktests` | station loading, storage, time and market configuration | Move behind the same prediction service |
-| Retention and write authorisation | prediction security through `isoDateTime` | alert storage, prediction storage and environment secrets | Extract security policy and retention orchestration separately |
+| Retention and write authorisation | `api/_retentionService.js` and `api/_securityPolicy.js` | alert storage, prediction storage and environment secrets | Extracted; compatibility exports remain wired through `_backend.js` |
+| Geocode cache | `api/_geocodeCache.js` | in-memory expiry and bounded eviction | Extracted; provider fallback policy remains in `_geocode.js` |
+| Address ranking | `api/_addressRanking.js` | pure scoring and significant-token ranking | Extracted; storage/query orchestration remains in `_addressIndex.js` |
 | Compatibility exports | final `module.exports` block | all slices | Preserve names until every consumer migrates deliberately |
 
 ## Public consumers

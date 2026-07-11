@@ -1,14 +1,18 @@
-const fs = require("node:fs");
-const path = require("node:path");
 const { createAddressRanking } = require("./_addressRanking");
 const { normaliseAddressText, normaliseSearchContext } = require("./_addressQuery");
+const { createAddressStorageAdapters } = require("./_addressStorageAdapters");
 
-const ROOT = path.resolve(__dirname, "..");
-const DEFAULT_SEED_PATH = path.join(ROOT, "prototype", "data", "gnaf-addresses.seed.json");
-
-let seedRecordsCache = null;
-let sqliteCache = null;
 const { addressIndexRank, scoreRecord, significantAddressTokens } = createAddressRanking({ normaliseAddressText });
+const {
+  configuredApiUrl,
+  configuredPostgresUrl,
+  configuredSqlitePath,
+  defaultSeedPath: DEFAULT_SEED_PATH,
+  fetchApiSuggestions,
+  loadSeedRecords,
+  openSqliteIndex,
+  postgresClient,
+} = createAddressStorageAdapters();
 
 function addressIndexStatus() {
   const sqlitePath = configuredSqlitePath();
@@ -171,26 +175,10 @@ function canStopUnitLikeNeedle(top) {
 }
 
 async function searchApiIndex(rawQuery, needle, limit) {
-  try {
-    const url = new URL("/search", configuredApiUrl());
-    url.searchParams.set("q", rawQuery);
-    url.searchParams.set("limit", String(Math.max(1, Math.min(Number(limit) || 5, 20))));
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
-    const response = await fetch(url.toString(), {
-      headers: apiHeaders(),
-      signal: controller.signal,
-    });
-    clearTimeout(timeout);
-    if (!response.ok) return [];
-    const payload = await response.json();
-    const rows = Array.isArray(payload?.suggestions) ? payload.suggestions : Array.isArray(payload) ? payload : [];
-    return rows
-      .map((row) => addressRecordToSuggestion(row, row.matchType || apiMatchType(row, needle), Number(row.score || 950)))
-      .filter((row) => Number.isFinite(row.lat) && Number.isFinite(row.lon));
-  } catch {
-    return [];
-  }
+  const rows = await fetchApiSuggestions(rawQuery, limit);
+  return rows
+    .map((row) => addressRecordToSuggestion(row, row.matchType || apiMatchType(row, needle), Number(row.score || 950)))
+    .filter((row) => Number.isFinite(row.lat) && Number.isFinite(row.lon));
 }
 
 async function searchPostgresIndex(needle, limit) {
@@ -1269,69 +1257,6 @@ function addressRecordToSuggestion(record, matchType, score) {
   };
 }
 
-function loadSeedRecords() {
-  if (seedRecordsCache) return seedRecordsCache;
-  try {
-    const payload = JSON.parse(fs.readFileSync(DEFAULT_SEED_PATH, "utf8"));
-    seedRecordsCache = Array.isArray(payload) ? payload : [];
-  } catch {
-    seedRecordsCache = [];
-  }
-  return seedRecordsCache;
-}
-
-function configuredSqlitePath() {
-  const value = process.env.FUEL_PATH_GNAF_SQLITE_PATH || "";
-  if (!value) return "";
-  const resolved = path.resolve(value);
-  return fs.existsSync(resolved) ? resolved : "";
-}
-
-function configuredApiUrl() {
-  return process.env.FUEL_PATH_GNAF_API_URL || "";
-}
-
-function apiHeaders() {
-  const token = process.env.FUEL_PATH_GNAF_API_TOKEN || "";
-  return {
-    Accept: "application/json",
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  };
-}
-
-function configuredPostgresUrl() {
-  return process.env.FUEL_PATH_GNAF_DATABASE_URL || "";
-}
-
-function postgresClient() {
-  const connectionString = configuredPostgresUrl();
-  if (!connectionString) return null;
-  if (postgresClient.cache?.connectionString === connectionString) return postgresClient.cache.sql;
-  try {
-    const { neon } = require("@neondatabase/serverless");
-    const sql = neon(connectionString);
-    postgresClient.cache = { connectionString, sql };
-    return sql;
-  } catch {
-    postgresClient.cache = null;
-    return null;
-  }
-}
-
-function openSqliteIndex() {
-  const sqlitePath = configuredSqlitePath();
-  if (!sqlitePath) return null;
-  if (sqliteCache?.path === sqlitePath) return sqliteCache.database;
-  try {
-    const { DatabaseSync } = require("node:sqlite");
-    const database = new DatabaseSync(sqlitePath, { readOnly: true });
-    sqliteCache = { path: sqlitePath, database };
-    return database;
-  } catch {
-    sqliteCache = null;
-    return null;
-  }
-}
 
 function sqliteAddressSelect(database) {
   const optional = [

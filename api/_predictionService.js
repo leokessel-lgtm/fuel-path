@@ -1,4 +1,5 @@
 const { createPredictionReadiness } = require("./_predictionReadiness");
+const { createPredictionSecurity } = require("./_predictionSecurity");
 function createPredictionService({
   REGION_ORDER,
   appendPredictionBacktestRecord,
@@ -12,6 +13,12 @@ function createPredictionService({
   tokenSecurity,
 }) {
   const PREDICTION_BACKTEST_MAX_RECORDS = 500;
+  const { predictionWriteAuthorised, predictionWriteSecurity } = createPredictionSecurity({
+    predictionStorageStatus,
+    tokenAuthorised,
+    tokenSecurity,
+    maxRecords: PREDICTION_BACKTEST_MAX_RECORDS,
+  });
   const {
     predictionBacktestSummary,
     predictionReadiness,
@@ -46,7 +53,7 @@ function createPredictionService({
       snapshots: predictionSnapshotSummary(snapshots),
     };
   }
-  
+
   function predictionSignal({ region = "", market = "", fuel = "", historyDays = 0, observedPriceCount = 0 } = {}) {
     const safeRegion = String(region || "").trim().toUpperCase();
     const safeMarket = String(market || "").trim();
@@ -54,7 +61,7 @@ function createPredictionService({
     const history = Number(historyDays || 0);
     const observed = Number(observedPriceCount || 0);
     const marketProfile = predictionMarketProfile({ region: safeRegion, market: safeMarket, fuel: safeFuel });
-  
+
     if (!REGION_ORDER.includes(safeRegion)) {
       return noCycleSignal({ region: safeRegion || "UNKNOWN", fuel: safeFuel, reason: "unsupported_region" });
     }
@@ -72,7 +79,7 @@ function createPredictionService({
     if (history < 28 || observed < 56) {
       return noCycleSignal({ region: safeRegion, fuel: safeFuel, reason: "sparse_history", market: marketProfile });
     }
-  
+
     const readiness = predictionReadiness([], { durable: false });
     return {
       region: safeRegion,
@@ -87,7 +94,7 @@ function createPredictionService({
       readiness,
     };
   }
-  
+
   function noCycleSignal({ region, fuel, reason, market }) {
     const labels = {
       unsupported_region: "Fuel Path does not have cycle evidence for this region.",
@@ -110,7 +117,7 @@ function createPredictionService({
       readiness: predictionReadiness([], { durable: false }),
     };
   }
-  
+
   function predictionMarketProfile({ region = "", market = "", fuel = "" } = {}) {
     const safeRegion = String(region || "").trim().toUpperCase();
     const safeMarket = normaliseCycleMarket(market);
@@ -130,7 +137,7 @@ function createPredictionService({
       TAS: "Hobart",
       NT: "Darwin",
     };
-  
+
     if (!supportedFuel) {
       return {
         region: safeRegion,
@@ -142,7 +149,7 @@ function createPredictionService({
         marketLabel: safeMarket,
       };
     }
-  
+
     if (trendOnlyFuels.includes(safeFuel)) {
       return {
         region: safeRegion,
@@ -154,7 +161,7 @@ function createPredictionService({
         marketLabel: safeMarket || nonCycleCapitals[safeRegion] || safeRegion,
       };
     }
-  
+
     const supportedMarket = cycleMarkets[safeRegion];
     if (supportedMarket?.labels.includes(safeMarket)) {
       return {
@@ -171,7 +178,7 @@ function createPredictionService({
             : "Cycle timing varies and must be backed by measured city-market evidence before user-facing guidance.",
       };
     }
-  
+
     return {
         region: safeRegion,
       fuel: safeFuel,
@@ -182,7 +189,7 @@ function createPredictionService({
       marketLabel: safeMarket || nonCycleCapitals[safeRegion] || safeRegion,
     };
   }
-  
+
   function normaliseCycleMarket(value = "") {
     return String(value || "")
       .trim()
@@ -191,7 +198,7 @@ function createPredictionService({
       .replace(/\s+/g, " ")
       .trim();
   }
-  
+
   async function recordPredictionBacktest(input = {}) {
     const record = normalisePredictionBacktestRecord(input);
     await appendPredictionBacktestRecord(record, { maxRecords: PREDICTION_BACKTEST_MAX_RECORDS });
@@ -203,7 +210,7 @@ function createPredictionService({
       storage: (await predictionStatus()).storage,
     };
   }
-  
+
   async function runPredictionMarketBacktestJob({
     limit,
     now = new Date().toISOString(),
@@ -258,7 +265,7 @@ function createPredictionService({
       const handledKeys = new Set(batchResult.results.map(marketFuelKey));
       markets.splice(0, markets.length, ...markets.filter((marketConfig) => !handledKeys.has(marketFuelKey(marketConfig))));
     }
-  
+
     for (const marketConfig of markets) {
       try {
         const snapshot = await predictionMarketPriceSnapshot({ marketConfig, forceRefresh, loadStationDataFn });
@@ -266,7 +273,7 @@ function createPredictionService({
           results.push({ ...marketConfigSummary(marketConfig), status: "skipped", reason: snapshot.reason, snapshot });
           continue;
         }
-  
+
         results.push(await processPredictionMarketSnapshot({
           marketConfig,
           snapshot,
@@ -285,7 +292,7 @@ function createPredictionService({
         });
       }
     }
-  
+
     return {
       accepted: true,
       dryRun: Boolean(dryRun),
@@ -313,7 +320,7 @@ function createPredictionService({
       predictions: await predictionStatus(),
     };
   }
-  
+
   async function recordPredictionMarketObservation({
     points = [],
     fuels = [],
@@ -330,7 +337,7 @@ function createPredictionService({
       fuelSet.has(marketConfig.fuel) &&
       points.some((point) => distanceKm(point, marketConfig) <= Math.max(12, marketConfig.radiusKm)),
     );
-  
+
     for (const marketConfig of markets) {
       const snapshot = predictionMarketSnapshotFromStationData({ marketConfig, data });
       if (!snapshot.usable) continue;
@@ -341,14 +348,14 @@ function createPredictionService({
       await appendPredictionMarketSnapshotRecord(record);
       snapshots.push(record);
     }
-  
+
     return {
       accepted: snapshots.length > 0,
       reason: snapshots.length ? "" : "no_supported_market_snapshot_from_reused_data",
       snapshots,
     };
   }
-  
+
   async function maybeRunPredictionMarketBatch({
     markets = [],
     today,
@@ -400,7 +407,7 @@ function createPredictionService({
       results,
     };
   }
-  
+
   async function processPredictionMarketSnapshot({
     marketConfig,
     snapshot,
@@ -413,7 +420,7 @@ function createPredictionService({
   } = {}) {
     const snapshotRecord = predictionMarketSnapshotRecord({ marketConfig, snapshot, observedAt: safeNow });
     if (!dryRun) await appendPredictionMarketSnapshotRecord(snapshotRecord);
-  
+
     const dueId = predictionMarketBacktestId({ market: marketConfig.market, fuel: marketConfig.fuel, targetDate: today });
     const due = existingRecords.find((record) => record.id === dueId);
     let completed = null;
@@ -432,7 +439,7 @@ function createPredictionService({
         actualDirection: directionFromDelta(snapshot.medianCpl - Number(due.predictedCpl)),
       });
     }
-  
+
     const seedId = predictionMarketBacktestId({ market: marketConfig.market, fuel: marketConfig.fuel, targetDate: tomorrow });
     const alreadySeeded = existingRecords.some((record) => record.id === seedId);
     let seeded = null;
@@ -449,7 +456,7 @@ function createPredictionService({
         predictedDirection: "flat",
       });
     }
-  
+
     return {
       ...marketConfigSummary(marketConfig),
       status: "ok",
@@ -459,7 +466,7 @@ function createPredictionService({
       snapshotId: dryRun ? "dry_run" : snapshotRecord.id,
     };
   }
-  
+
   function normalisePredictionBacktestRecord(input) {
     const id = String(input.id || `bt_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`).trim();
     const region = String(input.region || "").trim().toUpperCase();
@@ -471,7 +478,7 @@ function createPredictionService({
       throw new Error("fuel is not supported for prediction back-testing");
     }
     if (!targetDate) throw new Error("targetDate must be YYYY-MM-DD");
-  
+
     const predictedCpl = optionalNumber(input.predictedCpl);
     const actualCpl = optionalNumber(input.actualCpl);
     const absoluteErrorCpl = Number.isFinite(predictedCpl) && Number.isFinite(actualCpl) ? round(Math.abs(predictedCpl - actualCpl), 2) : undefined;
@@ -495,7 +502,7 @@ function createPredictionService({
       recordedAt: new Date().toISOString(),
     };
   }
-  
+
   function predictionMarketBacktestMarkets() {
     return [
       market("NSW", "sydney", "Sydney", -33.8688, 151.2093),
@@ -505,7 +512,7 @@ function createPredictionService({
       market("WA", "perth", "Perth/Mandurah", -31.9523, 115.8613),
     ].flatMap((base) => ["E10", "U91", "P95", "P98"].map((fuel) => ({ ...base, fuel })));
   }
-  
+
   function selectPredictionCollectionMarkets({
     allMarkets = [],
     dueMarkets = [],
@@ -518,7 +525,7 @@ function createPredictionService({
     const selected = [];
     const selectedKeys = new Set();
     const safeLimit = Math.max(1, Math.min(allMarkets.length || 1, Number(limit || 5)));
-  
+
     for (const group of predictionMarketBatchGroups()) {
       const groupMarkets = allMarkets.filter((marketConfig) => batchGroupIncludesMarket(group, marketConfig));
       if (!groupMarkets.length || groupMarkets.length > safeLimit) continue;
@@ -533,7 +540,7 @@ function createPredictionService({
         }
       }
     }
-  
+
     for (const marketConfig of [...dueMarkets, ...rotatedMarkets]) {
       if (selected.length >= safeLimit) break;
       const key = marketFuelKey(marketConfig);
@@ -541,10 +548,10 @@ function createPredictionService({
       selected.push(marketConfig);
       selectedKeys.add(key);
     }
-  
+
     return selected;
   }
-  
+
   function predictionMarketBatchGroups() {
     return [
       {
@@ -573,7 +580,7 @@ function createPredictionService({
       },
     ];
   }
-  
+
   function batchGroupIncludesMarket(group, marketConfig) {
     return (
       marketConfig.region === group.region &&
@@ -581,14 +588,14 @@ function createPredictionService({
       group.fuels.includes(marketConfig.fuel)
     );
   }
-  
+
   function predictionBatchGroupScheduledToday(group, today) {
     const parsed = new Date(`${today}T00:00:00Z`);
     if (Number.isNaN(parsed.getTime())) return false;
     const dayIndex = Math.floor(parsed.getTime() / 86400000);
     return (dayIndex + Number(group.offset || 0)) % Math.max(1, Number(group.intervalDays || 1)) === 0;
   }
-  
+
   function market(region, market, label, lat, lon) {
     return {
       region,
@@ -599,7 +606,7 @@ function createPredictionService({
       radiusKm: region === "WA" ? 45 : 35,
     };
   }
-  
+
   async function predictionMarketPriceSnapshot({ marketConfig, forceRefresh = false, loadStationDataFn = loadStationData }) {
     const data = await loadStationDataFn({
       requestedSource: "auto",
@@ -610,7 +617,7 @@ function createPredictionService({
     });
     return predictionMarketSnapshotFromStationData({ marketConfig, data });
   }
-  
+
   function predictionMarketSnapshotFromStationData({ marketConfig, data }) {
     const prices = (data.stations || [])
       .map((station) => Number(station?.prices?.[marketConfig.fuel]))
@@ -639,11 +646,11 @@ function createPredictionService({
       warning: data.warning || "",
     };
   }
-  
+
   function predictionMarketBacktestId({ market, fuel, targetDate }) {
     return `market:${normaliseCycleMarket(market)}:${String(fuel || "").toUpperCase()}:${targetDate}`;
   }
-  
+
   function predictionMarketSnapshotRecord({ marketConfig, snapshot, observedAt }) {
     const observedDate = String(observedAt || new Date().toISOString()).slice(0, 10);
     return {
@@ -664,12 +671,12 @@ function createPredictionService({
       warning: snapshot.warning || "",
     };
   }
-  
+
   function predictionBacktestDailyLimit() {
     const configured = Number(process.env.FUEL_PATH_PREDICTION_BACKTEST_DAILY_LIMIT || 5);
     return Number.isFinite(configured) ? Math.max(1, Math.min(20, Math.floor(configured))) : 5;
   }
-  
+
   function rotateByDay(items = [], dateOnlyValue = "") {
     if (!items.length) return [];
     const parsed = new Date(`${dateOnlyValue}T00:00:00Z`);
@@ -677,7 +684,7 @@ function createPredictionService({
     const offset = dayIndex % items.length;
     return [...items.slice(offset), ...items.slice(0, offset)];
   }
-  
+
   function marketConfigSummary(config) {
     return {
       region: config.region,
@@ -686,11 +693,11 @@ function createPredictionService({
       fuel: config.fuel,
     };
   }
-  
+
   function marketFuelKey(value = {}) {
     return `${normaliseCycleMarket(value.market)}:${String(value.fuel || "").toUpperCase()}`;
   }
-  
+
   function predictionSnapshotStats(snapshots = []) {
     const stats = {};
     for (const snapshot of snapshots) {
@@ -704,7 +711,7 @@ function createPredictionService({
     }
     return stats;
   }
-  
+
   function predictionMarketPriority(left, right, snapshotStats, today) {
     const leftStats = snapshotStats[marketFuelKey(left)] || { count: 0, latestDate: "" };
     const rightStats = snapshotStats[marketFuelKey(right)] || { count: 0, latestDate: "" };
@@ -712,28 +719,28 @@ function createPredictionService({
     const rightObservedToday = rightStats.latestDate === today ? 1 : 0;
     return leftObservedToday - rightObservedToday || leftStats.count - rightStats.count;
   }
-  
+
   function median(values = []) {
     if (!values.length) return undefined;
     const midpoint = Math.floor(values.length / 2);
     const value = values.length % 2 ? values[midpoint] : (values[midpoint - 1] + values[midpoint]) / 2;
     return round(value, 2);
   }
-  
+
   function directionFromDelta(delta) {
     if (!Number.isFinite(delta)) return "unknown";
     if (delta > 1) return "up";
     if (delta < -1) return "down";
     return "flat";
   }
-  
+
   function dateOffset(dateOnlyValue, days) {
     const parsed = new Date(`${dateOnlyValue}T00:00:00Z`);
     if (Number.isNaN(parsed.getTime())) return new Date().toISOString().slice(0, 10);
     parsed.setUTCDate(parsed.getUTCDate() + Number(days || 0));
     return parsed.toISOString().slice(0, 10);
   }
-  
+
   async function listPredictionBacktests({ region = "", fuel = "", limit = 50 } = {}) {
     const safeRegion = String(region || "").trim().toUpperCase();
     const safeFuel = String(fuel || "").trim().toUpperCase();
@@ -745,22 +752,7 @@ function createPredictionService({
       storage: (await predictionStatus()).storage,
     };
   }
-  
-  function predictionWriteSecurity() {
-    const storage = predictionStorageStatus({ maxRecords: PREDICTION_BACKTEST_MAX_RECORDS });
-    return tokenSecurity({
-      expected: process.env.PREDICTION_BACKTEST_WRITE_TOKEN,
-      storageDurable: storage.durable,
-      directHeader: "X-Fuel-Path-Prediction-Token",
-    });
-  }
-  
-  function predictionWriteAuthorised(req = {}) {
-    const security = predictionWriteSecurity();
-    if (!security.tokenRequired) return true;
-    if (!security.tokenConfigured) return false;
-    return tokenAuthorised(req, process.env.PREDICTION_BACKTEST_WRITE_TOKEN, "x-fuel-path-prediction-token");
-  }
+
   function normaliseDateOnly(value) {
     const text = String(value || "").trim();
     if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return "";

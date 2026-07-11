@@ -33,10 +33,15 @@ test("hosted geocode preview smoke writes pass report for high-risk cases", asyn
     assert.equal(payload.summary.topMatch, 20);
     assert.equal(payload.summary.addressTopMatch, 12);
     assert.equal(payload.summary.poiTopMatch, 8);
+    assert.equal(payload.target, api.url);
+    assert.equal(payload.transport, "direct_http");
+    assert.equal(payload.performanceEvidence, "request_elapsed_only");
     assert.deepEqual(payload.diagnostics.likelyBlockers, []);
     assert.equal(payload.diagnostics.addressTopProviderCounts.fuel_path_gnaf, 12);
     assert.match(report, /Fuel Path Hosted Geocode Preview Smoke/);
     assert.match(report, /Likely blockers: none/);
+    assert.match(report, /Transport: direct_http/);
+    assert.match(report, /not a load benchmark/);
     assert.match(report, /Rottnest Island WA/);
   } finally {
     await api.close();
@@ -109,6 +114,26 @@ test("hosted geocode preview smoke diagnoses non-GNAF hosted address rows", asyn
   } finally {
     await api.close();
   }
+});
+
+test("tracked hosted preview summary stays redacted and claim-bounded", () => {
+  const file = path.join(
+    ROOT,
+    "docs/04-validation-evidence/hosted-preview/hosted-geocode-preview-summary-2026-07-12.json",
+  );
+  const payload = JSON.parse(fs.readFileSync(file, "utf8"));
+  const text = JSON.stringify(payload);
+
+  assert.equal(payload.evidenceType, "hosted_preview_functional_correctness");
+  assert.equal(payload.functionalSmoke.status, "passed");
+  assert.equal(payload.functionalSmoke.topMatches, 20);
+  assert.equal(payload.transport.performanceEvidence, "invalid_cli_transport_overhead");
+  assert.equal(payload.readinessImpact.performance, "not_proven_by_this_run");
+  assert.equal(payload.readinessImpact.beta, "not_proven");
+  assert.equal(payload.authentication.missingTokenStatus, 401);
+  assert.equal(payload.authentication.wrongTokenStatus, 401);
+  assert.equal(payload.authentication.tokenObservedInResponse, false);
+  assert.doesNotMatch(text, /Authorization|Bearer|FUEL_PATH_GNAF_API_TOKEN|1 Adelaide Street|87A Corea Street/);
 });
 
 async function startMockPreviewApi(options = {}) {

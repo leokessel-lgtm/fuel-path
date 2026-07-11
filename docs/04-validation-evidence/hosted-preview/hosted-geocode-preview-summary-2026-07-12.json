@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "evidenceType": "hosted_preview_functional_correctness",
+  "recordedAt": "2026-07-12T09:35:51+10:00",
+  "sourceCommit": "9c3ab55",
+  "deployment": {
+    "id": "dpl_96iFqyCCoNBKBacmZtKyzJETrhzJ",
+    "url": "https://fuel-path-dblpbpy05-leonardo-volpi-kesselring-s-projects.vercel.app",
+    "protected": true
+  },
+  "transport": {
+    "mode": "authenticated_vercel_cli",
+    "performanceEvidence": "invalid_cli_transport_overhead",
+    "note": "Elapsed times include Vercel CLI authentication and startup overhead and must not support latency or performance claims."
+  },
+  "functionalSmoke": {
+    "status": "passed",
+    "cases": 20,
+    "topMatches": 20,
+    "addressCases": 12,
+    "addressTopMatches": 12,
+    "poiCases": 8,
+    "poiTopMatches": 8,
+    "rankedOnly": 0,
+    "failures": 0,
+    "lookupStatusOk": 20,
+    "jurisdictions": ["ACT", "NSW", "NT", "QLD", "SA", "TAS", "VIC", "WA"],
+    "categories": {
+      "airport": "2/2",
+      "exact": "8/8",
+      "island": "2/2",
+      "landmark": "1/1",
+      "lot_rural": "1/1",
+      "remote": "1/1",
+      "remote_landmark": "2/2",
+      "suffix": "1/1",
+      "unit_address": "2/2"
+    }
+  },
+  "authentication": {
+    "missingTokenStatus": 401,
+    "wrongTokenStatus": 401,
+    "authorisedStatus": 200,
+    "tokenObservedInResponse": false
+  },
+  "readinessImpact": {
+    "providerData": "hosted_preview_functional_smoke_passed",
+    "quality": "functional_correctness_only",
+    "performance": "not_proven_by_this_run",
+    "webProduction": "not_assessed_by_preview_evidence",
+    "beta": "not_proven",
+    "store": "not_proven"
+  },
+  "generatedSources": [
+    "tmp/geocode-hosted-preview-smoke-pr21-native-protected-preview-2026-07-12.json",
+    "tmp/geocode-hosted-preview-smoke-pr21-native-protected-preview-2026-07-12.md"
+  ]
+}

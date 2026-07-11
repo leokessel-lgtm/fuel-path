@@ -32,7 +32,7 @@ function createPredictionReadiness({ REGION_ORDER, marketFuelKey, round }) {
       accuracyClaimsAllowed: predictionReadiness(records, { durable: false }).accuracyClaimsAllowed,
     };
   }
-  
+
   function predictionSnapshotSummary(snapshots = []) {
     const byMarket = {};
     const byFuel = {};
@@ -50,7 +50,7 @@ function createPredictionReadiness({ REGION_ORDER, marketFuelKey, round }) {
       byFuel,
     };
   }
-  
+
   function predictionReadiness(records = [], storage = {}) {
     const completed = records.filter((record) => Number.isFinite(record.absoluteErrorCpl));
     const directionRecords = records.filter((record) => typeof record.directionMatched === "boolean");
@@ -94,7 +94,7 @@ function createPredictionReadiness({ REGION_ORDER, marketFuelKey, round }) {
       accuracyClaimsAllowed: blockers.length === 0,
     };
   }
-  
+
   function predictionBlindSpots({ records = [], storage = {}, meanAbsoluteErrorCpl, directionAccuracy } = {}) {
     const regions = Array.from(new Set(records.map((record) => record.region).filter(Boolean)));
     const fuels = Array.from(new Set(records.map((record) => record.fuel).filter(Boolean)));
@@ -116,7 +116,7 @@ function createPredictionReadiness({ REGION_ORDER, marketFuelKey, round }) {
     if (!Number.isFinite(directionAccuracy)) blindSpots.push("Directional accuracy is not measurable until direction-labelled back-tests exist.");
     return Array.from(new Set(blindSpots));
   }
-  
+
   return { predictionBacktestSummary, predictionBlindSpots, predictionReadiness, predictionSnapshotSummary };
 }
 

@@ -1,19 +1,24 @@
 #!/usr/bin/env node
 import fsp from "node:fs/promises";
 import path from "node:path";
+import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const args = parseArgs(process.argv.slice(2));
 const RUN_ID = args.runId || process.env.FUEL_PATH_HOSTED_PREVIEW_RUN_ID || new Date().toISOString().replace(/[:.]/g, "-");
 const API_BASE = args.apiBase || process.env.FUEL_PATH_API_BASE || "";
+const VERCEL_DEPLOYMENT = args.vercelDeployment || process.env.FUEL_PATH_VERCEL_DEPLOYMENT || "";
+const TARGET = VERCEL_DEPLOYMENT || API_BASE;
+const TRANSPORT = VERCEL_DEPLOYMENT ? "authenticated_vercel_cli" : "direct_http";
+const PERFORMANCE_EVIDENCE = VERCEL_DEPLOYMENT ? "invalid_cli_transport_overhead" : "request_elapsed_only";
 const LIMIT = Number(args.limit || process.env.FUEL_PATH_HOSTED_PREVIEW_LIMIT || 5);
 const PROVIDER = args.provider || process.env.FUEL_PATH_GEOCODE_PROVIDER || "nominatim";
 const DELAY_MS = Number(args.delayMs || process.env.FUEL_PATH_HOSTED_PREVIEW_DELAY_MS || 0);
 
 async function main() {
-  if (!API_BASE) {
-    throw new Error("Set --api-base or FUEL_PATH_API_BASE for hosted geocode preview smoke.");
+  if (!TARGET) {
+    throw new Error("Set --api-base, --vercel-deployment, FUEL_PATH_API_BASE or FUEL_PATH_VERCEL_DEPLOYMENT for hosted geocode preview smoke.");
   }
 
   const rows = [];
@@ -26,7 +31,9 @@ async function main() {
   const diagnostics = diagnose(rows);
   const payload = {
     runId: RUN_ID,
-    apiBase: API_BASE,
+    target: TARGET,
+    transport: TRANSPORT,
+    performanceEvidence: PERFORMANCE_EVIDENCE,
     limit: LIMIT,
     provider: PROVIDER,
     caseCount: CASES.length,
@@ -78,11 +85,28 @@ async function runCase(testCase, index) {
 }
 
 async function geocodeQuery(query, index) {
-  const url = new URL("/api/geocode", API_BASE);
+  const url = new URL("/api/geocode", TARGET);
   url.searchParams.set("q", query);
   url.searchParams.set("limit", String(LIMIT));
   url.searchParams.set("provider", PROVIDER);
   url.searchParams.set("sessionToken", `hosted-preview-${RUN_ID}-${index}`);
+  if (VERCEL_DEPLOYMENT) {
+    try {
+      const output = execFileSync(
+        "npx",
+        ["vercel", "curl", `${url.pathname}${url.search}`, "--deployment", VERCEL_DEPLOYMENT, "--", "--silent", "--show-error"],
+        {
+          cwd: ROOT,
+          encoding: "utf8",
+          env: { ...process.env, NPM_CONFIG_CACHE: process.env.NPM_CONFIG_CACHE || path.join(ROOT, ".npm-cache") },
+          maxBuffer: 1024 * 1024,
+        },
+      );
+      return JSON.parse(output);
+    } catch {
+      return { suggestions: [], lookupStatus: "http_error", warning: "Authenticated Vercel preview request failed" };
+    }
+  }
   const response = await fetch(url);
   if (!response.ok) return { suggestions: [], lookupStatus: "http_error", warning: `HTTP ${response.status}` };
   return response.json();
@@ -230,7 +254,13 @@ function renderReport(payload) {
 
 Run ID: ${payload.runId}
 
-Target: ${payload.apiBase}
+Target: ${payload.target}
+
+Transport: ${payload.transport}
+
+Performance evidence: ${payload.performanceEvidence}
+
+${payload.performanceEvidence === "invalid_cli_transport_overhead" ? "Elapsed times include Vercel CLI authentication and startup overhead. Do not use this run for latency or performance claims." : "Elapsed times are request-level observations only and are not a load benchmark."}
 
 ## Summary
 

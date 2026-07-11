@@ -7,7 +7,7 @@ once. Preserve public contracts and add focused tests before each split.
 | --- | --- | --- | --- |
 | P0 | `api/_backend.js` | Composition root is reduced to wiring, thin request-domain helpers and compatibility exports | Keep the 300-line boundary ratcheted and reject domain logic regrowth |
 | P0 | `api/_geocode.js` | Provider selection, address index and response shaping remain coupled; cache and failure policy are extracted | Extract provider execution adapters behind the existing geocode contract |
-| P0 | `api/_addressIndex.js` | Storage access remains coupled; query normalisation and ranking are extracted | Extract SQLite, Postgres and API storage adapters with existing fixtures |
+| P0 | `api/_addressIndex.js` | Storage configuration, connections and query execution are adapter-bound; SQL query planning and result shaping remain coupled | Extract coherent exact-unit and typeahead query planners without changing ranking or fixtures |
 | P1 | `mobile-app/src/components/PlanRouteSheet.tsx` | Recommendation, evidence and action rendering are coupled | Extract result sections without changing wording or route rules |
 | P1 | `StationMap.native.tsx` and `StationMap.web.tsx` | Camera, markers, selection and platform rendering are large | Extract shared map selection/camera state; keep renderers platform-specific |
 | P1 | `api/ev-chargers.js` | Public handler directly composes multiple EV adapters and policy modules | Move EV orchestration behind one internal contract |

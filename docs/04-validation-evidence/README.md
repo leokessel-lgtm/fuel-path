@@ -16,3 +16,13 @@ product strategy and release decisions.
 
 - [`VALIDATION-PASS-2026-06-14.md`](VALIDATION-PASS-2026-06-14.md): dated historical pass.
 - [`SYNTHETIC-VALIDATION-SESSIONS.md`](SYNTHETIC-VALIDATION-SESSIONS.md): synthetic rehearsal only, never customer proof.
+
+## Hosted machine-readable evidence
+
+Detailed hosted lookup reports contain exact test addresses and remain generated
+under ignored `tmp/`. Durable repository evidence belongs under
+`hosted-preview/` as a redacted summary containing deployment identity, commit,
+transport, performance-claim boundary, aggregate jurisdiction/category results,
+authentication rejection checks and source artefact names. Never copy API
+tokens, response headers, raw credentials or participant addresses into tracked
+evidence.

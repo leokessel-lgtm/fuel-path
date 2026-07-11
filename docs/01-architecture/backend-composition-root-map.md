@@ -8,8 +8,8 @@ public handler changes its backend dependency.
 ## Current boundary
 
 `api/_backend.js` remains the wiring point for routing, geocoding, fuel
-providers, scoring and alerts, but still owns provider loading,
-prediction-domain logic and retention orchestration. Run
+providers, scoring and alerts, but still owns prediction-domain logic and
+retention orchestration. Run
 `npm run check:backend-composition` for its current export, consumer and line
 measurements. The committed contract fails when those boundaries drift.
 
@@ -25,7 +25,8 @@ every deployment must retain the Hobby-plan ceiling of 12 serverless functions.
 | Composition and adapter wiring | imports and service initialisation in `_backend.js` | routing, geocoder, alert orchestration and state fuel adapters | Remain in `_backend.js` |
 | Inbound request utilities | `api/_request.js` | request and response objects | Extracted; re-exported unchanged from `_backend.js` |
 | Outbound provider transport | `api/_providerHttp.js` | `fetch`, timeouts and provider responses | Extracted and injected through `_backend.js` |
-| Station decoration and provider loading | `stationBrandText` through `providerFromSource` | discount registry, capabilities, provider adapters, cache and single-flight | Extract one provider-loading service injected with adapters |
+| Station discount decoration | `api/_stationDiscounts.js` | discount registry and current date | Extracted as a pure injected decorator |
+| Station provider loading | `api/_stationProviderService.js` | capabilities, provider adapters, cache and single-flight | Extracted as an injected provider-loading service |
 | Prediction status and signals | `predictionStatus` through `normaliseCycleMarket` | prediction storage and capability state | Move behind a prediction service contract |
 | Prediction collection and backtesting | `recordPredictionBacktest` through `listPredictionBacktests` | station loading, storage, time and market configuration | Move behind the same prediction service |
 | Retention and write authorisation | prediction security through `isoDateTime` | alert storage, prediction storage and environment secrets | Extract security policy and retention orchestration separately |
@@ -78,9 +79,16 @@ Outbound provider transport is isolated in `api/_providerHttp.js`:
 
 - `fetchJson`
 
+Station discount decoration is isolated in `api/_stationDiscounts.js`, and
+provider selection, production terms gates, cache/single-flight orchestration,
+multi-provider aggregation and sample fallback are isolated in
+`api/_stationProviderService.js`. Adapter construction remains in
+`api/_backend.js`, and `loadStationData` remains re-exported unchanged for all
+public consumers.
+
 `pointFromQuery` and `routeFromPayload` remain in `_backend.js` because they
 encode Fuel Path domain shapes rather than generic HTTP. No public handler
-import changed. Provider loading is the next bounded extraction.
+import changed. Prediction status and signals are the next bounded extraction.
 
 This is a classification improvement, not evidence of lower latency, smaller
 functions or greater traffic capacity. Those claims require separate hosted

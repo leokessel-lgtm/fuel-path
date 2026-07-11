@@ -180,6 +180,16 @@ function createAlertOrchestration({ buildRoute, capabilitiesForPoints, loadStati
     );
   }
 
+  function alertsAdminWriteAuthorised(req = {}) {
+    const expectedToken = process.env.ALERTS_VALIDATION_TOKEN || process.env.ALERTS_WRITE_TOKEN;
+    if (!expectedToken) return false;
+    const headers = req.headers || {};
+    const auth = headers.authorization || headers.Authorization || "";
+    const direct = headers["x-fuel-path-alerts-token"] || headers["X-Fuel-Path-Alerts-Token"] || "";
+    const supplied = String(auth).replace(/^Bearer\s+/i, "").trim() || String(direct).trim();
+    return supplied === expectedToken;
+  }
+
   function issueAlertClientCapability({ userId = "", deviceId = "" } = {}) {
     const security = alertsWriteSecurity();
     if (!security.clientTokenEnabled || !security.clientCapabilityConfigured) {
@@ -346,6 +356,51 @@ function createAlertOrchestration({ buildRoute, capabilitiesForPoints, loadStati
       idempotencyStatus: "recorded",
       ...delivery,
       alerts: await alertsStatus(),
+    };
+  }
+
+  async function validateSavedRouteAlertDelivery({ routeId = "", userId = "", deviceId = "" } = {}) {
+    assertDurableAlertStorage();
+    if (process.env.EXPO_PUSH_VALIDATION_ENABLED !== "1") {
+      return { accepted: false, deliveryStatus: "validation_delivery_disabled" };
+    }
+    const routes = await listSavedRoutes({ userId, enabledOnly: true, limit: 50 });
+    const route = routes.find((item) => item.id === routeId && item.userId === userId);
+    const devices = await listPushDevices({ userId, status: "active", limit: 50 });
+    const device = devices.find((item) => item.deviceId === deviceId && item.userId === userId);
+    if (!route || !device) {
+      return { accepted: false, deliveryStatus: "validation_target_not_found" };
+    }
+    const now = new Date().toISOString();
+    const evaluation = buildSavedRouteAlertEvaluation({
+      route,
+      devices: [device],
+      candidate: {
+        stationCode: "validation-only",
+        stationName: "Fuel Path validation",
+        estimatedSavingDollars: Math.max(10, Number(route.minSavingDollars || 0) + 1),
+        detourMinutes: 0,
+        freshnessMinutes: 0,
+        openNow: true,
+      },
+      notificationPermission: "granted",
+      regionCapabilities: [{ region: "VALIDATION", capability: "live" }],
+      now,
+      pushDeliveryEnabled: true,
+      idempotencyKey: `validation:${route.id}:${device.deviceId}:${now}`,
+    });
+    evaluation.messageTitle = "Fuel Path notification test";
+    evaluation.messageBody = "Your Pixel is ready for saved-route alerts.";
+    const recordedEvaluation = await appendRouteAlertEvaluation(evaluation);
+    if (recordedEvaluation?._alreadyRecorded) {
+      return { accepted: false, deliveryStatus: "skipped_duplicate_evaluation" };
+    }
+    const delivery = await deliverSavedRouteAlert({ route, devices: [device], evaluation, pushDeliveryEnabled: true });
+    return {
+      accepted: delivery.deliveryStatus === "sent_to_expo",
+      deliveryStatus: delivery.deliveryStatus,
+      evaluationId: evaluation.id,
+      ticketAccepted: delivery.deliveryStatus === "sent_to_expo",
     };
   }
 
@@ -607,6 +662,7 @@ function createAlertOrchestration({ buildRoute, capabilitiesForPoints, loadStati
   }
 
   return {
+    alertsAdminWriteAuthorised,
     alertsStatus,
     alertsWriteAuthorised,
     alertsWriteSecurity,
@@ -614,6 +670,7 @@ function createAlertOrchestration({ buildRoute, capabilitiesForPoints, loadStati
     cronAuthorised,
     deleteBackendSavedRoute,
     evaluateSavedRouteAlert,
+    validateSavedRouteAlertDelivery,
     issueAlertClientCapability,
     listBackendAlertEvaluations,
     listBackendPushDevices,

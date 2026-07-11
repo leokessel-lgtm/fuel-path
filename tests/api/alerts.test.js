@@ -696,6 +696,57 @@ test("Expo push delivery persists tickets only when delivery gate is enabled", a
   }
 });
 
+test("validation delivery sends to one stored device without enabling global push", async () => {
+  const originalToken = process.env.ALERTS_WRITE_TOKEN;
+  const originalValidation = process.env.EXPO_PUSH_VALIDATION_ENABLED;
+  const originalDelivery = process.env.EXPO_PUSH_DELIVERY_ENABLED;
+  process.env.ALERTS_WRITE_TOKEN = "alert-token";
+  process.env.EXPO_PUSH_VALIDATION_ENABLED = "1";
+  delete process.env.EXPO_PUSH_DELIVERY_ENABLED;
+  const store = memoryDurableStore();
+  setAlertStorageForTests(store);
+  let sentMessages = [];
+  setExpoPushClientForTests({
+    async sendExpoPushMessages(messages) {
+      sentMessages = messages;
+      return [{ status: "ok", id: "validation-ticket", to: messages[0].to }];
+    },
+  });
+
+  try {
+    const headers = { authorization: "Bearer alert-token" };
+    await callSavedRoutes("POST", {}, route, headers);
+    await callPushRegister(device, headers);
+    const denied = await callAlerts("POST", { action: "validation-delivery" }, {
+      routeId: route.id,
+      userId: route.userId,
+      deviceId: device.deviceId,
+    });
+    const accepted = await callAlerts("POST", { action: "validation-delivery" }, {
+      routeId: route.id,
+      userId: route.userId,
+      deviceId: device.deviceId,
+    }, headers);
+
+    assert.equal(denied.status, 401);
+    assert.equal(accepted.status, 202);
+    assert.equal(accepted.payload.deliveryStatus, "sent_to_expo");
+    assert.equal(accepted.payload.ticketAccepted, true);
+    assert.equal(sentMessages.length, 1);
+    assert.equal(sentMessages[0].to, device.expoPushToken);
+    assert.equal(process.env.EXPO_PUSH_DELIVERY_ENABLED, undefined);
+  } finally {
+    setAlertStorageForTests(null);
+    setExpoPushClientForTests(null);
+    if (originalToken === undefined) delete process.env.ALERTS_WRITE_TOKEN;
+    else process.env.ALERTS_WRITE_TOKEN = originalToken;
+    if (originalValidation === undefined) delete process.env.EXPO_PUSH_VALIDATION_ENABLED;
+    else process.env.EXPO_PUSH_VALIDATION_ENABLED = originalValidation;
+    if (originalDelivery === undefined) delete process.env.EXPO_PUSH_DELIVERY_ENABLED;
+    else process.env.EXPO_PUSH_DELIVERY_ENABLED = originalDelivery;
+  }
+});
+
 test("scheduled evaluator is idempotent across cron overlap and retry", async () => {
   const originalCron = process.env.CRON_SECRET;
   const originalDelivery = process.env.EXPO_PUSH_DELIVERY_ENABLED;

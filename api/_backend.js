@@ -112,11 +112,13 @@ const { geocode, geocodeProviderStatus } = createGeocoder({
 const {
   alertsStatus,
   alertsWriteAuthorised,
+  alertsAdminWriteAuthorised,
   alertsWriteSecurity,
   checkPushReceipts,
   cronAuthorised,
   deleteBackendSavedRoute,
   evaluateSavedRouteAlert,
+  validateSavedRouteAlertDelivery,
   issueAlertClientCapability,
   listBackendAlertEvaluations,
   listBackendPushDevices,
@@ -1425,7 +1427,6 @@ async function runRetentionCleanup({
     predictions,
   };
 }
-
 function retentionCleanupAuthorised(req = {}) {
   if (cronAuthorised(req)) return true;
   if (!process.env.ALERTS_WRITE_TOKEN) return false;
@@ -1435,25 +1436,21 @@ function retentionCleanupAuthorised(req = {}) {
   const bearer = String(auth).replace(/^Bearer\s+/i, "").trim();
   return (bearer || String(direct).trim()) === process.env.ALERTS_WRITE_TOKEN;
 }
-
 function normaliseDateOnly(value) {
   const text = String(value || "").trim();
   if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return "";
   const parsed = new Date(`${text}T00:00:00Z`);
   return Number.isNaN(parsed.getTime()) ? "" : text;
 }
-
 function optionalNumber(value) {
   if (value === undefined || value === null || value === "") return undefined;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : undefined;
 }
-
 function normaliseDirection(value) {
   const direction = String(value || "unknown").trim().toLowerCase();
   return ["up", "down", "flat", "unknown"].includes(direction) ? direction : "unknown";
 }
-
 function positiveInteger(value, fallback) {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
@@ -1465,6 +1462,7 @@ function isoDateTime(value) {
 }
 
 module.exports = {
+  alertsAdminWriteAuthorised,
   alertsWriteAuthorised,
   alertsWriteSecurity,
   alertsStatus,
@@ -1478,6 +1476,7 @@ module.exports = {
   deleteBackendSavedRoute,
   distanceKm,
   evaluateSavedRouteAlert,
+  validateSavedRouteAlertDelivery,
   fuelProviderCapabilityMatrix,
   geocode,
   geocodeProviderStatus,

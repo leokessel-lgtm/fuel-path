@@ -1,9 +1,11 @@
 const {
   alertsStatus,
+  alertsAdminWriteAuthorised,
   alertsWriteAuthorised,
   alertsWriteSecurity,
   deleteBackendSavedRoute,
   evaluateSavedRouteAlert,
+  validateSavedRouteAlertDelivery,
   issueAlertClientCapability,
   listBackendAlertEvaluations,
   listBackendPushDevices,
@@ -70,6 +72,16 @@ module.exports = async function handler(req, res) {
     if (action === "client-capability") {
       const capability = issueAlertClientCapability(req.body || {});
       sendJson(res, capability.accepted ? 202 : 403, capability);
+      return;
+    }
+
+    if (action === "validation-delivery") {
+      if (!alertsAdminWriteAuthorised(req)) {
+        sendJson(res, 401, { error: "Validation delivery is not authorised." });
+        return;
+      }
+      const result = await validateSavedRouteAlertDelivery(req.body || {});
+      sendJson(res, result.accepted ? 202 : 409, result);
       return;
     }
 

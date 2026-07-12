@@ -101,7 +101,6 @@ for (let index = 0; index < cases.length; index += 1) {
     const partial = summarise(rows);
     console.log(`${index + 1}/${cases.length} addressTop=${rateText(partial.byKind.address?.finalTopRate)} poiTop=${rateText(partial.byKind.poi?.finalTopRate)} p90Any=${partial.overall.p90AnyChars}`);
   }
-  if (DELAY_MS) await sleep(DELAY_MS);
 }
 
 const jsonPath = `tmp/geocode-hosted-national-benchmark-${RUN_ID}.json`;
@@ -174,6 +173,7 @@ async function runCase(testCase, index) {
     const requestMs = Date.now() - started;
     elapsedMs += requestMs;
     requestElapsedMs.push(requestMs);
+    if (DELAY_MS) await sleep(DELAY_MS);
     if (payload?.lookupStatus === "request_timeout") {
       finalPayload = payload;
       finalSuggestions = [];
@@ -199,6 +199,7 @@ async function runCase(testCase, index) {
     const requestMs = Date.now() - started;
     elapsedMs += requestMs;
     requestElapsedMs.push(requestMs);
+    if (DELAY_MS) await sleep(DELAY_MS);
     finalSuggestions = Array.isArray(finalPayload?.suggestions) ? finalPayload.suggestions : [];
   }
 

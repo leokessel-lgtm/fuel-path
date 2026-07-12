@@ -1056,6 +1056,12 @@ const checks = [
       planScreen.includes("const handleAddressFieldBlur = (field: \"from\" | \"to\")") &&
       planScreen.includes("fromSelectionSuppressRef.current") &&
       planScreen.includes("toSelectionSuppressRef.current") &&
+      planScreen.includes("const finishAddressFieldSelection = (field: \"from\" | \"to\")") &&
+      planScreen.includes("finishAddressFieldSelection(field);") &&
+      !planScreen.includes("fromSelectionSuppressTimerRef") &&
+      !planScreen.includes("toSelectionSuppressTimerRef") &&
+      planRouteEditorCard.includes('keyboardShouldPersistTaps="always"') &&
+      routeAddressSuggestions.includes('keyboardShouldPersistTaps="always"') &&
       routeAddressSuggestions.includes("addressLocalityHint") &&
       routeInputPrecision.includes("Add suburb or postcode to narrow the address.") &&
       routeInputPrecision.includes("Street found. Add suburb or postcode to choose the right area.") &&

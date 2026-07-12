@@ -31,7 +31,7 @@ export function AddressSuggestions({
       {!loading
         ? (
           <ScrollView
-            keyboardShouldPersistTaps="handled"
+            keyboardShouldPersistTaps="always"
             nestedScrollEnabled
             showsVerticalScrollIndicator={suggestions.length > 3}
             style={styles.suggestionScroll}

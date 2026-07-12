@@ -149,8 +149,6 @@ export function PlanScreenLogic({
   const activeAddressFieldRef = useRef<"from" | "to" | null>(null);
   const fromSelectionSuppressRef = useRef(false);
   const toSelectionSuppressRef = useRef(false);
-  const fromSelectionSuppressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const toSelectionSuppressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fromPointIsCurrentLocation = Boolean(
     currentLocation &&
       fromPoint &&
@@ -363,21 +361,17 @@ export function PlanScreenLogic({
 
   const beginAddressFieldSelection = (field: "from" | "to") => {
     if (field === "from") {
-      if (fromSelectionSuppressTimerRef.current) {
-        clearTimeout(fromSelectionSuppressTimerRef.current);
-      }
       fromSelectionSuppressRef.current = true;
-      fromSelectionSuppressTimerRef.current = setTimeout(() => {
-        fromSelectionSuppressRef.current = false;
-      }, 250);
     } else {
-      if (toSelectionSuppressTimerRef.current) {
-        clearTimeout(toSelectionSuppressTimerRef.current);
-      }
       toSelectionSuppressRef.current = true;
-      toSelectionSuppressTimerRef.current = setTimeout(() => {
-        toSelectionSuppressRef.current = false;
-      }, 250);
+    }
+  };
+
+  const finishAddressFieldSelection = (field: "from" | "to") => {
+    if (field === "from") {
+      fromSelectionSuppressRef.current = false;
+    } else {
+      toSelectionSuppressRef.current = false;
     }
   };
 
@@ -415,24 +409,6 @@ export function PlanScreenLogic({
 
   const selectAddressSuggestion = async (field: "from" | "to", point: MapPoint) => {
     markRouteEdited();
-    if (field === "from") {
-      if (fromSelectionSuppressTimerRef.current) {
-        clearTimeout(fromSelectionSuppressTimerRef.current);
-      }
-      fromSelectionSuppressRef.current = true;
-      fromSelectionSuppressTimerRef.current = setTimeout(() => {
-        fromSelectionSuppressRef.current = false;
-      }, 200);
-    } else {
-      if (toSelectionSuppressTimerRef.current) {
-        clearTimeout(toSelectionSuppressTimerRef.current);
-      }
-      toSelectionSuppressRef.current = true;
-      toSelectionSuppressTimerRef.current = setTimeout(() => {
-        toSelectionSuppressRef.current = false;
-      }, 200);
-    }
-
     const query = field === "from" ? from : to;
     let resolvedPoint = point;
     if (!Number.isFinite(point.lat) || !Number.isFinite(point.lon)) {
@@ -443,6 +419,7 @@ export function PlanScreenLogic({
         });
       } catch {
         dispatchRoute({ type: "transient-error", error: "Choose another suggestion, or try a fuller address, suburb or place." });
+        finishAddressFieldSelection(field);
         return;
       }
     }
@@ -461,6 +438,7 @@ export function PlanScreenLogic({
     clearAddressSuggestionError();
     reopenRouteEditor();
     resetAddressSessionToken(field);
+    finishAddressFieldSelection(field);
   };
 
   const useCurrentFromLocation = async () => {
@@ -518,6 +496,7 @@ export function PlanScreenLogic({
     clearAddressSuggestionError();
     reopenRouteEditor();
     resetAddressSessionToken(field);
+    finishAddressFieldSelection(field);
   };
 
   const clearBlockedRoutePlanning = () => {

@@ -88,7 +88,7 @@ export function PlanRouteEditorCard({
     <View style={[styles.searchCard, maxHeight ? { maxHeight } : null]}>
       <ScrollView
         contentContainerStyle={styles.searchCardContent}
-        keyboardShouldPersistTaps="handled"
+        keyboardShouldPersistTaps="always"
         nestedScrollEnabled
         showsVerticalScrollIndicator={false}
       >

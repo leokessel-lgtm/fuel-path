@@ -7,6 +7,7 @@ const scriptDir = resolve(fileURLToPath(import.meta.url), "..");
 const mobileRoot = resolve(scriptDir, "..");
 const repoRoot = resolve(mobileRoot, "..");
 const outputRoot = resolve(repoRoot, "tmp", "native-checklist");
+const smokeOutputRoot = resolve(repoRoot, "tmp", "native-smoke");
 const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
 const reportBase = `native-visual-checklist-${timestamp}`;
 
@@ -18,10 +19,13 @@ const explicitArtifact = argumentValue("--artifact") || process.env.FUEL_PATH_NA
 const skipInstall = process.argv.includes("--skip-install");
 const doInstall = !skipInstall;
 const resetAppData = process.argv.includes("--reset-app-data");
+const planOnly = process.argv.includes("--plan-only");
+const evParity = process.argv.includes("--ev-parity");
 
 const artifact = explicitArtifact ? resolve(repoRoot, explicitArtifact) : findLatestArtifact();
 
 mkdirSync(outputRoot, { recursive: true });
+mkdirSync(smokeOutputRoot, { recursive: true });
 const reportMd = join(outputRoot, `${reportBase}.md`);
 
 if (!existsSync(adb)) throw new Error(`adb not found at ${adb}`);
@@ -39,29 +43,39 @@ const evidence = [];
 
 await installAndLaunch();
 await switchTab("Plan");
-await captureState("plan_default", {
-  "Bottom navigation visible": hasBottomTabs,
-  "Plan form shell present": (xml) => /content-desc="From"/.test(xml) && /content-desc="To"/.test(xml),
-  "Map surface present on plan home": hasGoogleMapXml,
-});
+if (evParity) {
+  await captureEvParityFlow();
+} else {
+  await captureState("plan_default", {
+    "Bottom navigation visible": hasBottomTabs,
+    "Plan form shell present": (xml) => /content-desc="From"/.test(xml) && /content-desc="To"/.test(xml),
+    "Map surface present on plan home": hasGoogleMapXml,
+  });
 
-await capturePlanFlow();
-await switchTab("Nearby");
-await captureState("nearby_default", {
-  "Nearby controls present": (xml) => /Nearby location|Choose fuel or EV charging/.test(xml),
-  "Station markers present": hasAnyStationMarker,
-  "Bottom navigation visible": hasBottomTabs,
-});
-await interactNearby();
-await switchTab("Settings");
-await captureState("settings_root", {
-  "Settings rows visible": hasSettingsRoot,
-  "Settings tab selected": (xml) => /content-desc="Settings"[^>]*selected="true"/.test(xml) || /text="Settings"/.test(xml),
-});
-await captureSettingsSections();
+  await capturePlanFlow();
+  if (!planOnly) {
+    await switchTab("Nearby");
+    await captureState("nearby_default", {
+      "Nearby controls present": (xml) => /Nearby location|Choose fuel or EV charging/.test(xml),
+      "Station markers present": hasAnyStationMarker,
+      "Bottom navigation visible": hasBottomTabs,
+    });
+    await interactNearby();
+    await switchTab("Settings");
+    await captureState("settings_root", {
+      "Settings rows visible": hasSettingsRoot,
+      "Settings tab selected": (xml) => /content-desc="Settings"[^>]*selected="true"/.test(xml) || /text="Settings"/.test(xml),
+    });
+    await captureSettingsSections();
+  }
+}
 
 await generateReport();
 console.log(`Checklist complete: ${reportMd}`);
+if (evidence.some((item) => item.rows.some((row) => row.status !== "PASS"))) {
+  console.error("Native visual checklist contains failed or blocked checks.");
+  process.exitCode = 1;
+}
 
 async function capturePlanFlow() {
   await tapByLabel("From", { fallbackX: 190, fallbackY: 330 });
@@ -129,6 +143,49 @@ async function capturePlanFlow() {
       rows: [{ label: "Station marker available for tap", status: "BLOCKED" }],
     });
   }
+}
+
+async function captureEvParityFlow() {
+  if (/text="Edit"/.test(readUiDump())) {
+    await tapByLabel("Edit", { fallbackX: 1110, fallbackY: 500 });
+    await wait(900);
+  }
+  await tapByLabel("From", { fallbackX: 190, fallbackY: 500 });
+  await clearAndType("Sylvania NSW");
+  await wait(1800);
+  const fromSuggestionFound = await tapByLabel(/Use Sylvania NSW 2224/i, { fallbackX: 430, fallbackY: 820 });
+  await wait(1000);
+
+  await tapByLabel("To", { fallbackX: 190, fallbackY: 650 });
+  await clearAndType("Newcastle NSW");
+  await wait(1800);
+  const toSuggestionFound = await tapByLabel(/Use Newcastle NSW 2300|Use Newcastle NSW/i, { fallbackX: 430, fallbackY: 980 });
+  await wait(1000);
+
+  await tapByLabel(/Check route range|Plan route/i, { fallbackX: 300, fallbackY: 1050 });
+  await wait(14000);
+
+  const xml = readUiDump();
+  const stem = `android-pixel-ev-route-result-${timestamp}`;
+  const screenshot = join(smokeOutputRoot, `${stem}.png`);
+  const xmlPath = join(smokeOutputRoot, `${stem}.xml`);
+  const pngResult = run(["-s", serial, "exec-out", "screencap", "-p"], {
+    encoding: "buffer",
+    maxBuffer: 24 * 1024 * 1024,
+  });
+  if (pngResult.status !== 0) throw new Error("EV parity screenshot failed");
+  writeFileSync(xmlPath, xml);
+  writeFileSync(screenshot, pngResult.stdout);
+  const rows = [
+    ["Sylvania autocomplete suggestion found", fromSuggestionFound],
+    ["Newcastle autocomplete suggestion found", toSuggestionFound],
+    ["EV profile active", /EV|400 km/i.test(xml)],
+    ["Sylvania endpoint present", /Sylvania/i.test(xml)],
+    ["Newcastle endpoint present", /Newcastle/i.test(xml)],
+    ["Route charger options present", /Route charger options/i.test(xml)],
+    ["400 km selected range present", /\d+ km route\. 400 km selected range/i.test(xml)],
+  ].map(([label, passed]) => ({ label: String(label), status: passed ? "PASS" : "FAIL" }));
+  evidence.push({ stateName: "android_ev_route_parity", screenshot, xmlPath, rows });
 }
 
 async function interactNearby() {
@@ -376,15 +433,20 @@ function latestDump() {
 }
 
 function findNodeByText(xml, value) {
-  const source = value instanceof RegExp ? value.source : escapeRegex(String(value));
-  const rx = new RegExp(`<node\\b[^>]*text="[^"]*${source}[^"]*"[^>]*bounds="\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\]"`, "i");
+  const textPattern = value instanceof RegExp
+    ? `[^"]*${value.source}[^"]*`
+    : escapeRegex(String(value));
+  const rx = new RegExp(`<node\\b[^>]*text="${textPattern}"[^>]*bounds="\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\]"`, "i");
   const match = xml.match(rx);
   if (!match) return null;
   return { left: Number(match[1]), top: Number(match[2]), right: Number(match[3]), bottom: Number(match[4]) };
 }
 
 function findNodeByContentDesc(xml, pattern) {
-  const matcher = new RegExp(pattern instanceof RegExp ? pattern.source : String(pattern), "i");
+  const matcher = new RegExp(
+    pattern instanceof RegExp ? pattern.source : `^${escapeRegex(String(pattern))}$`,
+    "i",
+  );
   const matches = [...xml.matchAll(/<node\b[^>]*content-desc="([^"]+)"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"[^>]*>/gi)];
   const target = matches.find((match) => matcher.test(match[1] || ""));
   if (!target) return null;
@@ -414,10 +476,11 @@ async function tapByLabel(label, options = {}) {
 
   if (node) {
     await tapBounds(node);
-    return;
+    return true;
   }
 
   run(["-s", serial, "shell", "input", "tap", String(fallbackX), String(fallbackY)]);
+  return false;
 }
 
 function findNodeByTextOrContent(xml, label) {

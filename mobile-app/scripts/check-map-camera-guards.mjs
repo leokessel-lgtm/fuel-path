@@ -1434,12 +1434,16 @@ const checks = [
     ok:
       packageJson.includes('"native:android-alert-sync-smoke": "node scripts/native-android-alert-sync-smoke.mjs"') &&
       androidAlertSyncSmoke.includes("/api/alerts?action=client-capability") &&
+      androidAlertSyncSmoke.includes("installationId, installationSecret") &&
       androidAlertSyncSmoke.includes("/api/push/register") &&
       androidAlertSyncSmoke.includes("/api/saved-routes") &&
       androidAlertSyncSmoke.includes("fakeExpoPushToken") &&
+      androidAlertSyncSmoke.includes("FUEL_PATH_ALLOW_PRODUCTION_ALERT_SMOKE") &&
       androidAlertSyncSmoke.includes("Temporary saved route watch cleanup succeeds") &&
       androidAlertSyncSmoke.includes("Temporary saved route watch is absent after cleanup") &&
-      androidAlertSyncSmoke.includes("Scoped capability and push token values are intentionally omitted from this report."),
+      androidAlertSyncSmoke.includes("Temporary installation data is deleted atomically") &&
+      androidAlertSyncSmoke.includes("Revoked installation capability cannot read saved routes") &&
+      androidAlertSyncSmoke.includes("Installation secret, scoped capability and push token values are intentionally omitted from this report."),
   },
   {
     label: "Android alert delivery gate distinguishes backend sync from real push delivery",
@@ -1523,6 +1527,9 @@ const checks = [
       nativeEvidenceAudit.includes("Android route-watch backend sync smoke") &&
       nativeEvidenceAudit.includes("latestAndroidNotificationReadiness") &&
       nativeEvidenceAudit.includes("latestAndroidAlertSync") &&
+      nativeEvidenceAudit.includes("latestExcludedProductionAlertSync") &&
+      nativeEvidenceAudit.includes("It does not validate PR #30's account-free Preview contract.") &&
+      nativeEvidenceAudit.includes("Production-targeted alert sync reports do not satisfy the account-free PR #30 Preview lane.") &&
       nativeEvidenceAudit.includes("fuel-path-local-standalone") &&
       nativeEvidenceAudit.includes("Android debug APK") &&
       nativeEvidenceAudit.includes('path.resolve(repoRoot, "native-artifacts")') &&

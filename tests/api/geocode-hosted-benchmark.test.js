@@ -33,6 +33,7 @@ const RURAL_ADDRESS_ROWS = [
 test("hosted national benchmark runs against an HTTP geocode API contract", async () => {
   const fixture = buildAddressFixture();
   const api = await startMockGeocodeApi(ADDRESS_ROWS);
+  const runId = `checkpoint-${Date.now()}`;
   try {
     const { stdout } = await execFileAsync(
       process.execPath,
@@ -56,6 +57,10 @@ test("hosted national benchmark runs against an HTTP geocode API contract", asyn
         "80",
         "--delay-ms",
         "0",
+        "--checkpoint-every",
+        "1",
+        "--run-id",
+        runId,
       ],
       { cwd: ROOT, timeout: 30_000 },
     );
@@ -67,6 +72,10 @@ test("hosted national benchmark runs against an HTTP geocode API contract", asyn
     assert.equal(result.summary.byKind.address.finalTopMatch, 8);
     assert.equal(result.summary.byKind.poi.cases, 8);
     assert.equal(result.fetchCalls.httpGeocode > 0, true);
+    const checkpoint = JSON.parse(fs.readFileSync(path.join(ROOT, "tmp", `geocode-hosted-national-benchmark-${runId}.checkpoint.json`), "utf8"));
+    assert.equal(checkpoint.status, "running");
+    assert.equal(checkpoint.completedCases, 16);
+    fs.rmSync(path.join(ROOT, "tmp", `geocode-hosted-national-benchmark-${runId}.checkpoint.json`), { force: true });
   } finally {
     await api.close();
     fs.rmSync(fixture.dir, { recursive: true, force: true });

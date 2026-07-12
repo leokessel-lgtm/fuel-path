@@ -1,0 +1,97 @@
+{
+  "schemaVersion": 1,
+  "evidenceType": "hosted_national_lookup_readiness",
+  "recordedAt": "2026-07-12T11:37:42+10:00",
+  "sourceCommit": "4456408",
+  "targets": {
+    "oracleApi": "https://gnaf.152.69.175.222.sslip.io",
+    "benchmarkApiBase": "https://fuel-path.vercel.app",
+    "previewDeployment": "https://fuel-path-euwbpf0oj-leonardo-volpi-kesselring-s-projects.vercel.app"
+  },
+  "oracleReadiness": {
+    "status": "passed",
+    "addressRows": 16905824,
+    "minimumAddressRows": 10000000,
+    "tableExists": true,
+    "indexReady": true,
+    "missingIndexes": [],
+    "missingTokenStatus": 401,
+    "wrongTokenStatus": 401
+  },
+  "previewReadiness": {
+    "status": "not_ready",
+    "reportedAddressRows": 16905824,
+    "rowCountReady": true,
+    "exactSmokeStatus": "passed",
+    "blockers": ["hosted_national_benchmark_not_passed"]
+  },
+  "hostedBenchmark": {
+    "status": "failed",
+    "runId": "final-main-4456408-rural-unit-context-20260712",
+    "mode": "http",
+    "profile": "rural-unit",
+    "caseContext": true,
+    "caseContextRadiusKm": 80,
+    "delayMs": 50,
+    "cases": 900,
+    "httpGeocodeRequests": 2894,
+    "coverage": {
+      "addressCases": 600,
+      "poiCases": 300,
+      "ruralOrRemoteAddressCases": 525,
+      "unitOrBuildingAddressCases": 112,
+      "allStatesRepresented": true
+    },
+    "results": {
+      "addressTopMatches": 597,
+      "addressTopRate": 0.995,
+      "requiredAddressTopRate": 1,
+      "addressP90Characters": 22,
+      "maximumAddressP90Characters": 42,
+      "poiTopMatches": 300,
+      "poiTopRate": 1,
+      "requiredPoiTopRate": 0.98,
+      "poiP90Characters": 3,
+      "maximumPoiP90Characters": 12
+    },
+    "failures": [
+      {
+        "id": "hosted-0080",
+        "state": "ACT",
+        "query": "Lake Tuggeranong College Offc 1 123 Cowlishaw Street Greenway ACT 2900",
+        "expectedLabel": "Lake Tuggeranong College, Offc 1, 123 Cowlishaw Street, Greenway ACT 2900",
+        "outcome": "request_timeout",
+        "timeoutMs": 8000
+      },
+      {
+        "id": "hosted-0099",
+        "state": "ACT",
+        "query": "Tuggeranong Youth Resource Centre 43 Pitman Street Greenway ACT 2900",
+        "expectedLabel": "Tuggeranong Youth Resource Centre, 43 Pitman Street, Greenway ACT 2900",
+        "outcome": "request_timeout",
+        "timeoutMs": 8000
+      },
+      {
+        "id": "hosted-0122",
+        "state": "ACT",
+        "query": "Lanyon Homestead 754 Tharwa Drive Tuggeranong ACT 2900",
+        "expectedLabel": "Lanyon Homestead, 754 Tharwa Drive, Tuggeranong ACT 2900",
+        "outcome": "wrong_top_suggestion",
+        "observedTopLabel": "Lanyon Homestead, Tharwa ACT 2620",
+        "observedTopProvider": "fuel_path_regional_gazetteer"
+      }
+    ]
+  },
+  "readinessImpact": {
+    "providerData": "oracle_national_row_count_and_indexes_proven",
+    "quality": "hosted_national_benchmark_failed",
+    "preview": "row_count_blocker_cleared_benchmark_blocker_remains",
+    "webProduction": "benchmark_target_only_not_release_approval",
+    "beta": "not_proven",
+    "store": "not_proven"
+  },
+  "generatedSources": [
+    "tmp/geocode-hosted-national-benchmark-final-main-4456408-rural-unit-context-20260712.json",
+    "tmp/geocode-hosted-national-benchmark-final-main-4456408-rural-unit-context-20260712.csv"
+  ]
+}

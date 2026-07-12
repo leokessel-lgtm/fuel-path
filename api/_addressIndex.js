@@ -124,8 +124,9 @@ async function searchApiNeedles(needles, limit, rawNeedle = "") {
     const rows = await searchApiIndex(item.rawQuery, item.needle, limit);
     groups.push(rows);
     const merged = mergeAddressSuggestions(groups, limit);
-    if (rows.length) return merged;
-    if (shouldStopApiNeedleSearch(merged, item.needle, limit, item.rawNeedle || rawNeedle)) return merged;
+    if (shouldStopApiNeedleSearch(rows, item.needle, limit, item.rawNeedle || rawNeedle)) {
+      return mergeAddressSuggestions([rows, ...groups], limit);
+    }
   }
   return mergeAddressSuggestions(groups, limit);
 }
@@ -1590,7 +1591,6 @@ function addressDisplayMetadata(record, matchType) {
 function escapeFtsTerm(value) {
   return String(value).replace(/["']/g, " ").replace(/[^\p{L}\p{N}_-]+/gu, " ").trim();
 }
-
 function addressSearchNeedles(rawQuery) {
   const primary = normaliseLeadingUnitAliasNeedle(rawQuery);
   const leadingUnitSlashNeedles = queryHasLeadingUnitSlashNeedleVariants(primary, rawQuery);

@@ -1336,6 +1336,51 @@ test("Oracle-hosted building searches query address cores before broad names", a
   }
 });
 
+test("Oracle-hosted building searches continue from a non-exact core result to the named exact address", async () => {
+  const api = await startMockGnafApi({
+    suggestionsForQuery(query) {
+      if (query === "7795 jundah longreach road stonehenge qld 4730") {
+        return [{
+          id: "GAQLD_OTHER",
+          label: "7795 Jundah Longreach Road, Stonehenge QLD 4730",
+          lat: -24.2,
+          lon: 143.4,
+          state: "QLD",
+          postcode: "4730",
+          matchType: "address_contains",
+        }];
+      }
+      if (query === "Glenroy 7795 Jundah - Longreach Road Stonehenge QLD 4730") {
+        return [{
+          id: "GAQLD_GLENROY",
+          label: "Glenroy, 7795 Jundah - Longreach Road, Stonehenge QLD 4730",
+          lat: -24.37876985,
+          lon: 143.39646325,
+          state: "QLD",
+          postcode: "4730",
+          matchType: "exact_address",
+        }];
+      }
+      return [];
+    },
+  });
+  try {
+    await withEnv({ FUEL_PATH_GNAF_API_URL: api.url, FUEL_PATH_GNAF_API_TOKEN: "test-token" }, async () => {
+      const suggestions = await searchAddressIndex("Glenroy 7795 Jundah - Longreach Road Stonehenge QLD 4730", 3);
+      assert.equal(suggestions[0].label, "Glenroy, 7795 Jundah - Longreach Road, Stonehenge QLD 4730");
+      assert.deepEqual(
+        api.requests.map((request) => new URL(request.url, api.url).searchParams.get("q")),
+        [
+          "7795 jundah longreach road stonehenge qld 4730",
+          "Glenroy 7795 Jundah - Longreach Road Stonehenge QLD 4730",
+        ],
+      );
+    });
+  } finally {
+    await api.close();
+  }
+});
+
 test("G-NAF API failure falls back to seed records", async () => {
   const api = await startMockGnafApi({ status: 503 });
   await withEnv(
@@ -1383,7 +1428,7 @@ function installFetchMock() {
   };
 }
 
-async function startMockGnafApi({ status = 200 } = {}) {
+async function startMockGnafApi({ status = 200, suggestionsForQuery = null } = {}) {
   const requests = [];
   const server = http.createServer((request, response) => {
     requests.push({
@@ -1391,12 +1436,15 @@ async function startMockGnafApi({ status = 200 } = {}) {
       authorization: request.headers.authorization,
     });
     response.writeHead(status, { "content-type": "application/json" });
+    const query = new URL(request.url, "http://127.0.0.1").searchParams.get("q") || "";
     response.end(
       JSON.stringify({
         ok: status === 200,
         suggestions:
           status === 200
-            ? [
+            ? suggestionsForQuery
+              ? suggestionsForQuery(query)
+              : [
                 {
                   id: "GANSW_API_1",
                   label: "87A Corea Street, Sylvania NSW 2224",

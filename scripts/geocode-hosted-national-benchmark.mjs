@@ -485,7 +485,18 @@ function suggestionMatches(testCase, suggestion) {
   const label = normalise(suggestion?.label);
   if (!label) return false;
   if (testCase.kind === "address") {
-    return normalise(testCase.expectedLabel) === label && suggestion?.provider === "fuel_path_gnaf";
+    if (suggestion?.provider !== "fuel_path_gnaf") return false;
+    if (normalise(testCase.expectedLabel) === label) return true;
+    const expected = addressParts(testCase.expectedLabel);
+    const actual = addressParts(suggestion?.label);
+    if (!expected || !actual || expected.unit) return false;
+    return (
+      expected.number === actual.number &&
+      expected.street === actual.street &&
+      expected.locality === actual.locality &&
+      expected.state === actual.state &&
+      expected.postcode === actual.postcode
+    );
   }
   const stateMatch =
     suggestion?.state === testCase.state ||

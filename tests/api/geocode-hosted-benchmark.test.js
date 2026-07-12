@@ -127,6 +127,12 @@ test("hosted national benchmark rural-unit profile samples compact rows by local
   }
 });
 
+test("hosted national benchmark applies pacing between autocomplete requests", () => {
+  const source = fs.readFileSync(path.join(ROOT, "scripts/geocode-hosted-national-benchmark.mjs"), "utf8");
+  assert.equal((source.match(/if \(DELAY_MS\) await sleep\(DELAY_MS\);/g) || []).length, 2);
+  assert.doesNotMatch(source, /console\.log\(`\$\{index \+ 1\}\/\$\{cases\.length\}[\s\S]{0,500}if \(DELAY_MS\) await sleep\(DELAY_MS\);/);
+});
+
 function buildAddressFixture(rows = ADDRESS_ROWS, extraArgs = []) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-hosted-benchmark-"));
   const inputPath = path.join(dir, "GNAF_CORE.psv");

@@ -1,4 +1,4 @@
-const { assertProductDatabaseSchema, createProductSqlClient } = require("./_productDatabase");
+const { assertProductDatabaseSchema, createProductSqlClient, productDatabaseUrl } = require("./_productDatabase");
 const { rowToDevice, rowToEvaluation, rowToRoute } = require("./_alertRecords");
 const { setAlertInstallationStorageForTests } = require("./_alertInstallationStorage");
 
@@ -568,13 +568,7 @@ async function ensureTables(sql) {
 
 
 function databaseUrl() {
-  return (
-    process.env.DATABASE_URL ||
-    process.env.POSTGRES_URL ||
-    process.env.POSTGRES_PRISMA_URL ||
-    process.env.NEON_DATABASE_URL ||
-    ""
-  );
+  return productDatabaseUrl();
 }
 
 function cleanText(value) {

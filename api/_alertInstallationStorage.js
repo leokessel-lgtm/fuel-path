@@ -1,4 +1,4 @@
-const { assertAlertInstallationSchema, createProductSqlClient } = require("./_productDatabase");
+const { assertAlertInstallationSchema, createProductSqlClient, productDatabaseUrl } = require("./_productDatabase");
 const { isoDateTime } = require("./_alertRecords");
 
 let sqlClient;
@@ -164,8 +164,7 @@ async function deleteInstallationAlertData(installationId = "", now = new Date()
 }
 
 function databaseUrl() {
-  return process.env.DATABASE_URL || process.env.POSTGRES_URL
-    || process.env.POSTGRES_PRISMA_URL || process.env.NEON_DATABASE_URL || "";
+  return productDatabaseUrl();
 }
 
 async function getSql() {

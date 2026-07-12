@@ -37,6 +37,17 @@ function usesDirectPostgres(connectionString) {
   }
 }
 
+function productDatabaseUrl() {
+  return (
+    process.env.FUEL_PATH_PRODUCT_DATABASE_URL ||
+    process.env.DATABASE_URL ||
+    process.env.POSTGRES_URL ||
+    process.env.POSTGRES_PRISMA_URL ||
+    process.env.NEON_DATABASE_URL ||
+    ""
+  );
+}
+
 async function assertProductDatabaseSchema(sql) {
   const existing = schemaChecks.get(sql);
   if (existing) return existing;
@@ -114,5 +125,6 @@ module.exports = {
   assertAlertInstallationSchema,
   assertProductDatabaseSchema,
   createProductSqlClient,
+  productDatabaseUrl,
   resetProductDatabaseSchemaForTests,
 };

@@ -10,10 +10,10 @@
   "applePrivacyReviewReference": "STORE-DATA-SAFETY.md Apple App Privacy review 2026-07-05",
   "googleDataSafetyReviewed": true,
   "googleDataSafetyReviewReference": "STORE-DATA-SAFETY.md Google Data Safety review 2026-07-05",
-  "providerLimitationsDisclosed": false,
-  "providerLimitationsDisclosureReference": "",
+  "providerLimitationsDisclosed": true,
+  "providerLimitationsDisclosureReference": "docs/02-build-release/STORE-LISTING-PROVIDER-LIMITATIONS-REVIEW-2026-07-12.md reviewed provider limitation disclosure 2026-07-12",
   "supportProcessReady": true,
   "supportProcessReference": "docs/02-build-release/SUPPORT-RUNBOOK.md Support process reviewed and support contact confirmation 2026-07-05",
-  "reviewedAt": "2026-07-10",
+  "reviewedAt": "2026-07-12",
   "reviewer": "Leo Kesselring"
 }

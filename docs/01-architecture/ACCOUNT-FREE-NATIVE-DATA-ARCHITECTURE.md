@@ -215,7 +215,10 @@ address or route values.
 
 1. Keep PR #29 unchanged and merge/review it independently.
 2. Create a new database target for Preview before any migration. Preview and
-   Production must never share `DATABASE_URL` during this rollout.
+   Production must never share the effective product database target during
+   this rollout. Preview uses the Preview-only
+   `FUEL_PATH_PRODUCT_DATABASE_URL` override; Production continues to use its
+   managed `DATABASE_URL`.
 3. Treat the owner-scoped saved-route primary-key change as a forward-only
    constraint migration, not a purely additive change. Rehearse its lock time,
    existing-row reconciliation and corrective forward migration on the isolated
@@ -233,10 +236,12 @@ address or route values.
    not run destructive down migrations on production; restore from backup or
    issue a corrective forward migration.
 
-Before any hosted migration, verify the Vercel Preview and Production
-environment values, database roles, connection-pooling posture, backup/restore
-evidence and who is permitted to run migrations. Those facts are currently
-**unknown / needs verification**.
+Before any hosted migration, verify the Vercel Preview and Production effective
+product database targets, database roles, connection-pooling posture,
+backup/restore evidence and who is permitted to run migrations. A schema-only
+Neon `preview` branch and Preview-only product database override now exist, but
+their isolation, least-privilege role, backup/restore path and migration
+rehearsal still require verification before any hosted migration.
 
 ## QA And Regression Gates
 

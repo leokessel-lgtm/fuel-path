@@ -1,10 +1,10 @@
 {
   "notes": [
     "Private provider-terms evidence file created on 2026-07-05 from held local and Gmail evidence.",
-    "This file intentionally marks only proof we genuinely hold as confirmed.",
     "Do not add API keys, bearer tokens, subscriber tokens, client secrets or raw credential values to this file or its source notes.",
-    "Current state: QLD and VIC access proof exists in email, but explicit terms/caching/attribution/commercial-use acceptance evidence is still missing unless Leo confirms and records that review.",
-    "NSW, ACT and TAS remain blocked for provider terms because current email search found API.NSW verification-code emails only, not approval or accepted FuelCheck terms evidence. TAS technical API access is documented elsewhere, but usage/caching/attribution terms are still not confirmed here."
+    "Current state: QLD and VIC access proof exists in email, but explicit terms, caching, attribution and commercial-use acceptance evidence is still missing unless independently recorded from the provider or authority.",
+    "NSW, ACT and TAS remain blocked for provider terms because current email search found API.NSW verification-code emails only, not approval or accepted FuelCheck terms evidence. TAS technical API access is documented elsewhere, but usage, caching and attribution terms are still not confirmed here.",
+    "The 2026-07-12 release-owner attestation is retained in provider-terms-release-owner-confirmation-2026-07-12.md as an internal operating decision. It is not provider or authority terms evidence and cannot clear public live-price claims."
   ],
   "regions": {
     "NSW": {

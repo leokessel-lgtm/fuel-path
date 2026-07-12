@@ -75,8 +75,9 @@ pgmigrations;`.
 - Every product-state schema change gets a new forward-only migration under
   `db/migrations/`.
 - Run `npm run db:migrate` with `DATABASE_URL` set for a shared or hosted
-  environment. This command is intentionally explicit and never reads a G-NAF
-  connection variable.
+  environment. The application may use `FUEL_PATH_PRODUCT_DATABASE_URL` as a
+  Preview-only runtime override, but the migration command remains intentionally
+  explicit and never reads a G-NAF connection variable.
 - The initial baseline is idempotent so it can adopt a pre-existing product
   database whose tables were created before migrations were introduced.
 - Do not run schema-changing SQL in API request handling. Runtime checks only

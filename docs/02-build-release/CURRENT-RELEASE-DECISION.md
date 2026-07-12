@@ -1,24 +1,29 @@
 # Fuel Path release decision
 
-Reviewed: 2026-07-10 (Australia/Sydney)
+Reviewed: 2026-07-12 (Australia/Sydney)
 
 ## Decision
 
-**NO-GO for controlled beta or public store release.**
+**NO-GO for controlled beta, hosted alert rollout or public store release.**
 
-The documentation move is verified, but release readiness is blocked. Do not
-reuse the superseded 2026-07-06 GO decision as current proof.
+PR #30's account-free foundation is quality-checked and its two repaired review
+threads are resolved, but release readiness is blocked. Do not reuse the
+superseded 2026-07-06 GO decision as current proof.
 
 ## Current blockers
 
-The current local beta-readiness gate reports:
+The current beta-readiness gate reports:
 
-- `physical_device_validation_missing`
-- `native_performance_not_claimable`
-- `native_blocker_packet_stale`
-- `ios_native_validation_missing`
+- `android_preview_smoke_missing`
+- `native_blocker_packet_missing`
 - `store_listing_links_missing`
-- `provider_limitations_disclosure_missing`
+
+The managed `DATABASE_URL`, `POSTGRES_URL` and `POSTGRES_PRISMA_URL` values
+remain shared. A Preview-only `FUEL_PATH_PRODUCT_DATABASE_URL` override now
+points to a schema-only Neon Preview branch, and the PR #29 and PR #30
+migrations were rehearsed there successfully. The override selector is not yet
+deployed in Preview, and least-privilege role plus backup/restore evidence
+remain required before hosted alert rollout or any Production migration.
 
 The App Store and Google Play URLs previously recorded in store evidence both
 returned HTTP 404 on 2026-07-10. They have been removed from current evidence.
@@ -27,21 +32,36 @@ The corrected evidence is
 
 ## Ready but not sufficient
 
-- Provider terms evidence passes for configured providers, but public live-price
-  claims remain limited to WA.
+- Provider capability is live across configured regions, but public live-price
+  claims remain blocked until provider or authority terms evidence is held for
+  each gated region. The 2026-07-12 release-owner attestation is an internal
+  operating decision, not provider terms evidence.
 - Support readiness passes with the current runbook, owner and contact evidence.
+- Provider-limitation disclosure copy is reviewed and ready to include in final
+  listing materials.
 - The hosted privacy page resolves, but store publication remains blocked until
   real public listing URLs and final listing disclosure evidence exist.
+- Root secret hygiene passes, the backend suite passes 559 of 559 tests, and
+  mobile `npm run verify` passes. These are quality evidence only, not native
+  device or store evidence.
 
 ## Next actions
 
-1. Create or confirm real App Store and Google Play listings, then verify both
+1. Deploy the Preview database-override selector, then verify Preview runtime
+   uses the isolated target. Create a least-privilege runtime role and complete
+   a backup/restore rehearsal before any hosted alert rollout.
+2. Complete Google Play developer identity and Android-device verification, and
+   enable App Store Connect for the paid Apple Developer account.
+3. Create or confirm real App Store and Google Play listings, then verify both
    public URLs before recording them as evidence.
-2. Review provider-limitation wording in the actual listing copy.
-3. Refresh the native blocker packet against the current Android evidence.
-4. Resolve the native performance source mismatch.
-5. Add the missing iOS validation screenshots or device evidence.
-6. Rerun the beta-readiness gate before changing this decision.
+4. Put the reviewed provider-limitation disclosure into the final App Store and
+   Google Play listing materials.
+5. Refresh the native blocker packet against the current Android evidence, then
+   add signed iOS device evidence when devices are available.
+6. Collect dated provider or authority terms evidence for each gated region,
+   including allowed public use, cache limits and attribution requirements.
+7. Rerun the beta-readiness gate with the held provider and support evidence
+   inputs before changing this decision.
 
 ## Historical decision
 

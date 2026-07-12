@@ -51,6 +51,20 @@ The historical repo split between stabilisation, backlog and generated artefacts
 
 ## Local Run
 
+### Product-state database
+
+The local product-state database covers alerts, saved routes, prediction history
+and geocoding quota. It does not contain the national G-NAF index.
+
+```sh
+npm run db:up
+npm run db:migrate:local
+```
+
+For a clean local database, run `npm run db:reset`. See
+[`docs/01-architecture/LOCAL-DEVELOPMENT-DATABASE.md`](docs/01-architecture/LOCAL-DEVELOPMENT-DATABASE.md)
+for migration and production rollout rules.
+
 Start the local backend:
 
 ```sh

@@ -1,9 +1,10 @@
+const { assertProductDatabaseSchema, createProductSqlClient } = require("./_productDatabase");
+
 const DEFAULT_MAX_RECORDS = 500;
 const TABLE_NAME = "fuel_path_prediction_backtests";
 const SNAPSHOT_TABLE_NAME = "fuel_path_market_price_snapshots";
 
 let sqlClient;
-let ensureTablePromise;
 let testStorage;
 
 const memoryStore = {
@@ -308,80 +309,12 @@ function listMemorySnapshots({ market = "", fuel = "", limit = 200 } = {}) {
 
 async function getSql() {
   if (sqlClient) return sqlClient;
-  const { neon } = require("@neondatabase/serverless");
-  sqlClient = neon(databaseUrl());
+  sqlClient = createProductSqlClient(databaseUrl());
   return sqlClient;
 }
 
 async function ensureTable(sql) {
-  if (!ensureTablePromise) {
-    ensureTablePromise = (async () => {
-      await sql`
-        CREATE TABLE IF NOT EXISTS fuel_path_prediction_backtests (
-          id TEXT PRIMARY KEY,
-          region TEXT NOT NULL,
-          market TEXT NOT NULL DEFAULT '',
-          fuel TEXT NOT NULL,
-          target_date DATE NOT NULL,
-          prediction_date DATE NOT NULL,
-          model_version TEXT NOT NULL,
-          predicted_cpl DOUBLE PRECISION,
-          actual_cpl DOUBLE PRECISION,
-          absolute_error_cpl DOUBLE PRECISION,
-          predicted_direction TEXT NOT NULL DEFAULT 'unknown',
-          actual_direction TEXT NOT NULL DEFAULT 'unknown',
-          direction_matched BOOLEAN,
-          recorded_at TIMESTAMPTZ NOT NULL,
-          raw JSONB NOT NULL DEFAULT '{}'::jsonb
-        )
-      `;
-      await sql`
-        ALTER TABLE fuel_path_prediction_backtests
-        ADD COLUMN IF NOT EXISTS market TEXT NOT NULL DEFAULT ''
-      `;
-      await sql`
-        CREATE INDEX IF NOT EXISTS fuel_path_prediction_backtests_region_fuel_target_idx
-        ON fuel_path_prediction_backtests (region, fuel, target_date DESC)
-      `;
-      await sql`
-        CREATE INDEX IF NOT EXISTS fuel_path_prediction_backtests_market_fuel_target_idx
-        ON fuel_path_prediction_backtests (market, fuel, target_date DESC)
-      `;
-      await sql`
-        CREATE INDEX IF NOT EXISTS fuel_path_prediction_backtests_recorded_at_idx
-        ON fuel_path_prediction_backtests (recorded_at DESC)
-      `;
-      await sql`
-        CREATE TABLE IF NOT EXISTS fuel_path_market_price_snapshots (
-          id TEXT PRIMARY KEY,
-          region TEXT NOT NULL,
-          market TEXT NOT NULL,
-          fuel TEXT NOT NULL,
-          observed_date DATE NOT NULL,
-          observed_at TIMESTAMPTZ NOT NULL,
-          median_cpl DOUBLE PRECISION,
-          low_cpl DOUBLE PRECISION,
-          high_cpl DOUBLE PRECISION,
-          exact_price_count INTEGER NOT NULL DEFAULT 0,
-          provider TEXT NOT NULL DEFAULT '',
-          capability TEXT NOT NULL DEFAULT '',
-          cache_mode TEXT NOT NULL DEFAULT '',
-          cache_age_seconds DOUBLE PRECISION,
-          warning TEXT NOT NULL DEFAULT '',
-          raw JSONB NOT NULL DEFAULT '{}'::jsonb
-        )
-      `;
-      await sql`
-        CREATE INDEX IF NOT EXISTS fuel_path_market_price_snapshots_market_fuel_date_idx
-        ON fuel_path_market_price_snapshots (market, fuel, observed_date DESC)
-      `;
-      await sql`
-        CREATE INDEX IF NOT EXISTS fuel_path_market_price_snapshots_observed_at_idx
-        ON fuel_path_market_price_snapshots (observed_at DESC)
-      `;
-    })();
-  }
-  return ensureTablePromise;
+  return assertProductDatabaseSchema(sql);
 }
 
 function rowToSnapshotRecord(row) {

@@ -1,0 +1,19 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: fuel_path
+      POSTGRES_USER: fuel_path
+      POSTGRES_PASSWORD: fuel_path
+    ports:
+      - "54329:5432"
+    volumes:
+      - fuel-path-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fuel_path -d fuel_path"]
+      interval: 2s
+      timeout: 5s
+      retries: 15
+
+volumes:
+  fuel-path-postgres-data:

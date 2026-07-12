@@ -11,6 +11,7 @@ Current runtime boundaries only. They do not prove approval or capacity.
 | Request, cache or storage change | [`runtime-data-flow.md`](runtime-data-flow.md) | Status contracts, storage adapters and load tests |
 | Traffic or capacity work | [`scaling-model.md`](scaling-model.md) | `PERFORMANCE-GUARDRAILS.md` and hosted evidence |
 | Refactor planning | [`backend-composition-root-map.md`](backend-composition-root-map.md) | [`refactor-backlog.md`](refactor-backlog.md) and architecture checks |
+| Local or production product database | [`LOCAL-DEVELOPMENT-DATABASE.md`](LOCAL-DEVELOPMENT-DATABASE.md) | `db/migrations/` and the storage modules |
 
 ## Rules
 

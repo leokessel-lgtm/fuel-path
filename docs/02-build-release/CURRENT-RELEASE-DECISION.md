@@ -19,11 +19,14 @@ The current beta-readiness gate reports:
 - `store_listing_links_missing`
 
 The managed `DATABASE_URL`, `POSTGRES_URL` and `POSTGRES_PRISMA_URL` values
-remain shared. A Preview-only `FUEL_PATH_PRODUCT_DATABASE_URL` override now
-points to a schema-only Neon Preview branch, and the PR #29 and PR #30
-migrations were rehearsed there successfully. The override selector is not yet
-deployed in Preview, and least-privilege role plus backup/restore evidence
-remain required before hosted alert rollout or any Production migration.
+remain shared. A Preview-only `FUEL_PATH_PRODUCT_DATABASE_URL` override points
+to a schema-only Neon Preview branch, and the PR #29 and PR #30 migrations were
+rehearsed there successfully. The selector and Preview-only account-free
+capability configuration are now deployed on the PR #30 branch. The complete
+capability, device registration, route save/list/delete, atomic installation
+deletion and revocation lifecycle passed there with zero device/route rows
+remaining. Least-privilege role plus backup/restore evidence remain required
+before hosted alert rollout or any Production migration.
 
 The App Store and Google Play URLs previously recorded in store evidence both
 returned HTTP 404 on 2026-07-10. They have been removed from current evidence.
@@ -47,9 +50,9 @@ The corrected evidence is
 
 ## Next actions
 
-1. Deploy the Preview database-override selector, then verify Preview runtime
-   uses the isolated target. Create a least-privilege runtime role and complete
-   a backup/restore rehearsal before any hosted alert rollout.
+1. Create a least-privilege Preview runtime role and complete a backup/restore
+   rehearsal before any hosted alert rollout. Keep Production migrations
+   blocked until the rehearsal and an explicit rollout decision are recorded.
 2. Complete Google Play developer identity and Android-device verification, and
    enable App Store Connect for the paid Apple Developer account.
 3. Create or confirm real App Store and Google Play listings, then verify both

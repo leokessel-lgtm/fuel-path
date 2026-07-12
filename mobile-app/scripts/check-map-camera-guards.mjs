@@ -1434,6 +1434,7 @@ const checks = [
     ok:
       packageJson.includes('"native:android-alert-sync-smoke": "node scripts/native-android-alert-sync-smoke.mjs"') &&
       androidAlertSyncSmoke.includes("/api/alerts?action=client-capability") &&
+      androidAlertSyncSmoke.includes("`installation_readiness_${timestamp}`") &&
       androidAlertSyncSmoke.includes("installationId, installationSecret") &&
       androidAlertSyncSmoke.includes("/api/push/register") &&
       androidAlertSyncSmoke.includes("/api/saved-routes") &&

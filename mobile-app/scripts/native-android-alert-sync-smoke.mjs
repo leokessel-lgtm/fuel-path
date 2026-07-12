@@ -16,7 +16,7 @@ const apiBaseUrl = (
   process.env.EXPO_PUBLIC_FUEL_PATH_API_BASE_URL ||
   "https://fuel-path.vercel.app"
 ).replace(/\/+$/, "");
-const installationId = `readiness_installation_${timestamp}`;
+const installationId = `installation_readiness_${timestamp}`;
 const installationSecret = randomBytes(32).toString("base64url");
 const userId = installationId;
 const deviceId = installationId;

@@ -996,6 +996,7 @@ const checks = [
       alertDeviceSecurity.includes("Crypto.getRandomBytesAsync(32)") &&
       backendAlerts.includes("ALERT_INSTALL_MARKER_KEY") &&
       backendAlerts.includes("ALERT_BACKEND_ENROLLED_KEY") &&
+      backendAlerts.includes("ALERT_LEGACY_IDENTITY_KEY") &&
       backendAlerts.includes("await secureSet(ALERT_IDENTITY_KEY, JSON.stringify(identity))") &&
       alertDeviceSecurity.includes("SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY") &&
       !backendAlerts.includes("vehicleRego") &&

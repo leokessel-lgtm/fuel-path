@@ -219,7 +219,9 @@ address or route values.
 3. Treat the owner-scoped saved-route primary-key change as a forward-only
    constraint migration, not a purely additive change. Rehearse its lock time,
    existing-row reconciliation and corrective forward migration on the isolated
-   Preview database before Production.
+   Preview database before Production. The migration purges legacy `local_*`
+   alert owners before duplicate route IDs become valid, and the native upgrade
+   removes the matching v1 local identity/capability keys before minting v2.
 4. Run migrations once in controlled CI/deploy step, not from every mobile
    request. Retain the runtime schema check as a fail-closed diagnostic.
 5. Deploy with client alert capability issuing and delivery disabled. The

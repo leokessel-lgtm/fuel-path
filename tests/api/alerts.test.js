@@ -402,8 +402,10 @@ test("backend mints scoped client capability for saved-route sync without exposi
 test("installation capabilities isolate identical deterministic route ids", async () => {
   const originalEnabled = process.env.ALERTS_CLIENT_WRITE_ENABLED;
   const originalSecret = process.env.ALERTS_CLIENT_CAPABILITY_SECRET;
+  const originalWriteToken = process.env.ALERTS_WRITE_TOKEN;
   process.env.ALERTS_CLIENT_WRITE_ENABLED = "1";
   process.env.ALERTS_CLIENT_CAPABILITY_SECRET = "preview-capability-secret";
+  process.env.ALERTS_WRITE_TOKEN = "operator-alert-token";
   const store = memoryDurableStore();
   setAlertStorageForTests(store);
   try {
@@ -423,6 +425,14 @@ test("installation capabilities isolate identical deterministic route ids", asyn
     await store.updateSavedRouteLastAlert(route.id, "2026-07-12T08:00:00.000Z", firstInstallation.installationId);
     assert.equal(store.routes.find((item) => item.userId === firstInstallation.installationId)?.lastAlertSentAt, "2026-07-12T08:00:00.000Z");
     assert.equal(store.routes.find((item) => item.userId === secondInstallation.installationId)?.lastAlertSentAt, undefined);
+    const ambiguousOperatorDelete = await callSavedRoutes(
+      "DELETE",
+      { routeId: route.id },
+      {},
+      { authorization: "Bearer operator-alert-token" },
+    );
+    assert.equal(ambiguousOperatorDelete.status, 400);
+    assert.equal(store.routes.length, 2);
     await callSavedRoutes("DELETE", { routeId: route.id }, {}, firstHeaders);
     const secondAfterDelete = await callSavedRoutes("GET", {}, {}, secondHeaders);
 
@@ -437,6 +447,8 @@ test("installation capabilities isolate identical deterministic route ids", asyn
     else process.env.ALERTS_CLIENT_WRITE_ENABLED = originalEnabled;
     if (originalSecret === undefined) delete process.env.ALERTS_CLIENT_CAPABILITY_SECRET;
     else process.env.ALERTS_CLIENT_CAPABILITY_SECRET = originalSecret;
+    if (originalWriteToken === undefined) delete process.env.ALERTS_WRITE_TOKEN;
+    else process.env.ALERTS_WRITE_TOKEN = originalWriteToken;
   }
 });
 

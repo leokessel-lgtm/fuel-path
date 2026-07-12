@@ -30,6 +30,18 @@ exports.up = (pgm) => {
     )
   `);
   pgm.sql(`
+    DELETE FROM fuel_path_route_alert_evaluations
+    WHERE LEFT(user_id, 6) = 'local_'
+  `);
+  pgm.sql(`
+    DELETE FROM fuel_path_saved_routes
+    WHERE LEFT(user_id, 6) = 'local_'
+  `);
+  pgm.sql(`
+    DELETE FROM fuel_path_push_devices
+    WHERE LEFT(user_id, 6) = 'local_'
+  `);
+  pgm.sql(`
     ALTER TABLE fuel_path_saved_routes
     DROP CONSTRAINT IF EXISTS fuel_path_saved_routes_pkey
   `);

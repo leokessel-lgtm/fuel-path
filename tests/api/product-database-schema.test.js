@@ -55,5 +55,6 @@ test("anonymous alert migration scopes route keys and capability issuance", () =
   );
   assert.match(source, /capability_version INTEGER NOT NULL DEFAULT 1/);
   assert.match(source, /fuel_path_alert_rate_limits/);
+  assert.match(source, /DELETE FROM fuel_path_saved_routes[\s\S]*LEFT\(user_id, 6\) = 'local_'/);
   assert.match(source, /PRIMARY KEY \(user_id, id\)/);
 });

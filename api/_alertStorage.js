@@ -140,10 +140,11 @@ async function deleteSavedRoute({ routeId = "", userId = "" } = {}) {
   const safeRouteId = cleanText(routeId);
   const safeUserId = cleanText(userId);
   if (!safeRouteId) throw new Error("routeId is required");
+  if (!safeUserId) throw new Error("userId is required for saved-route deletion");
   if (testStorage?.deleteSavedRoute) return testStorage.deleteSavedRoute({ routeId: safeRouteId, userId: safeUserId });
   if (!databaseUrl()) {
     const index = memoryStore.routes.findIndex((item) =>
-      item.id === safeRouteId && (!safeUserId || item.userId === safeUserId)
+      item.id === safeRouteId && item.userId === safeUserId
     );
     if (index < 0) return null;
     const [deleted] = memoryStore.routes.splice(index, 1);
@@ -152,17 +153,11 @@ async function deleteSavedRoute({ routeId = "", userId = "" } = {}) {
 
   const sql = await getSql();
   await ensureTables(sql);
-  const rows = safeUserId
-    ? await sql`
-      DELETE FROM fuel_path_saved_routes
-      WHERE id = ${safeRouteId} AND user_id = ${safeUserId}
-      RETURNING *
-    `
-    : await sql`
-      DELETE FROM fuel_path_saved_routes
-      WHERE id = ${safeRouteId}
-      RETURNING *
-    `;
+  const rows = await sql`
+    DELETE FROM fuel_path_saved_routes
+    WHERE id = ${safeRouteId} AND user_id = ${safeUserId}
+    RETURNING *
+  `;
   return rows[0] ? rowToRoute(rows[0]) : null;
 }
 

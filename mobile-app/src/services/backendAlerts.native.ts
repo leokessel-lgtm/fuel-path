@@ -27,6 +27,8 @@ const ALERT_IDENTITY_KEY = "fuel-path:alert-installation:v2";
 const ALERT_CAPABILITY_KEY = "fuel-path:alert-capability:v2";
 const ALERT_BACKEND_ENROLLED_KEY = "fuel-path:alert-backend-enrolled:v1";
 const ALERT_INSTALL_MARKER_KEY = "fuel-path:install-marker:v1";
+const ALERT_LEGACY_IDENTITY_KEY = "fuel-path:alert-identity:v1";
+const ALERT_LEGACY_CAPABILITY_KEY = "fuel-path:alert-capability:v1";
 const ALERT_CAPABILITY_REFRESH_BUFFER_MS = 60 * 1000;
 let alertIdentityPromise: Promise<AlertIdentity> | null = null;
 
@@ -189,6 +191,10 @@ async function loadAlertIdentity(): Promise<AlertIdentity> {
     installationSecret: await randomSecret(),
   };
   await secureSet(ALERT_IDENTITY_KEY, JSON.stringify(identity));
+  await Promise.all([
+    AsyncStorage.removeItem(ALERT_LEGACY_IDENTITY_KEY),
+    AsyncStorage.removeItem(ALERT_LEGACY_CAPABILITY_KEY),
+  ]);
   await AsyncStorage.setItem(ALERT_INSTALL_MARKER_KEY, randomUuid());
   return identity;
 }
@@ -207,6 +213,8 @@ async function clearAlertIdentity(resetPromise = true) {
     secureDelete(ALERT_CAPABILITY_KEY),
     secureDelete(ALERT_BACKEND_ENROLLED_KEY),
     AsyncStorage.removeItem(ALERT_INSTALL_MARKER_KEY),
+    AsyncStorage.removeItem(ALERT_LEGACY_IDENTITY_KEY),
+    AsyncStorage.removeItem(ALERT_LEGACY_CAPABILITY_KEY),
   ]);
   if (resetPromise) alertIdentityPromise = null;
 }

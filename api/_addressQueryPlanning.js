@@ -26,4 +26,11 @@ function planTypeaheadAddressQuery({ startsWithNumber, startsWithLot, embeddedAd
   return { prefix: false, typeaheadFallback: true, prefixNeedle: null };
 }
 
-module.exports = { planTypeaheadAddressQuery, planUnitAddressQuery };
+function prioritiseHostedAddressNeedles({ rawItem, needles = [], startsWithAddressCore } = {}) {
+  const ordered = !startsWithAddressCore && needles.length > 1
+    ? [...needles.slice(1), needles[0]]
+    : needles;
+  return [...ordered, rawItem];
+}
+
+module.exports = { planTypeaheadAddressQuery, planUnitAddressQuery, prioritiseHostedAddressNeedles };

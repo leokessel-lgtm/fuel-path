@@ -1317,6 +1317,25 @@ test("Oracle-hosted G-NAF API is preferred when configured", async () => {
   }
 });
 
+test("Oracle-hosted building searches query address cores before broad names", async () => {
+  const cases = [
+    ["Lake Tuggeranong College Offc 1 123 Cowlishaw Street Greenway ACT 2900", "offc 1 123 cowlishaw street greenway act 2900"],
+    ["Tuggeranong Youth Resource Centre 43 Pitman Street Greenway ACT 2900", "43 pitman street greenway act 2900"],
+    ["Lanyon Homestead 754 Tharwa Drive Tuggeranong ACT 2900", "754 tharwa drive tuggeranong act 2900"],
+  ];
+  for (const [query, expectedApiQuery] of cases) {
+    const api = await startMockGnafApi();
+    try {
+      await withEnv({ FUEL_PATH_GNAF_API_URL: api.url, FUEL_PATH_GNAF_API_TOKEN: "test-token" }, async () => {
+        await searchAddressIndex(query, 3);
+        assert.equal(new URL(api.requests[0].url, api.url).searchParams.get("q"), expectedApiQuery);
+      });
+    } finally {
+      await api.close();
+    }
+  }
+});
+
 test("G-NAF API failure falls back to seed records", async () => {
   const api = await startMockGnafApi({ status: 503 });
   await withEnv(

@@ -1,6 +1,6 @@
 const { createAddressRanking } = require("./_addressRanking");
 const { normaliseAddressText, normaliseSearchContext } = require("./_addressQuery");
-const { createAddressStorageAdapters } = require("./_addressStorageAdapters"); const { planTypeaheadAddressQuery, planUnitAddressQuery } = require("./_addressQueryPlanning");
+const { createAddressStorageAdapters } = require("./_addressStorageAdapters"); const { planTypeaheadAddressQuery, planUnitAddressQuery, prioritiseHostedAddressNeedles } = require("./_addressQueryPlanning");
 
 const { addressIndexRank, scoreRecord, significantAddressTokens } = createAddressRanking({ normaliseAddressText });
 const {
@@ -133,11 +133,11 @@ async function searchApiNeedles(needles, limit, rawNeedle = "") {
 function apiAddressSearchNeedles(rawQuery, needles) {
   const rawNeedle = normaliseAddressText(rawQuery);
   if (!rawNeedle) return needles;
-  const seen = new Set();
-  return [
-    { needle: rawNeedle, rawQuery: String(rawQuery || ""), rawNeedle: String(rawQuery || "") },
-    ...needles,
-  ].filter((item) => {
+  const seen = new Set(); return prioritiseHostedAddressNeedles({
+    rawItem: { needle: rawNeedle, rawQuery: String(rawQuery || ""), rawNeedle: String(rawQuery || "") },
+    needles,
+    startsWithAddressCore: /^\d/.test(rawNeedle) || unitLikeQueryStartsWithUnitToken(rawNeedle),
+  }).filter((item) => {
     if (!item?.needle || item.needle.length < 4 || seen.has(item.needle)) return false;
     seen.add(item.needle);
     return true;

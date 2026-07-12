@@ -1137,7 +1137,7 @@ function createGeocoder({ fetchJson, loadStationData }) {
 
   function shouldReturnFastLocalAutocomplete(query, suggestions, requiresExactAddress) {
     if (!suggestions.length) return false;
-    if (requiresExactAddress && looksLikeAddressStreetQuery(query)) return false;
+    if (requiresExactAddress && (looksLikeAddressStreetQuery(query) || broadAreaSuggestionLeavesSpecificQueryTerms(query, suggestions[0]))) return false;
     if (!hasStrongLocalSuggestion(query, suggestions) && !hasStrongRegionalPoiSuggestion(query, suggestions)) return false;
     const top = suggestions[0];
     if (isBroadAreaSuggestion(top) && broadAreaSuggestionLeavesSpecificQueryTerms(query, top)) return false;

@@ -398,6 +398,30 @@ function RouteResultsPanel({
               <Text style={styles.noticeText}>{policyNotice}</Text>
             </View>
           ) : null}
+          <View style={styles.compactActionRow}>
+            <Pressable
+              accessibilityLabel={evidenceExpanded ? "Hide route evidence" : "Show route evidence"}
+              accessibilityRole="button"
+              onPress={() => setEvidenceExpanded((value) => !value)}
+              style={styles.secondaryActionButton}
+            >
+              <Text style={styles.secondaryActionText}>{evidenceExpanded ? "Less" : "Why?"}</Text>
+            </Pressable>
+            {routeEndpointsPresent ? (
+              <Pressable
+                accessibilityLabel={currentRouteSaved ? "Route already saved" : "Save route"}
+                accessibilityRole="button"
+                disabled={currentRouteSaved}
+                onPress={onSaveCommute}
+                style={[
+                  styles.secondaryActionButton,
+                  currentRouteSaved && styles.secondaryActionButtonDisabled,
+                ]}
+              >
+                <Text style={styles.secondaryActionText}>{currentRouteSaved ? "Saved" : "Save"}</Text>
+              </Pressable>
+            ) : null}
+          </View>
           <View style={styles.compactRecommendation}>
             {recommendationSummary ? (
               <Pressable
@@ -493,30 +517,6 @@ function RouteResultsPanel({
               <Text style={styles.noticeText}>{routeFuelMismatch}</Text>
             </View>
           ) : null}
-          <View style={styles.compactActionRow}>
-            <Pressable
-              accessibilityLabel={evidenceExpanded ? "Hide route evidence" : "Show route evidence"}
-              accessibilityRole="button"
-              onPress={() => setEvidenceExpanded((value) => !value)}
-              style={styles.secondaryActionButton}
-            >
-              <Text style={styles.secondaryActionText}>{evidenceExpanded ? "Less" : "Why?"}</Text>
-            </Pressable>
-            {routeEndpointsPresent ? (
-              <Pressable
-                accessibilityLabel={currentRouteSaved ? "Route already saved" : "Save route"}
-                accessibilityRole="button"
-                disabled={currentRouteSaved}
-                onPress={onSaveCommute}
-                style={[
-                  styles.secondaryActionButton,
-                  currentRouteSaved && styles.secondaryActionButtonDisabled,
-                ]}
-              >
-                <Text style={styles.secondaryActionText}>{currentRouteSaved ? "Saved" : "Save"}</Text>
-              </Pressable>
-            ) : null}
-          </View>
           {evidenceExpanded ? (
             <ScrollView
               contentContainerStyle={styles.expandedEvidenceContent}

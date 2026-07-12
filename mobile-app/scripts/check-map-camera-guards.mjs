@@ -767,6 +767,7 @@ const checks = [
       planRouteSheet.includes("recommendationPriceTile") &&
       planRouteSheet.includes("recommendationStationName") &&
       planRouteSheet.includes("recommendationRouteValue") &&
+      planRouteSheet.indexOf("styles.compactActionRow") < planRouteSheet.indexOf("styles.compactRecommendation") &&
       !decisionEvidencePanel.includes("Decision trade-offs") &&
       !planScreen.includes("routeDecisionAlternatives") &&
       !planScreen.includes("cheapestTradeOffExplanation"),

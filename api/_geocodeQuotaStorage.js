@@ -1,7 +1,8 @@
+const { assertProductDatabaseSchema, createProductSqlClient } = require("./_productDatabase");
+
 const DEFAULT_QUOTA_KEY = "google_places_fallback";
 
 let sqlClient;
-let ensureTablePromise;
 let testStorage;
 
 const memoryQuotas = new Map();
@@ -119,30 +120,12 @@ async function getGeocodeQuotaUsage({
 
 async function getSql() {
   if (sqlClient) return sqlClient;
-  const { neon } = require("@neondatabase/serverless");
-  sqlClient = neon(databaseUrl());
+  sqlClient = createProductSqlClient(databaseUrl());
   return sqlClient;
 }
 
 async function ensureTable(sql) {
-  if (!ensureTablePromise) {
-    ensureTablePromise = (async () => {
-      await sql`
-        CREATE TABLE IF NOT EXISTS fuel_path_geocode_quotas (
-          quota_key TEXT NOT NULL,
-          quota_date DATE NOT NULL,
-          calls INTEGER NOT NULL DEFAULT 0,
-          updated_at TIMESTAMPTZ NOT NULL,
-          PRIMARY KEY (quota_key, quota_date)
-        )
-      `;
-      await sql`
-        CREATE INDEX IF NOT EXISTS fuel_path_geocode_quotas_updated_at_idx
-        ON fuel_path_geocode_quotas (updated_at DESC)
-      `;
-    })();
-  }
-  return ensureTablePromise;
+  return assertProductDatabaseSchema(sql);
 }
 
 function databaseUrl() {

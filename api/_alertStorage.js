@@ -1,7 +1,8 @@
+const { assertProductDatabaseSchema, createProductSqlClient } = require("./_productDatabase");
+
 const DEFAULT_MAX_RECORDS = 500;
 
 let sqlClient;
-let ensureTablesPromise;
 let testStorage;
 
 const memoryStore = {
@@ -551,92 +552,12 @@ function purgeMemoryAlertRetention({
 
 async function getSql() {
   if (sqlClient) return sqlClient;
-  const { neon } = require("@neondatabase/serverless");
-  sqlClient = neon(databaseUrl());
+  sqlClient = createProductSqlClient(databaseUrl());
   return sqlClient;
 }
 
 async function ensureTables(sql) {
-  if (!ensureTablesPromise) {
-    ensureTablesPromise = (async () => {
-      await sql`
-        CREATE TABLE IF NOT EXISTS fuel_path_push_devices (
-          id TEXT PRIMARY KEY,
-          user_id TEXT NOT NULL,
-          device_id TEXT NOT NULL,
-          platform TEXT NOT NULL,
-          expo_push_token TEXT NOT NULL,
-          app_version TEXT,
-          status TEXT NOT NULL,
-          last_seen_at TIMESTAMPTZ NOT NULL,
-          invalidated_at TIMESTAMPTZ,
-          raw JSONB NOT NULL DEFAULT '{}'::jsonb
-        )
-      `;
-      await sql`
-        CREATE INDEX IF NOT EXISTS fuel_path_push_devices_user_status_idx
-        ON fuel_path_push_devices (user_id, status, last_seen_at DESC)
-      `;
-      await sql`
-        CREATE TABLE IF NOT EXISTS fuel_path_saved_routes (
-          id TEXT PRIMARY KEY,
-          user_id TEXT NOT NULL,
-          name TEXT NOT NULL,
-          from_lat DOUBLE PRECISION NOT NULL,
-          from_lon DOUBLE PRECISION NOT NULL,
-          from_label TEXT NOT NULL,
-          to_lat DOUBLE PRECISION NOT NULL,
-          to_lon DOUBLE PRECISION NOT NULL,
-          to_label TEXT NOT NULL,
-          fuel TEXT NOT NULL,
-          alert_enabled BOOLEAN NOT NULL,
-          alert_time_local TEXT NOT NULL,
-          timezone TEXT NOT NULL,
-          min_saving_dollars DOUBLE PRECISION NOT NULL,
-          max_detour_minutes DOUBLE PRECISION NOT NULL,
-          paused_until TIMESTAMPTZ,
-          last_alert_sent_at TIMESTAMPTZ,
-          created_at TIMESTAMPTZ NOT NULL,
-          updated_at TIMESTAMPTZ NOT NULL,
-          raw JSONB NOT NULL DEFAULT '{}'::jsonb
-        )
-      `;
-      await sql`
-        CREATE INDEX IF NOT EXISTS fuel_path_saved_routes_user_enabled_idx
-        ON fuel_path_saved_routes (user_id, alert_enabled, updated_at DESC)
-      `;
-      await sql`
-        CREATE TABLE IF NOT EXISTS fuel_path_route_alert_evaluations (
-          id TEXT PRIMARY KEY,
-          saved_route_id TEXT NOT NULL,
-          user_id TEXT NOT NULL,
-          status TEXT NOT NULL,
-          reason TEXT NOT NULL,
-          station_code TEXT,
-          station_name TEXT,
-          estimated_saving_dollars DOUBLE PRECISION,
-          detour_minutes DOUBLE PRECISION,
-          freshness_minutes DOUBLE PRECISION,
-          message_title TEXT,
-          message_body TEXT,
-          evaluated_at TIMESTAMPTZ NOT NULL,
-          push_delivery_enabled BOOLEAN NOT NULL,
-          push_ticket_id TEXT,
-          push_receipt_status TEXT,
-          raw JSONB NOT NULL DEFAULT '{}'::jsonb
-        )
-      `;
-      await sql`
-        CREATE INDEX IF NOT EXISTS fuel_path_route_alert_evaluations_route_idx
-        ON fuel_path_route_alert_evaluations (saved_route_id, evaluated_at DESC)
-      `;
-      await sql`
-        CREATE INDEX IF NOT EXISTS fuel_path_route_alert_evaluations_user_idx
-        ON fuel_path_route_alert_evaluations (user_id, evaluated_at DESC)
-      `;
-    })();
-  }
-  return ensureTablesPromise;
+  return assertProductDatabaseSchema(sql);
 }
 
 function rowToDevice(row) {

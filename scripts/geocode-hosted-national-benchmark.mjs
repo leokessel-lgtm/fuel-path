@@ -32,6 +32,7 @@ const MAX_ADDRESS_P90_CHARS = Number(args.maxAddressP90Chars || process.env.FUEL
 const MAX_POI_P90_CHARS = Number(args.maxPoiP90Chars || process.env.FUEL_PATH_HOSTED_BENCHMARK_MAX_POI_P90_CHARS || 12);
 const REQUEST_TIMEOUT_MS = Number(args.requestTimeoutMs || process.env.FUEL_PATH_HOSTED_BENCHMARK_REQUEST_TIMEOUT_MS || 8000);
 const PROGRESS_EVERY = Number(args.progressEvery || process.env.FUEL_PATH_HOSTED_BENCHMARK_PROGRESS_EVERY || 50);
+const CHECKPOINT_EVERY = Math.max(1, Number(args.checkpointEvery || process.env.FUEL_PATH_HOSTED_BENCHMARK_CHECKPOINT_EVERY || 50));
 const PLAN_ONLY = Boolean(args.planOnly || process.env.FUEL_PATH_HOSTED_BENCHMARK_PLAN_ONLY === "1");
 const fetchCalls = {
   total: 0,
@@ -93,6 +94,9 @@ for (let index = 0; index < cases.length; index += 1) {
     console.log(`case ${index + 1}/${cases.length} ${cases[index].kind} ${cases[index].state || ""} ${cases[index].query}`);
   }
   rows.push(await runCase(cases[index], index + 1));
+  if ((index + 1) % CHECKPOINT_EVERY === 0 || index === cases.length - 1) {
+    await writeCheckpoint(rows, cases.length, "running");
+  }
   if ((index + 1) % 50 === 0 || index === cases.length - 1) {
     const partial = summarise(rows);
     console.log(`${index + 1}/${cases.length} addressTop=${rateText(partial.byKind.address?.finalTopRate)} poiTop=${rateText(partial.byKind.poi?.finalTopRate)} p90Any=${partial.overall.p90AnyChars}`);
@@ -100,41 +104,54 @@ for (let index = 0; index < cases.length; index += 1) {
   if (DELAY_MS) await sleep(DELAY_MS);
 }
 
-const summary = summarise(rows);
-const payload = {
-  runId: RUN_ID,
-  mode: MODE,
-  apiBase: MODE === "http" ? API_BASE : "",
-  addressSqlite: ADDRESS_SQLITE,
-  provider: PROVIDER,
-  limit: LIMIT,
-  minPrefixChars: MIN_PREFIX_CHARS,
-  minAddressPrefixChars: MIN_ADDRESS_PREFIX_CHARS,
-  prefixProbeMode: "autocomplete_checkpoints",
-  externalFailureMode: EXTERNAL_FAILURE_MODE,
-  requested: {
-    addresses: ADDRESS_COUNT,
-    pois: POI_COUNT,
-    profile: PROFILE,
-    states: SELECTED_STATES,
-    caseContext: CASE_CONTEXT,
-    caseContextRadiusKm: CASE_CONTEXT ? CASE_CONTEXT_RADIUS_KM : null,
-  },
-  fetchCalls,
-  index: indexEvidence(ADDRESS_SQLITE),
-  summary,
-  coverage: coverageSummary(rows),
-  rows,
-};
-
-await fsp.mkdir(path.join(ROOT, "tmp"), { recursive: true });
 const jsonPath = `tmp/geocode-hosted-national-benchmark-${RUN_ID}.json`;
 const csvPath = `tmp/geocode-hosted-national-benchmark-${RUN_ID}.csv`;
+const summary = summarise(rows);
+const payload = benchmarkPayload(rows, cases.length, "completed");
+await fsp.mkdir(path.join(ROOT, "tmp"), { recursive: true });
 await fsp.writeFile(path.join(ROOT, jsonPath), JSON.stringify(payload, null, 2));
 await fsp.writeFile(path.join(ROOT, csvPath), `${toCsv(rows)}\n`);
 
 console.log(JSON.stringify({ runId: RUN_ID, jsonPath, csvPath, fetchCalls, summary }, null, 2));
 assertThresholds(summary, rows);
+
+async function writeCheckpoint(rows, totalCases, status) {
+  const checkpointPath = `tmp/geocode-hosted-national-benchmark-${RUN_ID}.checkpoint.json`;
+  const payload = benchmarkPayload(rows, totalCases, status);
+  await fsp.mkdir(path.join(ROOT, "tmp"), { recursive: true });
+  await fsp.writeFile(path.join(ROOT, checkpointPath), JSON.stringify(payload, null, 2));
+}
+
+function benchmarkPayload(rows, totalCases, status) {
+  return {
+    runId: RUN_ID,
+    status,
+    completedCases: rows.length,
+    totalCases,
+    mode: MODE,
+    apiBase: MODE === "http" ? API_BASE : "",
+    addressSqlite: ADDRESS_SQLITE,
+    provider: PROVIDER,
+    limit: LIMIT,
+    minPrefixChars: MIN_PREFIX_CHARS,
+    minAddressPrefixChars: MIN_ADDRESS_PREFIX_CHARS,
+    prefixProbeMode: "autocomplete_checkpoints",
+    externalFailureMode: EXTERNAL_FAILURE_MODE,
+    requested: {
+      addresses: ADDRESS_COUNT,
+      pois: POI_COUNT,
+      profile: PROFILE,
+      states: SELECTED_STATES,
+      caseContext: CASE_CONTEXT,
+      caseContextRadiusKm: CASE_CONTEXT ? CASE_CONTEXT_RADIUS_KM : null,
+    },
+    fetchCalls,
+    index: indexEvidence(ADDRESS_SQLITE),
+    summary: summarise(rows),
+    coverage: coverageSummary(rows),
+    rows,
+  };
+}
 
 async function runCase(testCase, index) {
   const prefixes = prefixesFor(testCase.query, testCase.kind);

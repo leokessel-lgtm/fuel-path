@@ -67,11 +67,15 @@ export function useRouteAlerts({
 
     let active = true;
     Promise.all(staleLocalReminderCommutes.map((commute) => cancelSavedCommuteAlert(commute)))
-      .then(() => {
+      .then((results) => {
         if (!active) return;
+        const failedIds = new Set(staleLocalReminderCommutes
+          .filter((_, index) => results[index]?.status === "failed")
+          .map((commute) => commute.id));
         setSavedCommutes((current) =>
           current.map((commute) => {
             if (
+              failedIds.has(commute.id) ||
               commute.localReminderEnabled !== false ||
               scheduledRouteNotificationIds(commute).length === 0
             ) {
@@ -113,20 +117,24 @@ export function useRouteAlerts({
       setNotificationPermission(permission.state);
       setNotificationMessage(permission.message);
       if (permission.state !== "denied" || !savedCommutes.some((commute) => commute.alertEnabled)) return;
-      await Promise.all(savedCommutes.map((commute) => cancelSavedCommuteAlert(commute)));
+      const cancellations = await Promise.all(savedCommutes.map((commute) => cancelSavedCommuteAlert(commute)));
+      const failedLocalIds = new Set(savedCommutes
+        .filter((_, index) => cancellations[index]?.status === "failed")
+        .map((commute) => commute.id));
       const deletion = await deleteBackendAlertData();
       if (!active) return;
       setSavedCommutes((current) => current.map((commute) => ({
         ...commute,
-        alertEnabled: false,
+        alertEnabled: deletion.status !== "synced",
         alertStatus: "needs_permission",
         alertStatusMessage: deletion.status === "synced"
           ? "Notifications are off. Backend alert data was deleted."
           : "Notifications are off. Alert-data deletion still needs retry.",
-        backendSyncedAt: undefined,
-        nextAlertAt: undefined,
-        scheduledNotificationId: undefined,
-        scheduledNotificationIds: undefined,
+        backendSyncedAt: deletion.status === "synced" ? undefined : commute.backendSyncedAt,
+        localReminderEnabled: false,
+        nextAlertAt: failedLocalIds.has(commute.id) ? commute.nextAlertAt : undefined,
+        scheduledNotificationId: failedLocalIds.has(commute.id) ? commute.scheduledNotificationId : undefined,
+        scheduledNotificationIds: failedLocalIds.has(commute.id) ? commute.scheduledNotificationIds : undefined,
       })));
     };
 
@@ -188,7 +196,7 @@ export function useRouteAlerts({
               enabled: false,
               preferences,
             });
-        if (backendSync.status === "failed") {
+        if (backendSync.status !== "synced") {
           setSavedCommutes((current) => current.map((commute) =>
             commute.id === commuteId
               ? { ...commute, alertStatus: "failed", alertStatusMessage: backendSync.message }
@@ -197,6 +205,7 @@ export function useRouteAlerts({
           return;
         }
         const result = await cancelSavedCommuteAlert(targetCommute);
+        const localCancellationFailed = result.status === "failed";
         setSavedCommutes((current) =>
           current.map((commute) =>
             commute.id === commuteId
@@ -205,9 +214,10 @@ export function useRouteAlerts({
                   alertStatus: result.status,
                   alertStatusMessage: alertStatusMessage(result.message, backendSync.message),
                   backendSyncedAt: backendSync.syncedAt,
-                  nextAlertAt: undefined,
-                  scheduledNotificationId: undefined,
-                  scheduledNotificationIds: undefined,
+                  localReminderEnabled: localCancellationFailed ? false : commute.localReminderEnabled,
+                  nextAlertAt: localCancellationFailed ? commute.nextAlertAt : undefined,
+                  scheduledNotificationId: localCancellationFailed ? commute.scheduledNotificationId : undefined,
+                  scheduledNotificationIds: localCancellationFailed ? commute.scheduledNotificationIds : undefined,
                 })
               : commute,
           ),
@@ -296,16 +306,22 @@ export function useRouteAlerts({
         setNotificationMessage(result.message);
         return;
       }
-      await Promise.all(savedCommutes.map((commute) => cancelSavedCommuteAlert(commute)));
+      const cancellations = await Promise.all(savedCommutes.map((commute) => cancelSavedCommuteAlert(commute)));
+      const failedLocalIds = new Set(savedCommutes
+        .filter((_, index) => cancellations[index]?.status === "failed")
+        .map((commute) => commute.id));
       setSavedCommutes((current) => current.map((commute) => ({
         ...commute,
         alertEnabled: false,
-        alertStatus: "off",
-        alertStatusMessage: "Route alert is off.",
+        alertStatus: failedLocalIds.has(commute.id) ? "failed" : "off",
+        alertStatusMessage: failedLocalIds.has(commute.id)
+          ? "Backend alert data was deleted. Local reminder cancellation needs retry."
+          : "Route alert is off.",
         backendSyncedAt: undefined,
-        nextAlertAt: undefined,
-        scheduledNotificationId: undefined,
-        scheduledNotificationIds: undefined,
+        localReminderEnabled: false,
+        nextAlertAt: failedLocalIds.has(commute.id) ? commute.nextAlertAt : undefined,
+        scheduledNotificationId: failedLocalIds.has(commute.id) ? commute.scheduledNotificationId : undefined,
+        scheduledNotificationIds: failedLocalIds.has(commute.id) ? commute.scheduledNotificationIds : undefined,
         updatedAt: new Date().toISOString(),
       })));
       setNotificationMessage(result.message);
@@ -321,15 +337,33 @@ export function useRouteAlerts({
     setAlertSyncingCommuteId(commuteId);
     try {
       const localCancel = await cancelSavedCommuteAlert(targetCommute);
-      const backendDelete = await deleteBackendSavedRoute({ commute: targetCommute });
-      if (backendDelete.status === "failed") {
+      if (localCancel.status === "failed") {
+        setSavedCommutes((current) => current.map((commute) =>
+          commute.id === commuteId
+            ? alertStateUpdate(commute, {
+                alertEnabled: commute.alertEnabled,
+                alertStatus: "failed",
+                alertStatusMessage: localCancel.message,
+                backendSyncedAt: commute.backendSyncedAt,
+                nextAlertAt: commute.nextAlertAt,
+                scheduledNotificationId: commute.scheduledNotificationId,
+                scheduledNotificationIds: commute.scheduledNotificationIds,
+              })
+            : commute
+        ));
+        return;
+      }
+      const backendDelete = targetCommute.backendSyncedAt
+        ? await deleteBackendSavedRoute({ commute: targetCommute })
+        : { status: "synced" as const, message: "No backend route watch was stored." };
+      if (backendDelete.status !== "synced") {
         setSavedCommutes((current) =>
           current.map((commute) =>
             commute.id === commuteId
               ? alertStateUpdate(commute, {
                   alertEnabled: commute.alertEnabled,
                   alertStatus: "failed",
-                  alertStatusMessage: alertStatusMessage(localCancel.message, backendDelete.message),
+                  alertStatusMessage: backendDelete.message,
                   backendSyncedAt: commute.backendSyncedAt,
                   nextAlertAt: commute.nextAlertAt,
                   scheduledNotificationId: commute.scheduledNotificationId,
@@ -475,6 +509,7 @@ function alertStateUpdate(
     alertStatus: CommuteAlertStatus;
     alertStatusMessage: string;
     backendSyncedAt?: string;
+    localReminderEnabled?: boolean;
     nextAlertAt?: string;
     scheduledNotificationId?: string;
     scheduledNotificationIds?: string[];

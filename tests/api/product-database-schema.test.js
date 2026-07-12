@@ -5,6 +5,7 @@ const test = require("node:test");
 
 const {
   REQUIRED_TABLES,
+  assertAlertInstallationSchema,
   assertProductDatabaseSchema,
   createProductSqlClient,
   resetProductDatabaseSchemaForTests,
@@ -23,6 +24,15 @@ test("product database schema check accepts a fully migrated database", async ()
   await assertProductDatabaseSchema(sqlWithRows([], queries));
   assert.equal(queries.length, 1);
   for (const table of REQUIRED_TABLES) assert.match(queries[0], new RegExp(table));
+  assert.doesNotMatch(queries[0], /fuel_path_alert_installations/);
+});
+
+test("anonymous alert tables are checked only by the opt-in alert boundary", async () => {
+  resetProductDatabaseSchemaForTests();
+  const queries = [];
+  await assertAlertInstallationSchema(sqlWithRows([], queries));
+  assert.equal(queries.length, 1);
+  assert.match(queries[0], /unnest\(\?::text\[\]\)/);
 });
 
 test("product database schema check names missing tables and migration command", async () => {

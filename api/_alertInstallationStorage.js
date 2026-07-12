@@ -1,4 +1,4 @@
-const { assertProductDatabaseSchema, createProductSqlClient } = require("./_productDatabase");
+const { assertAlertInstallationSchema, createProductSqlClient } = require("./_productDatabase");
 const { isoDateTime } = require("./_alertRecords");
 
 let sqlClient;
@@ -33,7 +33,7 @@ async function registerAnonymousInstallation({
     return { ...record, created: true };
   }
   const sql = await getSql();
-  await assertProductDatabaseSchema(sql);
+  await assertAlertInstallationSchema(sql);
   await sql`
     INSERT INTO fuel_path_alert_installations (
       installation_id, secret_hash, secret_key_version, capability_version, created_at, last_seen_at
@@ -57,7 +57,7 @@ async function getAnonymousInstallation(installationId = "") {
   if (!safeId) return null;
   if (testStorage) return testStorage.__alertInstallations?.get(safeId) || null;
   const sql = await getSql();
-  await assertProductDatabaseSchema(sql);
+  await assertAlertInstallationSchema(sql);
   const rows = await sql`
     SELECT installation_id, secret_hash, secret_key_version, capability_version,
       created_at, last_seen_at, revoked_at
@@ -93,7 +93,7 @@ async function consumeAlertRateLimit({ rateKey, action, now, windowSeconds = 60,
     return { allowed: next.count <= limit, ...next };
   }
   const sql = await getSql();
-  await assertProductDatabaseSchema(sql);
+  await assertAlertInstallationSchema(sql);
   const rows = await sql`
     INSERT INTO fuel_path_alert_rate_limits (rate_key, action, window_started_at, request_count)
     VALUES (${safeRateKey}, ${safeAction}, ${safeNow}, 1)
@@ -135,7 +135,7 @@ async function deleteInstallationAlertData(installationId = "", now = new Date()
     };
   }
   const sql = await getSql();
-  await assertProductDatabaseSchema(sql);
+  await assertAlertInstallationSchema(sql);
   const rows = await sql`
     WITH deleted_evaluations AS (
       DELETE FROM fuel_path_route_alert_evaluations WHERE user_id = ${safeId} RETURNING id

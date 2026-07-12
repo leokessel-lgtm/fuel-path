@@ -25,6 +25,7 @@ type SyncResult = {
 
 const ALERT_IDENTITY_KEY = "fuel-path:alert-installation:v2";
 const ALERT_CAPABILITY_KEY = "fuel-path:alert-capability:v2";
+const ALERT_BACKEND_ENROLLED_KEY = "fuel-path:alert-backend-enrolled:v1";
 const ALERT_INSTALL_MARKER_KEY = "fuel-path:install-marker:v1";
 const ALERT_CAPABILITY_REFRESH_BUFFER_MS = 60 * 1000;
 let alertIdentityPromise: Promise<AlertIdentity> | null = null;
@@ -45,12 +46,15 @@ export async function syncSavedRouteAlert({
   preferences: AppPreferences;
 }): Promise<SyncResult> {
   try {
+    if (enabled) await secureSet(ALERT_BACKEND_ENROLLED_KEY, "1");
     const identity = await getAlertIdentity();
     const capability = await getAlertCapability(identity);
     if (!capability) {
       return {
-        status: "skipped",
-        message: "Smart route checks need backend capability issuing.",
+        status: enabled ? "skipped" : "failed",
+        message: enabled
+          ? "Smart route checks need backend capability issuing."
+          : "Route watch could not be turned off while the backend is unavailable.",
       };
     }
     if (enabled && expoPushToken) {
@@ -72,6 +76,7 @@ export async function syncSavedRouteAlert({
         status: "skipped",
         remoteDeliveryEnabled,
         message: "Smart route watch was saved, but push delivery is not enabled for this build yet.",
+        syncedAt: new Date().toISOString(),
       };
     }
 
@@ -93,6 +98,15 @@ export async function syncSavedRouteAlert({
 
 export async function deleteMyAlertData(): Promise<SyncResult> {
   try {
+    const enrolled = await secureGet(ALERT_BACKEND_ENROLLED_KEY);
+    if (enrolled !== "1") {
+      await clearAlertIdentity();
+      return {
+        status: "synced",
+        message: "No backend alert data was stored. Your saved routes remain on this device with alerts off.",
+        syncedAt: new Date().toISOString(),
+      };
+    }
     const identity = await getAlertIdentity();
     const capability = await getAlertCapability(identity);
     if (!capability) {
@@ -120,8 +134,8 @@ export async function deleteBackendSavedRoute({
     const capability = await getAlertCapability(identity);
     if (!capability) {
       return {
-        status: "skipped",
-        message: "Smart route checks need backend capability issuing.",
+        status: "failed",
+        message: "Route watch could not be deleted while the backend is unavailable.",
       };
     }
     await deleteAlertJson("/api/saved-routes", capability.token, {
@@ -153,8 +167,13 @@ async function loadAlertIdentity(): Promise<AlertIdentity> {
       const parsed = JSON.parse(raw) as Partial<AlertIdentity>;
       if (parsed.installationId && parsed.installationSecret) {
         if (!marker && Platform.OS !== "web") {
-          const retired = await retirePersistedIosInstallation(parsed as AlertIdentity);
-          if (!retired) throw new Error("Previous installation alert data could not be retired.");
+          const enrolled = await secureGet(ALERT_BACKEND_ENROLLED_KEY);
+          if (enrolled === "1") {
+            const retired = await retirePersistedIosInstallation(parsed as AlertIdentity);
+            if (!retired) throw new Error("Previous installation alert data could not be retired.");
+          } else {
+            await clearAlertIdentity(false);
+          }
         } else {
           return { installationId: parsed.installationId, installationSecret: parsed.installationSecret };
         }
@@ -186,6 +205,7 @@ async function clearAlertIdentity(resetPromise = true) {
   await Promise.all([
     secureDelete(ALERT_IDENTITY_KEY),
     secureDelete(ALERT_CAPABILITY_KEY),
+    secureDelete(ALERT_BACKEND_ENROLLED_KEY),
     AsyncStorage.removeItem(ALERT_INSTALL_MARKER_KEY),
   ]);
   if (resetPromise) alertIdentityPromise = null;

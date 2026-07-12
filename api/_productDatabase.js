@@ -5,11 +5,10 @@ const REQUIRED_TABLES = [
   "fuel_path_prediction_backtests",
   "fuel_path_market_price_snapshots",
   "fuel_path_geocode_quotas",
-  "fuel_path_alert_installations",
-  "fuel_path_alert_rate_limits",
 ];
 
 let schemaChecks = new WeakMap();
+let alertInstallationSchemaChecks = new WeakMap();
 
 function createProductSqlClient(connectionString) {
   if (usesDirectPostgres(connectionString)) {
@@ -51,9 +50,7 @@ async function assertProductDatabaseSchema(sql) {
           ('fuel_path_route_alert_evaluations'),
           ('fuel_path_prediction_backtests'),
           ('fuel_path_market_price_snapshots'),
-          ('fuel_path_geocode_quotas'),
-          ('fuel_path_alert_installations'),
-          ('fuel_path_alert_rate_limits')
+          ('fuel_path_geocode_quotas')
       )
       SELECT table_name
       FROM required
@@ -77,12 +74,44 @@ async function assertProductDatabaseSchema(sql) {
   }
 }
 
+async function assertAlertInstallationSchema(sql) {
+  const existing = alertInstallationSchemaChecks.get(sql);
+  if (existing) return existing;
+  const check = assertRequiredTables(sql, [
+    "fuel_path_alert_installations",
+    "fuel_path_alert_rate_limits",
+  ]);
+  alertInstallationSchemaChecks.set(sql, check);
+  try {
+    return await check;
+  } catch (error) {
+    alertInstallationSchemaChecks.delete(sql);
+    throw error;
+  }
+}
+
+async function assertRequiredTables(sql, tables) {
+  const missing = await sql`
+    SELECT table_name
+    FROM unnest(${tables}::text[]) AS required(table_name)
+    WHERE to_regclass('public.' || table_name) IS NULL
+    ORDER BY table_name
+  `;
+  if (!missing.length) return;
+  const names = missing.map((row) => row.table_name).join(", ");
+  throw new Error(
+    `Product database migrations have not been applied. Missing tables: ${names}. Run npm run db:migrate before starting this environment.`
+  );
+}
+
 function resetProductDatabaseSchemaForTests() {
   schemaChecks = new WeakMap();
+  alertInstallationSchemaChecks = new WeakMap();
 }
 
 module.exports = {
   REQUIRED_TABLES,
+  assertAlertInstallationSchema,
   assertProductDatabaseSchema,
   createProductSqlClient,
   resetProductDatabaseSchemaForTests,

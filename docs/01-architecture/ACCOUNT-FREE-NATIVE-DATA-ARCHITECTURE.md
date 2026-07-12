@@ -216,13 +216,17 @@ address or route values.
 1. Keep PR #29 unchanged and merge/review it independently.
 2. Create a new database target for Preview before any migration. Preview and
    Production must never share `DATABASE_URL` during this rollout.
-3. Add only forward-compatible migrations: additive nullable fields/tables,
-   backfill in bounded batches, dual-read/dual-write behind a disabled feature
-   flag, then enforce constraints after metrics and reconciliation pass.
+3. Treat the owner-scoped saved-route primary-key change as a forward-only
+   constraint migration, not a purely additive change. Rehearse its lock time,
+   existing-row reconciliation and corrective forward migration on the isolated
+   Preview database before Production.
 4. Run migrations once in controlled CI/deploy step, not from every mobile
    request. Retain the runtime schema check as a fail-closed diagnostic.
-5. Deploy code that understands old and new schema before enabling writes.
-   Enable a small internal installation allowlist, then preview-only tests.
+5. Deploy with client alert capability issuing and delivery disabled. The
+   shared product-schema check must not require alert-only tables, so dormant
+   code cannot break unrelated database paths before the migration. Migrate the
+   isolated target, verify it, then enable a small internal installation
+   allowlist for preview-only tests.
 6. Roll back behaviour with flags and disable scheduler/delivery first. Do
    not run destructive down migrations on production; restore from backup or
    issue a corrective forward migration.
@@ -236,7 +240,7 @@ evidence and who is permitted to run migrations. Those facts are currently
 
 | Gate | Required proof |
 | --- | --- |
-| Migration | Empty DB, PR #29 baseline adoption, additive migration, bounded backfill, rerun/idempotency and forward-only rollback path. |
+| Migration | Empty DB, PR #29 baseline adoption, composite-key constraint rehearsal, bounded reconciliation, rerun/idempotency and corrective-forward rollback path. |
 | API ownership | Cross-installation read/update/delete attempts fail; caller-supplied owner fields are ignored/rejected; capability expiry, replay and rate limits are covered. |
 | Deletion | Route delete, whole alert-data delete, retry after timeout, local clear and backend purge all pass without re-creating the subscription. |
 | iOS device | First install, upgrade, uninstall/reinstall with persisted-keychain edge case, permission denial/revoke, token rotation and notification tap on physical build. |

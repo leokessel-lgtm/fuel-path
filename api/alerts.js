@@ -76,7 +76,9 @@ module.exports = async function handler(req, res) {
     const action = stringParam(req.query.action || req.body?.action, "evaluate");
     if (action === "client-capability") {
       const capability = await issueAlertClientCapability(req.body || {}, req);
-      sendJson(res, capability.accepted ? 202 : 403, capability);
+      const rateLimited = Number(capability.retryAfterSeconds) > 0;
+      if (rateLimited) res.setHeader?.("Retry-After", String(capability.retryAfterSeconds));
+      sendJson(res, capability.accepted ? 202 : rateLimited ? 429 : 403, capability);
       return;
     }
 

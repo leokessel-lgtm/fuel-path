@@ -257,6 +257,7 @@ async function checkSavedRouteAlertContract() {
 
   assert.equal(result.status, "skipped");
   assert.equal(result.remoteDeliveryEnabled, false);
+  assert.ok(result.syncedAt);
   assert.equal(alertFetchCalls.length, 2);
   assert.equal(alertFetchCalls[0].url, "https://fuel-path.test/api/alerts?action=client-capability");
   assert.equal(alertFetchCalls[1].url, "https://fuel-path.test/api/saved-routes");
@@ -284,6 +285,7 @@ async function checkSavedRouteAlertContract() {
   assert.equal(alertFetchCalls[2].url, "https://fuel-path.test/api/alerts?action=delete-installation-data");
   assert.equal(storage.has("fuel-path:alert-installation:v2"), false);
   assert.equal(storage.has("fuel-path:alert-capability:v2"), false);
+  assert.equal(storage.has("fuel-path:alert-backend-enrolled:v1"), false);
   assert.equal(storage.has("fuel-path:install-marker:v1"), false);
 
   const expired = loadBackendAlertContractModule({
@@ -301,6 +303,14 @@ async function checkSavedRouteAlertContract() {
   assert.equal(expired.alertFetchCalls[0].url, "https://fuel-path.test/api/alerts?action=client-capability");
   assert.equal(expired.storage.has("fuel-path:alert-capability:v2"), false);
 
+  const expiredDisable = await expired.syncSavedRouteAlert({
+    commute,
+    enabled: false,
+    preferences,
+  });
+  assert.equal(expiredDisable.status, "failed");
+  assert.match(expiredDisable.message, /could not be turned off/i);
+
   const reinstalled = loadBackendAlertContractModule({
     capabilityBody: { token: "retirement-token", expiresAt: "2099-01-01T00:00:00.000Z" },
     initialStorage: {
@@ -308,6 +318,7 @@ async function checkSavedRouteAlertContract() {
         installationId: `installation_${"a".repeat(32)}`,
         installationSecret: `secret_${"b".repeat(48)}`,
       }),
+      "fuel-path:alert-backend-enrolled:v1": "1",
     },
   });
   await Promise.all([
@@ -318,6 +329,11 @@ async function checkSavedRouteAlertContract() {
   assert.equal(reinstalled.alertFetchCalls[1].url, "https://fuel-path.test/api/alerts?action=delete-installation-data");
   assert.equal(JSON.parse(reinstalled.storage.get("fuel-path:alert-installation:v2")).installationId, "installation_uuid-contract");
   assert.equal(reinstalled.storage.get("fuel-path:install-marker:v1"), "uuid-contract");
+
+  const neverEnrolled = loadBackendAlertContractModule({ capabilityBody: null });
+  const neverEnrolledDelete = await neverEnrolled.deleteMyAlertData();
+  assert.equal(neverEnrolledDelete.status, "synced");
+  assert.equal(neverEnrolled.alertFetchCalls.length, 0);
 }
 
 function loadBackendAlertContractModule({ capabilityBody, initialStorage = {} }) {

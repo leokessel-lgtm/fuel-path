@@ -285,6 +285,8 @@ const checks = [
       files.backendAlerts.includes('action=delete-installation-data') &&
       files.routeAlertsHook.includes("deleteAllAlertData") &&
       files.routeAlertsHook.includes("subscribeToPushTokenChanges") &&
+      files.routeAlertsHook.includes('backendSync.status !== "synced"') &&
+      files.routeAlertsHook.includes("targetCommute.backendSyncedAt") &&
       files.routeAlertsHook.includes('state === "active"'),
   },
   {

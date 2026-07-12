@@ -535,7 +535,7 @@ test("capability issuance is durably rate limited", async () => {
       responses.push(await callAlerts("POST", { action: "client-capability" }, installation));
     }
     assert.equal(responses.slice(0, 10).every((response) => response.status === 202), true);
-    assert.equal(responses[10].status, 403);
+    assert.equal(responses[10].status, 429);
     assert.match(responses[10].payload.error, /too many/i);
   } finally {
     setAlertStorageForTests(null);

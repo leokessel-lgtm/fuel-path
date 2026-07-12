@@ -255,6 +255,16 @@ export async function cancelSavedCommuteAlert(commute: SavedCommute): Promise<Sc
   };
 }
 
+export async function subscribeToPushTokenChanges(onChange: () => void) {
+  if (Platform.OS === "web" || androidNotificationsUnavailableInExpoGo()) return undefined;
+  try {
+    const Notifications = await import("expo-notifications");
+    return Notifications.addPushTokenListener(onChange);
+  } catch {
+    return undefined;
+  }
+}
+
 async function ensureRouteAlertChannel(
   Notifications: typeof import("expo-notifications"),
 ) {

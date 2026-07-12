@@ -75,7 +75,7 @@ module.exports = async function handler(req, res) {
 
     const action = stringParam(req.query.action || req.body?.action, "evaluate");
     if (action === "client-capability") {
-      const capability = issueAlertClientCapability(req.body || {});
+      const capability = await issueAlertClientCapability(req.body || {}, req);
       sendJson(res, capability.accepted ? 202 : 403, capability);
       return;
     }
@@ -87,6 +87,11 @@ module.exports = async function handler(req, res) {
       }
       const result = await validateSavedRouteAlertDelivery(req.body || {});
       sendJson(res, result.accepted ? 202 : 409, result);
+      return;
+    }
+
+    if (action === "evaluate" && !alertsAdminWriteAuthorised(req)) {
+      sendJson(res, 401, { error: "Alert evaluation requires operator authorisation." });
       return;
     }
 
@@ -102,15 +107,27 @@ module.exports = async function handler(req, res) {
     }
 
     if (action === "register-device") {
-      sendJson(res, 202, await registerPushDevice(req.body || {}));
+      const input = await capabilityOwnedInput(req, req.body || {});
+      if (!input) return sendJson(res, 401, { error: "Route watch sync requires an installation capability." });
+      sendJson(res, 202, await registerPushDevice(input));
       return;
     }
     if (action === "save-route") {
-      sendJson(res, 202, await saveBackendSavedRoute(req.body || {}));
+      const input = await capabilityOwnedInput(req, req.body || {});
+      if (!input) return sendJson(res, 401, { error: "Route watch sync requires an installation capability." });
+      sendJson(res, 202, await saveBackendSavedRoute(input));
       return;
     }
     if (action === "delete-route") {
-      sendJson(res, 202, await deleteBackendSavedRoute(req.body || {}));
+      const input = await capabilityOwnedInput(req, req.body || {});
+      if (!input) return sendJson(res, 401, { error: "Route watch sync requires an installation capability." });
+      sendJson(res, 202, await deleteBackendSavedRoute(input));
+      return;
+    }
+    if (action === "delete-installation-data") {
+      const subject = await alertsWriteAuthorised.subjectFor?.(req);
+      if (!subject) return sendJson(res, 401, { error: "Alert-data deletion requires an installation capability." });
+      sendJson(res, 202, await deleteBackendSavedRoute.allForInstallation(subject.installationId));
       return;
     }
     if (action === "evaluate") {
@@ -120,7 +137,7 @@ module.exports = async function handler(req, res) {
 
     sendJson(res, 400, {
       error: "That route watch action is not available.",
-      supportedActions: ["register-device", "save-route", "delete-route", "evaluate"],
+      supportedActions: ["register-device", "save-route", "delete-route", "delete-installation-data", "evaluate"],
       alerts: await alertsStatus(),
     });
   } catch (error) {
@@ -136,11 +153,16 @@ async function savedRoutesEndpoint(req, res) {
 
   try {
     if (req.method === "GET") {
+      const subject = await alertsWriteAuthorised.subjectFor?.(req);
+      if (!subject && !alertRecordsReadAuthorised(req)) {
+        sendJson(res, 401, { error: "Saved routes require installation or operator authorisation." });
+        return;
+      }
       sendJson(
         res,
         200,
         await listBackendSavedRoutes({
-          userId: stringParam(req.query.userId),
+          userId: subject?.installationId || stringParam(req.query.userId),
           enabledOnly: stringParam(req.query.enabledOnly) === "1",
           limit: numberParam(req.query.limit, 50),
         }),
@@ -160,22 +182,34 @@ async function savedRoutesEndpoint(req, res) {
     }
 
     if (req.method === "DELETE") {
-      sendJson(
-        res,
-        202,
-        await deleteBackendSavedRoute({
+      const input = await capabilityOwnedInput(req, {
           routeId: stringParam(req.query.routeId || req.query.id || req.body?.routeId || req.body?.id),
           userId: stringParam(req.query.userId || req.body?.userId),
-        }),
-      );
+      });
+      if (!input) return sendJson(res, 401, { error: "Saved route sync requires an installation capability." });
+      sendJson(res, 202, await deleteBackendSavedRoute(input));
       return;
     }
 
-    sendJson(res, 202, await saveBackendSavedRoute(req.body || {}));
+    const input = await capabilityOwnedInput(req, req.body || {});
+    if (!input) return sendJson(res, 401, { error: "Saved route sync requires an installation capability." });
+    sendJson(res, 202, await saveBackendSavedRoute(input));
   } catch (error) {
     sendJson(res, 400, {
       error: publicErrorMessage(error, "alerts"),
       alerts: await alertsStatus(),
     });
   }
+}
+
+async function capabilityOwnedInput(req, input) {
+  const subject = await alertsWriteAuthorised.subjectFor?.(req);
+  if (subject) {
+    return {
+      ...input,
+      userId: subject.installationId,
+      deviceId: subject.installationId,
+    };
+  }
+  return alertsAdminWriteAuthorised(req) ? input : null;
 }

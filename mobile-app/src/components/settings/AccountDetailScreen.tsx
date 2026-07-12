@@ -1,4 +1,4 @@
-import { Platform, Pressable, ScrollView, Text, View } from "react-native";
+import { Alert, Platform, Pressable, ScrollView, Text, View } from "react-native";
 
 import { DiscountWalletCard } from "../DiscountWalletCard";
 import { SavedPlacesCard } from "../SavedPlacesCard";
@@ -17,6 +17,7 @@ export function AccountDetailScreen({
   notificationPermission,
   onBack,
   onClearNamedPlace,
+  onDeleteAlertData,
   onFuelChange,
   onHomeChargingAccessChange,
   onRemoveCommute,
@@ -123,6 +124,28 @@ export function AccountDetailScreen({
           <Text style={styles.muted}>
             Fuel Path stores your preferences locally and may use aggregate product signals like saved routes, route watches and navigation opens. Provider diagnostics and beta evidence stay out of the main settings flow unless they need action.
           </Text>
+          <Text style={styles.muted}>
+            Your saved routes are stored on this device. They will not automatically move to a new phone or return after deleting the app.
+          </Text>
+          <Pressable
+            accessibilityLabel="Delete my alert data"
+            accessibilityRole="button"
+            disabled={alertSyncingCommuteId != null}
+            onPress={() => Alert.alert(
+              "Delete alert data?",
+              "This turns off route alerts and deletes your anonymous alert routes, push token and alert history from Fuel Path. Saved routes stay on this device.",
+              [
+                { text: "Cancel", style: "cancel" },
+                { text: "Delete", style: "destructive", onPress: onDeleteAlertData },
+              ],
+            )}
+            style={styles.dataDeleteButton}
+          >
+            <Text style={styles.dataDeleteButtonText}>
+              {alertSyncingCommuteId === "all-alert-data" ? "Deleting alert data…" : "Delete my alert data"}
+            </Text>
+          </Pressable>
+          <Text accessibilityRole="alert" style={styles.muted}>{notificationMessage}</Text>
           <NavigationPreference
             value={preferences.navigationApp}
             onChange={onNavigationAppChange}

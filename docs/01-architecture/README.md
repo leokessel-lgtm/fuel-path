@@ -10,6 +10,7 @@ Current runtime boundaries only. They do not prove approval or capacity.
 | Provider or failure handling | [`provider-failure-boundaries.md`](provider-failure-boundaries.md) | `docs/03-provider-data/README.md` and provider tests |
 | Request, cache or storage change | [`runtime-data-flow.md`](runtime-data-flow.md) | Status contracts, storage adapters and load tests |
 | Traffic or capacity work | [`scaling-model.md`](scaling-model.md) | `PERFORMANCE-GUARDRAILS.md` and hosted evidence |
+| Account-free native data, alerts or anonymous ownership | [`ACCOUNT-FREE-NATIVE-DATA-ARCHITECTURE.md`](ACCOUNT-FREE-NATIVE-DATA-ARCHITECTURE.md) | `LOCAL-DEVELOPMENT-DATABASE.md`, `BACKEND-PUSH-SCHEDULER-DESIGN.md` and native device evidence |
 | Refactor planning | [`backend-composition-root-map.md`](backend-composition-root-map.md) | [`refactor-backlog.md`](refactor-backlog.md) and architecture checks |
 | Local or production product database | [`LOCAL-DEVELOPMENT-DATABASE.md`](LOCAL-DEVELOPMENT-DATABASE.md) | `db/migrations/` and the storage modules |
 

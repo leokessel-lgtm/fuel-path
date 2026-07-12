@@ -1,12 +1,13 @@
 const { assertProductDatabaseSchema, createProductSqlClient } = require("./_productDatabase");
+const { rowToDevice, rowToEvaluation, rowToRoute } = require("./_alertRecords");
+const { setAlertInstallationStorageForTests } = require("./_alertInstallationStorage");
 
 const DEFAULT_MAX_RECORDS = 500;
-
 let sqlClient;
 let testStorage;
-
 const memoryStore = {
   devices: [],
+  installations: [],
   routes: [],
   evaluations: [],
 };
@@ -68,6 +69,13 @@ async function upsertPushDevice(record) {
   const sql = await getSql();
   await ensureTables(sql);
   await sql`
+    WITH retired_token AS (
+      UPDATE fuel_path_push_devices
+      SET status = 'inactive', invalidated_at = ${record.lastSeenAt}
+      WHERE expo_push_token = ${record.expoPushToken}
+        AND id <> ${record.id}
+        AND status = 'active'
+    )
     INSERT INTO fuel_path_push_devices (
       id, user_id, device_id, platform, expo_push_token, app_version, status, last_seen_at, invalidated_at, raw
     )
@@ -86,7 +94,6 @@ async function upsertPushDevice(record) {
   `;
   return record;
 }
-
 async function upsertSavedRoute(record) {
   if (testStorage) return testStorage.upsertSavedRoute(record);
   if (!databaseUrl()) return upsertMemorySavedRoute(record);
@@ -106,7 +113,7 @@ async function upsertSavedRoute(record) {
       ${record.pausedUntil || null}, ${record.lastAlertSentAt || null}, ${record.createdAt}, ${record.updatedAt},
       ${JSON.stringify(record)}
     )
-    ON CONFLICT (id) DO UPDATE SET
+    ON CONFLICT (user_id, id) DO UPDATE SET
       name = EXCLUDED.name,
       from_lat = EXCLUDED.from_lat,
       from_lon = EXCLUDED.from_lon,
@@ -214,10 +221,12 @@ async function updateRouteAlertDelivery({ evaluationId, pushTicketId = "", pushR
   return rows[0] ? rowToEvaluation(rows[0]) : null;
 }
 
-async function updateSavedRouteLastAlert(routeId, sentAt) {
-  if (testStorage?.updateSavedRouteLastAlert) return testStorage.updateSavedRouteLastAlert(routeId, sentAt);
+async function updateSavedRouteLastAlert(routeId, sentAt, userId = "") {
+  if (testStorage?.updateSavedRouteLastAlert) return testStorage.updateSavedRouteLastAlert(routeId, sentAt, userId);
   if (!databaseUrl()) {
-    const record = memoryStore.routes.find((item) => item.id === routeId);
+    const record = memoryStore.routes.find((item) =>
+      item.id === routeId && (!userId || item.userId === userId)
+    );
     if (record) record.lastAlertSentAt = sentAt;
     return record || null;
   }
@@ -227,7 +236,7 @@ async function updateSavedRouteLastAlert(routeId, sentAt) {
   const rows = await sql`
     UPDATE fuel_path_saved_routes
     SET last_alert_sent_at = ${sentAt}, updated_at = ${sentAt}
-    WHERE id = ${routeId}
+    WHERE id = ${routeId} AND user_id = ${userId}
     RETURNING *
   `;
   return rows[0] ? rowToRoute(rows[0]) : null;
@@ -486,7 +495,9 @@ function upsertMemory(key, record) {
 }
 
 function upsertMemorySavedRoute(record) {
-  const index = memoryStore.routes.findIndex((item) => item.id === record.id);
+  const index = memoryStore.routes.findIndex((item) =>
+    item.id === record.id && item.userId === record.userId
+  );
   if (index < 0) {
     memoryStore.routes.push(record);
     return record;
@@ -560,91 +571,6 @@ async function ensureTables(sql) {
   return assertProductDatabaseSchema(sql);
 }
 
-function rowToDevice(row) {
-  return {
-    id: row.id,
-    userId: row.user_id,
-    deviceId: row.device_id,
-    platform: row.platform,
-    expoPushToken: row.expo_push_token,
-    appVersion: row.app_version || "",
-    status: row.status,
-    lastSeenAt: isoDateTime(row.last_seen_at),
-    invalidatedAt: row.invalidated_at ? isoDateTime(row.invalidated_at) : undefined,
-  };
-}
-
-function rowToRoute(row) {
-  const raw = rawObject(row.raw);
-  return {
-    id: row.id,
-    userId: row.user_id,
-    name: row.name,
-    from: { lat: Number(row.from_lat), lon: Number(row.from_lon), label: row.from_label },
-    to: { lat: Number(row.to_lat), lon: Number(row.to_lon), label: row.to_label },
-    fuel: row.fuel,
-    vehicleId: raw.vehicleId || "",
-    vehicleEnergyType: raw.vehicleEnergyType || "",
-    alertEnabled: Boolean(row.alert_enabled),
-    alertTimeLocal: row.alert_time_local,
-    alertDays: Array.isArray(raw.alertDays) ? raw.alertDays : [],
-    timezone: row.timezone,
-    minSavingDollars: Number(row.min_saving_dollars),
-    maxDetourMinutes: Number(row.max_detour_minutes),
-    eligibleDiscounts: Array.isArray(raw.eligibleDiscounts) ? raw.eligibleDiscounts : [],
-    tankLitres: optionalNumber(raw.tankLitres),
-    tankPercent: optionalNumber(raw.tankPercent),
-    economy: optionalNumber(raw.economy),
-    reserveKm: optionalNumber(raw.reserveKm),
-    evBatteryKwh: optionalNumber(raw.evBatteryKwh),
-    evRangeKm: optionalNumber(raw.evRangeKm),
-    evConnectors: Array.isArray(raw.evConnectors) ? raw.evConnectors : [],
-    pausedUntil: row.paused_until ? isoDateTime(row.paused_until) : undefined,
-    lastAlertSentAt: row.last_alert_sent_at ? isoDateTime(row.last_alert_sent_at) : undefined,
-    createdAt: isoDateTime(row.created_at),
-    updatedAt: isoDateTime(row.updated_at),
-  };
-}
-
-function rawObject(value) {
-  if (!value) return {};
-  if (typeof value === "object") return value;
-  try {
-    const parsed = JSON.parse(value);
-    return parsed && typeof parsed === "object" ? parsed : {};
-  } catch {
-    return {};
-  }
-}
-
-function rowToEvaluation(row) {
-  const raw = rawObject(row.raw);
-  return {
-    id: row.id,
-    routeId: row.saved_route_id,
-    userId: row.user_id,
-    status: row.status,
-    reason: row.reason,
-    outcome: raw.outcome,
-    outcomeLabel: raw.outcomeLabel,
-    outcomeSummary: raw.outcomeSummary,
-    stationCode: row.station_code || undefined,
-    stationName: row.station_name || undefined,
-    alertBasis: raw.alertBasis || undefined,
-    cycleSignalMode: raw.cycleSignalMode || undefined,
-    cycleReadinessStatus: raw.cycleReadinessStatus || undefined,
-    cycleAlertsEnabled: raw.cycleAlertsEnabled === true,
-    estimatedSavingDollars: optionalNumber(row.estimated_saving_dollars),
-    detourMinutes: optionalNumber(row.detour_minutes),
-    freshnessMinutes: optionalNumber(row.freshness_minutes),
-    messageTitle: row.message_title || undefined,
-    messageBody: row.message_body || undefined,
-    evaluatedAt: isoDateTime(row.evaluated_at),
-    pushDeliveryEnabled: Boolean(row.push_delivery_enabled),
-    pushTicketId: row.push_ticket_id || undefined,
-    pushReceiptStatus: row.push_receipt_status || undefined,
-  };
-}
 
 function databaseUrl() {
   return (
@@ -682,20 +608,9 @@ function nullableNumber(value) {
   return Number.isFinite(value) ? value : null;
 }
 
-function optionalNumber(value) {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : undefined;
-}
-
-function isoDateTime(value) {
-  if (!value) return new Date().toISOString();
-  if (value instanceof Date) return value.toISOString();
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? String(value) : parsed.toISOString();
-}
-
 function setAlertStorageForTests(storage) {
   testStorage = storage || null;
+  setAlertInstallationStorageForTests(storage);
 }
 
 module.exports = {

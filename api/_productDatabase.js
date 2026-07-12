@@ -5,6 +5,8 @@ const REQUIRED_TABLES = [
   "fuel_path_prediction_backtests",
   "fuel_path_market_price_snapshots",
   "fuel_path_geocode_quotas",
+  "fuel_path_alert_installations",
+  "fuel_path_alert_rate_limits",
 ];
 
 let schemaChecks = new WeakMap();
@@ -49,7 +51,9 @@ async function assertProductDatabaseSchema(sql) {
           ('fuel_path_route_alert_evaluations'),
           ('fuel_path_prediction_backtests'),
           ('fuel_path_market_price_snapshots'),
-          ('fuel_path_geocode_quotas')
+          ('fuel_path_geocode_quotas'),
+          ('fuel_path_alert_installations'),
+          ('fuel_path_alert_rate_limits')
       )
       SELECT table_name
       FROM required

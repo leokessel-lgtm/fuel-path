@@ -694,7 +694,9 @@ function RouteFollowUpPrompt({
       <View style={styles.followUpCard}>
         <View style={styles.followUpCopy}>
           <Text style={styles.followUpTitle}>Save this commute</Text>
-          <Text style={styles.followUpText}>Keep this route ready for repeat checks.</Text>
+          <Text style={styles.followUpText}>
+            Keep this route ready for repeat checks. Saved routes stay on this device and will not move to a new phone or return after deleting the app.
+          </Text>
         </View>
         <Pressable
           accessibilityLabel="Save this commute"
@@ -1578,12 +1580,8 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     textAlign: "center",
   },
-  tomorrowPriceDown: {
-    color: colors.greenDark,
-  },
-  tomorrowPriceUp: {
-    color: colors.amber,
-  },
+  tomorrowPriceDown: { color: colors.greenDark },
+  tomorrowPriceUp: { color: colors.amber },
   eyebrow: {
     ...typography.eyebrow,
     textTransform: "uppercase",

@@ -25,6 +25,7 @@ export type AccountScreenProps = {
     updates: Partial<Pick<AppPreferences, "evBatteryKwh" | "evRangeKm" | "fuelTankLitres" | "homeChargingAccess" | "evChargingPreference" | "vehicleName" | "vehicleRego">>,
   ) => void;
   onClearVehicleProfile: () => void;
+  onDeleteAlertData: () => void;
   onVehicleEnergyTypeChange: (vehicleEnergyType: VehicleEnergyType) => void;
   onAddVehicle: (vehicleEnergyType?: VehicleEnergyType) => void;
   onRemoveVehicle: (vehicleId: string) => void;

@@ -67,10 +67,10 @@ test("backend alert sync rejects ephemeral memory storage", async () => {
   const saved = await callSavedRoutes("POST", {}, route);
   const registered = await callPushRegister(device);
 
-  assert.equal(saved.status, 400);
-  assert.match(saved.payload.error, /Route watch could not update/i);
-  assert.equal(registered.status, 400);
-  assert.match(registered.payload.error, /Route watch could not update/i);
+  assert.equal(saved.status, 401);
+  assert.match(saved.payload.error, /installation capability/i);
+  assert.equal(registered.status, 401);
+  assert.match(registered.payload.error, /installation capability/i);
 });
 
 test("saved-route alert foundation stores route, device and sendable evaluation", async () => {
@@ -97,7 +97,7 @@ test("saved-route alert foundation stores route, device and sendable evaluation"
         openNow: true,
       },
     }, headers);
-    const routes = await callSavedRoutes("GET", { userId: "user-test" });
+    const routes = await callSavedRoutes("GET", { userId: "user-test" }, {}, headers);
     const evaluations = await callAlerts("GET", { mode: "evaluations", routeId: route.id }, {}, headers);
 
     assert.equal(saved.status, 202);
@@ -319,7 +319,7 @@ test("durable alert storage requires write token and keeps push disabled", async
   }
 });
 
-test("durable alert storage can use a separate preview client validation token", async () => {
+test("durable alert storage rejects a shared client token without an installation capability", async () => {
   const originalAdminToken = process.env.ALERTS_WRITE_TOKEN;
   const originalClientEnabled = process.env.ALERTS_CLIENT_WRITE_ENABLED;
   const originalClientToken = process.env.ALERTS_CLIENT_WRITE_TOKEN;
@@ -335,7 +335,7 @@ test("durable alert storage can use a separate preview client validation token",
     const status = await callStatus();
 
     assert.equal(rejected.status, 401);
-    assert.equal(accepted.status, 202);
+    assert.equal(accepted.status, 401);
     assert.equal(status.payload.alerts.writeSecurity.adminTokenConfigured, false);
     assert.equal(status.payload.alerts.writeSecurity.clientTokenEnabled, true);
     assert.equal(status.payload.alerts.writeSecurity.clientTokenConfigured, true);
@@ -365,12 +365,10 @@ test("backend mints scoped client capability for saved-route sync without exposi
 
   try {
     const rejected = await callSavedRoutes("POST", {}, route);
-    const capability = await callAlerts("POST", { action: "client-capability" }, {
-      userId: route.userId,
-      deviceId: device.deviceId,
-    });
+    const installation = anonymousInstallation();
+    const capability = await callAlerts("POST", { action: "client-capability" }, installation);
     const headers = { authorization: `Bearer ${capability.payload.token}` };
-    const accepted = await callSavedRoutes("POST", {}, route, headers);
+    const accepted = await callSavedRoutes("POST", {}, { ...route, userId: "forged-owner" }, headers);
     const registered = await callPushRegister(device, headers);
     const status = await callStatus();
 
@@ -379,7 +377,11 @@ test("backend mints scoped client capability for saved-route sync without exposi
     assert.equal(capability.payload.accepted, true);
     assert.equal(typeof capability.payload.token, "string");
     assert.match(capability.payload.token, /\./);
+    const capabilityPayload = JSON.parse(Buffer.from(capability.payload.token.split(".")[0], "base64url").toString("utf8"));
+    assert.equal(capabilityPayload.exp - capabilityPayload.iat, 15 * 60);
+    assert.equal(capabilityPayload.capabilityVersion, 1);
     assert.equal(accepted.status, 202);
+    assert.equal(accepted.payload.route.userId, installation.installationId);
     assert.equal(registered.status, 202);
     assert.equal(status.payload.alerts.writeSecurity.clientCapabilityConfigured, true);
     assert.equal(status.payload.alerts.writeSecurity.clientTokenConfigured, false);
@@ -397,6 +399,153 @@ test("backend mints scoped client capability for saved-route sync without exposi
   }
 });
 
+test("installation capabilities isolate identical deterministic route ids", async () => {
+  const originalEnabled = process.env.ALERTS_CLIENT_WRITE_ENABLED;
+  const originalSecret = process.env.ALERTS_CLIENT_CAPABILITY_SECRET;
+  process.env.ALERTS_CLIENT_WRITE_ENABLED = "1";
+  process.env.ALERTS_CLIENT_CAPABILITY_SECRET = "preview-capability-secret";
+  const store = memoryDurableStore();
+  setAlertStorageForTests(store);
+  try {
+    const firstInstallation = anonymousInstallation("a");
+    const secondInstallation = anonymousInstallation("c");
+    const firstCapability = await callAlerts("POST", { action: "client-capability" }, firstInstallation);
+    const secondCapability = await callAlerts("POST", { action: "client-capability" }, secondInstallation);
+    const firstHeaders = { authorization: `Bearer ${firstCapability.payload.token}` };
+    const secondHeaders = { authorization: `Bearer ${secondCapability.payload.token}` };
+
+    const first = await callSavedRoutes("POST", {}, { ...route, name: "First owner" }, firstHeaders);
+    const second = await callSavedRoutes("POST", {}, { ...route, name: "Second owner" }, secondHeaders);
+    const firstList = await callSavedRoutes("GET", {}, {}, firstHeaders);
+    const secondList = await callSavedRoutes("GET", {}, {}, secondHeaders);
+    const firstName = firstList.payload.routes.find((item) => item.userId === firstInstallation.installationId)?.name;
+    const secondName = secondList.payload.routes.find((item) => item.userId === secondInstallation.installationId)?.name;
+    await store.updateSavedRouteLastAlert(route.id, "2026-07-12T08:00:00.000Z", firstInstallation.installationId);
+    assert.equal(store.routes.find((item) => item.userId === firstInstallation.installationId)?.lastAlertSentAt, "2026-07-12T08:00:00.000Z");
+    assert.equal(store.routes.find((item) => item.userId === secondInstallation.installationId)?.lastAlertSentAt, undefined);
+    await callSavedRoutes("DELETE", { routeId: route.id }, {}, firstHeaders);
+    const secondAfterDelete = await callSavedRoutes("GET", {}, {}, secondHeaders);
+
+    assert.equal(first.status, 202);
+    assert.equal(second.status, 202);
+    assert.equal(firstName, "First owner");
+    assert.equal(secondName, "Second owner");
+    assert.equal(secondAfterDelete.payload.routes[0].name, "Second owner");
+  } finally {
+    setAlertStorageForTests(null);
+    if (originalEnabled === undefined) delete process.env.ALERTS_CLIENT_WRITE_ENABLED;
+    else process.env.ALERTS_CLIENT_WRITE_ENABLED = originalEnabled;
+    if (originalSecret === undefined) delete process.env.ALERTS_CLIENT_CAPABILITY_SECRET;
+    else process.env.ALERTS_CLIENT_CAPABILITY_SECRET = originalSecret;
+  }
+});
+
+test("client capability cannot invoke evaluation or internal jobs", async () => {
+  const originalEnabled = process.env.ALERTS_CLIENT_WRITE_ENABLED;
+  const originalSecret = process.env.ALERTS_CLIENT_CAPABILITY_SECRET;
+  process.env.ALERTS_CLIENT_WRITE_ENABLED = "1";
+  process.env.ALERTS_CLIENT_CAPABILITY_SECRET = "preview-capability-secret";
+  const store = memoryDurableStore();
+  setAlertStorageForTests(store);
+  try {
+    const capability = await callAlerts("POST", { action: "client-capability" }, anonymousInstallation("d"));
+    const headers = { authorization: `Bearer ${capability.payload.token}` };
+    const evaluation = await callAlerts("POST", { action: "evaluate" }, { route }, headers);
+    const job = await callHandler(internalJobsHandler, {
+      method: "POST",
+      query: { job: "evaluate-route-alerts" },
+      body: {},
+      headers,
+    });
+    assert.equal(evaluation.status, 401);
+    assert.equal(job.status, 401);
+  } finally {
+    setAlertStorageForTests(null);
+    if (originalEnabled === undefined) delete process.env.ALERTS_CLIENT_WRITE_ENABLED;
+    else process.env.ALERTS_CLIENT_WRITE_ENABLED = originalEnabled;
+    if (originalSecret === undefined) delete process.env.ALERTS_CLIENT_CAPABILITY_SECRET;
+    else process.env.ALERTS_CLIENT_CAPABILITY_SECRET = originalSecret;
+  }
+});
+
+test("delete-my-alert-data is atomic and revokes the existing capability", async () => {
+  const originalEnabled = process.env.ALERTS_CLIENT_WRITE_ENABLED;
+  const originalSecret = process.env.ALERTS_CLIENT_CAPABILITY_SECRET;
+  process.env.ALERTS_CLIENT_WRITE_ENABLED = "1";
+  process.env.ALERTS_CLIENT_CAPABILITY_SECRET = "preview-capability-secret";
+  const store = memoryDurableStore();
+  setAlertStorageForTests(store);
+  try {
+    const installation = anonymousInstallation("e");
+    const capability = await callAlerts("POST", { action: "client-capability" }, installation);
+    const headers = { authorization: `Bearer ${capability.payload.token}` };
+    await callSavedRoutes("POST", {}, route, headers);
+    await callPushRegister(device, headers);
+    const deleted = await callAlerts("POST", { action: "delete-installation-data" }, {}, headers);
+    const retryWrite = await callSavedRoutes("POST", {}, route, headers);
+
+    assert.equal(deleted.status, 202);
+    assert.equal(deleted.payload.deletedRouteCount, 1);
+    assert.equal(deleted.payload.deletedDeviceCount, 1);
+    assert.equal(deleted.payload.revoked, true);
+    assert.equal(retryWrite.status, 401);
+    assert.equal(store.routes.length, 0);
+    assert.equal(store.devices.length, 0);
+  } finally {
+    setAlertStorageForTests(null);
+    if (originalEnabled === undefined) delete process.env.ALERTS_CLIENT_WRITE_ENABLED;
+    else process.env.ALERTS_CLIENT_WRITE_ENABLED = originalEnabled;
+    if (originalSecret === undefined) delete process.env.ALERTS_CLIENT_CAPABILITY_SECRET;
+    else process.env.ALERTS_CLIENT_CAPABILITY_SECRET = originalSecret;
+  }
+});
+
+test("push-token registration keeps one active anonymous owner", async () => {
+  const originalToken = process.env.ALERTS_WRITE_TOKEN;
+  process.env.ALERTS_WRITE_TOKEN = "operator-token";
+  const store = memoryDurableStore();
+  setAlertStorageForTests(store);
+  try {
+    const headers = { authorization: "Bearer operator-token" };
+    await callPushRegister({ ...device, userId: "installation-first", deviceId: "first" }, headers);
+    await callPushRegister({ ...device, userId: "installation-second", deviceId: "second" }, headers);
+    const active = store.devices.filter((item) => item.expoPushToken === device.expoPushToken && item.status === "active");
+    const inactive = store.devices.filter((item) => item.expoPushToken === device.expoPushToken && item.status === "inactive");
+    assert.equal(active.length, 1);
+    assert.equal(active[0].userId, "installation-second");
+    assert.equal(inactive.length, 1);
+  } finally {
+    setAlertStorageForTests(null);
+    if (originalToken === undefined) delete process.env.ALERTS_WRITE_TOKEN;
+    else process.env.ALERTS_WRITE_TOKEN = originalToken;
+  }
+});
+
+test("capability issuance is durably rate limited", async () => {
+  const originalEnabled = process.env.ALERTS_CLIENT_WRITE_ENABLED;
+  const originalSecret = process.env.ALERTS_CLIENT_CAPABILITY_SECRET;
+  process.env.ALERTS_CLIENT_WRITE_ENABLED = "1";
+  process.env.ALERTS_CLIENT_CAPABILITY_SECRET = "preview-capability-secret";
+  const store = memoryDurableStore();
+  setAlertStorageForTests(store);
+  try {
+    const installation = anonymousInstallation("f");
+    const responses = [];
+    for (let attempt = 0; attempt < 11; attempt += 1) {
+      responses.push(await callAlerts("POST", { action: "client-capability" }, installation));
+    }
+    assert.equal(responses.slice(0, 10).every((response) => response.status === 202), true);
+    assert.equal(responses[10].status, 403);
+    assert.match(responses[10].payload.error, /too many/i);
+  } finally {
+    setAlertStorageForTests(null);
+    if (originalEnabled === undefined) delete process.env.ALERTS_CLIENT_WRITE_ENABLED;
+    else process.env.ALERTS_CLIENT_WRITE_ENABLED = originalEnabled;
+    if (originalSecret === undefined) delete process.env.ALERTS_CLIENT_CAPABILITY_SECRET;
+    else process.env.ALERTS_CLIENT_CAPABILITY_SECRET = originalSecret;
+  }
+});
+
 test("saved-route delete removes backend route behind write token", async () => {
   const original = process.env.ALERTS_WRITE_TOKEN;
   process.env.ALERTS_WRITE_TOKEN = "alert-token";
@@ -408,7 +557,7 @@ test("saved-route delete removes backend route behind write token", async () => 
     const saved = await callSavedRoutes("POST", {}, route, headers);
     const rejected = await callSavedRoutes("DELETE", { routeId: route.id, userId: route.userId });
     const deleted = await callSavedRoutes("DELETE", { routeId: route.id, userId: route.userId }, {}, headers);
-    const listed = await callSavedRoutes("GET", { userId: route.userId });
+    const listed = await callSavedRoutes("GET", { userId: route.userId }, {}, headers);
 
     assert.equal(saved.status, 202);
     assert.equal(rejected.status, 401);
@@ -441,7 +590,7 @@ test("saved-route edits preserve alert audit state", async () => {
   };
 
   await upsertStoredSavedRoute(original);
-  await updateStoredSavedRouteLastAlert(original.id, sentAt);
+  await updateStoredSavedRouteLastAlert(original.id, sentAt, original.userId);
   const stored = await upsertStoredSavedRoute(edited);
   const listed = await listStoredSavedRoutes({ userId: route.userId, limit: 100 });
   const persisted = listed.find((item) => item.id === original.id);
@@ -1031,6 +1180,13 @@ function freshCandidate(overrides = {}) {
   };
 }
 
+function anonymousInstallation(seed = "a") {
+  return {
+    installationId: `installation_${seed.repeat(32)}`,
+    installationSecret: `secret_${seed.repeat(48)}`,
+  };
+}
+
 function memoryDurableStore() {
   const devices = [];
   const routes = [];
@@ -1054,11 +1210,19 @@ function memoryDurableStore() {
       return { deviceCount: devices.length, routeCount: routes.length, evaluationCount: evaluations.length };
     },
     async upsertPushDevice(record) {
+      for (const item of devices) {
+        if (item.id !== record.id && item.expoPushToken === record.expoPushToken && item.status === "active") {
+          item.status = "inactive";
+          item.invalidatedAt = record.lastSeenAt;
+        }
+      }
       upsert(devices, record);
       return record;
     },
     async upsertSavedRoute(record) {
-      upsert(routes, record);
+      const index = routes.findIndex((item) => item.id === record.id && item.userId === record.userId);
+      if (index >= 0) routes[index] = record;
+      else routes.push(record);
       return record;
     },
     async deleteSavedRoute({ routeId, userId = "" }) {
@@ -1073,14 +1237,17 @@ function memoryDurableStore() {
       evaluations.push(record);
       return record;
     },
-    async listPushDevices() {
-      return devices;
+    async listPushDevices({ userId = "", status = "" } = {}) {
+      return devices.filter((item) =>
+        (!userId || item.userId === userId)
+        && (!status || item.status === status || (!item.status && status === "active"))
+      );
     },
-    async listSavedRoutes() {
-      return routes;
+    async listSavedRoutes({ userId = "", enabledOnly = false } = {}) {
+      return routes.filter((item) => (!userId || item.userId === userId) && (!enabledOnly || item.alertEnabled));
     },
-    async listRouteAlertEvaluations() {
-      return evaluations;
+    async listRouteAlertEvaluations({ routeId = "", userId = "" } = {}) {
+      return evaluations.filter((item) => (!routeId || item.routeId === routeId) && (!userId || item.userId === userId));
     },
     async listPendingPushTicketEvaluations() {
       return evaluations.filter((record) => record.pushTicketId && !record.pushReceiptStatus);
@@ -1093,8 +1260,8 @@ function memoryDurableStore() {
       }
       return record || null;
     },
-    async updateSavedRouteLastAlert(routeId, sentAt) {
-      const record = routes.find((item) => item.id === routeId);
+    async updateSavedRouteLastAlert(routeId, sentAt, userId = "") {
+      const record = routes.find((item) => item.id === routeId && (!userId || item.userId === userId));
       if (record) record.lastAlertSentAt = sentAt;
       return record || null;
     },

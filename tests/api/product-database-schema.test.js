@@ -1,4 +1,6 @@
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
 const test = require("node:test");
 
 const {
@@ -34,4 +36,14 @@ test("product database schema check names missing tables and migration command",
 test("local product database URLs use the direct Postgres client", () => {
   const local = createProductSqlClient("postgres://fuel_path:fuel_path@127.0.0.1:54329/fuel_path");
   assert.equal(typeof local, "function");
+});
+
+test("anonymous alert migration scopes route keys and capability issuance", () => {
+  const source = fs.readFileSync(
+    path.join(__dirname, "../../db/migrations/1763035200000_anonymous_alert_installations.js"),
+    "utf8",
+  );
+  assert.match(source, /capability_version INTEGER NOT NULL DEFAULT 1/);
+  assert.match(source, /fuel_path_alert_rate_limits/);
+  assert.match(source, /PRIMARY KEY \(user_id, id\)/);
 });

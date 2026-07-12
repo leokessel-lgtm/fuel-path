@@ -13,6 +13,12 @@ const {
   upsertPushDevice,
   upsertSavedRoute,
 } = require("./_alertStorage");
+const {
+  consumeAlertRateLimit,
+  deleteInstallationAlertData,
+  getAnonymousInstallation,
+  registerAnonymousInstallation,
+} = require("./_alertInstallationStorage");
 const { fetchExpoPushReceipts, sendExpoPushMessages } = require("./_expoPush");
 const {
   buildSavedRouteAlertEvaluation,
@@ -26,15 +32,12 @@ const {
   normalisePushDevice,
 } = require("./_alertRecords");
 const { providerHealth } = require("./_providerRuntime");
-const { createHmac, timingSafeEqual } = require("node:crypto");
-
+const { createHash, createHmac, timingSafeEqual } = require("node:crypto");
 const ALERT_MAX_RECORDS = 500;
 const ALERT_CAPABILITY_SCOPE = "alerts-client-write-v1";
-const ALERT_CAPABILITY_TTL_SECONDS = 60 * 60 * 24 * 30;
-
+const ALERT_CAPABILITY_TTL_SECONDS = 15 * 60;
 function createAlertOrchestration({ buildRoute, capabilitiesForPoints, loadStationData, predictionStatus, scoreRoute }) {
   let alertRouteScorerForTests;
-
   async function alertsStatus() {
     const storage = alertStorageStatus({ maxRecords: ALERT_MAX_RECORDS });
     const cronConfigured = Boolean(process.env.CRON_SECRET);
@@ -75,35 +78,17 @@ function createAlertOrchestration({ buildRoute, capabilitiesForPoints, loadStati
       pushProviderConfigured: pushDeliveryEnabled,
       cronConfigured,
       supportedDecisionStatuses: [
-        "send_alert",
-        "range_first",
-        "alert_disabled",
-        "quiet_today",
-        "saving_below_threshold",
-        "detour_above_threshold",
-        "stale_price",
-        "station_closed",
-        "region_unsupported",
-        "provider_access_pending",
-        "missing_push_token",
-        "permission_missing",
-        "cycle_guidance_not_ready",
-        "not_evaluated",
-        "failed",
+        "send_alert", "range_first", "alert_disabled", "quiet_today", "saving_below_threshold",
+        "detour_above_threshold", "stale_price", "station_closed", "region_unsupported",
+        "provider_access_pending", "missing_push_token", "permission_missing",
+        "cycle_guidance_not_ready", "not_evaluated", "failed",
       ],
-      supportedAlertOutcomes: [
-        "send_alert",
-        "watch_only",
-        "skip_alert",
-        "quiet_today",
-        "range_first",
-      ],
+      supportedAlertOutcomes: ["send_alert", "watch_only", "skip_alert", "quiet_today", "range_first"],
       nextBuildStep: pushDeliveryEnabled
         ? "Connect scheduled evaluation to live route scoring and monitor Expo push receipts."
         : "Enable EXPO_PUSH_DELIVERY_ENABLED only after native device-token validation passes.",
     };
   }
-
   function alertPushDeliveryEnabled(userId = "") {
     if (process.env.EXPO_PUSH_DELIVERY_ENABLED !== "1") return false;
     const allowedUserIds = String(process.env.EXPO_PUSH_BETA_USER_IDS || "")
@@ -112,7 +97,6 @@ function createAlertOrchestration({ buildRoute, capabilitiesForPoints, loadStati
       .filter(Boolean);
     return userId ? allowedUserIds.includes(userId) : allowedUserIds.length > 0;
   }
-
   async function alertCycleSignalStatus() {
     const fallback = {
       mode: "background_measurement_only",
@@ -146,7 +130,6 @@ function createAlertOrchestration({ buildRoute, capabilitiesForPoints, loadStati
       };
     }
   }
-
   function alertsWriteSecurity() {
     const adminTokenConfigured = Boolean(process.env.ALERTS_WRITE_TOKEN);
     const clientTokenEnabled = process.env.ALERTS_CLIENT_WRITE_ENABLED === "1";
@@ -166,7 +149,6 @@ function createAlertOrchestration({ buildRoute, capabilitiesForPoints, loadStati
       acceptedHeaders: ["Authorization: Bearer <token>", "X-Fuel-Path-Alerts-Token"],
     };
   }
-
   function alertsWriteAuthorised(req = {}) {
     const security = alertsWriteSecurity();
     if (!security.tokenRequired) return true;
@@ -184,7 +166,6 @@ function createAlertOrchestration({ buildRoute, capabilitiesForPoints, loadStati
       supplied === process.env.ALERTS_CLIENT_WRITE_TOKEN
     );
   }
-
   function alertsAdminWriteAuthorised(req = {}) {
     const expectedToken = process.env.ALERTS_VALIDATION_TOKEN || process.env.ALERTS_WRITE_TOKEN;
     if (!expectedToken) return false;
@@ -194,7 +175,6 @@ function createAlertOrchestration({ buildRoute, capabilitiesForPoints, loadStati
     const supplied = String(auth).replace(/^Bearer\s+/i, "").trim() || String(direct).trim();
     return supplied === expectedToken;
   }
-
   function alertRecordsReadAuthorised(req = {}) {
     if (!process.env.ALERTS_WRITE_TOKEN) return false;
     const headers = req.headers || {};
@@ -203,8 +183,7 @@ function createAlertOrchestration({ buildRoute, capabilitiesForPoints, loadStati
     const supplied = String(auth).replace(/^Bearer\s+/i, "").trim() || String(direct).trim();
     return supplied === process.env.ALERTS_WRITE_TOKEN;
   }
-
-  function issueAlertClientCapability({ userId = "", deviceId = "" } = {}) {
+  async function issueAlertClientCapability({ installationId = "", installationSecret = "" } = {}, req = {}) {
     const security = alertsWriteSecurity();
     if (!security.clientTokenEnabled || !security.clientCapabilityConfigured) {
       return {
@@ -213,20 +192,58 @@ function createAlertOrchestration({ buildRoute, capabilitiesForPoints, loadStati
         alerts: security,
       };
     }
-    const safeUserId = cleanCapabilityText(userId);
-    const safeDeviceId = cleanCapabilityText(deviceId);
-    if (!safeUserId || !safeDeviceId) {
+    const safeInstallationId = cleanInstallationId(installationId);
+    const safeInstallationSecret = cleanInstallationSecret(installationSecret);
+    if (!safeInstallationId || !safeInstallationSecret) {
       return {
         accepted: false,
-        error: "Alert client capability requires userId and deviceId.",
+        error: "Alert client capability requires an installation identity.",
+        alerts: security,
+      };
+    }
+    assertDurableAlertStorage();
+    const rateKeys = capabilityRateKeys(req, safeInstallationId);
+    const [networkRate, installationRate] = await Promise.all([
+      consumeAlertRateLimit({
+        rateKey: rateKeys.network,
+        action: "issue-capability-network",
+        limit: 30,
+        windowSeconds: 60,
+      }),
+      consumeAlertRateLimit({
+        rateKey: rateKeys.installation,
+        action: "issue-capability-installation",
+        limit: 10,
+        windowSeconds: 60,
+      }),
+    ]);
+    if (!networkRate.allowed || !installationRate.allowed) {
+      return {
+        accepted: false,
+        error: "Too many alert capability requests. Try again shortly.",
+        retryAfterSeconds: 60,
+        alerts: security,
+      };
+    }
+    const installation = await registerAnonymousInstallation({
+      installationId: safeInstallationId,
+      secretHash: installationSecretHash(safeInstallationSecret),
+    });
+    if (
+      installation.revokedAt ||
+      !timingSafeEqualText(installation.secretHash, installationSecretHash(safeInstallationSecret))
+    ) {
+      return {
+        accepted: false,
+        error: "Alert client capability is not available for this installation.",
         alerts: security,
       };
     }
     const now = Math.floor(Date.now() / 1000);
     const payload = {
       scope: ALERT_CAPABILITY_SCOPE,
-      userId: safeUserId,
-      deviceId: safeDeviceId,
+      installationId: safeInstallationId,
+      capabilityVersion: Number(installation.capabilityVersion || 1),
       iat: now,
       exp: now + ALERT_CAPABILITY_TTL_SECONDS,
     };
@@ -238,7 +255,21 @@ function createAlertOrchestration({ buildRoute, capabilitiesForPoints, loadStati
       alerts: security,
     };
   }
-
+  async function alertClientCapabilitySubject(req = {}) {
+    const headers = req.headers || {};
+    const auth = headers.authorization || headers.Authorization || "";
+    const supplied = String(auth).replace(/^Bearer\s+/i, "").trim();
+    const payload = verifyAlertClientCapability(supplied);
+    if (!payload) return null;
+    const installation = await getAnonymousInstallation(payload.installationId);
+    if (
+      !installation ||
+      installation.revokedAt ||
+      Number(installation.capabilityVersion || 1) !== Number(payload.capabilityVersion)
+    ) return null;
+    return { installationId: payload.installationId };
+  }
+  alertsWriteAuthorised.subjectFor = alertClientCapabilitySubject;
   function verifyAlertClientCapability(token = "") {
     if (!token || !alertClientCapabilitySecret()) return false;
     const [encodedPayload, suppliedSignature] = String(token).split(".");
@@ -254,19 +285,18 @@ function createAlertOrchestration({ buildRoute, capabilitiesForPoints, loadStati
     const now = Math.floor(Date.now() / 1000);
     return (
       payload?.scope === ALERT_CAPABILITY_SCOPE &&
-      typeof payload.userId === "string" &&
-      typeof payload.deviceId === "string" &&
+      typeof payload.installationId === "string" &&
+      Boolean(cleanInstallationId(payload.installationId)) &&
       Number.isFinite(payload.exp) &&
-      payload.exp > now
-    );
+      payload.exp > now &&
+      Number.isFinite(payload.capabilityVersion)
+    ) ? payload : null;
   }
-
   function assertDurableAlertStorage() {
     const storage = alertStorageStatus({ maxRecords: ALERT_MAX_RECORDS });
     if (storage.durable) return;
     throw new Error("Backend alert sync requires durable alert storage. Set DATABASE_URL or NEON_DATABASE_URL before syncing saved routes, devices or scheduled evaluations.");
   }
-
   function cronAuthorised(req = {}) {
     const expected = process.env.CRON_SECRET;
     if (!expected) return false;
@@ -275,7 +305,6 @@ function createAlertOrchestration({ buildRoute, capabilitiesForPoints, loadStati
     const bearer = String(auth).replace(/^Bearer\s+/i, "").trim();
     return bearer === expected;
   }
-
   async function registerPushDevice(input = {}) {
     assertDurableAlertStorage();
     const record = normalisePushDevice(input);
@@ -286,7 +315,6 @@ function createAlertOrchestration({ buildRoute, capabilitiesForPoints, loadStati
       alerts: await alertsStatus(),
     };
   }
-
   async function saveBackendSavedRoute(input = {}) {
     assertDurableAlertStorage();
     const route = normaliseBackendSavedRoute(input);
@@ -297,7 +325,6 @@ function createAlertOrchestration({ buildRoute, capabilitiesForPoints, loadStati
       alerts: await alertsStatus(),
     };
   }
-
   async function deleteBackendSavedRoute({ routeId = "", userId = "" } = {}) {
     assertDurableAlertStorage();
     const deleted = await deleteSavedRoute({ routeId, userId });
@@ -309,7 +336,16 @@ function createAlertOrchestration({ buildRoute, capabilitiesForPoints, loadStati
       alerts: await alertsStatus(),
     };
   }
-
+  async function deleteMyAlertData(installationId = "") {
+    assertDurableAlertStorage();
+    const deleted = await deleteInstallationAlertData(installationId);
+    return {
+      accepted: true,
+      installationId,
+      ...deleted,
+    };
+  }
+  deleteBackendSavedRoute.allForInstallation = deleteMyAlertData;
   async function listBackendSavedRoutes({ userId = "", enabledOnly = false, limit = 50 } = {}) {
     assertDurableAlertStorage();
     const routes = await listSavedRoutes({ userId, enabledOnly, limit });
@@ -318,7 +354,6 @@ function createAlertOrchestration({ buildRoute, capabilitiesForPoints, loadStati
       alerts: await alertsStatus(),
     };
   }
-
   async function listBackendPushDevices({ userId = "", status = "active", limit = 50 } = {}) {
     assertDurableAlertStorage();
     const devices = await listPushDevices({ userId, status, limit });
@@ -327,7 +362,6 @@ function createAlertOrchestration({ buildRoute, capabilitiesForPoints, loadStati
       alerts: await alertsStatus(),
     };
   }
-
   async function listBackendAlertEvaluations({ routeId = "", userId = "", limit = 50 } = {}) {
     assertDurableAlertStorage();
     const evaluations = await listRouteAlertEvaluations({ routeId, userId, limit });
@@ -336,7 +370,6 @@ function createAlertOrchestration({ buildRoute, capabilitiesForPoints, loadStati
       alerts: await alertsStatus(),
     };
   }
-
   async function evaluateSavedRouteAlert(input = {}) {
     assertDurableAlertStorage();
     const route = normaliseBackendSavedRoute(input.route || input);
@@ -372,7 +405,6 @@ function createAlertOrchestration({ buildRoute, capabilitiesForPoints, loadStati
       alerts: await alertsStatus(),
     };
   }
-
   async function validateSavedRouteAlertDelivery({ routeId = "", userId = "", deviceId = "" } = {}) {
     assertDurableAlertStorage();
     if (process.env.EXPO_PUSH_VALIDATION_ENABLED !== "1") {
@@ -424,7 +456,6 @@ function createAlertOrchestration({ buildRoute, capabilitiesForPoints, loadStati
       ticketAccepted: delivery.deliveryStatus === "sent_to_expo",
     };
   }
-
   async function deliverSavedRouteAlert({
     route,
     devices = [],
@@ -434,10 +465,8 @@ function createAlertOrchestration({ buildRoute, capabilitiesForPoints, loadStati
   } = {}) {
     if (evaluation.status !== "send_alert") return { deliveryStatus: "not_applicable" };
     if (!pushDeliveryEnabled) return { deliveryStatus: "not_sent_push_provider_disabled" };
-
     const activeDevices = devices.filter((device) => device.status !== "inactive" && isExpoPushToken(device.expoPushToken));
     if (!activeDevices.length) return { deliveryStatus: "not_sent_no_valid_expo_token" };
-
     try {
       const messages = activeDevices.map((device) => ({
         to: device.expoPushToken,
@@ -470,11 +499,10 @@ function createAlertOrchestration({ buildRoute, capabilitiesForPoints, loadStati
         });
         return { deliveryStatus: "expo_ticket_error", pushTickets: tickets };
       }
-
       const pushTicketId = okTickets.map((ticket) => ticket.id).join(",");
       evaluation.pushTicketId = pushTicketId;
       await updateRouteAlertDelivery({ evaluationId: evaluation.id, pushTicketId });
-      if (recordLastAlert) await updateSavedRouteLastAlert(route.id, evaluation.evaluatedAt);
+      if (recordLastAlert) await updateSavedRouteLastAlert(route.id, evaluation.evaluatedAt, route.userId);
       return { deliveryStatus: "sent_to_expo", pushTickets: tickets };
     } catch (error) {
       await updateRouteAlertDelivery({
@@ -487,14 +515,12 @@ function createAlertOrchestration({ buildRoute, capabilitiesForPoints, loadStati
       };
     }
   }
-
   async function runScheduledRouteAlertEvaluation({ limit = 50, now, ignoreWindow = false } = {}) {
     assertDurableAlertStorage();
     const evaluatedAt = validIsoDate(now) || new Date().toISOString();
     const routes = await listSavedRoutes({ enabledOnly: true, limit });
     const results = [];
     const alertedUserIds = new Set();
-
     for (const route of routes) {
       if (!ignoreWindow && !routeAlertWindowDue(route, evaluatedAt)) {
         results.push({ routeId: route.id, status: "skipped", reason: "outside_alert_window" });
@@ -544,7 +570,6 @@ function createAlertOrchestration({ buildRoute, capabilitiesForPoints, loadStati
       });
       if (result.evaluation.status === "send_alert") alertedUserIds.add(route.userId);
     }
-
     return {
       accepted: true,
       mode: "scheduled_saved_route_alert_evaluation",
@@ -557,10 +582,8 @@ function createAlertOrchestration({ buildRoute, capabilitiesForPoints, loadStati
       alerts: await alertsStatus(),
     };
   }
-
   async function scoreSavedRouteForAlert(route, evaluatedAt) {
     if (alertRouteScorerForTests) return alertRouteScorerForTests(route, evaluatedAt);
-
     const fallbackCapabilities = capabilitiesForPoints([route.from, route.to]);
     try {
       const plannedRoute = await buildRoute({ from: route.from, to: route.to });
@@ -610,7 +633,6 @@ function createAlertOrchestration({ buildRoute, capabilitiesForPoints, loadStati
       };
     }
   }
-
   function alertCandidateFromScore(recommendation, evaluatedAt, cycleSignals = {}) {
     const station = recommendation.station || {};
     return {
@@ -627,11 +649,9 @@ function createAlertOrchestration({ buildRoute, capabilitiesForPoints, loadStati
       reachable: recommendation.reachable !== false,
     };
   }
-
   function setAlertRouteScorerForTests(scorer) {
     alertRouteScorerForTests = typeof scorer === "function" ? scorer : null;
   }
-
   async function checkPushReceipts({ limit = 100 } = {}) {
     assertDurableAlertStorage();
     const pending = await listPendingPushTicketEvaluations({ limit });
@@ -645,7 +665,6 @@ function createAlertOrchestration({ buildRoute, capabilitiesForPoints, loadStati
         alerts: await alertsStatus(),
       };
     }
-
     const receipts = await fetchExpoPushReceipts(ids);
     let updatedCount = 0;
     for (const evaluation of pending) {
@@ -658,7 +677,6 @@ function createAlertOrchestration({ buildRoute, capabilitiesForPoints, loadStati
       });
       updatedCount += 1;
     }
-
     return {
       accepted: true,
       checkedCount: ids.length,
@@ -667,27 +685,23 @@ function createAlertOrchestration({ buildRoute, capabilitiesForPoints, loadStati
       alerts: await alertsStatus(),
     };
   }
-
   function validIsoDate(value) {
     if (!value) return "";
     const parsed = new Date(value);
     return Number.isNaN(parsed.getTime()) ? "" : parsed.toISOString();
   }
-
   function hoursBetween(start, end) {
     const startMs = new Date(start).getTime();
     const endMs = new Date(end).getTime();
     if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) return Infinity;
     return Math.abs(endMs - startMs) / 36e5;
   }
-
   function minutesSince(start, end) {
     const startMs = new Date(start).getTime();
     const endMs = new Date(end).getTime();
     if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) return undefined;
     return Math.max(0, Math.round((endMs - startMs) / 60000));
   }
-
   return {
     alertsAdminWriteAuthorised,
     alertRecordsReadAuthorised,
@@ -709,33 +723,51 @@ function createAlertOrchestration({ buildRoute, capabilitiesForPoints, loadStati
     setAlertRouteScorerForTests,
   };
 }
-
 function alertClientCapabilitySecret() {
   return process.env.ALERTS_CLIENT_CAPABILITY_SECRET || process.env.ALERTS_CLIENT_WRITE_TOKEN || "";
 }
-
 function cleanCapabilityText(value) {
   return String(value || "").trim().slice(0, 160);
 }
-
+function cleanInstallationId(value) {
+  const id = String(value || "").trim();
+  return /^installation_[a-z0-9_-]{20,160}$/i.test(id) ? id : "";
+}
+function cleanInstallationSecret(value) {
+  const secret = String(value || "").trim();
+  return /^[a-z0-9_-]{32,256}$/i.test(secret) ? secret : "";
+}
+function installationSecretHash(value) {
+  return createHash("sha256").update(value).digest("base64url");
+}
+function capabilityRateKeys(req, installationId) {
+  const headers = req?.headers || {};
+  const forwarded = String(headers["x-forwarded-for"] || headers["X-Forwarded-For"] || "").split(",")[0].trim();
+  const remote = String(req?.socket?.remoteAddress || req?.connection?.remoteAddress || "").trim();
+  const network = forwarded || remote || "unknown";
+  const digest = (value) => createHmac("sha256", alertClientCapabilitySecret())
+    .update(value)
+    .digest("base64url");
+  return {
+    network: digest(`network:${network}`),
+    installation: digest(`installation:${installationId}`),
+  };
+}
 function signAlertClientCapability(payload) {
   const encodedPayload = Buffer.from(JSON.stringify(payload)).toString("base64url");
   return `${encodedPayload}.${signCapabilityPart(encodedPayload)}`;
 }
-
 function signCapabilityPart(encodedPayload) {
   return createHmac("sha256", alertClientCapabilitySecret())
     .update(encodedPayload)
     .digest("base64url");
 }
-
 function timingSafeEqualText(left, right) {
   const leftBuffer = Buffer.from(String(left));
   const rightBuffer = Buffer.from(String(right));
   if (leftBuffer.length !== rightBuffer.length) return false;
   return timingSafeEqual(leftBuffer, rightBuffer);
 }
-
 module.exports = {
   createAlertOrchestration,
 };

@@ -1,6 +1,11 @@
 import { Dispatch, SetStateAction, useCallback, useEffect, useState } from "react";
+import { AppState, Platform } from "react-native";
 
-import { deleteBackendSavedRoute, syncSavedRouteAlert } from "../services/backendAlerts";
+import {
+  deleteBackendSavedRoute,
+  deleteMyAlertData as deleteBackendAlertData,
+  syncSavedRouteAlert,
+} from "../services/backendAlerts";
 import {
   cancelSavedCommuteAlert,
   configureRouteNotificationHandler,
@@ -8,6 +13,7 @@ import {
   getRouteNotificationPermission,
   requestRouteNotificationPermission,
   scheduleSavedCommuteAlert,
+  subscribeToPushTokenChanges,
 } from "../services/routeNotifications";
 import { scheduledRouteNotificationIds } from "../services/routeNotificationSchedule";
 import {
@@ -96,6 +102,69 @@ export function useRouteAlerts({
     };
   }, [savedCommutes, setSavedCommutes]);
 
+  useEffect(() => {
+    if (Platform.OS === "web") return undefined;
+    let active = true;
+    let pushTokenSubscription: { remove: () => void } | undefined;
+
+    const disableRevokedAlerts = async () => {
+      const permission = await getRouteNotificationPermission();
+      if (!active) return;
+      setNotificationPermission(permission.state);
+      setNotificationMessage(permission.message);
+      if (permission.state !== "denied" || !savedCommutes.some((commute) => commute.alertEnabled)) return;
+      await Promise.all(savedCommutes.map((commute) => cancelSavedCommuteAlert(commute)));
+      const deletion = await deleteBackendAlertData();
+      if (!active) return;
+      setSavedCommutes((current) => current.map((commute) => ({
+        ...commute,
+        alertEnabled: false,
+        alertStatus: "needs_permission",
+        alertStatusMessage: deletion.status === "synced"
+          ? "Notifications are off. Backend alert data was deleted."
+          : "Notifications are off. Alert-data deletion still needs retry.",
+        backendSyncedAt: undefined,
+        nextAlertAt: undefined,
+        scheduledNotificationId: undefined,
+        scheduledNotificationIds: undefined,
+      })));
+    };
+
+    const refreshRotatedToken = async () => {
+      const token = await getExpoRoutePushToken();
+      if (!active || !token.token) return;
+      await Promise.all(savedCommutes
+        .filter((commute) => commute.alertEnabled)
+        .map((commute) => syncSavedRouteAlert({
+          commute,
+          enabled: true,
+          expoPushToken: token.token,
+          preferences,
+        })));
+    };
+
+    const appStateSubscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") void disableRevokedAlerts();
+    });
+    void subscribeToPushTokenChanges(() => {
+      void refreshRotatedToken();
+    })
+      .then((subscription) => {
+        if (!active) {
+          subscription?.remove();
+        } else {
+          pushTokenSubscription = subscription;
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      active = false;
+      appStateSubscription.remove();
+      pushTokenSubscription?.remove();
+    };
+  }, [preferences, savedCommutes, setSavedCommutes]);
+
   const requestNotifications = useCallback(async () => {
     const result = await requestRouteNotificationPermission();
     setNotificationPermission(result.state);
@@ -109,12 +178,25 @@ export function useRouteAlerts({
     setAlertSyncingCommuteId(commuteId);
     try {
       if (targetCommute.alertEnabled) {
+        const lastWatchedRoute = !savedCommutes.some(
+          (commute) => commute.id !== commuteId && commute.alertEnabled,
+        );
+        const backendSync = lastWatchedRoute
+          ? await deleteBackendAlertData()
+          : await syncSavedRouteAlert({
+              commute: targetCommute,
+              enabled: false,
+              preferences,
+            });
+        if (backendSync.status === "failed") {
+          setSavedCommutes((current) => current.map((commute) =>
+            commute.id === commuteId
+              ? { ...commute, alertStatus: "failed", alertStatusMessage: backendSync.message }
+              : commute
+          ));
+          return;
+        }
         const result = await cancelSavedCommuteAlert(targetCommute);
-        const backendSync = await syncSavedRouteAlert({
-          commute: targetCommute,
-          enabled: false,
-          preferences,
-        });
         setSavedCommutes((current) =>
           current.map((commute) =>
             commute.id === commuteId
@@ -204,6 +286,33 @@ export function useRouteAlerts({
       setAlertSyncingCommuteId(null);
     }
   }, [alertSyncingCommuteId, preferences, savedCommutes, setSavedCommutes]);
+
+  const deleteAllAlertData = useCallback(async () => {
+    if (alertSyncingCommuteId) return;
+    setAlertSyncingCommuteId("all-alert-data");
+    try {
+      const result = await deleteBackendAlertData();
+      if (result.status !== "synced") {
+        setNotificationMessage(result.message);
+        return;
+      }
+      await Promise.all(savedCommutes.map((commute) => cancelSavedCommuteAlert(commute)));
+      setSavedCommutes((current) => current.map((commute) => ({
+        ...commute,
+        alertEnabled: false,
+        alertStatus: "off",
+        alertStatusMessage: "Route alert is off.",
+        backendSyncedAt: undefined,
+        nextAlertAt: undefined,
+        scheduledNotificationId: undefined,
+        scheduledNotificationIds: undefined,
+        updatedAt: new Date().toISOString(),
+      })));
+      setNotificationMessage(result.message);
+    } finally {
+      setAlertSyncingCommuteId(null);
+    }
+  }, [alertSyncingCommuteId, savedCommutes, setSavedCommutes]);
 
   const removeCommute = useCallback(async (commuteId: string) => {
     const targetCommute = savedCommutes.find((commute) => commute.id === commuteId);
@@ -348,6 +457,7 @@ export function useRouteAlerts({
 
   return {
     alertSyncingCommuteId,
+    deleteAllAlertData,
     notificationMessage,
     notificationPermission,
     removeCommute,

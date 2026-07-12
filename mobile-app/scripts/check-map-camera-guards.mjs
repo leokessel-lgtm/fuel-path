@@ -31,6 +31,7 @@ const accountDetailScreen = read("src/components/settings/AccountDetailScreen.ts
 const weeklyReportCard = read("src/components/WeeklyReportCard.tsx");
 const routeAddressSuggestionHook = read("src/hooks/useRouteAddressSuggestions.ts");
 const routeAlertsHook = read("src/hooks/useRouteAlerts.ts");
+const alertDeviceSecurity = read("src/services/alertDeviceSecurity.native.ts");
 const theme = read("src/theme.ts");
 const typographyDoc = read("../docs/06-design-brand/typography-hierarchy.md");
 const routeRecommendationRules = read("../docs/route-recommendation-logic-rules.md");
@@ -71,7 +72,7 @@ const routeCameraInsets = read("src/utils/routeCameraInsets.ts");
 const preferencesStore = read("src/services/preferencesStore.ts");
 const recentLocationsStore = read("src/services/recentLocationsStore.ts");
 const savedCommutesStore = read("src/services/savedCommutesStore.ts");
-const backendAlerts = read("src/services/backendAlerts.ts");
+const backendAlerts = read("src/services/backendAlerts.native.ts");
 const routeNotifications = read("src/services/routeNotifications.ts");
 const currentLocation = read("src/services/currentLocation.ts");
 const pricing = read("src/utils/pricing.ts");
@@ -824,7 +825,7 @@ const checks = [
       nativeApiContracts.includes("assert.equal(body.brandFilter, true);") &&
       nativeApiContracts.includes('assert.equal("route" in body, false);') &&
       nativeApiContracts.includes("await checkSavedRouteAlertContract();") &&
-      nativeApiContracts.includes("const { syncSavedRouteAlert } = loadTsModule(backendAlertsSourcePath") &&
+      nativeApiContracts.includes("syncSavedRouteAlert,\n  } = loadTsModule(backendAlertsSourcePath") &&
       nativeApiContracts.includes("assert.equal(result.remoteDeliveryEnabled, false);") &&
       nativeApiContracts.includes('assert.equal(alertFetchCalls[1].url, "https://fuel-path.test/api/saved-routes");') &&
       nativeApiContracts.includes("assert.equal(body.vehicleId, \"vehicle-diesel\");") &&
@@ -987,12 +988,15 @@ const checks = [
       accountDetailScreen.includes("onRemoveCommute"),
   },
   {
-    label: "backend alert identity stays local generated and non-contact",
+    label: "backend alert identity stays secure, anonymous and non-contact",
     ok:
-      backendAlerts.includes('const ALERT_IDENTITY_KEY = "fuel-path:alert-identity:v1";') &&
-      backendAlerts.includes("userId: `local_${randomId()}`") &&
-      backendAlerts.includes("deviceId: `device_${randomId()}`") &&
-      backendAlerts.includes("AsyncStorage.setItem(ALERT_IDENTITY_KEY, JSON.stringify(identity))") &&
+      backendAlerts.includes('const ALERT_IDENTITY_KEY = "fuel-path:alert-installation:v2";') &&
+      backendAlerts.includes("installationId: `installation_${randomUuid()}`") &&
+      backendAlerts.includes("installationSecret: await randomSecret()") &&
+      alertDeviceSecurity.includes("Crypto.getRandomBytesAsync(32)") &&
+      backendAlerts.includes("ALERT_INSTALL_MARKER_KEY") &&
+      backendAlerts.includes("await secureSet(ALERT_IDENTITY_KEY, JSON.stringify(identity))") &&
+      alertDeviceSecurity.includes("SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY") &&
       !backendAlerts.includes("vehicleRego") &&
       !backendAlerts.includes("privacyContact") &&
       !backendAlerts.includes("email"),
@@ -1006,7 +1010,7 @@ const checks = [
       backendAlerts.includes("JSON.parse(text)") &&
       backendAlerts.includes("function normaliseAlertCapability(payload: unknown)") &&
       backendAlerts.includes("expiresAtMs - ALERT_CAPABILITY_REFRESH_BUFFER_MS <= Date.now()") &&
-      backendAlerts.includes("await AsyncStorage.removeItem(ALERT_CAPABILITY_KEY);") &&
+      backendAlerts.includes("await secureDelete(ALERT_CAPABILITY_KEY);") &&
       backendAlerts.includes("const capability = normaliseAlertCapability(payload);") &&
       backendAlerts.includes("Route watch could not update. Your saved route is still on this device, so you can try again.") &&
       backendAlerts.includes("Smart route watch could not update. Reminder state was kept.") &&
@@ -1015,7 +1019,7 @@ const checks = [
       backendAlerts.includes("Smart route watch was saved, but push delivery is not enabled for this build yet.") &&
       backendAlerts.includes("pushDeliveryEnabled") &&
       nativeApiContracts.includes("expired-capability-token") &&
-      nativeApiContracts.includes("assert.equal(expired.storage.has(\"fuel-path:alert-capability:v1\"), false);") &&
+      nativeApiContracts.includes("assert.equal(expired.storage.has(\"fuel-path:alert-capability:v2\"), false);") &&
       routeNotifications.includes("Smart route notifications are ready for this build.") &&
       !backendAlerts.includes("Expo push delivery is disabled by environment gate.") &&
       !backendAlerts.includes("response.json()"),

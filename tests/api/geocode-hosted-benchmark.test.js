@@ -29,6 +29,11 @@ const RURAL_ADDRESS_ROWS = [
   ["GATAS0101", "20 Alfred Street, Queenstown TAS 7467", "20", "Alfred", "Street", "Queenstown", "TAS", "7467", "145.556", "-42.080"],
   ["GANT0101", "34 Victoria Highway, Katherine South NT 0850", "34", "Victoria", "Highway", "Katherine South", "NT", "0850", "132.266", "-14.466"],
 ];
+const LOT_ADDRESS_ROWS = ADDRESS_ROWS.map((row) =>
+  row[0] === "GAQLD0001"
+    ? ["GAQLDLOT1", "Lot 127, Falcon Street, Longreach QLD 4730", "127", "Falcon", "Street", "Longreach", "QLD", "4730", "144.250841", "-23.44903667"]
+    : row,
+);
 
 test("hosted national benchmark runs against an HTTP geocode API contract", async () => {
   const fixture = buildAddressFixture();
@@ -127,6 +132,40 @@ test("hosted national benchmark rural-unit profile samples compact rows by local
   }
 });
 
+test("hosted national benchmark accepts a canonical G-NAF address when its source label includes Lot", async () => {
+  const fixture = buildAddressFixture(LOT_ADDRESS_ROWS);
+  const api = await startMockGeocodeApi(LOT_ADDRESS_ROWS, { canonicaliseLotLabels: true });
+  const runId = `lot-canonical-${Date.now()}`;
+  try {
+    const { stdout } = await execFileAsync(
+      process.execPath,
+      [
+        "scripts/geocode-hosted-national-benchmark.mjs",
+        "--mode", "http",
+        "--api-base", api.url,
+        "--address-sqlite", fixture.sqlitePath,
+        "--address-count", "8",
+        "--poi-count", "0",
+        "--profile", "rural-unit",
+        "--min-poi-top-rate", "0",
+        "--max-address-p90-chars", "80",
+        "--delay-ms", "0",
+        "--run-id", runId,
+      ],
+      { cwd: ROOT, timeout: 30_000 },
+    );
+    const jsonPath = stdout.match(/"jsonPath": "([^"]+)"/)?.[1];
+    const result = JSON.parse(fs.readFileSync(path.join(ROOT, jsonPath), "utf8"));
+    assert.equal(result.summary.byKind.address.finalTopMatch, 8);
+    assert.equal(result.rows.find((row) => row.expectedLabel.startsWith("Lot 127")).finalTopLabel, "127 Falcon Street, Longreach QLD 4730");
+    fs.rmSync(path.join(ROOT, jsonPath), { force: true });
+    fs.rmSync(path.join(ROOT, jsonPath.replace(/\.json$/, ".csv")), { force: true });
+  } finally {
+    await api.close();
+    fs.rmSync(fixture.dir, { recursive: true, force: true });
+  }
+});
+
 test("hosted national benchmark applies pacing between autocomplete requests", () => {
   const source = fs.readFileSync(path.join(ROOT, "scripts/geocode-hosted-national-benchmark.mjs"), "utf8");
   assert.equal((source.match(/if \(DELAY_MS\) await sleep\(DELAY_MS\);/g) || []).length, 2);
@@ -152,7 +191,7 @@ function buildAddressFixture(rows = ADDRESS_ROWS, extraArgs = []) {
   return { dir, inputPath, sqlitePath };
 }
 
-async function startMockGeocodeApi(rows = ADDRESS_ROWS) {
+async function startMockGeocodeApi(rows = ADDRESS_ROWS, { canonicaliseLotLabels = false } = {}) {
   const server = http.createServer((request, response) => {
     const url = new URL(request.url, "http://127.0.0.1");
     if (url.pathname !== "/api/geocode") {
@@ -163,7 +202,8 @@ async function startMockGeocodeApi(rows = ADDRESS_ROWS) {
     const limit = Math.max(1, Math.min(Number(url.searchParams.get("limit") || 5), 8));
     const addressSuggestions = rows
       .map((row) => ({
-        label: row[1],
+        label: canonicaliseLotLabels ? row[1].replace(/^Lot\s+(\d+),\s*/i, "$1 ") : row[1],
+        searchLabel: row[1],
         state: row[6],
         postcode: row[7],
         lat: Number(row[9]),
@@ -172,7 +212,8 @@ async function startMockGeocodeApi(rows = ADDRESS_ROWS) {
         type: "address",
         matchType: normalise(row[1].replace(/,/g, "")).startsWith(normalise(query)) ? "address_prefix" : "address_token_overlap",
       }))
-      .filter((row) => addressMatchesQuery(row.label, query));
+      .filter((row) => addressMatchesQuery(row.searchLabel, query))
+      .map(({ searchLabel, ...suggestion }) => suggestion);
 
     const poiState = stateFromQuery(query);
     const poiSuggestion = {

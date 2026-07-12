@@ -1,7 +1,7 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 
-const { planTypeaheadAddressQuery, planUnitAddressQuery } = require("../../api/_addressQueryPlanning");
+const { planTypeaheadAddressQuery, planUnitAddressQuery, prioritiseHostedAddressNeedles } = require("../../api/_addressQueryPlanning");
 
 test("unit query planning fails quiet until typeahead or an exact prefix is safe", () => {
   assert.deepEqual(planUnitAddressQuery({ hasUnitIntent: true }), {
@@ -57,4 +57,11 @@ test("typeahead planning keeps number, lot and embedded-address prefix lanes dis
     typeaheadFallback: true,
     prefixNeedle: null,
   });
+});
+
+test("hosted query planning prefers derived address cores only for building-first input", () => {
+  const primary = { needle: "venue 12 king street", rawQuery: "Venue 12 King Street" };
+  const core = { needle: "12 king street", rawQuery: "12 king street" };
+  assert.deepEqual(prioritiseHostedAddressNeedles({ rawItem: primary, needles: [primary, core], startsWithAddressCore: false }), [core, primary, primary]);
+  assert.deepEqual(prioritiseHostedAddressNeedles({ rawItem: primary, needles: [primary, core], startsWithAddressCore: true }), [primary, core, primary]);
 });

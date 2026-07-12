@@ -321,6 +321,7 @@ test("place-word address-like queries still resolve exact G-NAF rows", async () 
     [
       "ADDRESS_DETAIL_PID|ADDRESS_LABEL|BUILDING_NAME|FLAT_TYPE|FLAT_NUMBER|LEVEL_TYPE|LEVEL_NUMBER|NUMBER_FIRST|NUMBER_FIRST_SUFFIX|STREET_NAME|STREET_TYPE|LOCALITY_NAME|STATE|POSTCODE|GEOCODE_TYPE|LONGITUDE|LATITUDE",
       "GAPOS1001|Shell Service Station, Lot 1076, Searipple Road, Karratha WA 6714||| | | |1076| |Searipple|Road|Karratha|WA|6714|PROPERTY CENTROID|116.846|-20.736",
+      "GAACT1002|Lanyon Homestead, 754 Tharwa Drive, Tuggeranong ACT 2900|Lanyon Homestead|||||754||Tharwa|Drive|Tuggeranong|ACT|2900|PROPERTY CENTROID|149.08997593|-35.47986059",
     ].join("\n"),
   );
 
@@ -358,6 +359,15 @@ test("place-word address-like queries still resolve exact G-NAF rows", async () 
       assert.equal(result.location.provider, "fuel_path_gnaf");
       assert.equal(result.location.matchType, "exact_address");
       assert.equal(result.location.label, "Shell Service Station, Lot 1076, Searipple Road, Karratha WA 6714");
+      const landmarkAddress = await geocode({
+        query: "Lanyon Homestead 754 Tharwa Drive Tuggeranong ACT 2900",
+        limit: 5,
+        sessionToken: "regional-landmark-address-session",
+        searchContext: { nearLat: -35.47986059, nearLon: 149.08997593, nearRadiusKm: 80 },
+      });
+      assert.equal(landmarkAddress.location.provider, "fuel_path_gnaf");
+      assert.equal(landmarkAddress.location.matchType, "exact_address");
+      assert.equal(landmarkAddress.location.label, "Lanyon Homestead, 754 Tharwa Drive, Tuggeranong ACT 2900");
       assert.equal(mockFetch.calls.length, 0);
 
       mockFetch.restore();

@@ -384,6 +384,8 @@ const checks = [
       !nativeMap.includes("scale: 1.05") &&
       nativeMap.includes("const subdued = Boolean(") &&
       nativeMap.includes("routeEndpoints && selectedStationCode && !selected") &&
+      !nativeMap.includes("showCallout(") &&
+      !nativeMap.includes("markerRefs") &&
       nativeMap.includes("subdued && styles.pinSubdued") &&
       nativeMap.includes("pinSubdued: {") &&
       !nativeMap.includes("opacity: 0.68") &&

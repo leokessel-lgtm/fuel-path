@@ -942,6 +942,45 @@ test("validation delivery sends to one stored device without enabling global pus
   }
 });
 
+test("validation delivery refuses automatic selection unless exactly one route and device are active", async () => {
+  const originalToken = process.env.ALERTS_WRITE_TOKEN;
+  const originalValidation = process.env.EXPO_PUSH_VALIDATION_ENABLED;
+  process.env.ALERTS_WRITE_TOKEN = "alert-token";
+  process.env.EXPO_PUSH_VALIDATION_ENABLED = "1";
+  const store = memoryDurableStore();
+  setAlertStorageForTests(store);
+  let sentCount = 0;
+  setExpoPushClientForTests({
+    async sendExpoPushMessages(messages) {
+      sentCount += messages.length;
+      return messages.map((message, index) => ({ status: "ok", id: `validation-${index}`, to: message.to }));
+    },
+  });
+
+  try {
+    const headers = { authorization: "Bearer alert-token" };
+    await callSavedRoutes("POST", {}, route, headers);
+    await callPushRegister(device, headers);
+    const selected = await callAlerts("POST", { action: "validation-delivery" }, {}, headers);
+    assert.equal(selected.status, 202);
+    assert.equal(selected.payload.deliveryStatus, "sent_to_expo");
+    assert.equal(sentCount, 1);
+
+    await callSavedRoutes("POST", {}, { ...route, id: "route-second" }, headers);
+    const ambiguous = await callAlerts("POST", { action: "validation-delivery" }, {}, headers);
+    assert.equal(ambiguous.status, 409);
+    assert.equal(ambiguous.payload.deliveryStatus, "validation_target_ambiguous");
+    assert.equal(sentCount, 1);
+  } finally {
+    setAlertStorageForTests(null);
+    setExpoPushClientForTests(null);
+    if (originalToken === undefined) delete process.env.ALERTS_WRITE_TOKEN;
+    else process.env.ALERTS_WRITE_TOKEN = originalToken;
+    if (originalValidation === undefined) delete process.env.EXPO_PUSH_VALIDATION_ENABLED;
+    else process.env.EXPO_PUSH_VALIDATION_ENABLED = originalValidation;
+  }
+});
+
 test("scheduled evaluator is idempotent across cron overlap and retry", async () => {
   const originalCron = process.env.CRON_SECRET;
   const originalDelivery = process.env.EXPO_PUSH_DELIVERY_ENABLED;

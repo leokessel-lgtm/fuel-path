@@ -410,12 +410,39 @@ function createAlertOrchestration({ buildRoute, capabilitiesForPoints, loadStati
     if (process.env.EXPO_PUSH_VALIDATION_ENABLED !== "1") {
       return { accepted: false, deliveryStatus: "validation_delivery_disabled" };
     }
-    const routes = await listSavedRoutes({ userId, enabledOnly: true, limit: 50 });
-    const route = routes.find((item) => item.id === routeId && item.userId === userId);
-    const devices = await listPushDevices({ userId, status: "active", limit: 50 });
-    const device = devices.find((item) => item.deviceId === deviceId && item.userId === userId);
+    const hasExplicitTarget = Boolean(routeId || userId || deviceId);
+    if (hasExplicitTarget && (!routeId || !userId || !deviceId)) {
+      return { accepted: false, deliveryStatus: "validation_target_incomplete" };
+    }
+
+    const routes = await listSavedRoutes({
+      userId: hasExplicitTarget ? userId : "",
+      enabledOnly: true,
+      limit: hasExplicitTarget ? 50 : 2,
+    });
+    const route = hasExplicitTarget
+      ? routes.find((item) => item.id === routeId && item.userId === userId)
+      : routes.length === 1 ? routes[0] : null;
+    if (!route) {
+      return {
+        accepted: false,
+        deliveryStatus: hasExplicitTarget ? "validation_target_not_found" : "validation_target_ambiguous",
+      };
+    }
+
+    const devices = await listPushDevices({
+      userId: route.userId,
+      status: "active",
+      limit: hasExplicitTarget ? 50 : 2,
+    });
+    const device = hasExplicitTarget
+      ? devices.find((item) => item.deviceId === deviceId && item.userId === userId)
+      : devices.length === 1 ? devices[0] : null;
     if (!route || !device) {
-      return { accepted: false, deliveryStatus: "validation_target_not_found" };
+      return {
+        accepted: false,
+        deliveryStatus: hasExplicitTarget ? "validation_target_not_found" : "validation_target_ambiguous",
+      };
     }
     const now = new Date().toISOString();
     const validationRoute = { ...route, lastAlertSentAt: "" };

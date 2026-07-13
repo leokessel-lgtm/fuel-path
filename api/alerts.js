@@ -6,6 +6,7 @@ const {
   alertsWriteSecurity,
   deleteBackendSavedRoute,
   evaluateSavedRouteAlert,
+  enrolRouteWatch,
   validateSavedRouteAlertDelivery,
   issueAlertClientCapability,
   listBackendAlertEvaluations,
@@ -114,6 +115,12 @@ module.exports = async function handler(req, res) {
       sendJson(res, 202, await registerPushDevice(input));
       return;
     }
+    if (action === "enrol-watch") {
+      const input = await capabilityOwnedInput(req, req.body || {});
+      if (!input) return sendJson(res, 401, { status: "backend_rejected", code: "capability_required" });
+      sendJson(res, 202, await enrolRouteWatch(input));
+      return;
+    }
     if (action === "save-route") {
       const input = await capabilityOwnedInput(req, req.body || {});
       if (!input) return sendJson(res, 401, { error: "Route watch sync requires an installation capability." });
@@ -139,7 +146,7 @@ module.exports = async function handler(req, res) {
 
     sendJson(res, 400, {
       error: "That route watch action is not available.",
-      supportedActions: ["register-device", "save-route", "delete-route", "delete-installation-data", "evaluate"],
+      supportedActions: ["enrol-watch", "register-device", "save-route", "delete-route", "delete-installation-data", "evaluate"],
       alerts: await alertsStatus(),
     });
   } catch (error) {

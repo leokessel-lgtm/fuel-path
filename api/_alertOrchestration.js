@@ -325,6 +325,24 @@ function createAlertOrchestration({ buildRoute, capabilitiesForPoints, loadStati
       alerts: await alertsStatus(),
     };
   }
+  async function enrolRouteWatch(input = {}) {
+    assertDurableAlertStorage();
+    const device = normalisePushDevice(input);
+    const route = normaliseBackendSavedRoute(input);
+    if (!route.alertEnabled) {
+      return { accepted: false, status: "watch_disabled", code: "watch_disabled" };
+    }
+    await upsertPushDevice(device);
+    await upsertSavedRoute(route);
+    return {
+      accepted: true,
+      status: "enabled",
+      code: "watch_enabled",
+      device: { id: device.id, platform: device.platform },
+      route: { id: route.id, alertEnabled: route.alertEnabled },
+      alerts: await alertsStatus(),
+    };
+  }
   async function deleteBackendSavedRoute({ routeId = "", userId = "" } = {}) {
     assertDurableAlertStorage();
     const deleted = await deleteSavedRoute({ routeId, userId });
@@ -720,6 +738,7 @@ function createAlertOrchestration({ buildRoute, capabilitiesForPoints, loadStati
     registerPushDevice,
     runScheduledRouteAlertEvaluation,
     saveBackendSavedRoute,
+    enrolRouteWatch,
     setAlertRouteScorerForTests,
   };
 }

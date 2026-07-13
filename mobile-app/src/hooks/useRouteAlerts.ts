@@ -253,7 +253,6 @@ export function useRouteAlerts({
         return;
       }
 
-      const result = await scheduleSavedCommuteAlert(targetCommute);
       const tokenResult = await getExpoRoutePushToken();
       const backendSync =
         tokenResult.status === "ready"
@@ -269,6 +268,9 @@ export function useRouteAlerts({
               syncedAt: undefined,
             };
       const backendSynced = smartRouteDeliveryReady(backendSync);
+      const result = backendSynced && targetCommute.localReminderEnabled !== false
+        ? await scheduleSavedCommuteAlert(targetCommute)
+        : { status: "off" as const, message: "Local reminders are off.", nextAlertAt: undefined, notificationId: undefined, notificationIds: undefined };
       const localReminderScheduled = result.status === "scheduled";
       setSavedCommutes((current) =>
         current.map((commute) =>
@@ -281,9 +283,7 @@ export function useRouteAlerts({
                     ? "failed"
                     : result.status,
                 alertStatusMessage: alertStatusMessage(
-                  backendSynced
-                    ? "Route watch is on. Smart alerts only when worth checking."
-                    : result.message,
+                  backendSynced ? "Route watch is on. Smart alerts only when worth checking." : backendSync.message,
                   backendSynced && result.status === "scheduled"
                     ? "Reminder scheduled for selected days."
                     : backendSync.message,

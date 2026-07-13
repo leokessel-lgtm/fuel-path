@@ -252,6 +252,7 @@ async function checkSavedRouteAlertContract() {
   const result = await syncSavedRouteAlert({
     commute,
     enabled: true,
+    expoPushToken: "ExponentPushToken[contract-device]",
     preferences,
   });
 
@@ -260,11 +261,12 @@ async function checkSavedRouteAlertContract() {
   assert.ok(result.syncedAt);
   assert.equal(alertFetchCalls.length, 2);
   assert.equal(alertFetchCalls[0].url, "https://fuel-path.test/api/alerts?action=client-capability");
-  assert.equal(alertFetchCalls[1].url, "https://fuel-path.test/api/saved-routes");
+  assert.equal(alertFetchCalls[1].url, "https://fuel-path.test/api/alerts?action=enrol-watch");
   assert.equal(alertFetchCalls[1].init.headers.Authorization, "Bearer capability-token");
 
   const body = JSON.parse(alertFetchCalls[1].init.body);
   assert.equal(body.id, "commute-1");
+  assert.equal(body.expoPushToken, "ExponentPushToken[contract-device]");
   assert.equal(body.userId, undefined);
   assert.equal(body.vehicleId, "vehicle-diesel");
   assert.equal(body.vehicleEnergyType, "diesel");

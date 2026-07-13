@@ -17,6 +17,7 @@ type AlertCapability = {
 };
 
 type SyncResult = {
+  code?: string;
   message: string;
   remoteDeliveryEnabled?: boolean;
   status: "synced" | "skipped" | "failed";
@@ -59,19 +60,28 @@ export async function syncSavedRouteAlert({
           : "Route watch could not be turned off while the backend is unavailable.",
       };
     }
-    if (enabled && expoPushToken) {
-      await postAlertJson("/api/push/register", capability.token, {
-        platform: Platform.OS,
-        expoPushToken,
-        appVersion: "1.0.0",
-      });
+    if (!enabled) {
+      const savedRoute = await postAlertJson("/api/saved-routes", capability.token, backendSavedRoutePayload({
+        commute,
+        enabled: false,
+        preferences,
+      }));
+      return {
+        status: "synced",
+        remoteDeliveryEnabled: routeWatchRemoteDeliveryEnabled(savedRoute),
+        message: "Route watch turned off.",
+        syncedAt: new Date().toISOString(),
+      };
     }
-
-    const savedRoute = await postAlertJson("/api/saved-routes", capability.token, backendSavedRoutePayload({
-      commute,
-      enabled,
-      preferences,
-    }));
+    if (!enabled || !expoPushToken) {
+      return { status: "failed", code: "push_token_required", message: "This device push token is unavailable. Try again after reopening notifications." };
+    }
+    const savedRoute = await postAlertJson("/api/alerts?action=enrol-watch", capability.token, {
+      ...backendSavedRoutePayload({ commute, enabled, preferences }),
+      platform: Platform.OS,
+      expoPushToken,
+      appVersion: "1.0.0",
+    });
     const remoteDeliveryEnabled = routeWatchRemoteDeliveryEnabled(savedRoute);
     if (enabled && remoteDeliveryEnabled === false) {
       return {
@@ -90,10 +100,13 @@ export async function syncSavedRouteAlert({
         : "Route watch turned off.",
       syncedAt: new Date().toISOString(),
     };
-  } catch {
+  } catch (error) {
     return {
+      code: error instanceof RouteWatchError ? error.code : "backend_unavailable",
       status: "failed",
-      message: "Smart route watch could not update. Reminder state was kept.",
+      message: error instanceof RouteWatchError
+        ? error.message
+        : "Smart route watch could not update. Your saved route remains on this device.",
     };
   }
 }
@@ -347,9 +360,23 @@ async function postAlertJson(path: string, token: string, body: unknown) {
   });
   const payload = await readAlertJson(response);
   if (!response.ok) {
-    throw new Error("Route watch could not update. Your saved route is still on this device, so you can try again.");
+    throw new RouteWatchError(
+      response.status === 401 ? "capability_rejected" : response.status === 429 ? "rate_limited" : "backend_rejected",
+      safeAlertError(payload) || "Smart route watch could not update. Your saved route remains on this device.",
+    );
   }
   return payload;
+}
+
+class RouteWatchError extends Error {
+  constructor(readonly code: string, message: string) {
+    super(message);
+  }
+}
+
+function safeAlertError(payload: unknown) {
+  const value = payload && typeof payload === "object" ? (payload as { error?: unknown }).error : "";
+  return typeof value === "string" ? value.slice(0, 180) : "";
 }
 
 function routeWatchRemoteDeliveryEnabled(payload: unknown) {

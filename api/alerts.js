@@ -6,7 +6,6 @@ const {
   alertsWriteSecurity,
   deleteBackendSavedRoute,
   evaluateSavedRouteAlert,
-  enrolRouteWatch,
   validateSavedRouteAlertDelivery,
   issueAlertClientCapability,
   listBackendAlertEvaluations,
@@ -118,7 +117,22 @@ module.exports = async function handler(req, res) {
     if (action === "enrol-watch") {
       const input = await capabilityOwnedInput(req, req.body || {});
       if (!input) return sendJson(res, 401, { status: "backend_rejected", code: "capability_required" });
-      sendJson(res, 202, await enrolRouteWatch(input));
+      if (input.alertEnabled !== true) {
+        sendJson(res, 400, { status: "backend_rejected", code: "watch_disabled" });
+        return;
+      }
+      const [device, route] = await Promise.all([
+        registerPushDevice(input),
+        saveBackendSavedRoute(input),
+      ]);
+      sendJson(res, 202, {
+        accepted: true,
+        status: "enabled",
+        code: "watch_enabled",
+        device: { id: device.device?.id, platform: device.device?.platform },
+        route: { id: route.route?.id, alertEnabled: route.route?.alertEnabled },
+        alerts: route.alerts,
+      });
       return;
     }
     if (action === "save-route") {

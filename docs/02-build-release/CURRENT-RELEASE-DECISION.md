@@ -19,8 +19,8 @@ The remaining release blockers are:
   evidence
 - signed iOS device/distribution evidence
 - dated provider or authority terms evidence for each gated public region
-- a least-privilege Preview runtime role and backup/restore rehearsal before
-  hosted alert rollout or any Production migration
+- an explicit Production database and hosted/global push rollout decision with
+  Production-specific least-privilege, backup and rollback evidence
 
 The 12 July `android_preview_smoke_missing` and
 `native_blocker_packet_missing` labels predated the final PR #30 physical-device
@@ -32,14 +32,23 @@ required before a future automated beta decision; that evidence-portability gap
 is not evidence that the Android behaviour is untested.
 
 The managed `DATABASE_URL`, `POSTGRES_URL` and `POSTGRES_PRISMA_URL` values
-remain shared. A Preview-only `FUEL_PATH_PRODUCT_DATABASE_URL` override points
-to a schema-only Neon Preview branch, and the PR #29 and PR #30 migrations were
-rehearsed there successfully. The selector and Preview-only account-free
-capability configuration are now deployed on the PR #30 branch. The complete
-capability, device registration, route save/list/delete, atomic installation
-deletion and revocation lifecycle passed there with zero device/route rows
-remaining. Least-privilege role plus backup/restore evidence remain required
-before hosted alert rollout or any Production migration.
+remain shared, but product state in Preview is isolated through the Preview-only
+`FUEL_PATH_PRODUCT_DATABASE_URL` override. A dedicated least-privilege runtime
+role now has DML access to only the eight product and alert tables, with no
+G-NAF, migration-ledger, truncate or schema-creation access. Owner migrations
+remain idempotent while runtime migrations fail closed. The full account-free
+watch-off, re-enrolment and Privacy lifecycle passed under that restricted role,
+and a PostgreSQL 17 logical backup restored into a temporary database with all
+11 tables, 118 columns, 11 constraints, 27 indexes, row counts and data hashes
+matching. The restore database and temporary files were removed. The fresh
+protected Preview deployment reports healthy durable alert storage at 1 device,
+1 route and 0 evaluations, with writes and push delivery disabled. See
+[`evidence/PREVIEW-PRODUCT-DATABASE-SAFETY-2026-07-13.md`](evidence/PREVIEW-PRODUCT-DATABASE-SAFETY-2026-07-13.md).
+
+This clears the isolated Preview database safety gate. It does not authorise a
+Production migration or hosted/global push rollout. Production still requires a
+separate explicit decision with Production-specific least-privilege, backup and
+rollback evidence.
 
 The App Store and Google Play URLs previously recorded in store evidence both
 returned HTTP 404 on 2026-07-10. They have been removed from current evidence.
@@ -72,6 +81,9 @@ real push delivery or public store readiness.
 
 ## Ready but not sufficient
 
+- Preview product-state isolation, least-privilege runtime access and logical
+  backup/restore are proven. This is Preview safety evidence, not Production
+  migration or global push authorisation.
 - Provider capability is live across configured regions, but public live-price
   claims remain blocked until provider or authority terms evidence is held for
   each gated region. The 2026-07-12 release-owner attestation is an internal
@@ -86,20 +98,20 @@ real push delivery or public store readiness.
 
 ## Next actions
 
-1. Create a least-privilege Preview runtime role and complete a backup/restore
-   rehearsal before any hosted alert rollout. Keep Production migrations
-   blocked until the rehearsal and an explicit rollout decision are recorded.
-2. Complete Google Play developer identity and Android-device verification, and
+1. Complete Google Play developer identity and Android-device verification, and
    enable App Store Connect for the paid Apple Developer account.
-3. Create or confirm real App Store and Google Play listings, then verify both
+2. Create or confirm real App Store and Google Play listings, then verify both
    public URLs before recording them as evidence.
-4. Put the reviewed provider-limitation disclosure into the final App Store and
+3. Put the reviewed provider-limitation disclosure into the final App Store and
    Google Play listing materials.
-5. Add signed iOS device evidence when devices are available. Generate a fresh
+4. Add signed iOS device evidence when devices are available. Generate a fresh
    structured native blocker packet when preparing the next automated beta
    decision so it references the current Android state.
-6. Collect dated provider or authority terms evidence for each gated region,
+5. Collect dated provider or authority terms evidence for each gated region,
    including allowed public use, cache limits and attribution requirements.
+6. Keep Production migration and hosted/global push disabled until a separate
+   explicit rollout decision records Production-specific least privilege,
+   backup and rollback evidence.
 7. Rerun the beta-readiness gate with the held provider and support evidence
    inputs before changing this decision.
 

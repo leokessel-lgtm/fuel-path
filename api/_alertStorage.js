@@ -1,6 +1,15 @@
-const { assertProductDatabaseSchema, createProductSqlClient, productDatabaseUrl } = require("./_productDatabase");
+const {
+  assertAlertInstallationSchema,
+  assertProductDatabaseSchema,
+  createProductSqlClient,
+  productDatabaseUrl,
+} = require("./_productDatabase");
 const { rowToDevice, rowToEvaluation, rowToRoute } = require("./_alertRecords");
 const { setAlertInstallationStorageForTests } = require("./_alertInstallationStorage");
+const {
+  deleteOrphanedInstallationAlertData,
+  orphanedInstallationRetentionCounts,
+} = require("./_orphanedAlertRetention");
 
 const DEFAULT_MAX_RECORDS = 500;
 let sqlClient;
@@ -454,6 +463,7 @@ async function purgeAlertRetention({
   inactiveDeviceDays = 90,
   disabledRouteDays = 90,
   evaluationDays = 180,
+  orphanedInstallationDays = 90,
 } = {}) {
   if (testStorage?.purgeAlertRetention) {
     return testStorage.purgeAlertRetention({
@@ -462,25 +472,29 @@ async function purgeAlertRetention({
       inactiveDeviceDays,
       disabledRouteDays,
       evaluationDays,
+      orphanedInstallationDays,
     });
   }
 
   const deviceCutoff = cutoffIso(now, inactiveDeviceDays);
   const routeCutoff = cutoffIso(now, disabledRouteDays);
   const evaluationCutoff = cutoffIso(now, evaluationDays);
+  const orphanedInstallationCutoff = cutoffIso(now, orphanedInstallationDays);
   if (!databaseUrl()) {
     return purgeMemoryAlertRetention({
       dryRun,
       deviceCutoff,
       routeCutoff,
       evaluationCutoff,
+      orphanedInstallationCutoff,
     });
   }
 
   const sql = await getSql();
   await ensureTables(sql);
+  await assertAlertInstallationSchema(sql);
   if (dryRun) {
-    const [devices, routes, evaluations] = await Promise.all([
+    const [devices, routes, evaluations, orphaned] = await Promise.all([
       sql`
         SELECT COUNT(*)::int AS count
         FROM fuel_path_push_devices
@@ -498,18 +512,27 @@ async function purgeAlertRetention({
         FROM fuel_path_route_alert_evaluations
         WHERE evaluated_at < ${evaluationCutoff}
       `,
+      orphanedInstallationRetentionCounts(sql, orphanedInstallationCutoff),
     ]);
     return {
       dryRun: true,
       inactiveDeviceCutoff: deviceCutoff,
       disabledRouteCutoff: routeCutoff,
       evaluationCutoff,
+      orphanedInstallationCutoff,
       deletedDeviceCount: Number(devices[0]?.count || 0),
       deletedRouteCount: Number(routes[0]?.count || 0),
       deletedEvaluationCount: Number(evaluations[0]?.count || 0),
+      deletedInstallationCount: Number(orphaned[0]?.installation_count || 0),
+      deletedOrphanedDeviceCount: Number(orphaned[0]?.device_count || 0),
+      deletedOrphanedRouteCount: Number(orphaned[0]?.route_count || 0),
+      deletedOrphanedEvaluationCount: Number(orphaned[0]?.evaluation_count || 0),
     };
   }
 
+  // Remove complete stale anonymous installations first. Its child deletes must not
+  // race the narrower retention deletes below.
+  const orphaned = await deleteOrphanedInstallationAlertData(sql, orphanedInstallationCutoff);
   const [devices, routes, evaluations] = await Promise.all([
     sql`
       DELETE FROM fuel_path_push_devices
@@ -534,9 +557,14 @@ async function purgeAlertRetention({
     inactiveDeviceCutoff: deviceCutoff,
     disabledRouteCutoff: routeCutoff,
     evaluationCutoff,
+    orphanedInstallationCutoff,
     deletedDeviceCount: devices.length,
     deletedRouteCount: routes.length,
     deletedEvaluationCount: evaluations.length,
+    deletedInstallationCount: Number(orphaned[0]?.installation_count || 0),
+    deletedOrphanedDeviceCount: Number(orphaned[0]?.device_count || 0),
+    deletedOrphanedRouteCount: Number(orphaned[0]?.route_count || 0),
+    deletedOrphanedEvaluationCount: Number(orphaned[0]?.evaluation_count || 0),
   };
 }
 
@@ -590,6 +618,7 @@ function purgeMemoryAlertRetention({
   deviceCutoff,
   routeCutoff,
   evaluationCutoff,
+  orphanedInstallationCutoff,
 }) {
   const staleDevice = (record) => record.status !== "active" && olderThan(record.invalidatedAt || record.lastSeenAt, deviceCutoff);
   const staleRoute = (record) => record.alertEnabled === false && olderThan(record.updatedAt, routeCutoff);
@@ -597,11 +626,27 @@ function purgeMemoryAlertRetention({
   const deletedDeviceCount = memoryStore.devices.filter(staleDevice).length;
   const deletedRouteCount = memoryStore.routes.filter(staleRoute).length;
   const deletedEvaluationCount = memoryStore.evaluations.filter(staleEvaluation).length;
+  const staleInstallation = (record) => (
+    (record.revokedAt && olderThan(record.revokedAt, orphanedInstallationCutoff))
+    || (!record.revokedAt
+      && olderThan(record.lastSeenAt, orphanedInstallationCutoff)
+      && !memoryStore.routes.some((route) => route.userId === record.installationId && route.alertEnabled)
+      && !memoryStore.devices.some((device) => device.userId === record.installationId && device.status === "active"))
+  );
+  const orphanedInstallations = memoryStore.installations.filter(staleInstallation);
+  const orphanedIds = new Set(orphanedInstallations.map((record) => record.installationId));
+  const deletedOrphanedDeviceCount = memoryStore.devices.filter((record) => orphanedIds.has(record.userId)).length;
+  const deletedOrphanedRouteCount = memoryStore.routes.filter((record) => orphanedIds.has(record.userId)).length;
+  const deletedOrphanedEvaluationCount = memoryStore.evaluations.filter((record) => orphanedIds.has(record.userId)).length;
 
   if (!dryRun) {
     memoryStore.devices = memoryStore.devices.filter((record) => !staleDevice(record));
     memoryStore.routes = memoryStore.routes.filter((record) => !staleRoute(record));
     memoryStore.evaluations = memoryStore.evaluations.filter((record) => !staleEvaluation(record));
+    memoryStore.devices = memoryStore.devices.filter((record) => !orphanedIds.has(record.userId));
+    memoryStore.routes = memoryStore.routes.filter((record) => !orphanedIds.has(record.userId));
+    memoryStore.evaluations = memoryStore.evaluations.filter((record) => !orphanedIds.has(record.userId));
+    memoryStore.installations = memoryStore.installations.filter((record) => !orphanedIds.has(record.installationId));
   }
 
   return {
@@ -609,9 +654,14 @@ function purgeMemoryAlertRetention({
     inactiveDeviceCutoff: deviceCutoff,
     disabledRouteCutoff: routeCutoff,
     evaluationCutoff,
+    orphanedInstallationCutoff,
     deletedDeviceCount,
     deletedRouteCount,
     deletedEvaluationCount,
+    deletedInstallationCount: orphanedInstallations.length,
+    deletedOrphanedDeviceCount,
+    deletedOrphanedRouteCount,
+    deletedOrphanedEvaluationCount,
   };
 }
 

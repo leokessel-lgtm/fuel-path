@@ -80,7 +80,8 @@ are measured and tuned after controlled traffic.
 | Notification denied/revoked | Do not register/retain a newly acquired token. Mark existing push device inactive at the next authenticated app contact and stop evaluation/delivery for it. Local saved route remains local. |
 | Token rotation | Register at app foreground and through Expo's push-token listener. Upsert atomically, retire superseded token, and retry registration with backoff when offline. |
 | Push `DeviceNotRegistered` receipt | Invalidate the token immediately, halt sends and retain only minimal invalidation metadata until cleanup. |
-| Delete alert data | Revoke server capability, delete opted-in backend routes/devices/evaluations permitted by the deletion policy, clear local alert identity/capability and local alert schedules, then display completion/failure truthfully. |
+| Turn off route watch | Save that owned backend route with `alertEnabled=false`. Preserve the anonymous installation, device and evaluation history. |
+| Delete alert data | Revoke server capability, immediately delete opted-in backend routes/devices/evaluations, clear local alert identity/capability and local alert schedules, then display completion/failure truthfully. The retention job physically removes the revoked anonymous installation after 90 days. |
 
 Expo SDK 56 guidance supports this plan: SecureStore is encrypted key-value
 storage, iOS Keychain persistence across uninstall is possible but not

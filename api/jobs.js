@@ -106,6 +106,7 @@ async function retentionCleanupJob(req, res) {
         inactiveDeviceDays: numberParam(req.query.inactiveDeviceDays || body.inactiveDeviceDays, 90),
         disabledRouteDays: numberParam(req.query.disabledRouteDays || body.disabledRouteDays, 90),
         alertEvaluationDays: numberParam(req.query.alertEvaluationDays || body.alertEvaluationDays, 180),
+        orphanedInstallationDays: numberParam(req.query.orphanedInstallationDays || body.orphanedInstallationDays, 90),
         predictionBacktestDays: numberParam(req.query.predictionBacktestDays || body.predictionBacktestDays, 365),
       }),
     );

@@ -1213,7 +1213,7 @@ test("internal evaluator accepts write token without exposing public cron access
   }
 });
 
-test("retention cleanup job purges expired backend records only", async () => {
+test("retention cleanup job purges expired backend records and only orphaned anonymous installations", async () => {
   const originalToken = process.env.ALERTS_WRITE_TOKEN;
   process.env.ALERTS_WRITE_TOKEN = "alert-token";
   const store = memoryDurableStore();
@@ -1223,12 +1223,38 @@ test("retention cleanup job purges expired backend records only", async () => {
   const now = "2026-06-19T00:00:00.000Z";
 
   try {
+    store.__alertInstallations = new Map([
+      ["installation-orphan", {
+        installationId: "installation-orphan",
+        lastSeenAt: "2026-01-01T00:00:00.000Z",
+      }],
+      ["installation-active", {
+        installationId: "installation-active",
+        lastSeenAt: "2026-01-01T00:00:00.000Z",
+      }],
+    ]);
     await store.upsertPushDevice({
       ...device,
       id: "device-old-invalid",
       status: "invalid",
       lastSeenAt: "2026-01-01T00:00:00.000Z",
       invalidatedAt: "2026-01-02T00:00:00.000Z",
+    });
+    await store.upsertPushDevice({
+      ...device,
+      id: "device-orphan",
+      userId: "installation-orphan",
+      status: "inactive",
+      lastSeenAt: "2026-06-18T00:00:00.000Z",
+      invalidatedAt: "2026-06-18T00:00:00.000Z",
+    });
+    await store.upsertPushDevice({
+      ...device,
+      id: "device-active-installation",
+      userId: "installation-active",
+      expoPushToken: "ExponentPushToken[installation-active]",
+      status: "active",
+      lastSeenAt: "2026-01-01T00:00:00.000Z",
     });
     await store.upsertPushDevice({
       ...device,
@@ -1268,6 +1294,15 @@ test("retention cleanup job purges expired backend records only", async () => {
       status: "permission_missing",
       reason: "test",
       evaluatedAt: "2025-01-01T00:00:00.000Z",
+      pushDeliveryEnabled: false,
+    });
+    await store.appendRouteAlertEvaluation({
+      id: "eval-orphan-recent",
+      routeId: "route-orphan-disabled",
+      userId: "installation-orphan",
+      status: "permission_missing",
+      reason: "test",
+      evaluatedAt: "2026-06-18T00:00:00.000Z",
       pushDeliveryEnabled: false,
     });
     await store.appendRouteAlertEvaluation({
@@ -1321,6 +1356,9 @@ test("retention cleanup job purges expired backend records only", async () => {
     assert.equal(dryRun.payload.alerts.deletedDeviceCount, 1);
     assert.equal(dryRun.payload.alerts.deletedRouteCount, 1);
     assert.equal(dryRun.payload.alerts.deletedEvaluationCount, 1);
+    assert.equal(dryRun.payload.alerts.deletedInstallationCount, 1);
+    assert.equal(dryRun.payload.alerts.deletedOrphanedDeviceCount, 1);
+    assert.equal(dryRun.payload.alerts.deletedOrphanedEvaluationCount, 1);
     assert.equal(dryRun.payload.predictions.deletedCount, 1);
     assert.equal(store.devices.some((item) => item.id === "device-old-invalid"), true);
     assert.equal(predictionStore.records.some((item) => item.id === "prediction-old"), true);
@@ -1342,6 +1380,10 @@ test("retention cleanup job purges expired backend records only", async () => {
     assert.equal(store.routes.some((item) => item.id === "route-old-enabled"), true);
     assert.equal(store.evaluations.some((item) => item.id === "eval-old"), false);
     assert.equal(store.evaluations.some((item) => item.id === "eval-recent"), true);
+    assert.equal(store.devices.some((item) => item.id === "device-orphan"), false);
+    assert.equal(store.evaluations.some((item) => item.id === "eval-orphan-recent"), false);
+    assert.equal(store.__alertInstallations.has("installation-orphan"), false);
+    assert.equal(store.__alertInstallations.has("installation-active"), true);
     assert.equal(predictionStore.records.some((item) => item.id === "prediction-old"), false);
     assert.equal(predictionStore.records.some((item) => item.id === "prediction-recent"), true);
   } finally {
@@ -1470,29 +1512,51 @@ function memoryDurableStore() {
       }
       return record || null;
     },
-    async purgeAlertRetention({ now, dryRun, inactiveDeviceDays, disabledRouteDays, evaluationDays }) {
+    async purgeAlertRetention({ now, dryRun, inactiveDeviceDays, disabledRouteDays, evaluationDays, orphanedInstallationDays }) {
       const deviceCutoff = daysBefore(now, inactiveDeviceDays);
       const routeCutoff = daysBefore(now, disabledRouteDays);
       const evaluationCutoff = daysBefore(now, evaluationDays);
+      const orphanedInstallationCutoff = daysBefore(now, orphanedInstallationDays);
       const staleDevice = (record) => record.status !== "active" && olderThan(record.invalidatedAt || record.lastSeenAt, deviceCutoff);
       const staleRoute = (record) => record.alertEnabled === false && olderThan(record.updatedAt, routeCutoff);
       const staleEvaluation = (record) => olderThan(record.evaluatedAt, evaluationCutoff);
       const deletedDeviceCount = devices.filter(staleDevice).length;
       const deletedRouteCount = routes.filter(staleRoute).length;
       const deletedEvaluationCount = evaluations.filter(staleEvaluation).length;
+      const installations = store.__alertInstallations || new Map();
+      const staleInstallation = (record) => (
+        (record.revokedAt && olderThan(record.revokedAt, orphanedInstallationCutoff))
+        || (!record.revokedAt
+          && olderThan(record.lastSeenAt, orphanedInstallationCutoff)
+          && !routes.some((route) => route.userId === record.installationId && route.alertEnabled)
+          && !devices.some((device) => device.userId === record.installationId && device.status === "active"))
+      );
+      const orphanedIds = new Set([...installations.values()].filter(staleInstallation).map((record) => record.installationId));
+      const deletedOrphanedDeviceCount = devices.filter((record) => orphanedIds.has(record.userId)).length;
+      const deletedOrphanedRouteCount = routes.filter((record) => orphanedIds.has(record.userId)).length;
+      const deletedOrphanedEvaluationCount = evaluations.filter((record) => orphanedIds.has(record.userId)).length;
       if (!dryRun) {
         removeWhere(devices, staleDevice);
         removeWhere(routes, staleRoute);
         removeWhere(evaluations, staleEvaluation);
+        removeWhere(devices, (record) => orphanedIds.has(record.userId));
+        removeWhere(routes, (record) => orphanedIds.has(record.userId));
+        removeWhere(evaluations, (record) => orphanedIds.has(record.userId));
+        for (const installationId of orphanedIds) installations.delete(installationId);
       }
       return {
         dryRun,
         inactiveDeviceCutoff: deviceCutoff,
         disabledRouteCutoff: routeCutoff,
         evaluationCutoff,
+        orphanedInstallationCutoff,
         deletedDeviceCount,
         deletedRouteCount,
         deletedEvaluationCount,
+        deletedInstallationCount: orphanedIds.size,
+        deletedOrphanedDeviceCount,
+        deletedOrphanedRouteCount,
+        deletedOrphanedEvaluationCount,
       };
     },
   };

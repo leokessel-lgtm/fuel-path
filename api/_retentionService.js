@@ -3,6 +3,7 @@ function createRetentionService({ purgeAlertRetention, purgePredictionBacktests,
     inactiveDeviceDays: 90,
     disabledRouteDays: 90,
     alertEvaluationDays: 180,
+    orphanedInstallationDays: 90,
     predictionBacktestDays: 365,
   };
 
@@ -16,6 +17,7 @@ function createRetentionService({ purgeAlertRetention, purgePredictionBacktests,
         inactiveDeviceDays: policy.inactiveDeviceDays,
         disabledRouteDays: policy.disabledRouteDays,
         evaluationDays: policy.alertEvaluationDays,
+        orphanedInstallationDays: policy.orphanedInstallationDays,
       }),
       purgePredictionBacktests({ now: safeNow, dryRun, olderThanDays: policy.predictionBacktestDays }),
     ]);

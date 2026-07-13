@@ -17,6 +17,7 @@ import { useAppPreferences } from "./src/hooks/useAppPreferences";
 import { useRecentLocations } from "./src/hooks/useRecentLocations";
 import { useRouteAlerts } from "./src/hooks/useRouteAlerts";
 import { useSavedCommutes } from "./src/hooks/useSavedCommutes";
+import { initialiseAnonymousInstallation } from "./src/services/backendAlerts";
 import { colors, radii, shadow, spacing, surfaces, typeScale, typography } from "./src/theme";
 import { MapPoint, VehicleProfile } from "./src/types";
 
@@ -93,6 +94,7 @@ export default function App() {
   } = useSavedCommutes();
   const {
     alertSyncingCommuteId,
+    deleteAllAlertData,
     notificationMessage,
     notificationPermission,
     removeCommute,
@@ -105,6 +107,12 @@ export default function App() {
     savedCommutes,
     setSavedCommutes,
   });
+  useEffect(() => {
+    if (Platform.OS === "web") return;
+    void initialiseAnonymousInstallation().catch(() => {
+      // Local-first route planning must still work if secure storage is unavailable.
+    });
+  }, []);
   useEffect(() => {
     if (Platform.OS !== "web" || !releaseBuildId) return undefined;
     let active = true;
@@ -330,6 +338,7 @@ export default function App() {
               onToggleEvConnector={toggleEvConnector}
               onVehicleProfileChange={updateVehicleProfile}
               onClearVehicleProfile={() => updateVehicleProfile({ vehicleName: "", vehicleRego: "" })}
+              onDeleteAlertData={deleteAllAlertData}
               onVehicleEnergyTypeChange={updateVehicleEnergyType}
               onAddVehicle={addVehicle}
               onRemoveVehicle={removeVehicle}

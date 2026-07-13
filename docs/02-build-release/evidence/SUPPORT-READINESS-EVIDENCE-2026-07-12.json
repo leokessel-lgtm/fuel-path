@@ -1,0 +1,10 @@
+{
+  "supportContact": "support@fuelpath.app",
+  "supportOwner": "Leo Kesselring",
+  "reviewedAt": "2026-07-12",
+  "runbook": "docs/02-build-release/SUPPORT-RUNBOOK.md",
+  "notes": [
+    "Support contact, ownership and runbook coverage reviewed for the current release evidence on 2026-07-12.",
+    "This evidence clears the support-process gate only. It does not clear store listings, native device validation or hosted database migration."
+  ]
+}

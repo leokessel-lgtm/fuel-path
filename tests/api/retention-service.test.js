@@ -11,6 +11,7 @@ test("retention service normalises policy and keeps alert and prediction cleanup
   });
   const result = await service.runRetentionCleanup({ now: "2026-07-11T00:00:00Z", dryRun: true, inactiveDeviceDays: 12 });
   assert.equal(result.policy.inactiveDeviceDays, 12);
+  assert.equal(result.policy.orphanedInstallationDays, 90);
   assert.equal(result.policy.predictionBacktestDays, 365);
   assert.equal(result.alerts.deleted, 1);
   assert.equal(result.predictions.deleted, 2);

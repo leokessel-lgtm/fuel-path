@@ -9,6 +9,7 @@ routine work.
 | Task | Read first | Read only when relevant |
 | --- | --- | --- |
 | Understand the product | [`current-product.md`](current-product.md) | Detailed roadmap or research only when needed |
+| Plan account-free native data or backend alerts | [`00-product-vision/PROJECT-VISION.md`](00-product-vision/PROJECT-VISION.md) | [`01-architecture/ACCOUNT-FREE-NATIVE-DATA-ARCHITECTURE.md`](01-architecture/ACCOUNT-FREE-NATIVE-DATA-ARCHITECTURE.md) for boundaries and staged delivery |
 | Change route recommendations, scoring or savings wording | [`route-recommendation-logic-rules.md`](route-recommendation-logic-rules.md) | Latest route evidence under [`evidence/`](evidence/) |
 | Work on provider integrations or access | [`03-provider-data/README.md`](03-provider-data/README.md) | Open only the relevant provider decision, implementation note or evidence file |
 | Assess beta or store readiness | [`02-build-release/release-readiness-guide.md`](02-build-release/release-readiness-guide.md) | Current decision, gate plan and dated evidence as routed there |

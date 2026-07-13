@@ -35,7 +35,7 @@ test("address database adapters isolate construction and query failures", async 
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-adapter-"));
   const sqlitePath = path.join(directory, "addresses.sqlite");
   fs.writeFileSync(sqlitePath, "fixture");
-  process.env.FUEL_PATH_GNAF_DATABASE_URL = "postgres://example.invalid/db";
+  process.env.FUEL_PATH_GNAF_DATABASE_URL = "postgres://test:placeholder@example.test/fuel_path";
   process.env.FUEL_PATH_GNAF_SQLITE_PATH = sqlitePath;
   try {
     const adapters = createAddressStorageAdapters({

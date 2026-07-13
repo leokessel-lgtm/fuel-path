@@ -1,12 +1,24 @@
-const { assertProductDatabaseSchema, createProductSqlClient } = require("./_productDatabase");
+const {
+  assertAlertInstallationSchema,
+  assertProductDatabaseSchema,
+  createProductSqlClient,
+  productDatabaseUrl,
+} = require("./_productDatabase");
+const { rowToDevice, rowToEvaluation, rowToRoute } = require("./_alertRecords");
+const { setAlertInstallationStorageForTests } = require("./_alertInstallationStorage");
+const {
+  deleteStaleAlertRateLimits,
+  deleteOrphanedInstallationAlertData,
+  orphanedInstallationRetentionCounts,
+  staleAlertRateLimitCount,
+} = require("./_orphanedAlertRetention");
 
 const DEFAULT_MAX_RECORDS = 500;
-
 let sqlClient;
 let testStorage;
-
 const memoryStore = {
   devices: [],
+  installations: [],
   routes: [],
   evaluations: [],
 };
@@ -68,6 +80,13 @@ async function upsertPushDevice(record) {
   const sql = await getSql();
   await ensureTables(sql);
   await sql`
+    WITH retired_token AS (
+      UPDATE fuel_path_push_devices
+      SET status = 'inactive', invalidated_at = ${record.lastSeenAt}
+      WHERE expo_push_token = ${record.expoPushToken}
+        AND id <> ${record.id}
+        AND status = 'active'
+    )
     INSERT INTO fuel_path_push_devices (
       id, user_id, device_id, platform, expo_push_token, app_version, status, last_seen_at, invalidated_at, raw
     )
@@ -85,6 +104,64 @@ async function upsertPushDevice(record) {
       raw = EXCLUDED.raw
   `;
   return record;
+}
+
+async function enrolPushDeviceAndSavedRoute({ device, route } = {}) {
+  if (!device || !route) throw new Error("device and route are required for route-watch enrolment");
+  if (testStorage?.enrolPushDeviceAndSavedRoute) return testStorage.enrolPushDeviceAndSavedRoute({ device, route });
+  if (!databaseUrl()) {
+    const devices = memoryStore.devices.map((record) => ({ ...record }));
+    const routes = memoryStore.routes.map((record) => ({ ...record }));
+    try {
+      await upsertMemory("devices", device);
+      await upsertMemorySavedRoute(route);
+      return { device, route };
+    } catch (error) {
+      memoryStore.devices.splice(0, memoryStore.devices.length, ...devices);
+      memoryStore.routes.splice(0, memoryStore.routes.length, ...routes);
+      throw error;
+    }
+  }
+
+  const sql = await getSql();
+  await ensureTables(sql);
+  await sql`
+    WITH retired_token AS (
+      UPDATE fuel_path_push_devices
+      SET status = 'inactive', invalidated_at = ${device.lastSeenAt}
+      WHERE expo_push_token = ${device.expoPushToken} AND id <> ${device.id} AND status = 'active'
+    ), enrolled_device AS (
+      INSERT INTO fuel_path_push_devices (
+        id, user_id, device_id, platform, expo_push_token, app_version, status, last_seen_at, invalidated_at, raw
+      ) VALUES (
+        ${device.id}, ${device.userId}, ${device.deviceId}, ${device.platform}, ${device.expoPushToken},
+        ${device.appVersion}, ${device.status}, ${device.lastSeenAt}, ${device.invalidatedAt || null}, ${JSON.stringify(device)}
+      ) ON CONFLICT (id) DO UPDATE SET
+        platform = EXCLUDED.platform, expo_push_token = EXCLUDED.expo_push_token,
+        app_version = EXCLUDED.app_version, status = EXCLUDED.status, last_seen_at = EXCLUDED.last_seen_at,
+        invalidated_at = EXCLUDED.invalidated_at, raw = EXCLUDED.raw
+    ), enrolled_route AS (
+      INSERT INTO fuel_path_saved_routes (
+        id, user_id, name, from_lat, from_lon, from_label, to_lat, to_lon, to_label, fuel,
+        alert_enabled, alert_time_local, timezone, min_saving_dollars, max_detour_minutes,
+        paused_until, last_alert_sent_at, created_at, updated_at, raw
+      ) VALUES (
+        ${route.id}, ${route.userId}, ${route.name}, ${route.from.lat}, ${route.from.lon}, ${route.from.label},
+        ${route.to.lat}, ${route.to.lon}, ${route.to.label}, ${route.fuel}, ${route.alertEnabled},
+        ${route.alertTimeLocal}, ${route.timezone}, ${route.minSavingDollars}, ${route.maxDetourMinutes},
+        ${route.pausedUntil || null}, ${route.lastAlertSentAt || null}, ${route.createdAt}, ${route.updatedAt}, ${JSON.stringify(route)}
+      ) ON CONFLICT (user_id, id) DO UPDATE SET
+        name = EXCLUDED.name, from_lat = EXCLUDED.from_lat, from_lon = EXCLUDED.from_lon,
+        from_label = EXCLUDED.from_label, to_lat = EXCLUDED.to_lat, to_lon = EXCLUDED.to_lon,
+        to_label = EXCLUDED.to_label, fuel = EXCLUDED.fuel, alert_enabled = EXCLUDED.alert_enabled,
+        alert_time_local = EXCLUDED.alert_time_local, timezone = EXCLUDED.timezone,
+        min_saving_dollars = EXCLUDED.min_saving_dollars, max_detour_minutes = EXCLUDED.max_detour_minutes,
+        paused_until = EXCLUDED.paused_until,
+        last_alert_sent_at = COALESCE(EXCLUDED.last_alert_sent_at, fuel_path_saved_routes.last_alert_sent_at),
+        updated_at = EXCLUDED.updated_at, raw = EXCLUDED.raw
+    ) SELECT 1
+  `;
+  return { device, route };
 }
 
 async function upsertSavedRoute(record) {
@@ -106,7 +183,7 @@ async function upsertSavedRoute(record) {
       ${record.pausedUntil || null}, ${record.lastAlertSentAt || null}, ${record.createdAt}, ${record.updatedAt},
       ${JSON.stringify(record)}
     )
-    ON CONFLICT (id) DO UPDATE SET
+    ON CONFLICT (user_id, id) DO UPDATE SET
       name = EXCLUDED.name,
       from_lat = EXCLUDED.from_lat,
       from_lon = EXCLUDED.from_lon,
@@ -133,10 +210,11 @@ async function deleteSavedRoute({ routeId = "", userId = "" } = {}) {
   const safeRouteId = cleanText(routeId);
   const safeUserId = cleanText(userId);
   if (!safeRouteId) throw new Error("routeId is required");
+  if (!safeUserId) throw new Error("userId is required for saved-route deletion");
   if (testStorage?.deleteSavedRoute) return testStorage.deleteSavedRoute({ routeId: safeRouteId, userId: safeUserId });
   if (!databaseUrl()) {
     const index = memoryStore.routes.findIndex((item) =>
-      item.id === safeRouteId && (!safeUserId || item.userId === safeUserId)
+      item.id === safeRouteId && item.userId === safeUserId
     );
     if (index < 0) return null;
     const [deleted] = memoryStore.routes.splice(index, 1);
@@ -145,17 +223,11 @@ async function deleteSavedRoute({ routeId = "", userId = "" } = {}) {
 
   const sql = await getSql();
   await ensureTables(sql);
-  const rows = safeUserId
-    ? await sql`
-      DELETE FROM fuel_path_saved_routes
-      WHERE id = ${safeRouteId} AND user_id = ${safeUserId}
-      RETURNING *
-    `
-    : await sql`
-      DELETE FROM fuel_path_saved_routes
-      WHERE id = ${safeRouteId}
-      RETURNING *
-    `;
+  const rows = await sql`
+    DELETE FROM fuel_path_saved_routes
+    WHERE id = ${safeRouteId} AND user_id = ${safeUserId}
+    RETURNING *
+  `;
   return rows[0] ? rowToRoute(rows[0]) : null;
 }
 
@@ -214,10 +286,12 @@ async function updateRouteAlertDelivery({ evaluationId, pushTicketId = "", pushR
   return rows[0] ? rowToEvaluation(rows[0]) : null;
 }
 
-async function updateSavedRouteLastAlert(routeId, sentAt) {
-  if (testStorage?.updateSavedRouteLastAlert) return testStorage.updateSavedRouteLastAlert(routeId, sentAt);
+async function updateSavedRouteLastAlert(routeId, sentAt, userId = "") {
+  if (testStorage?.updateSavedRouteLastAlert) return testStorage.updateSavedRouteLastAlert(routeId, sentAt, userId);
   if (!databaseUrl()) {
-    const record = memoryStore.routes.find((item) => item.id === routeId);
+    const record = memoryStore.routes.find((item) =>
+      item.id === routeId && (!userId || item.userId === userId)
+    );
     if (record) record.lastAlertSentAt = sentAt;
     return record || null;
   }
@@ -227,7 +301,7 @@ async function updateSavedRouteLastAlert(routeId, sentAt) {
   const rows = await sql`
     UPDATE fuel_path_saved_routes
     SET last_alert_sent_at = ${sentAt}, updated_at = ${sentAt}
-    WHERE id = ${routeId}
+    WHERE id = ${routeId} AND user_id = ${userId}
     RETURNING *
   `;
   return rows[0] ? rowToRoute(rows[0]) : null;
@@ -391,6 +465,7 @@ async function purgeAlertRetention({
   inactiveDeviceDays = 90,
   disabledRouteDays = 90,
   evaluationDays = 180,
+  orphanedInstallationDays = 90,
 } = {}) {
   if (testStorage?.purgeAlertRetention) {
     return testStorage.purgeAlertRetention({
@@ -399,25 +474,29 @@ async function purgeAlertRetention({
       inactiveDeviceDays,
       disabledRouteDays,
       evaluationDays,
+      orphanedInstallationDays,
     });
   }
 
   const deviceCutoff = cutoffIso(now, inactiveDeviceDays);
   const routeCutoff = cutoffIso(now, disabledRouteDays);
   const evaluationCutoff = cutoffIso(now, evaluationDays);
+  const orphanedInstallationCutoff = cutoffIso(now, orphanedInstallationDays);
   if (!databaseUrl()) {
     return purgeMemoryAlertRetention({
       dryRun,
       deviceCutoff,
       routeCutoff,
       evaluationCutoff,
+      orphanedInstallationCutoff,
     });
   }
 
   const sql = await getSql();
   await ensureTables(sql);
+  await assertAlertInstallationSchema(sql);
   if (dryRun) {
-    const [devices, routes, evaluations] = await Promise.all([
+    const [devices, routes, evaluations, orphaned, rateLimits] = await Promise.all([
       sql`
         SELECT COUNT(*)::int AS count
         FROM fuel_path_push_devices
@@ -435,19 +514,30 @@ async function purgeAlertRetention({
         FROM fuel_path_route_alert_evaluations
         WHERE evaluated_at < ${evaluationCutoff}
       `,
+      orphanedInstallationRetentionCounts(sql, orphanedInstallationCutoff),
+      staleAlertRateLimitCount(sql, orphanedInstallationCutoff),
     ]);
     return {
       dryRun: true,
       inactiveDeviceCutoff: deviceCutoff,
       disabledRouteCutoff: routeCutoff,
       evaluationCutoff,
+      orphanedInstallationCutoff,
       deletedDeviceCount: Number(devices[0]?.count || 0),
       deletedRouteCount: Number(routes[0]?.count || 0),
       deletedEvaluationCount: Number(evaluations[0]?.count || 0),
+      deletedInstallationCount: Number(orphaned[0]?.installation_count || 0),
+      deletedOrphanedDeviceCount: Number(orphaned[0]?.device_count || 0),
+      deletedOrphanedRouteCount: Number(orphaned[0]?.route_count || 0),
+      deletedOrphanedEvaluationCount: Number(orphaned[0]?.evaluation_count || 0),
+      deletedRateLimitCount: Number(rateLimits[0]?.count || 0),
     };
   }
 
-  const [devices, routes, evaluations] = await Promise.all([
+  // Remove complete stale anonymous installations first. Its child deletes must not
+  // race the narrower retention deletes below.
+  const orphaned = await deleteOrphanedInstallationAlertData(sql, orphanedInstallationCutoff);
+  const [devices, routes, evaluations, rateLimits] = await Promise.all([
     sql`
       DELETE FROM fuel_path_push_devices
       WHERE status <> 'active'
@@ -465,15 +555,22 @@ async function purgeAlertRetention({
       WHERE evaluated_at < ${evaluationCutoff}
       RETURNING id
     `,
+    deleteStaleAlertRateLimits(sql, orphanedInstallationCutoff),
   ]);
   return {
     dryRun: false,
     inactiveDeviceCutoff: deviceCutoff,
     disabledRouteCutoff: routeCutoff,
     evaluationCutoff,
+    orphanedInstallationCutoff,
     deletedDeviceCount: devices.length,
     deletedRouteCount: routes.length,
     deletedEvaluationCount: evaluations.length,
+    deletedInstallationCount: Number(orphaned[0]?.installation_count || 0),
+    deletedOrphanedDeviceCount: Number(orphaned[0]?.device_count || 0),
+    deletedOrphanedRouteCount: Number(orphaned[0]?.route_count || 0),
+    deletedOrphanedEvaluationCount: Number(orphaned[0]?.evaluation_count || 0),
+    deletedRateLimitCount: rateLimits.length,
   };
 }
 
@@ -486,7 +583,9 @@ function upsertMemory(key, record) {
 }
 
 function upsertMemorySavedRoute(record) {
-  const index = memoryStore.routes.findIndex((item) => item.id === record.id);
+  const index = memoryStore.routes.findIndex((item) =>
+    item.id === record.id && item.userId === record.userId
+  );
   if (index < 0) {
     memoryStore.routes.push(record);
     return record;
@@ -525,6 +624,7 @@ function purgeMemoryAlertRetention({
   deviceCutoff,
   routeCutoff,
   evaluationCutoff,
+  orphanedInstallationCutoff,
 }) {
   const staleDevice = (record) => record.status !== "active" && olderThan(record.invalidatedAt || record.lastSeenAt, deviceCutoff);
   const staleRoute = (record) => record.alertEnabled === false && olderThan(record.updatedAt, routeCutoff);
@@ -532,11 +632,27 @@ function purgeMemoryAlertRetention({
   const deletedDeviceCount = memoryStore.devices.filter(staleDevice).length;
   const deletedRouteCount = memoryStore.routes.filter(staleRoute).length;
   const deletedEvaluationCount = memoryStore.evaluations.filter(staleEvaluation).length;
+  const staleInstallation = (record) => (
+    (record.revokedAt && olderThan(record.revokedAt, orphanedInstallationCutoff))
+    || (!record.revokedAt
+      && olderThan(record.lastSeenAt, orphanedInstallationCutoff)
+      && !memoryStore.routes.some((route) => route.userId === record.installationId && route.alertEnabled)
+      && !memoryStore.devices.some((device) => device.userId === record.installationId && device.status === "active"))
+  );
+  const orphanedInstallations = memoryStore.installations.filter(staleInstallation);
+  const orphanedIds = new Set(orphanedInstallations.map((record) => record.installationId));
+  const deletedOrphanedDeviceCount = memoryStore.devices.filter((record) => orphanedIds.has(record.userId)).length;
+  const deletedOrphanedRouteCount = memoryStore.routes.filter((record) => orphanedIds.has(record.userId)).length;
+  const deletedOrphanedEvaluationCount = memoryStore.evaluations.filter((record) => orphanedIds.has(record.userId)).length;
 
   if (!dryRun) {
     memoryStore.devices = memoryStore.devices.filter((record) => !staleDevice(record));
     memoryStore.routes = memoryStore.routes.filter((record) => !staleRoute(record));
     memoryStore.evaluations = memoryStore.evaluations.filter((record) => !staleEvaluation(record));
+    memoryStore.devices = memoryStore.devices.filter((record) => !orphanedIds.has(record.userId));
+    memoryStore.routes = memoryStore.routes.filter((record) => !orphanedIds.has(record.userId));
+    memoryStore.evaluations = memoryStore.evaluations.filter((record) => !orphanedIds.has(record.userId));
+    memoryStore.installations = memoryStore.installations.filter((record) => !orphanedIds.has(record.installationId));
   }
 
   return {
@@ -544,9 +660,15 @@ function purgeMemoryAlertRetention({
     inactiveDeviceCutoff: deviceCutoff,
     disabledRouteCutoff: routeCutoff,
     evaluationCutoff,
+    orphanedInstallationCutoff,
     deletedDeviceCount,
     deletedRouteCount,
     deletedEvaluationCount,
+    deletedInstallationCount: orphanedInstallations.length,
+    deletedOrphanedDeviceCount,
+    deletedOrphanedRouteCount,
+    deletedOrphanedEvaluationCount,
+    deletedRateLimitCount: 0,
   };
 }
 
@@ -560,100 +682,9 @@ async function ensureTables(sql) {
   return assertProductDatabaseSchema(sql);
 }
 
-function rowToDevice(row) {
-  return {
-    id: row.id,
-    userId: row.user_id,
-    deviceId: row.device_id,
-    platform: row.platform,
-    expoPushToken: row.expo_push_token,
-    appVersion: row.app_version || "",
-    status: row.status,
-    lastSeenAt: isoDateTime(row.last_seen_at),
-    invalidatedAt: row.invalidated_at ? isoDateTime(row.invalidated_at) : undefined,
-  };
-}
-
-function rowToRoute(row) {
-  const raw = rawObject(row.raw);
-  return {
-    id: row.id,
-    userId: row.user_id,
-    name: row.name,
-    from: { lat: Number(row.from_lat), lon: Number(row.from_lon), label: row.from_label },
-    to: { lat: Number(row.to_lat), lon: Number(row.to_lon), label: row.to_label },
-    fuel: row.fuel,
-    vehicleId: raw.vehicleId || "",
-    vehicleEnergyType: raw.vehicleEnergyType || "",
-    alertEnabled: Boolean(row.alert_enabled),
-    alertTimeLocal: row.alert_time_local,
-    alertDays: Array.isArray(raw.alertDays) ? raw.alertDays : [],
-    timezone: row.timezone,
-    minSavingDollars: Number(row.min_saving_dollars),
-    maxDetourMinutes: Number(row.max_detour_minutes),
-    eligibleDiscounts: Array.isArray(raw.eligibleDiscounts) ? raw.eligibleDiscounts : [],
-    tankLitres: optionalNumber(raw.tankLitres),
-    tankPercent: optionalNumber(raw.tankPercent),
-    economy: optionalNumber(raw.economy),
-    reserveKm: optionalNumber(raw.reserveKm),
-    evBatteryKwh: optionalNumber(raw.evBatteryKwh),
-    evRangeKm: optionalNumber(raw.evRangeKm),
-    evConnectors: Array.isArray(raw.evConnectors) ? raw.evConnectors : [],
-    pausedUntil: row.paused_until ? isoDateTime(row.paused_until) : undefined,
-    lastAlertSentAt: row.last_alert_sent_at ? isoDateTime(row.last_alert_sent_at) : undefined,
-    createdAt: isoDateTime(row.created_at),
-    updatedAt: isoDateTime(row.updated_at),
-  };
-}
-
-function rawObject(value) {
-  if (!value) return {};
-  if (typeof value === "object") return value;
-  try {
-    const parsed = JSON.parse(value);
-    return parsed && typeof parsed === "object" ? parsed : {};
-  } catch {
-    return {};
-  }
-}
-
-function rowToEvaluation(row) {
-  const raw = rawObject(row.raw);
-  return {
-    id: row.id,
-    routeId: row.saved_route_id,
-    userId: row.user_id,
-    status: row.status,
-    reason: row.reason,
-    outcome: raw.outcome,
-    outcomeLabel: raw.outcomeLabel,
-    outcomeSummary: raw.outcomeSummary,
-    stationCode: row.station_code || undefined,
-    stationName: row.station_name || undefined,
-    alertBasis: raw.alertBasis || undefined,
-    cycleSignalMode: raw.cycleSignalMode || undefined,
-    cycleReadinessStatus: raw.cycleReadinessStatus || undefined,
-    cycleAlertsEnabled: raw.cycleAlertsEnabled === true,
-    estimatedSavingDollars: optionalNumber(row.estimated_saving_dollars),
-    detourMinutes: optionalNumber(row.detour_minutes),
-    freshnessMinutes: optionalNumber(row.freshness_minutes),
-    messageTitle: row.message_title || undefined,
-    messageBody: row.message_body || undefined,
-    evaluatedAt: isoDateTime(row.evaluated_at),
-    pushDeliveryEnabled: Boolean(row.push_delivery_enabled),
-    pushTicketId: row.push_ticket_id || undefined,
-    pushReceiptStatus: row.push_receipt_status || undefined,
-  };
-}
 
 function databaseUrl() {
-  return (
-    process.env.DATABASE_URL ||
-    process.env.POSTGRES_URL ||
-    process.env.POSTGRES_PRISMA_URL ||
-    process.env.NEON_DATABASE_URL ||
-    ""
-  );
+  return productDatabaseUrl();
 }
 
 function cleanText(value) {
@@ -682,20 +713,9 @@ function nullableNumber(value) {
   return Number.isFinite(value) ? value : null;
 }
 
-function optionalNumber(value) {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : undefined;
-}
-
-function isoDateTime(value) {
-  if (!value) return new Date().toISOString();
-  if (value instanceof Date) return value.toISOString();
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? String(value) : parsed.toISOString();
-}
-
 function setAlertStorageForTests(storage) {
   testStorage = storage || null;
+  setAlertInstallationStorageForTests(storage);
 }
 
 module.exports = {
@@ -703,6 +723,7 @@ module.exports = {
   appendRouteAlertEvaluation,
   counts,
   deleteSavedRoute,
+  enrolPushDeviceAndSavedRoute,
   listPushDevices,
   listPendingPushTicketEvaluations,
   listRouteAlertEvaluations,

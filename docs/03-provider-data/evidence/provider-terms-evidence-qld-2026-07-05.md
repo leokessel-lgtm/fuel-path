@@ -20,7 +20,15 @@ Official source references reviewed on 2026-07-05:
 - https://www.treasury.qld.gov.au/research-and-publications/fuel-price-data/
 - https://www.fuelpricesqld.com.au/
 
+Follow-up evidence reviewed on 2026-07-12:
+- Fuel Prices QLD support replied on 2026-07-08 that the Fuel Price Data Licence
+  Terms of Service contain the answers to Fuel Path's usage, caching and
+  attribution questions, but did not give Fuel Path-specific legal advice.
+- The published 2024 licence permits a publisher to publish licensed data and
+  value-added products, subject to current and accurate prices within 30 minutes
+  and other published data within 24 hours, the required attribution/disclaimer,
+  and no implied Queensland Government endorsement.
+
 Current evidence gap:
-- This note supports that the production access email followed the sign-up/terms-acceptance path, but it does not independently capture the accepted Fuel Price Data Licence Terms of Service text.
-- This note does not yet prove the exact allowed price-cache max age, site-data cache max age, required attribution wording, or route-based consumer-app permission.
-- Before marking QLD fully ready, capture the licence/manual terms text or a provider support confirmation that explicitly covers Fuel Path's public route-based use.
+- This note supports that the production access email followed the sign-up/terms-acceptance path, and the published licence now supplies the general caching, attribution and value-added-product rules.
+- It does not independently capture Fuel Path's actual sign-up acceptance date or Leo's dated acceptance attestation. Do not mark QLD fully ready until that evidence is recorded and the app/listing copy is checked against the licence wording.

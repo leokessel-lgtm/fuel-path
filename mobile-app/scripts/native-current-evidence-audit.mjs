@@ -116,7 +116,13 @@ const latestAndroidPhone = latestAndroidPhysicalPreview || latestReport(/^androi
 const latestAndroidColdStart = latestReport(/^android-cold-start-smoke-.*\.md$/);
 const latestAndroidPerformanceCoverage = latestReport(/^android-performance-coverage-.*\.md$/);
 const latestAndroidNotificationReadiness = latestReport(/^android-notification-readiness-.*\.md$/);
-const latestAndroidAlertSync = latestReport(/^android-alert-sync-smoke-.*\.md$/);
+const latestAndroidAlertSync = latestReportWhere(/^android-alert-sync-smoke-.*\.md$/, (text) =>
+  /account-free Android route-watch backend contract/i.test(text) &&
+  !/^API base URL:\s*https:\/\/fuel-path\.vercel\.app\/?\s*$/im.test(text)
+);
+const latestExcludedProductionAlertSync = latestReportWhere(/^android-alert-sync-smoke-.*\.md$/, (text) =>
+  /^API base URL:\s*https:\/\/fuel-path\.vercel\.app\/?\s*$/im.test(text)
+);
 const latestAndroidAlertDeliveryGate = latestReport(/^android-alert-delivery-gate-.*\.md$/);
 const latestAndroidNavigationIntents = latestReport(/^android-navigation-intents-.*\.md$/);
 const latestRouteNotificationScheduleStress = latestReport(/^route-notification-schedule-stress-.*\.json$/);
@@ -200,6 +206,10 @@ const lines = [
   latestAndroidAlertSync ? `Report: \`${path.relative(repoRoot, latestAndroidAlertSync)}\`` : "Report: missing",
   "",
   ...readReportSignals(latestAndroidAlertSync).map((line) => `- ${line}`),
+  ...(latestExcludedProductionAlertSync ? [
+    "",
+    `- Excluded Production/PR #29 report: \`${path.relative(repoRoot, latestExcludedProductionAlertSync)}\`. It does not validate PR #30's account-free Preview contract.`,
+  ] : []),
   "",
   "### Android alert delivery gate",
   "",
@@ -249,6 +259,7 @@ const lines = [
   artefactInterpretation,
   "- Source guards, typecheck and native parity scripts still need to be run for the current checkout before making code-quality claims; this report indexes evidence artefacts rather than executing every guard.",
   "- Android notification readiness and route-watch backend sync evidence are separate from real delivered push-notification evidence.",
+  "- Production-targeted alert sync reports do not satisfy the account-free PR #30 Preview lane.",
   "- Android route schedule stress and EV route screenshots are now indexed when present, but they are still separate from lower-end Android performance and delivered push evidence.",
   "- This audit does not prove app-store readiness, delivered notifications, Android tablet UX quality or lower-end Android performance.",
   "- If this report says a report is missing, the launch claim depending on that report is not evidence-ready.",

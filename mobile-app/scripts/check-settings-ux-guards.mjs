@@ -14,6 +14,8 @@ const files = {
   stationBrandsCard: read("src/components/StationBrandsCard.tsx"),
   vehicleFuelCard: read("src/components/VehicleFuelCard.tsx"),
   savedCommutesHook: read("src/hooks/useSavedCommutes.ts"),
+  routeAlertsHook: read("src/hooks/useRouteAlerts.ts"),
+  backendAlerts: read("src/services/backendAlerts.native.ts"),
   savedCommutesStore: read("src/services/savedCommutesStore.ts"),
   preferencesHook: read("src/hooks/useAppPreferences.ts"),
   preferencesStore: read("src/services/preferencesStore.ts"),
@@ -273,6 +275,19 @@ const checks = [
       files.app.includes("window.addEventListener(\"focus\", checkLatestRelease)") &&
       files.app.includes("<Text style={styles.releaseBannerText}>New version ready</Text>") &&
       files.app.includes('accessibilityLabel="Refresh Fuel Path"'),
+  },
+  {
+    label: "account-free alert deletion and local-route loss copy stay user visible",
+    ok:
+      files.accountDetail.includes('accessibilityLabel="Delete my alert data"') &&
+      files.accountDetail.includes("Your saved routes are stored on this device.") &&
+      files.accountDetail.includes("will not automatically move to a new phone") &&
+      files.backendAlerts.includes('action=delete-installation-data') &&
+      files.routeAlertsHook.includes("deleteAllAlertData") &&
+      files.routeAlertsHook.includes("subscribeToPushTokenChanges") &&
+      files.routeAlertsHook.includes('backendSync.status !== "synced"') &&
+      files.routeAlertsHook.includes("targetCommute.backendSyncedAt") &&
+      files.routeAlertsHook.includes('state === "active"'),
   },
   {
     label: "Settings UX guards run in the mobile test chain",

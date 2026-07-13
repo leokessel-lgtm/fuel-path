@@ -29,7 +29,7 @@ module.exports = async function handler(req, res) {
 async function evaluateRouteAlerts(req, res) {
   if (!methodAllowed(req, res, ["POST"])) return;
 
-  if (!cronAuthorised(req) && !alertsWriteAuthorised(req)) {
+  if (!cronAuthorised(req) && !alertsAdminWriteAuthorised(req)) {
     sendJson(res, 401, {
       error: "Alert evaluation job requires CRON_SECRET or ALERTS_WRITE_TOKEN authorisation.",
       alerts: await alertsStatus(),
@@ -59,7 +59,7 @@ async function evaluateRouteAlerts(req, res) {
 async function checkPushReceiptsJob(req, res) {
   if (!methodAllowed(req, res, ["GET", "POST"])) return;
 
-  if (!cronAuthorised(req) && !alertsWriteAuthorised(req) && !alertsAdminWriteAuthorised(req)) {
+  if (!cronAuthorised(req) && !alertsAdminWriteAuthorised(req)) {
     sendJson(res, 401, {
       error: "Push receipt job requires CRON_SECRET or ALERTS_WRITE_TOKEN authorisation.",
       alerts: await alertsStatus(),
@@ -106,6 +106,7 @@ async function retentionCleanupJob(req, res) {
         inactiveDeviceDays: numberParam(req.query.inactiveDeviceDays || body.inactiveDeviceDays, 90),
         disabledRouteDays: numberParam(req.query.disabledRouteDays || body.disabledRouteDays, 90),
         alertEvaluationDays: numberParam(req.query.alertEvaluationDays || body.alertEvaluationDays, 180),
+        orphanedInstallationDays: numberParam(req.query.orphanedInstallationDays || body.orphanedInstallationDays, 90),
         predictionBacktestDays: numberParam(req.query.predictionBacktestDays || body.predictionBacktestDays, 365),
       }),
     );

@@ -11,7 +11,6 @@ import MapView, {
   Marker,
   Polyline,
   PROVIDER_GOOGLE,
-  type MapMarker,
   type Region,
 } from "react-native-maps";
 
@@ -104,7 +103,6 @@ export function StationMap({
 }) {
   const { width } = useWindowDimensions();
   const mapRef = useRef<MapView | null>(null);
-  const markerRefs = useRef<Record<string, MapMarker | null>>({});
   const lastCameraKeyRef = useRef("");
   const lastReportedUserCentreKeyRef = useRef("");
   const lastSelectedChargerIdRef = useRef<string | undefined>(undefined);
@@ -300,7 +298,6 @@ export function StationMap({
     );
     if (!selected) return;
 
-    markerRefs.current[selectedStationCode]?.showCallout();
     if (!userMovedMapRef.current) {
       runProgrammaticMapMove(programmaticMoveRef, () => {
         mapRef.current?.animateCamera(
@@ -560,9 +557,6 @@ export function StationMap({
                 }}
                 key={`${item.station.stationCode}-${markerAssetRefreshVersion}`}
                 onPress={() => handleMarkerPress(item.station.stationCode)}
-                ref={(marker) => {
-                  markerRefs.current[item.station.stationCode] = marker;
-                }}
                 tracksViewChanges={Platform.OS === "android"}
                 zIndex={selected ? 700 : subdued ? 420 : 500}
               >

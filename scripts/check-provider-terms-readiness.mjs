@@ -226,6 +226,7 @@ function evidenceSourceReady(region, entry, evidenceState) {
   }
 
   if (containsProviderSecret(sourceText)) return false;
+  if (/^\s*source type:\s*release-owner confirmation\b/im.test(sourceText)) return false;
   const referenceDate = firstConcreteDate(entry.evidenceReference);
   if (!referenceDate) return false;
   const referenceDateText = referenceDate.toISOString().slice(0, 10);

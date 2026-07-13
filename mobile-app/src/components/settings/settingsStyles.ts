@@ -105,6 +105,21 @@ export const styles = StyleSheet.create({
     fontWeight: "400",
     lineHeight: 18,
   },
+  dataDeleteButton: {
+    alignItems: "center",
+    alignSelf: "flex-start",
+    borderColor: colors.red,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    minHeight: 44,
+    justifyContent: "center",
+    paddingHorizontal: spacing.md,
+  },
+  dataDeleteButtonText: {
+    color: colors.red,
+    fontSize: typography.buttonLabel.fontSize,
+    fontWeight: typography.buttonLabel.fontWeight,
+  },
   preferenceGroup: {
     gap: spacing.xs,
   },

@@ -31,6 +31,7 @@ const accountDetailScreen = read("src/components/settings/AccountDetailScreen.ts
 const weeklyReportCard = read("src/components/WeeklyReportCard.tsx");
 const routeAddressSuggestionHook = read("src/hooks/useRouteAddressSuggestions.ts");
 const routeAlertsHook = read("src/hooks/useRouteAlerts.ts");
+const alertDeviceSecurity = read("src/services/alertDeviceSecurity.native.ts");
 const theme = read("src/theme.ts");
 const typographyDoc = read("../docs/06-design-brand/typography-hierarchy.md");
 const routeRecommendationRules = read("../docs/route-recommendation-logic-rules.md");
@@ -71,7 +72,7 @@ const routeCameraInsets = read("src/utils/routeCameraInsets.ts");
 const preferencesStore = read("src/services/preferencesStore.ts");
 const recentLocationsStore = read("src/services/recentLocationsStore.ts");
 const savedCommutesStore = read("src/services/savedCommutesStore.ts");
-const backendAlerts = read("src/services/backendAlerts.ts");
+const backendAlerts = read("src/services/backendAlerts.native.ts");
 const routeNotifications = read("src/services/routeNotifications.ts");
 const currentLocation = read("src/services/currentLocation.ts");
 const pricing = read("src/utils/pricing.ts");
@@ -383,6 +384,8 @@ const checks = [
       !nativeMap.includes("scale: 1.05") &&
       nativeMap.includes("const subdued = Boolean(") &&
       nativeMap.includes("routeEndpoints && selectedStationCode && !selected") &&
+      !nativeMap.includes("showCallout(") &&
+      !nativeMap.includes("markerRefs") &&
       nativeMap.includes("subdued && styles.pinSubdued") &&
       nativeMap.includes("pinSubdued: {") &&
       !nativeMap.includes("opacity: 0.68") &&
@@ -766,6 +769,7 @@ const checks = [
       planRouteSheet.includes("recommendationPriceTile") &&
       planRouteSheet.includes("recommendationStationName") &&
       planRouteSheet.includes("recommendationRouteValue") &&
+      planRouteSheet.indexOf("styles.compactActionRow") < planRouteSheet.indexOf("styles.compactRecommendation") &&
       !decisionEvidencePanel.includes("Decision trade-offs") &&
       !planScreen.includes("routeDecisionAlternatives") &&
       !planScreen.includes("cheapestTradeOffExplanation"),
@@ -824,9 +828,9 @@ const checks = [
       nativeApiContracts.includes("assert.equal(body.brandFilter, true);") &&
       nativeApiContracts.includes('assert.equal("route" in body, false);') &&
       nativeApiContracts.includes("await checkSavedRouteAlertContract();") &&
-      nativeApiContracts.includes("const { syncSavedRouteAlert } = loadTsModule(backendAlertsSourcePath") &&
+      nativeApiContracts.includes("syncSavedRouteAlert,\n  } = loadTsModule(backendAlertsSourcePath") &&
       nativeApiContracts.includes("assert.equal(result.remoteDeliveryEnabled, false);") &&
-      nativeApiContracts.includes('assert.equal(alertFetchCalls[1].url, "https://fuel-path.test/api/saved-routes");') &&
+      nativeApiContracts.includes('assert.equal(alertFetchCalls[1].url, "https://fuel-path.test/api/alerts?action=enrol-watch");') &&
       nativeApiContracts.includes("assert.equal(body.vehicleId, \"vehicle-diesel\");") &&
       nativeApiContracts.includes("assert.equal(body.vehicleEnergyType, \"diesel\");") &&
       nativeApiContracts.includes("assert.equal(body.fuel, \"PDL\");") &&
@@ -987,12 +991,17 @@ const checks = [
       accountDetailScreen.includes("onRemoveCommute"),
   },
   {
-    label: "backend alert identity stays local generated and non-contact",
+    label: "backend alert identity stays secure, anonymous and non-contact",
     ok:
-      backendAlerts.includes('const ALERT_IDENTITY_KEY = "fuel-path:alert-identity:v1";') &&
-      backendAlerts.includes("userId: `local_${randomId()}`") &&
-      backendAlerts.includes("deviceId: `device_${randomId()}`") &&
-      backendAlerts.includes("AsyncStorage.setItem(ALERT_IDENTITY_KEY, JSON.stringify(identity))") &&
+      backendAlerts.includes('const ALERT_IDENTITY_KEY = "fuel-path-alert-installation-v3";') &&
+      backendAlerts.includes("installationId: `installation_${await randomUuid()}`") &&
+      backendAlerts.includes("installationSecret: await randomSecret()") &&
+      alertDeviceSecurity.includes("Crypto.getRandomBytesAsync(32)") &&
+      backendAlerts.includes("ALERT_INSTALL_MARKER_KEY") &&
+      backendAlerts.includes("ALERT_BACKEND_ENROLLED_KEY") &&
+      backendAlerts.includes("ALERT_LEGACY_IDENTITY_KEY") &&
+      backendAlerts.includes("await secureSet(ALERT_IDENTITY_KEY, JSON.stringify(identity))") &&
+      alertDeviceSecurity.includes("SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY") &&
       !backendAlerts.includes("vehicleRego") &&
       !backendAlerts.includes("privacyContact") &&
       !backendAlerts.includes("email"),
@@ -1006,16 +1015,16 @@ const checks = [
       backendAlerts.includes("JSON.parse(text)") &&
       backendAlerts.includes("function normaliseAlertCapability(payload: unknown)") &&
       backendAlerts.includes("expiresAtMs - ALERT_CAPABILITY_REFRESH_BUFFER_MS <= Date.now()") &&
-      backendAlerts.includes("await AsyncStorage.removeItem(ALERT_CAPABILITY_KEY);") &&
+      backendAlerts.includes("await secureDelete(ALERT_CAPABILITY_KEY);") &&
       backendAlerts.includes("const capability = normaliseAlertCapability(payload);") &&
       backendAlerts.includes("Route watch could not update. Your saved route is still on this device, so you can try again.") &&
-      backendAlerts.includes("Smart route watch could not update. Reminder state was kept.") &&
+      backendAlerts.includes("Smart route watch could not update. Your saved route remains on this device.") &&
       backendAlerts.includes("Route watch delete failed. Saved route was kept so you can retry.") &&
       backendAlerts.includes("routeWatchRemoteDeliveryEnabled(savedRoute)") &&
       backendAlerts.includes("Smart route watch was saved, but push delivery is not enabled for this build yet.") &&
       backendAlerts.includes("pushDeliveryEnabled") &&
       nativeApiContracts.includes("expired-capability-token") &&
-      nativeApiContracts.includes("assert.equal(expired.storage.has(\"fuel-path:alert-capability:v1\"), false);") &&
+      nativeApiContracts.includes("assert.equal(expired.storage.has(\"fuel-path-alert-capability-v3\"), false);") &&
       routeNotifications.includes("Smart route notifications are ready for this build.") &&
       !backendAlerts.includes("Expo push delivery is disabled by environment gate.") &&
       !backendAlerts.includes("response.json()"),
@@ -1281,7 +1290,8 @@ const checks = [
       backendAlerts.indexOf("routeWatchRemoteDeliveryEnabled(savedRoute)") <
         backendAlerts.indexOf("Smart route watch updated.") &&
       routeAlertsHook.includes("function smartRouteDeliveryReady") &&
-      routeAlertsHook.includes('result.status === "synced" && result.remoteDeliveryEnabled !== false') &&
+      routeAlertsHook.includes('return result.status === "synced" || result.status === "skipped";') &&
+      routeAlertsHook.includes("The gate controls sending, not whether this device and route were registered.") &&
       routeAlertsHook.includes("const backendSynced = smartRouteDeliveryReady(backendSync);") &&
       !routeAlertsHook.includes('backendSync.status === "synced";') &&
       routeNotifications.includes("Smart route notifications are ready for this build.") &&
@@ -1290,6 +1300,9 @@ const checks = [
       routeNotifications.includes("Smart route notifications need an EAS project id in the native build.") &&
       routeNotifications.includes("Smart route notifications need a development or preview build, not Expo Go.") &&
       routeNotifications.includes("getExpoRoutePushToken") &&
+      routeNotifications.includes("let expoPushTokenRequest: Promise<PushTokenResult> | null = null;") &&
+      routeNotifications.includes("expoPushTokenRequest = getExpoRoutePushTokenOnce().finally") &&
+      routeAlertsHook.includes("if (now - lastPushTokenRefreshAt < 30_000) return;") &&
       routeNotifications.includes("expoProjectId()") &&
       routeNotifications.includes("remotePushUnavailableInExpoGo()") &&
       routeNotifications.indexOf("await ensureRouteAlertChannel(Notifications);") <
@@ -1428,12 +1441,17 @@ const checks = [
     ok:
       packageJson.includes('"native:android-alert-sync-smoke": "node scripts/native-android-alert-sync-smoke.mjs"') &&
       androidAlertSyncSmoke.includes("/api/alerts?action=client-capability") &&
+      androidAlertSyncSmoke.includes("`installation_readiness_${timestamp}`") &&
+      androidAlertSyncSmoke.includes("installationId, installationSecret") &&
       androidAlertSyncSmoke.includes("/api/push/register") &&
       androidAlertSyncSmoke.includes("/api/saved-routes") &&
       androidAlertSyncSmoke.includes("fakeExpoPushToken") &&
+      androidAlertSyncSmoke.includes("FUEL_PATH_ALLOW_PRODUCTION_ALERT_SMOKE") &&
       androidAlertSyncSmoke.includes("Temporary saved route watch cleanup succeeds") &&
       androidAlertSyncSmoke.includes("Temporary saved route watch is absent after cleanup") &&
-      androidAlertSyncSmoke.includes("Scoped capability and push token values are intentionally omitted from this report."),
+      androidAlertSyncSmoke.includes("Temporary installation data is deleted atomically") &&
+      androidAlertSyncSmoke.includes("Revoked installation capability cannot read saved routes") &&
+      androidAlertSyncSmoke.includes("Installation secret, scoped capability and push token values are intentionally omitted from this report."),
   },
   {
     label: "Android alert delivery gate distinguishes backend sync from real push delivery",
@@ -1517,6 +1535,9 @@ const checks = [
       nativeEvidenceAudit.includes("Android route-watch backend sync smoke") &&
       nativeEvidenceAudit.includes("latestAndroidNotificationReadiness") &&
       nativeEvidenceAudit.includes("latestAndroidAlertSync") &&
+      nativeEvidenceAudit.includes("latestExcludedProductionAlertSync") &&
+      nativeEvidenceAudit.includes("It does not validate PR #30's account-free Preview contract.") &&
+      nativeEvidenceAudit.includes("Production-targeted alert sync reports do not satisfy the account-free PR #30 Preview lane.") &&
       nativeEvidenceAudit.includes("fuel-path-local-standalone") &&
       nativeEvidenceAudit.includes("Android debug APK") &&
       nativeEvidenceAudit.includes('path.resolve(repoRoot, "native-artifacts")') &&

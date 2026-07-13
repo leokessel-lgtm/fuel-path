@@ -1,4 +1,4 @@
-const { assertProductDatabaseSchema, createProductSqlClient } = require("./_productDatabase");
+const { assertProductDatabaseSchema, createProductSqlClient, productDatabaseUrl } = require("./_productDatabase");
 
 const DEFAULT_MAX_RECORDS = 500;
 const TABLE_NAME = "fuel_path_prediction_backtests";
@@ -357,13 +357,7 @@ function rowToRecord(row) {
 }
 
 function databaseUrl() {
-  return (
-    process.env.DATABASE_URL ||
-    process.env.POSTGRES_URL ||
-    process.env.POSTGRES_PRISMA_URL ||
-    process.env.NEON_DATABASE_URL ||
-    ""
-  );
+  return productDatabaseUrl();
 }
 
 function cutoffIso(now, days) {

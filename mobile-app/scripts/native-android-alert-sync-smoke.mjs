@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { randomBytes } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -15,18 +16,29 @@ const apiBaseUrl = (
   process.env.EXPO_PUBLIC_FUEL_PATH_API_BASE_URL ||
   "https://fuel-path.vercel.app"
 ).replace(/\/+$/, "");
-const userId = `readiness_user_${timestamp}`;
-const deviceId = `readiness_device_${timestamp}`;
+const installationId = `installation_readiness_${timestamp}`;
+const installationSecret = randomBytes(32).toString("base64url");
+const userId = installationId;
+const deviceId = installationId;
 const routeId = `readiness_route_${timestamp}`;
 const checks = [];
-const cleanup = [];
+
+if (
+  new URL(apiBaseUrl).hostname === "fuel-path.vercel.app" &&
+  process.env.FUEL_PATH_ALLOW_PRODUCTION_ALERT_SMOKE !== "1"
+) {
+  console.error(
+    "Refusing to write synthetic alert data to Production. Pass a Preview URL with --api-base-url, or set FUEL_PATH_ALLOW_PRODUCTION_ALERT_SMOKE=1 only for an explicitly authorised Production check.",
+  );
+  process.exit(1);
+}
 
 mkdirSync(smokeDir, { recursive: true });
 
 const capability = await step("Scoped client capability issued", async () => {
   const response = await requestJson("/api/alerts?action=client-capability", {
     method: "POST",
-    body: { userId, deviceId },
+    body: { installationId, installationSecret },
   });
   assertStatus(response, 202);
   if (response.payload?.accepted !== true || !response.payload?.token) {
@@ -67,13 +79,13 @@ await step("Saved route watch save contract accepts Android payload", async () =
   if (response.payload?.accepted !== true || response.payload?.route?.id !== routeId) {
     throw new Error(response.payload?.error || "route not accepted");
   }
-  cleanup.push("delete-route");
   return { detail: `saved ${response.payload.route.fuel} route watch` };
 }, { fail: true, skip: !token });
 
 await step("Saved route watch can be listed back for this Android identity", async () => {
   const response = await requestJson(`/api/saved-routes?userId=${encodeURIComponent(userId)}&limit=5`, {
     method: "GET",
+    token,
   });
   assertStatus(response, 200);
   const route = Array.isArray(response.payload?.routes)
@@ -90,13 +102,13 @@ await step("Temporary saved route watch cleanup succeeds", async () => {
   });
   assertStatus(response, 202);
   if (response.payload?.deleted !== true) throw new Error("delete did not remove the temporary route");
-  cleanup.splice(0, cleanup.length);
   return { detail: "deleted temporary route" };
 }, { fail: true, skip: !token });
 
 await step("Temporary saved route watch is absent after cleanup", async () => {
   const response = await requestJson(`/api/saved-routes?userId=${encodeURIComponent(userId)}&limit=5`, {
     method: "GET",
+    token,
   });
   assertStatus(response, 200);
   const route = Array.isArray(response.payload?.routes)
@@ -106,6 +118,33 @@ await step("Temporary saved route watch is absent after cleanup", async () => {
   return { detail: "cleanup verified" };
 }, { fail: true });
 
+await step("Temporary installation data is deleted atomically", async () => {
+  const response = await requestJson("/api/alerts?action=delete-installation-data", {
+    method: "POST",
+    token,
+    body: {},
+  });
+  assertStatus(response, 202);
+  if (response.payload?.accepted !== true || response.payload?.revoked !== true) {
+    throw new Error(response.payload?.error || "installation capability was not revoked");
+  }
+  if (Number(response.payload?.deletedDeviceCount) < 1) {
+    throw new Error("temporary push device was not deleted");
+  }
+  return {
+    detail: `deleted ${response.payload.deletedDeviceCount} device(s), revoked capability`,
+  };
+}, { fail: true, skip: !token });
+
+await step("Revoked installation capability cannot read saved routes", async () => {
+  const response = await requestJson("/api/saved-routes?limit=5", {
+    method: "GET",
+    token,
+  });
+  assertStatus(response, 401);
+  return { detail: "revocation verified" };
+}, { fail: true, skip: !token });
+
 const status = checks.some((item) => item.status === "fail")
   ? "failed"
   : checks.some((item) => item.status === "warn")
@@ -114,9 +153,6 @@ const status = checks.some((item) => item.status === "fail")
 
 writeReport(status);
 console.log(`Android alert sync smoke ${status}: ${reportPath}`);
-if (cleanup.length) {
-  console.error(`Cleanup warning: temporary route may remain for user ${userId}, route ${routeId}`);
-}
 if (status === "failed") process.exit(1);
 
 async function step(name, fn, { fail = false, skip = false } = {}) {
@@ -198,7 +234,7 @@ function writeReport(status) {
     "",
     `Status: ${status}`,
     `API base URL: ${apiBaseUrl}`,
-    `Temporary user: ${userId}`,
+    `Temporary installation: ${installationId}`,
     `Temporary route: ${routeId}`,
     "",
     "| Check | Status | Detail |",
@@ -207,12 +243,28 @@ function writeReport(status) {
     "",
     "## Interpretation",
     "",
-    "- This proves the Android route-watch backend contract can issue a scoped capability, accept a push-device registration shape, save a route watch, list it, and delete the temporary route.",
+    ...reportInterpretation(status),
     "- It does not send a real push notification or prove Expo delivery to a physical device.",
-    "- Scoped capability and push token values are intentionally omitted from this report.",
+    "- Installation secret, scoped capability and push token values are intentionally omitted from this report.",
     "",
   ];
   writeFileSync(reportPath, `${lines.join("\n")}\n`);
+}
+
+function reportInterpretation(status) {
+  if (status === "passed") {
+    return [
+      "- This proves the account-free Android route-watch backend contract can issue an installation-scoped capability, accept a push-device registration shape, save and list a route watch, delete the temporary route, atomically delete the installation's alert data, and revoke the capability.",
+    ];
+  }
+  if (status === "partial") {
+    return [
+      "- This is partial evidence only. Read each failed or warned check before claiming any route-watch lifecycle coverage.",
+    ];
+  }
+  return [
+    "- This run provides no successful route-watch lifecycle proof. No claim about capability, route, device, evaluation or deletion behaviour may be made from it.",
+  ];
 }
 
 function argumentValue(name) {

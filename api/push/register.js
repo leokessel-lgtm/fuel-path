@@ -1,5 +1,6 @@
 const {
   alertsStatus,
+  alertsAdminWriteAuthorised,
   alertsWriteAuthorised,
   alertsWriteSecurity,
   methodAllowed,
@@ -23,7 +24,15 @@ module.exports = async function handler(req, res) {
       return;
     }
 
-    sendJson(res, 202, await registerPushDevice(req.body || {}));
+    const subject = await alertsWriteAuthorised.subjectFor?.(req);
+    if (!subject && !alertsAdminWriteAuthorised(req)) {
+      sendJson(res, 401, { error: "Notifications require an installation capability." });
+      return;
+    }
+    const input = subject
+      ? { ...(req.body || {}), userId: subject.installationId, deviceId: subject.installationId }
+      : (req.body || {});
+    sendJson(res, 202, await registerPushDevice(input));
   } catch (error) {
     sendJson(res, 400, {
       error: publicErrorMessage(error, "alerts"),

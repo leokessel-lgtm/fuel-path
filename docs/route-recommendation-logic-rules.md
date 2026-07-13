@@ -64,6 +64,8 @@ Expanded Plan evidence may show:
 - follow-up prompt after the recommendation evidence:
   - do not repeat `Save this commute` while the top expanded `Save` action is already visible
   - `Watch this route` only after the route is saved
+  - the save prompt must state that saved routes stay on this device and will
+    not automatically move to a new phone or return after deleting the app
 
 Expanded Plan evidence should scroll inside the sheet. Keep the grabber, map button, compact recommendation card and `Less` / `Save` actions fixed while eligibility, `Why this stop`, source details, route options and follow-up content scroll underneath. Source/update/provider details should be hidden behind an explicit source-details control by default so the expanded state stays decision-focused rather than report-like.
 

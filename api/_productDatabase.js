@@ -8,6 +8,7 @@ const REQUIRED_TABLES = [
 ];
 
 let schemaChecks = new WeakMap();
+let alertInstallationSchemaChecks = new WeakMap();
 
 function createProductSqlClient(connectionString) {
   if (usesDirectPostgres(connectionString)) {
@@ -34,6 +35,17 @@ function usesDirectPostgres(connectionString) {
   } catch {
     return false;
   }
+}
+
+function productDatabaseUrl() {
+  return (
+    process.env.FUEL_PATH_PRODUCT_DATABASE_URL ||
+    process.env.DATABASE_URL ||
+    process.env.POSTGRES_URL ||
+    process.env.POSTGRES_PRISMA_URL ||
+    process.env.NEON_DATABASE_URL ||
+    ""
+  );
 }
 
 async function assertProductDatabaseSchema(sql) {
@@ -73,13 +85,46 @@ async function assertProductDatabaseSchema(sql) {
   }
 }
 
+async function assertAlertInstallationSchema(sql) {
+  const existing = alertInstallationSchemaChecks.get(sql);
+  if (existing) return existing;
+  const check = assertRequiredTables(sql, [
+    "fuel_path_alert_installations",
+    "fuel_path_alert_rate_limits",
+  ]);
+  alertInstallationSchemaChecks.set(sql, check);
+  try {
+    return await check;
+  } catch (error) {
+    alertInstallationSchemaChecks.delete(sql);
+    throw error;
+  }
+}
+
+async function assertRequiredTables(sql, tables) {
+  const missing = await sql`
+    SELECT table_name
+    FROM unnest(${tables}::text[]) AS required(table_name)
+    WHERE to_regclass('public.' || table_name) IS NULL
+    ORDER BY table_name
+  `;
+  if (!missing.length) return;
+  const names = missing.map((row) => row.table_name).join(", ");
+  throw new Error(
+    `Product database migrations have not been applied. Missing tables: ${names}. Run npm run db:migrate before starting this environment.`
+  );
+}
+
 function resetProductDatabaseSchemaForTests() {
   schemaChecks = new WeakMap();
+  alertInstallationSchemaChecks = new WeakMap();
 }
 
 module.exports = {
   REQUIRED_TABLES,
+  assertAlertInstallationSchema,
   assertProductDatabaseSchema,
   createProductSqlClient,
+  productDatabaseUrl,
   resetProductDatabaseSchemaForTests,
 };

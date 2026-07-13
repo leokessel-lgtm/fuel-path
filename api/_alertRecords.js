@@ -116,7 +116,109 @@ function stableId(value) {
   return hash.toString(36);
 }
 
+function rowToDevice(row) {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    deviceId: row.device_id,
+    platform: row.platform,
+    expoPushToken: row.expo_push_token,
+    appVersion: row.app_version || "",
+    status: row.status,
+    lastSeenAt: isoDateTime(row.last_seen_at),
+    invalidatedAt: row.invalidated_at ? isoDateTime(row.invalidated_at) : undefined,
+  };
+}
+
+function rowToRoute(row) {
+  const raw = rawObject(row.raw);
+  return {
+    id: row.id,
+    userId: row.user_id,
+    name: row.name,
+    from: { lat: Number(row.from_lat), lon: Number(row.from_lon), label: row.from_label },
+    to: { lat: Number(row.to_lat), lon: Number(row.to_lon), label: row.to_label },
+    fuel: row.fuel,
+    vehicleId: raw.vehicleId || "",
+    vehicleEnergyType: raw.vehicleEnergyType || "",
+    alertEnabled: Boolean(row.alert_enabled),
+    alertTimeLocal: row.alert_time_local,
+    alertDays: Array.isArray(raw.alertDays) ? raw.alertDays : [],
+    timezone: row.timezone,
+    minSavingDollars: Number(row.min_saving_dollars),
+    maxDetourMinutes: Number(row.max_detour_minutes),
+    eligibleDiscounts: Array.isArray(raw.eligibleDiscounts) ? raw.eligibleDiscounts : [],
+    tankLitres: optionalNumber(raw.tankLitres),
+    tankPercent: optionalNumber(raw.tankPercent),
+    economy: optionalNumber(raw.economy),
+    reserveKm: optionalNumber(raw.reserveKm),
+    evBatteryKwh: optionalNumber(raw.evBatteryKwh),
+    evRangeKm: optionalNumber(raw.evRangeKm),
+    evConnectors: Array.isArray(raw.evConnectors) ? raw.evConnectors : [],
+    pausedUntil: row.paused_until ? isoDateTime(row.paused_until) : undefined,
+    lastAlertSentAt: row.last_alert_sent_at ? isoDateTime(row.last_alert_sent_at) : undefined,
+    createdAt: isoDateTime(row.created_at),
+    updatedAt: isoDateTime(row.updated_at),
+  };
+}
+
+function rowToEvaluation(row) {
+  const raw = rawObject(row.raw);
+  return {
+    id: row.id,
+    routeId: row.saved_route_id,
+    userId: row.user_id,
+    status: row.status,
+    reason: row.reason,
+    outcome: raw.outcome,
+    outcomeLabel: raw.outcomeLabel,
+    outcomeSummary: raw.outcomeSummary,
+    stationCode: row.station_code || undefined,
+    stationName: row.station_name || undefined,
+    alertBasis: raw.alertBasis || undefined,
+    cycleSignalMode: raw.cycleSignalMode || undefined,
+    cycleReadinessStatus: raw.cycleReadinessStatus || undefined,
+    cycleAlertsEnabled: raw.cycleAlertsEnabled === true,
+    estimatedSavingDollars: optionalNumber(row.estimated_saving_dollars),
+    detourMinutes: optionalNumber(row.detour_minutes),
+    freshnessMinutes: optionalNumber(row.freshness_minutes),
+    messageTitle: row.message_title || undefined,
+    messageBody: row.message_body || undefined,
+    evaluatedAt: isoDateTime(row.evaluated_at),
+    pushDeliveryEnabled: Boolean(row.push_delivery_enabled),
+    pushTicketId: row.push_ticket_id || undefined,
+    pushReceiptStatus: row.push_receipt_status || undefined,
+  };
+}
+
+function rawObject(value) {
+  if (!value) return {};
+  if (typeof value === "object") return value;
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function optionalNumber(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function isoDateTime(value) {
+  if (!value) return new Date().toISOString();
+  if (value instanceof Date) return value.toISOString();
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? String(value) : parsed.toISOString();
+}
+
 module.exports = {
+  isoDateTime,
   normaliseBackendSavedRoute,
   normalisePushDevice,
+  rowToDevice,
+  rowToEvaluation,
+  rowToRoute,
 };

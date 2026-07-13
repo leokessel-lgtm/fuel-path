@@ -49,6 +49,12 @@
           "defaultChannel": "route-alerts",
           "enableBackgroundRemoteNotifications": false
         }
+      ],
+      [
+        "expo-secure-store",
+        {
+          "configureAndroidBackup": true
+        }
       ]
     ],
     "extra": {

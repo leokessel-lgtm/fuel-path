@@ -179,6 +179,61 @@ test("provider terms readiness rejects vague evidence fields even when booleans 
   );
 });
 
+test("provider terms readiness does not treat a release-owner confirmation as provider terms evidence", async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-provider-owner-attestation-"));
+  const evidence = providerTermsEvidence();
+  const evidenceDir = path.join(tmp, "evidence");
+  fs.mkdirSync(evidenceDir, { recursive: true });
+  for (const [region, entry] of Object.entries(evidence.regions)) {
+    const sourceName = `${region.toLowerCase()}-terms-source.md`;
+    entry.evidenceSource = `evidence/${sourceName}`;
+    fs.writeFileSync(
+      path.join(evidenceDir, sourceName),
+      [
+        "Source type: release-owner confirmation from Leo.",
+        `${providerFamilyText(region)} terms source for ${entry.evidenceReference}.`,
+        `Terms accepted at ${entry.termsAcceptedAt}.`,
+      ].join("\n"),
+    );
+  }
+  const evidencePath = path.join(tmp, "provider-terms-evidence.json");
+  fs.writeFileSync(evidencePath, `${JSON.stringify(evidence, null, 2)}\n`);
+
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "scripts/check-provider-terms-readiness.mjs",
+        "--production",
+        "--enforce-public-launch",
+        "--evidence-json",
+        evidencePath,
+      ],
+      {
+        cwd: ROOT,
+        env: {
+          ...process.env,
+          VIC_SERVO_SAVER_API_KEY: "",
+          NSW_FUEL_API_KEY: "test-nsw-key",
+          NSW_FUEL_API_SECRET: "test-nsw-secret",
+          QLD_FUEL_API_TOKEN: "test-qld-token",
+          FUEL_PATH_NSW_ACT_USAGE_TERMS_CONFIRMED: "1",
+          FUEL_PATH_QLD_USAGE_TERMS_CONFIRMED: "1",
+          FUEL_PATH_TAS_USAGE_TERMS_CONFIRMED: "1",
+          FUEL_PATH_FUELCHECK_USAGE_TERMS_CONFIRMED: "",
+        },
+        timeout: 10_000,
+      },
+    ),
+    (error) => {
+      const payload = JSON.parse(error.stdout);
+      assert.equal(payload.publicLivePriceClaimsAllowed, false);
+      assert.equal(payload.blockers.includes("nsw_terms_evidence_missing"), true);
+      return true;
+    },
+  );
+});
+
 test("provider terms readiness rejects generic attribution wording", async () => {
   const evidencePath = writeEvidenceFile({
     NSW: {

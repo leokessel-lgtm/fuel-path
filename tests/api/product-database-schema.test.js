@@ -1,10 +1,14 @@
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
 const test = require("node:test");
 
 const {
   REQUIRED_TABLES,
+  assertAlertInstallationSchema,
   assertProductDatabaseSchema,
   createProductSqlClient,
+  productDatabaseUrl,
   resetProductDatabaseSchemaForTests,
 } = require("../../api/_productDatabase");
 
@@ -21,6 +25,15 @@ test("product database schema check accepts a fully migrated database", async ()
   await assertProductDatabaseSchema(sqlWithRows([], queries));
   assert.equal(queries.length, 1);
   for (const table of REQUIRED_TABLES) assert.match(queries[0], new RegExp(table));
+  assert.doesNotMatch(queries[0], /fuel_path_alert_installations/);
+});
+
+test("anonymous alert tables are checked only by the opt-in alert boundary", async () => {
+  resetProductDatabaseSchemaForTests();
+  const queries = [];
+  await assertAlertInstallationSchema(sqlWithRows([], queries));
+  assert.equal(queries.length, 1);
+  assert.match(queries[0], /unnest\(\?::text\[\]\)/);
 });
 
 test("product database schema check names missing tables and migration command", async () => {
@@ -34,4 +47,32 @@ test("product database schema check names missing tables and migration command",
 test("local product database URLs use the direct Postgres client", () => {
   const local = createProductSqlClient("postgres://fuel_path:fuel_path@127.0.0.1:54329/fuel_path");
   assert.equal(typeof local, "function");
+});
+
+test("Preview product database override wins over generic database variables", () => {
+  const previous = {
+    override: process.env.FUEL_PATH_PRODUCT_DATABASE_URL,
+    database: process.env.DATABASE_URL,
+  };
+  process.env.FUEL_PATH_PRODUCT_DATABASE_URL = "postgres://preview.example.test/fuel_path";
+  process.env.DATABASE_URL = "postgres://production.example.test/fuel_path";
+  try {
+    assert.equal(productDatabaseUrl(), "postgres://preview.example.test/fuel_path");
+  } finally {
+    if (previous.override === undefined) delete process.env.FUEL_PATH_PRODUCT_DATABASE_URL;
+    else process.env.FUEL_PATH_PRODUCT_DATABASE_URL = previous.override;
+    if (previous.database === undefined) delete process.env.DATABASE_URL;
+    else process.env.DATABASE_URL = previous.database;
+  }
+});
+
+test("anonymous alert migration scopes route keys and capability issuance", () => {
+  const source = fs.readFileSync(
+    path.join(__dirname, "../../db/migrations/1763035200000_anonymous_alert_installations.js"),
+    "utf8",
+  );
+  assert.match(source, /capability_version INTEGER NOT NULL DEFAULT 1/);
+  assert.match(source, /fuel_path_alert_rate_limits/);
+  assert.match(source, /DELETE FROM fuel_path_saved_routes[\s\S]*LEFT\(user_id, 6\) = 'local_'/);
+  assert.match(source, /PRIMARY KEY \(user_id, id\)/);
 });

@@ -4,10 +4,11 @@ import { Platform } from "react-native";
 import { API_BASE_URL, EAS_PROJECT_ID } from "../config";
 import { AppPreferences, SavedCommute, VehicleProfile } from "../types";
 import { eligibleDiscountIds } from "../utils/discountRedemptions";
+import { randomSecret, randomUuid, secureDelete, secureGet, secureSet } from "./alertDeviceSecurity";
 
 type AlertIdentity = {
-  deviceId: string;
-  userId: string;
+  installationId: string;
+  installationSecret: string;
 };
 
 type AlertCapability = {
@@ -16,15 +17,26 @@ type AlertCapability = {
 };
 
 type SyncResult = {
+  code?: string;
   message: string;
   remoteDeliveryEnabled?: boolean;
   status: "synced" | "skipped" | "failed";
   syncedAt?: string;
 };
 
-const ALERT_IDENTITY_KEY = "fuel-path:alert-identity:v1";
-const ALERT_CAPABILITY_KEY = "fuel-path:alert-capability:v1";
-const ALERT_CAPABILITY_REFRESH_BUFFER_MS = 60 * 60 * 1000;
+// Expo SecureStore keys on Android may contain only letters, digits, '.', '-' and '_'.
+const ALERT_IDENTITY_KEY = "fuel-path-alert-installation-v3";
+const ALERT_CAPABILITY_KEY = `fuel-path-alert-capability-v3-${API_BASE_URL.replace(/[^A-Za-z0-9._-]/g, "_")}`;
+const ALERT_BACKEND_ENROLLED_KEY = "fuel-path-alert-backend-enrolled-v2";
+const ALERT_INSTALL_MARKER_KEY = "fuel-path:install-marker:v1";
+const ALERT_LEGACY_IDENTITY_KEY = "fuel-path:alert-identity:v1";
+const ALERT_LEGACY_CAPABILITY_KEY = "fuel-path:alert-capability:v1";
+const ALERT_CAPABILITY_REFRESH_BUFFER_MS = 60 * 1000;
+let alertIdentityPromise: Promise<AlertIdentity> | null = null;
+
+export async function initialiseAnonymousInstallation() {
+  await getAlertIdentity();
+}
 
 export async function syncSavedRouteAlert({
   commute,
@@ -40,34 +52,38 @@ export async function syncSavedRouteAlert({
   try {
     const identity = await getAlertIdentity();
     const capability = await getAlertCapability(identity);
-    if (!capability) {
+    if (!enabled) {
+      const savedRoute = await postAlertJson("/api/saved-routes", capability.token, backendSavedRoutePayload({
+        commute,
+        enabled: false,
+        preferences,
+      }));
       return {
-        status: "skipped",
-        message: "Smart route checks need backend capability issuing.",
+        status: "synced",
+        remoteDeliveryEnabled: routeWatchRemoteDeliveryEnabled(savedRoute),
+        message: "Route watch turned off.",
+        syncedAt: new Date().toISOString(),
       };
     }
-    if (enabled && expoPushToken) {
-      await postAlertJson("/api/push/register", capability.token, {
-        userId: identity.userId,
-        deviceId: identity.deviceId,
-        platform: Platform.OS,
-        expoPushToken,
-        appVersion: "1.0.0",
-      });
+    if (!enabled || !expoPushToken) {
+      return { status: "failed", code: "push_token_required", message: "This device push token is unavailable. Try again after reopening notifications." };
     }
-
-    const savedRoute = await postAlertJson("/api/saved-routes", capability.token, backendSavedRoutePayload({
-      commute,
-      enabled,
-      identity,
-      preferences,
-    }));
+    const savedRoute = await postAlertJson("/api/alerts?action=enrol-watch", capability.token, {
+      ...backendSavedRoutePayload({ commute, enabled, preferences }),
+      platform: Platform.OS,
+      expoPushToken,
+      appVersion: "1.0.0",
+    });
+    // This is only a local optimisation marker. A surviving secure identity is
+    // still deletable through Privacy if the marker disappears after reinstall.
+    await secureSet(ALERT_BACKEND_ENROLLED_KEY, "1");
     const remoteDeliveryEnabled = routeWatchRemoteDeliveryEnabled(savedRoute);
     if (enabled && remoteDeliveryEnabled === false) {
       return {
         status: "skipped",
         remoteDeliveryEnabled,
         message: "Smart route watch was saved, but push delivery is not enabled for this build yet.",
+        syncedAt: new Date().toISOString(),
       };
     }
 
@@ -79,11 +95,41 @@ export async function syncSavedRouteAlert({
         : "Route watch turned off.",
       syncedAt: new Date().toISOString(),
     };
-  } catch {
+  } catch (error) {
     return {
+      code: error instanceof RouteWatchError ? error.code : "backend_unavailable",
       status: "failed",
-      message: "Smart route watch could not update. Reminder state was kept.",
+      message: error instanceof RouteWatchError
+        ? error.message
+        : "Smart route watch could not update. Your saved route remains on this device.",
     };
+  }
+}
+
+export async function deleteMyAlertData(): Promise<SyncResult> {
+  try {
+    const identity = await loadStoredAlertIdentity();
+    if (!identity) {
+      await clearAlertIdentity();
+      return {
+        status: "synced",
+        message: "No local alert identity was stored. Your saved routes remain on this device with alerts off.",
+        syncedAt: new Date().toISOString(),
+      };
+    }
+    const capability = await getAlertCapability(identity);
+    if (!capability) {
+      return { status: "failed", message: "Alert data could not be deleted while the backend is unavailable." };
+    }
+    await postAlertJson("/api/alerts?action=delete-installation-data", capability.token, {});
+    await clearAlertIdentity();
+    return {
+      status: "synced",
+      message: "Alert data deleted. Your saved routes remain on this device with alerts off.",
+      syncedAt: new Date().toISOString(),
+    };
+  } catch {
+    return { status: "failed", message: "Alert data could not be deleted. Nothing was cleared locally, so you can retry." };
   }
 }
 
@@ -97,13 +143,12 @@ export async function deleteBackendSavedRoute({
     const capability = await getAlertCapability(identity);
     if (!capability) {
       return {
-        status: "skipped",
-        message: "Smart route checks need backend capability issuing.",
+        status: "failed",
+        message: "Route watch could not be deleted while the backend is unavailable.",
       };
     }
     await deleteAlertJson("/api/saved-routes", capability.token, {
       routeId: commute.id,
-      userId: identity.userId,
     });
     return {
       status: "synced",
@@ -119,24 +164,62 @@ export async function deleteBackendSavedRoute({
 }
 
 async function getAlertIdentity(): Promise<AlertIdentity> {
+  if (!alertIdentityPromise) alertIdentityPromise = loadAlertIdentity();
+  return alertIdentityPromise;
+}
+
+async function loadStoredAlertIdentity(): Promise<AlertIdentity | null> {
+  const raw = await secureGet(ALERT_IDENTITY_KEY);
+  if (!raw) return null;
+  const parsed = JSON.parse(raw) as Partial<AlertIdentity>;
+  if (!parsed.installationId || !parsed.installationSecret) return null;
+  return { installationId: parsed.installationId, installationSecret: parsed.installationSecret };
+}
+
+async function loadAlertIdentity(): Promise<AlertIdentity> {
   try {
-    const raw = await AsyncStorage.getItem(ALERT_IDENTITY_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw) as Partial<AlertIdentity>;
-      if (parsed.userId && parsed.deviceId) {
-        return { userId: parsed.userId, deviceId: parsed.deviceId };
+    const marker = await AsyncStorage.getItem(ALERT_INSTALL_MARKER_KEY);
+    const storedIdentity = await loadStoredAlertIdentity();
+    if (storedIdentity) {
+      if (!marker && Platform.OS !== "web") {
+        // Secure storage can survive a native reinstall while AsyncStorage does not.
+        // This continues the same opaque alert installation only; routine saved
+        // routes remain local and are not recovered. Privacy deletes it explicitly.
+        await AsyncStorage.setItem(ALERT_INSTALL_MARKER_KEY, await randomUuid());
       }
+      return storedIdentity;
     }
   } catch {
-    // Fall through to creating a new local identity.
+    alertIdentityPromise = null;
+    throw new RouteWatchError(
+      "installation_identity_unavailable",
+      "This device could not create its private route-watch identity. Reinstall Fuel Path before trying again.",
+    );
   }
 
   const identity = {
-    userId: `local_${randomId()}`,
-    deviceId: `device_${randomId()}`,
+    installationId: `installation_${await randomUuid()}`,
+    installationSecret: await randomSecret(),
   };
-  await AsyncStorage.setItem(ALERT_IDENTITY_KEY, JSON.stringify(identity));
+  await secureSet(ALERT_IDENTITY_KEY, JSON.stringify(identity));
+  await Promise.all([
+    AsyncStorage.removeItem(ALERT_LEGACY_IDENTITY_KEY),
+    AsyncStorage.removeItem(ALERT_LEGACY_CAPABILITY_KEY),
+  ]);
+  await AsyncStorage.setItem(ALERT_INSTALL_MARKER_KEY, await randomUuid());
   return identity;
+}
+
+async function clearAlertIdentity(resetPromise = true) {
+  await Promise.all([
+    secureDelete(ALERT_IDENTITY_KEY),
+    secureDelete(ALERT_CAPABILITY_KEY),
+    secureDelete(ALERT_BACKEND_ENROLLED_KEY),
+    AsyncStorage.removeItem(ALERT_INSTALL_MARKER_KEY),
+    AsyncStorage.removeItem(ALERT_LEGACY_IDENTITY_KEY),
+    AsyncStorage.removeItem(ALERT_LEGACY_CAPABILITY_KEY),
+  ]);
+  if (resetPromise) alertIdentityPromise = null;
 }
 
 function backendAlertsConfigured() {
@@ -150,19 +233,16 @@ export function configuredEasProjectId() {
 function backendSavedRoutePayload({
   commute,
   enabled,
-  identity,
   preferences,
 }: {
   commute: SavedCommute;
   enabled: boolean;
-  identity: AlertIdentity;
   preferences: AppPreferences;
 }) {
   const vehicle = routeVehicle(commute, preferences);
   const routeFuel = vehicle.vehicleEnergyType === "electric" ? commute.fuel : vehicle.fuel;
   return {
     id: commute.id,
-    userId: identity.userId,
     name: commute.name,
     from: commute.from,
     to: commute.to,
@@ -213,13 +293,13 @@ function estimatedEconomy(vehicle: VehicleProfile) {
   return 8.2;
 }
 
-async function getAlertCapability(identity: AlertIdentity): Promise<AlertCapability | null> {
+async function getAlertCapability(identity: AlertIdentity): Promise<AlertCapability> {
   try {
-    const raw = await AsyncStorage.getItem(ALERT_CAPABILITY_KEY);
+    const raw = await secureGet(ALERT_CAPABILITY_KEY);
     if (raw) {
       const capability = normaliseAlertCapability(JSON.parse(raw));
       if (capability) return capability;
-      await AsyncStorage.removeItem(ALERT_CAPABILITY_KEY);
+      await secureDelete(ALERT_CAPABILITY_KEY);
     }
   } catch {
     // Fall through to requesting a fresh scoped capability.
@@ -236,11 +316,20 @@ async function getAlertCapability(identity: AlertIdentity): Promise<AlertCapabil
     });
     const payload = await readAlertJson(response);
     const capability = normaliseAlertCapability(payload);
-    if (!response.ok || !capability) return null;
-    await AsyncStorage.setItem(ALERT_CAPABILITY_KEY, JSON.stringify(capability));
+    if (!response.ok || !capability) {
+      throw new RouteWatchError(
+        response.status === 429 ? "capability_rate_limited" : "capability_unavailable",
+        safeAlertError(payload) || "Smart route checks are temporarily unavailable.",
+      );
+    }
+    await secureSet(ALERT_CAPABILITY_KEY, JSON.stringify(capability));
     return capability;
-  } catch {
-    return null;
+  } catch (error) {
+    if (error instanceof RouteWatchError) throw error;
+    throw new RouteWatchError(
+      "capability_unavailable",
+      "Smart route checks are temporarily unavailable. Please try again shortly.",
+    );
   }
 }
 
@@ -270,9 +359,23 @@ async function postAlertJson(path: string, token: string, body: unknown) {
   });
   const payload = await readAlertJson(response);
   if (!response.ok) {
-    throw new Error("Route watch could not update. Your saved route is still on this device, so you can try again.");
+    throw new RouteWatchError(
+      response.status === 401 ? "capability_rejected" : response.status === 429 ? "rate_limited" : "backend_rejected",
+      safeAlertError(payload) || "Smart route watch could not update. Your saved route remains on this device.",
+    );
   }
   return payload;
+}
+
+class RouteWatchError extends Error {
+  constructor(readonly code: string, message: string) {
+    super(message);
+  }
+}
+
+function safeAlertError(payload: unknown) {
+  const value = payload && typeof payload === "object" ? (payload as { error?: unknown }).error : "";
+  return typeof value === "string" ? value.slice(0, 180) : "";
 }
 
 function routeWatchRemoteDeliveryEnabled(payload: unknown) {
@@ -306,10 +409,4 @@ async function readAlertJson(response: Response): Promise<Record<string, unknown
   } catch {
     return null;
   }
-}
-
-function randomId() {
-  const cryptoObject = globalThis.crypto;
-  if (cryptoObject?.randomUUID) return cryptoObject.randomUUID();
-  return `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 12)}`;
 }

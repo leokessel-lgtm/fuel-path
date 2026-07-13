@@ -13,6 +13,7 @@
     "checkPushReceipts",
     "cronAuthorised",
     "deleteBackendSavedRoute",
+    "enrolBackendRouteWatch",
     "distanceKm",
     "evaluateSavedRouteAlert",
     "fuelProviderCapabilityMatrix",

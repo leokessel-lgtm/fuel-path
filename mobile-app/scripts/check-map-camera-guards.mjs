@@ -991,7 +991,7 @@ const checks = [
   {
     label: "backend alert identity stays secure, anonymous and non-contact",
     ok:
-      backendAlerts.includes('const ALERT_IDENTITY_KEY = "fuel-path:alert-installation:v2";') &&
+      backendAlerts.includes('const ALERT_IDENTITY_KEY = "fuel-path-alert-installation-v3";') &&
       backendAlerts.includes("installationId: `installation_${await randomUuid()}`") &&
       backendAlerts.includes("installationSecret: await randomSecret()") &&
       alertDeviceSecurity.includes("Crypto.getRandomBytesAsync(32)") &&
@@ -1022,7 +1022,7 @@ const checks = [
       backendAlerts.includes("Smart route watch was saved, but push delivery is not enabled for this build yet.") &&
       backendAlerts.includes("pushDeliveryEnabled") &&
       nativeApiContracts.includes("expired-capability-token") &&
-      nativeApiContracts.includes("assert.equal(expired.storage.has(\"fuel-path:alert-capability:v2\"), false);") &&
+      nativeApiContracts.includes("assert.equal(expired.storage.has(\"fuel-path-alert-capability-v3\"), false);") &&
       routeNotifications.includes("Smart route notifications are ready for this build.") &&
       !backendAlerts.includes("Expo push delivery is disabled by environment gate.") &&
       !backendAlerts.includes("response.json()"),

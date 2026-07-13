@@ -281,15 +281,15 @@ async function checkSavedRouteAlertContract() {
   assert.equal(body.tankPercent, 40);
   assert.equal(body.economy, 7.4);
   assert.equal(body.reserveKm, 35);
-  const capabilityKey = "fuel-path:alert-capability:v2:https%3A%2F%2Ffuel-path.test";
+  const capabilityKey = "fuel-path-alert-capability-v3-https___fuel-path.test";
   assert.equal(JSON.parse(storage.get(capabilityKey)).token, "capability-token");
-  assert.equal(storage.get("fuel-path:alert-backend-enrolled:v1"), "1");
+  assert.equal(storage.get("fuel-path-alert-backend-enrolled-v2"), "1");
   const deleted = await deleteMyAlertData();
   assert.equal(deleted.status, "synced");
   assert.equal(alertFetchCalls[2].url, "https://fuel-path.test/api/alerts?action=delete-installation-data");
-  assert.equal(storage.has("fuel-path:alert-installation:v2"), false);
+  assert.equal(storage.has("fuel-path-alert-installation-v3"), false);
   assert.equal(storage.has(capabilityKey), false);
-  assert.equal(storage.has("fuel-path:alert-backend-enrolled:v1"), false);
+  assert.equal(storage.has("fuel-path-alert-backend-enrolled-v2"), false);
   assert.equal(storage.has("fuel-path:install-marker:v1"), false);
 
   const expired = loadBackendAlertContractModule({
@@ -306,8 +306,8 @@ async function checkSavedRouteAlertContract() {
   assert.equal(expiredResult.message, "Smart route checks are temporarily unavailable.");
   assert.equal(expired.alertFetchCalls.length, 1);
   assert.equal(expired.alertFetchCalls[0].url, "https://fuel-path.test/api/alerts?action=client-capability");
-  assert.equal(expired.storage.has("fuel-path:alert-capability:v2"), false);
-  assert.equal(expired.storage.has("fuel-path:alert-backend-enrolled:v1"), false);
+  assert.equal(expired.storage.has("fuel-path-alert-capability-v3"), false);
+  assert.equal(expired.storage.has("fuel-path-alert-backend-enrolled-v2"), false);
 
   const expiredDisable = await expired.syncSavedRouteAlert({
     commute,
@@ -320,11 +320,11 @@ async function checkSavedRouteAlertContract() {
   const reinstalled = loadBackendAlertContractModule({
     capabilityBody: { token: "retirement-token", expiresAt: "2099-01-01T00:00:00.000Z" },
     initialStorage: {
-      "fuel-path:alert-installation:v2": JSON.stringify({
+      "fuel-path-alert-installation-v3": JSON.stringify({
         installationId: `installation_${"a".repeat(32)}`,
         installationSecret: `secret_${"b".repeat(48)}`,
       }),
-      "fuel-path:alert-backend-enrolled:v1": "1",
+      "fuel-path-alert-backend-enrolled-v2": "1",
     },
   });
   await Promise.all([
@@ -333,7 +333,7 @@ async function checkSavedRouteAlertContract() {
   ]);
   assert.equal(reinstalled.alertFetchCalls[0].url, "https://fuel-path.test/api/alerts?action=client-capability");
   assert.equal(reinstalled.alertFetchCalls[1].url, "https://fuel-path.test/api/alerts?action=delete-installation-data");
-  assert.equal(JSON.parse(reinstalled.storage.get("fuel-path:alert-installation:v2")).installationId, "installation_uuid-contract");
+  assert.equal(JSON.parse(reinstalled.storage.get("fuel-path-alert-installation-v3")).installationId, "installation_uuid-contract");
   assert.equal(reinstalled.storage.get("fuel-path:install-marker:v1"), "uuid-contract");
 
   const neverEnrolled = loadBackendAlertContractModule({ capabilityBody: null });

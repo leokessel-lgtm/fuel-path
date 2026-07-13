@@ -24,9 +24,10 @@ type SyncResult = {
   syncedAt?: string;
 };
 
-const ALERT_IDENTITY_KEY = "fuel-path:alert-installation:v2";
-const ALERT_CAPABILITY_KEY = `fuel-path:alert-capability:v2:${encodeURIComponent(API_BASE_URL)}`;
-const ALERT_BACKEND_ENROLLED_KEY = "fuel-path:alert-backend-enrolled:v1";
+// Expo SecureStore keys on Android may contain only letters, digits, '.', '-' and '_'.
+const ALERT_IDENTITY_KEY = "fuel-path-alert-installation-v3";
+const ALERT_CAPABILITY_KEY = `fuel-path-alert-capability-v3-${API_BASE_URL.replace(/[^A-Za-z0-9._-]/g, "_")}`;
+const ALERT_BACKEND_ENROLLED_KEY = "fuel-path-alert-backend-enrolled-v2";
 const ALERT_INSTALL_MARKER_KEY = "fuel-path:install-marker:v1";
 const ALERT_LEGACY_IDENTITY_KEY = "fuel-path:alert-identity:v1";
 const ALERT_LEGACY_CAPABILITY_KEY = "fuel-path:alert-capability:v1";

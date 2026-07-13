@@ -21,7 +21,7 @@ Last reviewed: 13 July 2026, Australia/Sydney.
 - Push-token readiness: native config injects `extra.eas.projectId` when `EXPO_PUBLIC_EAS_PROJECT_ID`, `EAS_PROJECT_ID` or the static EAS project id is set; strict preview-environment preflight now passes through `npm run native:preflight`.
 - Local shell strict preflight passes all local build/map checks when `.env.local` is loaded, but remains blocked for backend alert capability issuing unless the preview backend secret env is exported locally.
 
-### 13 July 2026 PR #30 Pixel 9 Pro validation
+### 13 July 2026 PR #30 physical Android validation
 
 - Current physical target: Google Pixel 9 Pro `49231FDAP0017N`, Android 17 / API 37. Android physical readiness passed with the SDK at `~/Library/Android/sdk`.
 - Current checkout artefact: `mobile-app/native-artifacts/fuel-path-local-standalone-arm64-v8a-2026-07-12T22-12-25-983Z.apk`, 29.06 MB, SHA-256 `2a45e34697acb9280242611a9bc14809cb2e94ccd246cc4fd853e0e7fca7c2f4`. It is an arm64 release-style APK with the JS bundle packaged, signed with the local debug certificate for validation only. It is not a Play signing or store-submission artefact.
@@ -39,6 +39,10 @@ Last reviewed: 13 July 2026, Australia/Sydney.
 - Route-notification schedule stress passed: `tmp/native-smoke/route-notification-schedule-stress-2026-07-12T22-42-33.402Z.json`.
 - Android's raw one-frame `screencap` PNG was rendered with black compositor gaps by one image viewer. A six-second Android screen recording and Android CLI screenshot both showed the actual Nearby and EV route screens cleanly. No app rendering change was made on the basis of the faulty viewer.
 - These results clear the current local standalone APK for controlled internal Android validation only. They do not establish a current EAS Preview APK, real Expo push delivery, lower-end Android coverage, Play release signing, Play Console listing readiness or store readiness.
+- Pixel 9 Pro `49231FDAP0017N` passed the isolated user-driven route-watch/privacy lifecycle at commit `000c929`: final-watch disable preserved the remote device and route, re-enrolment remained idempotent, and destructive Privacy confirmation removed remote device/route/evaluation data and revoked the installation while retaining the saved route locally with alerts off. The full evidence is recorded in [PR #30](https://github.com/leokessel-lgtm/fuel-path/pull/30#issuecomment-4956743897).
+- Pixel 7 `28291FDH2001KG` then passed the same isolated Plan, watch-off, re-enrolment and Privacy-confirmation lifecycle, finishing with zero active installations, devices, routes and evaluations. The full evidence is recorded in [PR #30](https://github.com/leokessel-lgtm/fuel-path/pull/30#issuecomment-4957227125).
+- After commit `00683f5` removed the stale imperative Android callout command, Pixel 7 rendered real Google map tiles and two isolated QA price markers, selected both markers in one session and produced no callout, dispatch, fatal or Maps-authorisation errors. The marker regression and full map guard set passed. The full evidence is recorded in [PR #30](https://github.com/leokessel-lgtm/fuel-path/pull/30#issuecomment-4957805141).
+- The temporary QA package, backend, APK output, Firebase configuration, restricted Maps keys, device installs, local services and caches were removed after validation. Production was untouched, Preview protection remained enabled and global push delivery remained disabled.
 
 ## Required Environment
 

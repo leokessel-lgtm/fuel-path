@@ -531,7 +531,9 @@ function alertStatusMessage(primary: string, secondary?: string) {
 }
 
 function smartRouteDeliveryReady(result: { remoteDeliveryEnabled?: boolean; status: string }) {
-  return result.status === "synced" && result.remoteDeliveryEnabled !== false;
+  // A saved backend watch remains enrolled while the global delivery gate is off.
+  // The gate controls sending, not whether this device and route were registered.
+  return result.status === "synced" || result.status === "skipped";
 }
 
 const weekdays: Weekday[] = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];

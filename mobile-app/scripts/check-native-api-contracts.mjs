@@ -11,6 +11,7 @@ const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const mobileRoot = path.resolve(scriptDir, "..");
 const routeApiSourcePath = path.join(mobileRoot, "src/api/fuelPathApi.ts");
 const backendAlertsSourcePath = path.join(mobileRoot, "src/services/backendAlerts.native.ts");
+const routeAlertsSourcePath = path.join(mobileRoot, "src/hooks/useRouteAlerts.ts");
 
 const routeFetchCalls = [];
 const responsePayload = {
@@ -88,6 +89,7 @@ const { planFuelRoute } = loadTsModule(routeApiSourcePath, {
 
 await checkPlanFuelRouteContract(planFuelRoute);
 await checkSavedRouteAlertContract();
+checkRouteWatchDeletionBoundaries();
 
 console.log("Native API contract smoke passed.");
 
@@ -331,15 +333,30 @@ async function checkSavedRouteAlertContract() {
     reinstalled.initialiseAnonymousInstallation(),
     reinstalled.initialiseAnonymousInstallation(),
   ]);
-  assert.equal(reinstalled.alertFetchCalls[0].url, "https://fuel-path.test/api/alerts?action=client-capability");
-  assert.equal(reinstalled.alertFetchCalls[1].url, "https://fuel-path.test/api/alerts?action=delete-installation-data");
-  assert.equal(JSON.parse(reinstalled.storage.get("fuel-path-alert-installation-v3")).installationId, "installation_uuid-contract");
+  assert.equal(reinstalled.alertFetchCalls.length, 0);
+  assert.equal(JSON.parse(reinstalled.storage.get("fuel-path-alert-installation-v3")).installationId, `installation_${"a".repeat(32)}`);
   assert.equal(reinstalled.storage.get("fuel-path:install-marker:v1"), "uuid-contract");
 
   const neverEnrolled = loadBackendAlertContractModule({ capabilityBody: null });
   const neverEnrolledDelete = await neverEnrolled.deleteMyAlertData();
   assert.equal(neverEnrolledDelete.status, "synced");
   assert.equal(neverEnrolled.alertFetchCalls.length, 0);
+}
+
+function checkRouteWatchDeletionBoundaries() {
+  const source = readFileSync(routeAlertsSourcePath, "utf8");
+  const toggleStart = source.indexOf("const toggleCommuteAlert");
+  const privacyDeleteStart = source.indexOf("const deleteAllAlertData");
+  const permissionRevocationStart = source.indexOf("const disableRevokedAlerts");
+  const tokenRefreshStart = source.indexOf("const refreshRotatedToken");
+  assert.ok(toggleStart >= 0 && privacyDeleteStart > toggleStart);
+  assert.ok(permissionRevocationStart >= 0 && tokenRefreshStart > permissionRevocationStart);
+
+  const toggleSource = source.slice(toggleStart, privacyDeleteStart);
+  const permissionRevocationSource = source.slice(permissionRevocationStart, tokenRefreshStart);
+  assert.match(toggleSource, /syncSavedRouteAlert\(\{\s*commute: targetCommute,\s*enabled: false,/);
+  assert.doesNotMatch(toggleSource, /deleteBackendAlertData/);
+  assert.doesNotMatch(permissionRevocationSource, /deleteBackendAlertData/);
 }
 
 function loadBackendAlertContractModule({ capabilityBody, initialStorage = {} }) {

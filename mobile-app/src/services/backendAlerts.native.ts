@@ -177,16 +177,11 @@ async function loadAlertIdentity(): Promise<AlertIdentity> {
       const parsed = JSON.parse(raw) as Partial<AlertIdentity>;
       if (parsed.installationId && parsed.installationSecret) {
         if (!marker && Platform.OS !== "web") {
-          const enrolled = await secureGet(ALERT_BACKEND_ENROLLED_KEY);
-          if (enrolled === "1") {
-            const retired = await retirePersistedIosInstallation(parsed as AlertIdentity);
-            if (!retired) throw new Error("Previous installation alert data could not be retired.");
-          } else {
-            await clearAlertIdentity(false);
-          }
-        } else {
-          return { installationId: parsed.installationId, installationSecret: parsed.installationSecret };
+          // Secure storage can survive a native reinstall while AsyncStorage does not.
+          // Reuse the installation identity: Privacy is the only full alert-data deletion action.
+          await AsyncStorage.setItem(ALERT_INSTALL_MARKER_KEY, await randomUuid());
         }
+        return { installationId: parsed.installationId, installationSecret: parsed.installationSecret };
       }
     }
   } catch {
@@ -208,14 +203,6 @@ async function loadAlertIdentity(): Promise<AlertIdentity> {
   ]);
   await AsyncStorage.setItem(ALERT_INSTALL_MARKER_KEY, await randomUuid());
   return identity;
-}
-
-async function retirePersistedIosInstallation(identity: AlertIdentity) {
-  const capability = await getAlertCapability(identity);
-  if (!capability) return false;
-  await postAlertJson("/api/alerts?action=delete-installation-data", capability.token, {});
-  await clearAlertIdentity(false);
-  return true;
 }
 
 async function clearAlertIdentity(resetPromise = true) {

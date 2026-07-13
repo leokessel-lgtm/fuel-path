@@ -133,7 +133,7 @@ export function AccountDetailScreen({
             disabled={alertSyncingCommuteId != null}
             onPress={() => Alert.alert(
               "Delete alert data?",
-              "This turns off route alerts and deletes your anonymous alert routes, push token and alert history from Fuel Path. Saved routes stay on this device.",
+              "This permanently deletes all anonymous alert routes, push token and alert history from Fuel Path. It also turns off route alerts. Saved routes stay on this device.",
               [
                 { text: "Cancel", style: "cancel" },
                 { text: "Delete", style: "destructive", onPress: onDeleteAlertData },

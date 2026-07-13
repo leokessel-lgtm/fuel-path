@@ -828,7 +828,7 @@ const checks = [
       nativeApiContracts.includes("await checkSavedRouteAlertContract();") &&
       nativeApiContracts.includes("syncSavedRouteAlert,\n  } = loadTsModule(backendAlertsSourcePath") &&
       nativeApiContracts.includes("assert.equal(result.remoteDeliveryEnabled, false);") &&
-      nativeApiContracts.includes('assert.equal(alertFetchCalls[1].url, "https://fuel-path.test/api/saved-routes");') &&
+      nativeApiContracts.includes('assert.equal(alertFetchCalls[1].url, "https://fuel-path.test/api/alerts?action=enrol-watch");') &&
       nativeApiContracts.includes("assert.equal(body.vehicleId, \"vehicle-diesel\");") &&
       nativeApiContracts.includes("assert.equal(body.vehicleEnergyType, \"diesel\");") &&
       nativeApiContracts.includes("assert.equal(body.fuel, \"PDL\");") &&
@@ -1016,7 +1016,7 @@ const checks = [
       backendAlerts.includes("await secureDelete(ALERT_CAPABILITY_KEY);") &&
       backendAlerts.includes("const capability = normaliseAlertCapability(payload);") &&
       backendAlerts.includes("Route watch could not update. Your saved route is still on this device, so you can try again.") &&
-      backendAlerts.includes("Smart route watch could not update. Reminder state was kept.") &&
+      backendAlerts.includes("Smart route watch could not update. Your saved route remains on this device.") &&
       backendAlerts.includes("Route watch delete failed. Saved route was kept so you can retry.") &&
       backendAlerts.includes("routeWatchRemoteDeliveryEnabled(savedRoute)") &&
       backendAlerts.includes("Smart route watch was saved, but push delivery is not enabled for this build yet.") &&
@@ -1288,7 +1288,8 @@ const checks = [
       backendAlerts.indexOf("routeWatchRemoteDeliveryEnabled(savedRoute)") <
         backendAlerts.indexOf("Smart route watch updated.") &&
       routeAlertsHook.includes("function smartRouteDeliveryReady") &&
-      routeAlertsHook.includes('result.status === "synced" && result.remoteDeliveryEnabled !== false') &&
+      routeAlertsHook.includes('return result.status === "synced" || result.status === "skipped";') &&
+      routeAlertsHook.includes("The gate controls sending, not whether this device and route were registered.") &&
       routeAlertsHook.includes("const backendSynced = smartRouteDeliveryReady(backendSync);") &&
       !routeAlertsHook.includes('backendSync.status === "synced";') &&
       routeNotifications.includes("Smart route notifications are ready for this build.") &&

@@ -121,16 +121,26 @@ export function useRouteAlerts({
       const failedLocalIds = new Set(savedCommutes
         .filter((_, index) => cancellations[index]?.status === "failed")
         .map((commute) => commute.id));
-      const deletion = await deleteBackendAlertData();
+      const backendSyncs = await Promise.all(savedCommutes
+        .filter((commute) => commute.alertEnabled)
+        .map((commute) => syncSavedRouteAlert({
+          commute,
+          enabled: false,
+          preferences,
+        })));
+      const failedBackendIds = new Set(savedCommutes
+        .filter((commute) => commute.alertEnabled)
+        .filter((_, index) => backendSyncs[index]?.status !== "synced")
+        .map((commute) => commute.id));
       if (!active) return;
       setSavedCommutes((current) => current.map((commute) => ({
         ...commute,
-        alertEnabled: deletion.status !== "synced",
-        alertStatus: "needs_permission",
-        alertStatusMessage: deletion.status === "synced"
-          ? "Notifications are off. Backend alert data was deleted."
-          : "Notifications are off. Alert-data deletion still needs retry.",
-        backendSyncedAt: deletion.status === "synced" ? undefined : commute.backendSyncedAt,
+        alertEnabled: failedBackendIds.has(commute.id),
+        alertStatus: failedBackendIds.has(commute.id) ? "failed" : "needs_permission",
+        alertStatusMessage: failedBackendIds.has(commute.id)
+          ? "Notifications are off. Route watch update still needs retry."
+          : "Notifications are off. Route watch data was kept.",
+        backendSyncedAt: failedBackendIds.has(commute.id) ? commute.backendSyncedAt : new Date().toISOString(),
         localReminderEnabled: false,
         nextAlertAt: failedLocalIds.has(commute.id) ? commute.nextAlertAt : undefined,
         scheduledNotificationId: failedLocalIds.has(commute.id) ? commute.scheduledNotificationId : undefined,
@@ -190,16 +200,11 @@ export function useRouteAlerts({
     setAlertSyncingCommuteId(commuteId);
     try {
       if (targetCommute.alertEnabled) {
-        const lastWatchedRoute = !savedCommutes.some(
-          (commute) => commute.id !== commuteId && commute.alertEnabled,
-        );
-        const backendSync = lastWatchedRoute
-          ? await deleteBackendAlertData()
-          : await syncSavedRouteAlert({
-              commute: targetCommute,
-              enabled: false,
-              preferences,
-            });
+        const backendSync = await syncSavedRouteAlert({
+          commute: targetCommute,
+          enabled: false,
+          preferences,
+        });
         if (backendSync.status !== "synced") {
           setSavedCommutes((current) => current.map((commute) =>
             commute.id === commuteId

@@ -145,6 +145,72 @@ test("route-watch enrolment persists the device and route through one storage bo
   }
 });
 
+test("turning off the final route watch preserves the installation device and evaluation history", async () => {
+  const originalEnabled = process.env.ALERTS_CLIENT_WRITE_ENABLED;
+  const originalSecret = process.env.ALERTS_CLIENT_CAPABILITY_SECRET;
+  process.env.ALERTS_CLIENT_WRITE_ENABLED = "1";
+  process.env.ALERTS_CLIENT_CAPABILITY_SECRET = "preview-capability-secret";
+  const store = memoryDurableStore();
+  setAlertStorageForTests(store);
+  try {
+    const installation = anonymousInstallation("f");
+    const capability = await callAlerts("POST", { action: "client-capability" }, installation);
+    const headers = { authorization: `Bearer ${capability.payload.token}` };
+    await callAlerts("POST", { action: "enrol-watch" }, { ...route, ...device }, headers);
+    await store.appendRouteAlertEvaluation({
+      id: "evaluation-final-watch",
+      routeId: route.id,
+      userId: installation.installationId,
+      evaluatedAt: "2026-07-13T00:00:00.000Z",
+    });
+
+    const disabled = await callSavedRoutes("POST", {}, { ...route, alertEnabled: false }, headers);
+
+    assert.equal(disabled.status, 202);
+    assert.equal(disabled.payload.route.alertEnabled, false);
+    assert.equal(store.__alertInstallations.size, 1);
+    assert.equal(store.devices.length, 1);
+    assert.equal(store.routes.length, 1);
+    assert.equal(store.routes[0].alertEnabled, false);
+    assert.equal(store.evaluations.length, 1);
+  } finally {
+    setAlertStorageForTests(null);
+    if (originalEnabled === undefined) delete process.env.ALERTS_CLIENT_WRITE_ENABLED;
+    else process.env.ALERTS_CLIENT_WRITE_ENABLED = originalEnabled;
+    if (originalSecret === undefined) delete process.env.ALERTS_CLIENT_CAPABILITY_SECRET;
+    else process.env.ALERTS_CLIENT_CAPABILITY_SECRET = originalSecret;
+  }
+});
+
+test("route-watch re-enrolment is idempotent for one anonymous installation", async () => {
+  const originalEnabled = process.env.ALERTS_CLIENT_WRITE_ENABLED;
+  const originalSecret = process.env.ALERTS_CLIENT_CAPABILITY_SECRET;
+  process.env.ALERTS_CLIENT_WRITE_ENABLED = "1";
+  process.env.ALERTS_CLIENT_CAPABILITY_SECRET = "preview-capability-secret";
+  const store = memoryDurableStore();
+  setAlertStorageForTests(store);
+  try {
+    const installation = anonymousInstallation("r");
+    const capability = await callAlerts("POST", { action: "client-capability" }, installation);
+    const headers = { authorization: `Bearer ${capability.payload.token}` };
+    const first = await callAlerts("POST", { action: "enrol-watch" }, { ...route, ...device }, headers);
+    const second = await callAlerts("POST", { action: "enrol-watch" }, { ...route, ...device }, headers);
+
+    assert.equal(first.status, 202);
+    assert.equal(second.status, 202);
+    assert.equal(store.__alertInstallations.size, 1);
+    assert.equal(store.devices.length, 1);
+    assert.equal(store.routes.length, 1);
+    assert.equal(store.routes[0].userId, installation.installationId);
+  } finally {
+    setAlertStorageForTests(null);
+    if (originalEnabled === undefined) delete process.env.ALERTS_CLIENT_WRITE_ENABLED;
+    else process.env.ALERTS_CLIENT_WRITE_ENABLED = originalEnabled;
+    if (originalSecret === undefined) delete process.env.ALERTS_CLIENT_CAPABILITY_SECRET;
+    else process.env.ALERTS_CLIENT_CAPABILITY_SECRET = originalSecret;
+  }
+});
+
 test("route-watch enrolment leaves no partial records when its storage operation fails", async () => {
   const originalEnabled = process.env.ALERTS_CLIENT_WRITE_ENABLED;
   const originalSecret = process.env.ALERTS_CLIENT_CAPABILITY_SECRET;
@@ -550,16 +616,24 @@ test("delete-my-alert-data is atomic and revokes the existing capability", async
     const headers = { authorization: `Bearer ${capability.payload.token}` };
     await callSavedRoutes("POST", {}, route, headers);
     await callPushRegister(device, headers);
+    await store.appendRouteAlertEvaluation({
+      id: "evaluation-delete-all",
+      routeId: route.id,
+      userId: installation.installationId,
+      evaluatedAt: "2026-07-13T00:00:00.000Z",
+    });
     const deleted = await callAlerts("POST", { action: "delete-installation-data" }, {}, headers);
     const retryWrite = await callSavedRoutes("POST", {}, route, headers);
 
     assert.equal(deleted.status, 202);
     assert.equal(deleted.payload.deletedRouteCount, 1);
     assert.equal(deleted.payload.deletedDeviceCount, 1);
+    assert.equal(deleted.payload.deletedEvaluationCount, 1);
     assert.equal(deleted.payload.revoked, true);
     assert.equal(retryWrite.status, 401);
     assert.equal(store.routes.length, 0);
     assert.equal(store.devices.length, 0);
+    assert.equal(store.evaluations.length, 0);
   } finally {
     setAlertStorageForTests(null);
     if (originalEnabled === undefined) delete process.env.ALERTS_CLIENT_WRITE_ENABLED;

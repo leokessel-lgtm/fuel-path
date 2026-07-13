@@ -1,4 +1,4 @@
-export function randomUuid(): string;
+export function randomUuid(): Promise<string>;
 export function randomSecret(): Promise<string>;
 export function secureGet(key: string): Promise<string | null>;
 export function secureSet(key: string, value: string): Promise<void>;

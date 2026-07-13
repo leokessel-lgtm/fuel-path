@@ -190,11 +190,14 @@ async function loadAlertIdentity(): Promise<AlertIdentity> {
     }
   } catch {
     alertIdentityPromise = null;
-    throw new Error("Anonymous installation identity is unavailable.");
+    throw new RouteWatchError(
+      "installation_identity_unavailable",
+      "This device could not create its private route-watch identity. Reinstall Fuel Path before trying again.",
+    );
   }
 
   const identity = {
-    installationId: `installation_${randomUuid()}`,
+    installationId: `installation_${await randomUuid()}`,
     installationSecret: await randomSecret(),
   };
   await secureSet(ALERT_IDENTITY_KEY, JSON.stringify(identity));
@@ -202,7 +205,7 @@ async function loadAlertIdentity(): Promise<AlertIdentity> {
     AsyncStorage.removeItem(ALERT_LEGACY_IDENTITY_KEY),
     AsyncStorage.removeItem(ALERT_LEGACY_CAPABILITY_KEY),
   ]);
-  await AsyncStorage.setItem(ALERT_INSTALL_MARKER_KEY, randomUuid());
+  await AsyncStorage.setItem(ALERT_INSTALL_MARKER_KEY, await randomUuid());
   return identity;
 }
 

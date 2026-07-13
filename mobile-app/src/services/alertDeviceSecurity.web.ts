@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-export const randomUuid = () => crypto.randomUUID();
+export const randomUuid = async () => crypto.randomUUID();
 
 export async function randomSecret() {
   const bytes = crypto.getRandomValues(new Uint8Array(32));

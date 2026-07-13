@@ -992,7 +992,7 @@ const checks = [
     label: "backend alert identity stays secure, anonymous and non-contact",
     ok:
       backendAlerts.includes('const ALERT_IDENTITY_KEY = "fuel-path:alert-installation:v2";') &&
-      backendAlerts.includes("installationId: `installation_${randomUuid()}`") &&
+      backendAlerts.includes("installationId: `installation_${await randomUuid()}`") &&
       backendAlerts.includes("installationSecret: await randomSecret()") &&
       alertDeviceSecurity.includes("Crypto.getRandomBytesAsync(32)") &&
       backendAlerts.includes("ALERT_INSTALL_MARKER_KEY") &&

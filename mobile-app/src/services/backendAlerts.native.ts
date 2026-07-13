@@ -24,7 +24,7 @@ type SyncResult = {
 };
 
 const ALERT_IDENTITY_KEY = "fuel-path:alert-installation:v2";
-const ALERT_CAPABILITY_KEY = "fuel-path:alert-capability:v2";
+const ALERT_CAPABILITY_KEY = `fuel-path:alert-capability:v2:${encodeURIComponent(API_BASE_URL)}`;
 const ALERT_BACKEND_ENROLLED_KEY = "fuel-path:alert-backend-enrolled:v1";
 const ALERT_INSTALL_MARKER_KEY = "fuel-path:install-marker:v1";
 const ALERT_LEGACY_IDENTITY_KEY = "fuel-path:alert-identity:v1";

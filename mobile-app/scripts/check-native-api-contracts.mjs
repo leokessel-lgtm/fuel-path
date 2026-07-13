@@ -279,12 +279,13 @@ async function checkSavedRouteAlertContract() {
   assert.equal(body.tankPercent, 40);
   assert.equal(body.economy, 7.4);
   assert.equal(body.reserveKm, 35);
-  assert.equal(JSON.parse(storage.get("fuel-path:alert-capability:v2")).token, "capability-token");
+  const capabilityKey = "fuel-path:alert-capability:v2:https%3A%2F%2Ffuel-path.test";
+  assert.equal(JSON.parse(storage.get(capabilityKey)).token, "capability-token");
   const deleted = await deleteMyAlertData();
   assert.equal(deleted.status, "synced");
   assert.equal(alertFetchCalls[2].url, "https://fuel-path.test/api/alerts?action=delete-installation-data");
   assert.equal(storage.has("fuel-path:alert-installation:v2"), false);
-  assert.equal(storage.has("fuel-path:alert-capability:v2"), false);
+  assert.equal(storage.has(capabilityKey), false);
   assert.equal(storage.has("fuel-path:alert-backend-enrolled:v1"), false);
   assert.equal(storage.has("fuel-path:install-marker:v1"), false);
 

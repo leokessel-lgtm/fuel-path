@@ -12,6 +12,9 @@
     "preview": {
       "environment": "preview",
       "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_FUEL_PATH_API_BASE_URL": "https://fuel-path-git-codex-4d34d9-leonardo-volpi-kesselring-s-projects.vercel.app"
+      },
       "android": {
         "buildType": "apk"
       }

@@ -524,6 +524,40 @@ test("backend mints scoped client capability for saved-route sync without exposi
   }
 });
 
+test("existing-only capability mode accepts an enrolled installation without creating another", async () => {
+  const originalEnabled = process.env.ALERTS_CLIENT_WRITE_ENABLED;
+  const originalSecret = process.env.ALERTS_CLIENT_CAPABILITY_SECRET;
+  const originalExistingOnly = process.env.ALERTS_CLIENT_CAPABILITY_EXISTING_ONLY;
+  process.env.ALERTS_CLIENT_WRITE_ENABLED = "1";
+  process.env.ALERTS_CLIENT_CAPABILITY_SECRET = "preview-capability-secret";
+  delete process.env.ALERTS_CLIENT_CAPABILITY_EXISTING_ONLY;
+  const store = memoryDurableStore();
+  setAlertStorageForTests(store);
+
+  try {
+    const enrolledInstallation = anonymousInstallation("e");
+    const initial = await callAlerts("POST", { action: "client-capability" }, enrolledInstallation);
+    process.env.ALERTS_CLIENT_CAPABILITY_EXISTING_ONLY = "1";
+    const repeated = await callAlerts("POST", { action: "client-capability" }, enrolledInstallation);
+    const unknown = await callAlerts("POST", { action: "client-capability" }, anonymousInstallation("u"));
+
+    assert.equal(initial.status, 202);
+    assert.equal(repeated.status, 202);
+    assert.equal(repeated.payload.accepted, true);
+    assert.equal(unknown.status, 403);
+    assert.match(unknown.payload.error, /not available for this installation/i);
+    assert.equal(store.__alertInstallations.size, 1);
+  } finally {
+    setAlertStorageForTests(null);
+    if (originalEnabled === undefined) delete process.env.ALERTS_CLIENT_WRITE_ENABLED;
+    else process.env.ALERTS_CLIENT_WRITE_ENABLED = originalEnabled;
+    if (originalSecret === undefined) delete process.env.ALERTS_CLIENT_CAPABILITY_SECRET;
+    else process.env.ALERTS_CLIENT_CAPABILITY_SECRET = originalSecret;
+    if (originalExistingOnly === undefined) delete process.env.ALERTS_CLIENT_CAPABILITY_EXISTING_ONLY;
+    else process.env.ALERTS_CLIENT_CAPABILITY_EXISTING_ONLY = originalExistingOnly;
+  }
+});
+
 test("installation capabilities isolate identical deterministic route ids", async () => {
   const originalEnabled = process.env.ALERTS_CLIENT_WRITE_ENABLED;
   const originalSecret = process.env.ALERTS_CLIENT_CAPABILITY_SECRET;

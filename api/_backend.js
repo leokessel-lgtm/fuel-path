@@ -39,6 +39,7 @@ const {
 } = require("./_routeScoring");
 const { createGeocoder } = require("./_geocode");
 const { createAlertOrchestration } = require("./_alertOrchestration");
+const { enrolBackendRouteWatch } = require("./_alertEnrolment");
 const DISCOUNT_RULES = require("../shared/discountRegistry.json");
 const { createWaFuelWatchAdapter } = require("./_waFuelWatch");
 const { createFppDirectProvider } = require("./_fppDirectProvider");
@@ -70,7 +71,6 @@ const {
   providerPublicClaimStatus,
 } = require("./_capabilities");
 const { createRouting } = require("./_routing");
-
 const DEFAULT_CACHE_SECONDS = 300;
 const { buildRoute, routeProviderStatus } = createRouting({
   fetchJson,
@@ -185,7 +185,6 @@ const { retentionCleanupAuthorised, runRetentionCleanup } = createRetentionServi
   purgePredictionBacktests,
   cronAuthorised,
 });
-
 function cacheSeconds() {
   return Math.max(60, Number(process.env.FUEL_PATH_LIVE_CACHE_SECONDS || DEFAULT_CACHE_SECONDS));
 }
@@ -231,6 +230,7 @@ module.exports = {
   checkPushReceipts,
   cronAuthorised,
   deleteBackendSavedRoute,
+  enrolBackendRouteWatch,
   distanceKm,
   evaluateSavedRouteAlert,
   validateSavedRouteAlertDelivery,

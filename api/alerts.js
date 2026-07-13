@@ -5,6 +5,7 @@ const {
   alertsWriteAuthorised,
   alertsWriteSecurity,
   deleteBackendSavedRoute,
+  enrolBackendRouteWatch,
   evaluateSavedRouteAlert,
   validateSavedRouteAlertDelivery,
   issueAlertClientCapability,
@@ -121,17 +122,14 @@ module.exports = async function handler(req, res) {
         sendJson(res, 400, { status: "backend_rejected", code: "watch_disabled" });
         return;
       }
-      const [device, route] = await Promise.all([
-        registerPushDevice(input),
-        saveBackendSavedRoute(input),
-      ]);
+      const enrolment = await enrolBackendRouteWatch(input, { alertsStatus });
       sendJson(res, 202, {
         accepted: true,
         status: "enabled",
         code: "watch_enabled",
-        device: { id: device.device?.id, platform: device.device?.platform },
-        route: { id: route.route?.id, alertEnabled: route.route?.alertEnabled },
-        alerts: route.alerts,
+        device: { id: enrolment.device?.id, platform: enrolment.device?.platform },
+        route: { id: enrolment.route?.id, alertEnabled: enrolment.route?.alertEnabled },
+        alerts: enrolment.alerts,
       });
       return;
     }

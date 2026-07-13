@@ -119,6 +119,63 @@ test("saved-route alert foundation stores route, device and sendable evaluation"
   }
 });
 
+test("route-watch enrolment persists the device and route through one storage boundary", async () => {
+  const originalEnabled = process.env.ALERTS_CLIENT_WRITE_ENABLED;
+  const originalSecret = process.env.ALERTS_CLIENT_CAPABILITY_SECRET;
+  process.env.ALERTS_CLIENT_WRITE_ENABLED = "1";
+  process.env.ALERTS_CLIENT_CAPABILITY_SECRET = "preview-capability-secret";
+  const store = memoryDurableStore();
+  setAlertStorageForTests(store);
+  try {
+    const capability = await callAlerts("POST", { action: "client-capability" }, anonymousInstallation("w"));
+    const enrolled = await callAlerts("POST", { action: "enrol-watch" }, { ...route, ...device }, {
+      authorization: `Bearer ${capability.payload.token}`,
+    });
+
+    assert.equal(enrolled.status, 202);
+    assert.equal(enrolled.payload.code, "watch_enabled");
+    assert.equal(store.devices.length, 1);
+    assert.equal(store.routes.length, 1);
+  } finally {
+    setAlertStorageForTests(null);
+    if (originalEnabled === undefined) delete process.env.ALERTS_CLIENT_WRITE_ENABLED;
+    else process.env.ALERTS_CLIENT_WRITE_ENABLED = originalEnabled;
+    if (originalSecret === undefined) delete process.env.ALERTS_CLIENT_CAPABILITY_SECRET;
+    else process.env.ALERTS_CLIENT_CAPABILITY_SECRET = originalSecret;
+  }
+});
+
+test("route-watch enrolment leaves no partial records when its storage operation fails", async () => {
+  const originalEnabled = process.env.ALERTS_CLIENT_WRITE_ENABLED;
+  const originalSecret = process.env.ALERTS_CLIENT_CAPABILITY_SECRET;
+  process.env.ALERTS_CLIENT_WRITE_ENABLED = "1";
+  process.env.ALERTS_CLIENT_CAPABILITY_SECRET = "preview-capability-secret";
+  const store = memoryDurableStore();
+  let enrolmentCalls = 0;
+  store.enrolPushDeviceAndSavedRoute = async () => {
+    enrolmentCalls += 1;
+    throw new Error("simulated atomic enrolment failure");
+  };
+  setAlertStorageForTests(store);
+  try {
+    const capability = await callAlerts("POST", { action: "client-capability" }, anonymousInstallation("x"));
+    const rejected = await callAlerts("POST", { action: "enrol-watch" }, { ...route, ...device }, {
+      authorization: `Bearer ${capability.payload.token}`,
+    });
+
+    assert.equal(rejected.status, 400);
+    assert.equal(enrolmentCalls, 1);
+    assert.equal(store.devices.length, 0);
+    assert.equal(store.routes.length, 0);
+  } finally {
+    setAlertStorageForTests(null);
+    if (originalEnabled === undefined) delete process.env.ALERTS_CLIENT_WRITE_ENABLED;
+    else process.env.ALERTS_CLIENT_WRITE_ENABLED = originalEnabled;
+    if (originalSecret === undefined) delete process.env.ALERTS_CLIENT_CAPABILITY_SECRET;
+    else process.env.ALERTS_CLIENT_CAPABILITY_SECRET = originalSecret;
+  }
+});
+
 test("alert record listings require the operator token and never accept validation credentials", async () => {
   const originalWrite = process.env.ALERTS_WRITE_TOKEN;
   const originalValidation = process.env.ALERTS_VALIDATION_TOKEN;
@@ -1275,6 +1332,19 @@ function memoryDurableStore() {
       if (index >= 0) routes[index] = record;
       else routes.push(record);
       return record;
+    },
+    async enrolPushDeviceAndSavedRoute({ device, route }) {
+      const deviceSnapshot = devices.map((record) => ({ ...record }));
+      const routeSnapshot = routes.map((record) => ({ ...record }));
+      try {
+        await store.upsertPushDevice(device);
+        await store.upsertSavedRoute(route);
+        return { device, route };
+      } catch (error) {
+        devices.splice(0, devices.length, ...deviceSnapshot);
+        routes.splice(0, routes.length, ...routeSnapshot);
+        throw error;
+      }
     },
     async deleteSavedRoute({ routeId, userId = "" }) {
       const index = routes.findIndex((item) => item.id === routeId && (!userId || item.userId === userId));

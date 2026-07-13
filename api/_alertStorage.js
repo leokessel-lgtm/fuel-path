@@ -94,6 +94,65 @@ async function upsertPushDevice(record) {
   `;
   return record;
 }
+
+async function enrolPushDeviceAndSavedRoute({ device, route } = {}) {
+  if (!device || !route) throw new Error("device and route are required for route-watch enrolment");
+  if (testStorage?.enrolPushDeviceAndSavedRoute) return testStorage.enrolPushDeviceAndSavedRoute({ device, route });
+  if (!databaseUrl()) {
+    const devices = memoryStore.devices.map((record) => ({ ...record }));
+    const routes = memoryStore.routes.map((record) => ({ ...record }));
+    try {
+      await upsertMemory("devices", device);
+      await upsertMemorySavedRoute(route);
+      return { device, route };
+    } catch (error) {
+      memoryStore.devices.splice(0, memoryStore.devices.length, ...devices);
+      memoryStore.routes.splice(0, memoryStore.routes.length, ...routes);
+      throw error;
+    }
+  }
+
+  const sql = await getSql();
+  await ensureTables(sql);
+  await sql`
+    WITH retired_token AS (
+      UPDATE fuel_path_push_devices
+      SET status = 'inactive', invalidated_at = ${device.lastSeenAt}
+      WHERE expo_push_token = ${device.expoPushToken} AND id <> ${device.id} AND status = 'active'
+    ), enrolled_device AS (
+      INSERT INTO fuel_path_push_devices (
+        id, user_id, device_id, platform, expo_push_token, app_version, status, last_seen_at, invalidated_at, raw
+      ) VALUES (
+        ${device.id}, ${device.userId}, ${device.deviceId}, ${device.platform}, ${device.expoPushToken},
+        ${device.appVersion}, ${device.status}, ${device.lastSeenAt}, ${device.invalidatedAt || null}, ${JSON.stringify(device)}
+      ) ON CONFLICT (id) DO UPDATE SET
+        platform = EXCLUDED.platform, expo_push_token = EXCLUDED.expo_push_token,
+        app_version = EXCLUDED.app_version, status = EXCLUDED.status, last_seen_at = EXCLUDED.last_seen_at,
+        invalidated_at = EXCLUDED.invalidated_at, raw = EXCLUDED.raw
+    ), enrolled_route AS (
+      INSERT INTO fuel_path_saved_routes (
+        id, user_id, name, from_lat, from_lon, from_label, to_lat, to_lon, to_label, fuel,
+        alert_enabled, alert_time_local, timezone, min_saving_dollars, max_detour_minutes,
+        paused_until, last_alert_sent_at, created_at, updated_at, raw
+      ) VALUES (
+        ${route.id}, ${route.userId}, ${route.name}, ${route.from.lat}, ${route.from.lon}, ${route.from.label},
+        ${route.to.lat}, ${route.to.lon}, ${route.to.label}, ${route.fuel}, ${route.alertEnabled},
+        ${route.alertTimeLocal}, ${route.timezone}, ${route.minSavingDollars}, ${route.maxDetourMinutes},
+        ${route.pausedUntil || null}, ${route.lastAlertSentAt || null}, ${route.createdAt}, ${route.updatedAt}, ${JSON.stringify(route)}
+      ) ON CONFLICT (user_id, id) DO UPDATE SET
+        name = EXCLUDED.name, from_lat = EXCLUDED.from_lat, from_lon = EXCLUDED.from_lon,
+        from_label = EXCLUDED.from_label, to_lat = EXCLUDED.to_lat, to_lon = EXCLUDED.to_lon,
+        to_label = EXCLUDED.to_label, fuel = EXCLUDED.fuel, alert_enabled = EXCLUDED.alert_enabled,
+        alert_time_local = EXCLUDED.alert_time_local, timezone = EXCLUDED.timezone,
+        min_saving_dollars = EXCLUDED.min_saving_dollars, max_detour_minutes = EXCLUDED.max_detour_minutes,
+        paused_until = EXCLUDED.paused_until,
+        last_alert_sent_at = COALESCE(EXCLUDED.last_alert_sent_at, fuel_path_saved_routes.last_alert_sent_at),
+        updated_at = EXCLUDED.updated_at, raw = EXCLUDED.raw
+    ) SELECT 1
+  `;
+  return { device, route };
+}
+
 async function upsertSavedRoute(record) {
   if (testStorage) return testStorage.upsertSavedRoute(record);
   if (!databaseUrl()) return upsertMemorySavedRoute(record);
@@ -607,6 +666,7 @@ module.exports = {
   appendRouteAlertEvaluation,
   counts,
   deleteSavedRoute,
+  enrolPushDeviceAndSavedRoute,
   listPushDevices,
   listPendingPushTicketEvaluations,
   listRouteAlertEvaluations,

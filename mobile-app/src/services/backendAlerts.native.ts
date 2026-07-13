@@ -49,17 +49,8 @@ export async function syncSavedRouteAlert({
   preferences: AppPreferences;
 }): Promise<SyncResult> {
   try {
-    if (enabled) await secureSet(ALERT_BACKEND_ENROLLED_KEY, "1");
     const identity = await getAlertIdentity();
     const capability = await getAlertCapability(identity);
-    if (!capability) {
-      return {
-        status: enabled ? "skipped" : "failed",
-        message: enabled
-          ? "Smart route checks need backend capability issuing."
-          : "Route watch could not be turned off while the backend is unavailable.",
-      };
-    }
     if (!enabled) {
       const savedRoute = await postAlertJson("/api/saved-routes", capability.token, backendSavedRoutePayload({
         commute,
@@ -82,6 +73,9 @@ export async function syncSavedRouteAlert({
       expoPushToken,
       appVersion: "1.0.0",
     });
+    // Only record enrolment locally after both remote records have been accepted.
+    // This marker controls privacy deletion after a native reinstall.
+    await secureSet(ALERT_BACKEND_ENROLLED_KEY, "1");
     const remoteDeliveryEnabled = routeWatchRemoteDeliveryEnabled(savedRoute);
     if (enabled && remoteDeliveryEnabled === false) {
       return {
@@ -303,7 +297,7 @@ function estimatedEconomy(vehicle: VehicleProfile) {
   return 8.2;
 }
 
-async function getAlertCapability(identity: AlertIdentity): Promise<AlertCapability | null> {
+async function getAlertCapability(identity: AlertIdentity): Promise<AlertCapability> {
   try {
     const raw = await secureGet(ALERT_CAPABILITY_KEY);
     if (raw) {
@@ -326,11 +320,20 @@ async function getAlertCapability(identity: AlertIdentity): Promise<AlertCapabil
     });
     const payload = await readAlertJson(response);
     const capability = normaliseAlertCapability(payload);
-    if (!response.ok || !capability) return null;
+    if (!response.ok || !capability) {
+      throw new RouteWatchError(
+        response.status === 429 ? "capability_rate_limited" : "capability_unavailable",
+        safeAlertError(payload) || "Smart route checks are temporarily unavailable.",
+      );
+    }
     await secureSet(ALERT_CAPABILITY_KEY, JSON.stringify(capability));
     return capability;
-  } catch {
-    return null;
+  } catch (error) {
+    if (error instanceof RouteWatchError) throw error;
+    throw new RouteWatchError(
+      "capability_unavailable",
+      "Smart route checks are temporarily unavailable. Please try again shortly.",
+    );
   }
 }
 

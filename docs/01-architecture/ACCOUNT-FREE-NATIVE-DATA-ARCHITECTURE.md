@@ -17,11 +17,11 @@ backend. A server record is created only after explicit smart-alert opt-in.
 
 | Area | Evidence held | Gap to close before public alert use |
 | --- | --- | --- |
-| Product DB | `db/migrations/1762948800000_product_state_baseline.js` creates product-state tables and `api/_productDatabase.js` checks them at runtime. | Never run the plan against the shared Preview/Production Neon target. Provision a distinct preview target first. |
+| Product DB | `db/migrations/1762948800000_product_state_baseline.js` creates product-state tables and `api/_productDatabase.js` checks them at runtime. Preview now uses an isolated target, a dedicated least-privilege runtime role and a verified logical backup/restore path. | Keep Production migration blocked until a separate Production-specific least-privilege, backup and rollback decision is recorded. |
 | Local app state | Preferences, recents and saved commutes currently use `AsyncStorage`; saved commutes are capped at 20. | Keep routine data local but give the user an explicit local-data clear path and loss wording. |
-| Alert identity | `backendAlerts.native.ts` now creates an `installationId` plus secret and keeps it and the capability in SecureStore on native builds. | Physical iOS/Android lifecycle validation remains required. |
+| Alert identity | `backendAlerts.native.ts` now creates an `installationId` plus secret and keeps it and the capability in SecureStore on native builds. Pixel 7 and Pixel 9 Pro passed the Android watch-off, re-enrolment and Privacy lifecycle. | Signed iOS lifecycle and distribution evidence remain required. |
 | Alert API | Native alert writes derive the owner from a short-lived, server-revocable capability; shared client tokens cannot perform owner-bound mutations or internal evaluation jobs. | Add a general mutation-idempotency table before expanding beyond the current naturally idempotent upserts/deletes. |
-| Push storage | Active push tokens are unique, saved-route keys are owner-scoped, token rotation is reconciled and delete-my-alert-data removes the installation's alert rows atomically. | Collect physical-device lifecycle evidence and extend scheduled retention to revoked installation tombstones and stale rate-limit counters before public alert use. |
+| Push storage | Active push tokens are unique, saved-route keys are owner-scoped, token rotation is reconciled, delete-my-alert-data removes the installation's alert rows atomically, Android physical-device lifecycle evidence is held, and scheduled retention covers revoked installation tombstones and stale rate-limit counters. | Keep global push disabled until a separately authorised rollout has live delivery and receipt evidence. |
 
 ## Data Classification
 
@@ -144,13 +144,16 @@ Follow-up migrations should add:
 
 ## Implemented Foundation Slice
 
-The current uncommitted slice implements SecureStore identity and capability
+The merged foundation implements SecureStore identity and capability
 storage, cryptographic Expo UUID/secret generation, a non-secret reinstall
 marker, single-flight identity initialisation, capability version revocation,
 durable capability rate limits, owner-scoped route keys, internal-only
 evaluation jobs, atomic delete-my-alert-data, notification-permission
 reconciliation and push-token rotation refresh. Physical-device lifecycle
-evidence and hosted environment isolation remain release blockers.
+evidence now covers the Android route-watch and Privacy lifecycle on Pixel 7
+and Pixel 9 Pro. Hosted Preview product-state isolation, least-privilege runtime
+access and backup/restore are also proven. Signed iOS lifecycle/distribution and
+any Production or hosted/global push rollout remain separate blockers.
 
 Suggested initial retention is deliberately conservative and must align with
 the published policy before public use:

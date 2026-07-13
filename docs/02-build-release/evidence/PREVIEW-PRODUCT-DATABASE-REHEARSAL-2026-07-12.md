@@ -26,10 +26,12 @@ Date: 2026-07-12, Australia/Sydney
 - The required product and alert-installation tables and both migration ledger
   entries were queried successfully on the Preview target.
 
-## Remaining boundary
+## Superseded boundary
 
-The checked-out implementation now prefers `FUEL_PATH_PRODUCT_DATABASE_URL` for
-product state, but that selector must be merged and deployed before a Preview
-runtime can be claimed to use the isolated target. A least-privilege runtime
-role and backup/restore rehearsal are still required before hosted alert rollout
-or any Production migration.
+The selector was subsequently merged and deployed. The least-privilege runtime,
+account-free lifecycle and isolated backup/restore rehearsal completed on 13
+July. See
+[`PREVIEW-PRODUCT-DATABASE-SAFETY-2026-07-13.md`](PREVIEW-PRODUCT-DATABASE-SAFETY-2026-07-13.md).
+
+This clears the isolated Preview database safety gate only. Production
+migration and global push delivery remain unauthorised.

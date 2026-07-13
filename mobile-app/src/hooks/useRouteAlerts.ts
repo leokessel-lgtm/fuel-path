@@ -138,7 +138,11 @@ export function useRouteAlerts({
       })));
     };
 
+    let lastPushTokenRefreshAt = 0;
     const refreshRotatedToken = async () => {
+      const now = Date.now();
+      if (now - lastPushTokenRefreshAt < 30_000) return;
+      lastPushTokenRefreshAt = now;
       const token = await getExpoRoutePushToken();
       if (!active || !token.token) return;
       await Promise.all(savedCommutes

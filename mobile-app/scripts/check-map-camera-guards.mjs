@@ -1297,6 +1297,9 @@ const checks = [
       routeNotifications.includes("Smart route notifications need an EAS project id in the native build.") &&
       routeNotifications.includes("Smart route notifications need a development or preview build, not Expo Go.") &&
       routeNotifications.includes("getExpoRoutePushToken") &&
+      routeNotifications.includes("let expoPushTokenRequest: Promise<PushTokenResult> | null = null;") &&
+      routeNotifications.includes("expoPushTokenRequest = getExpoRoutePushTokenOnce().finally") &&
+      routeAlertsHook.includes("if (now - lastPushTokenRefreshAt < 30_000) return;") &&
       routeNotifications.includes("expoProjectId()") &&
       routeNotifications.includes("remotePushUnavailableInExpoGo()") &&
       routeNotifications.indexOf("await ensureRouteAlertChannel(Notifications);") <

@@ -29,6 +29,8 @@ type PushTokenResult = {
   status: "ready" | "unavailable" | "failed";
 };
 
+let expoPushTokenRequest: Promise<PushTokenResult> | null = null;
+
 export async function configureRouteNotificationHandler() {
   if (Platform.OS === "web") return;
   if (androidNotificationsUnavailableInExpoGo()) return;
@@ -184,7 +186,16 @@ export async function scheduleSavedCommuteAlert(commute: SavedCommute): Promise<
   }
 }
 
-export async function getExpoRoutePushToken(): Promise<PushTokenResult> {
+export function getExpoRoutePushToken(): Promise<PushTokenResult> {
+  if (!expoPushTokenRequest) {
+    expoPushTokenRequest = getExpoRoutePushTokenOnce().finally(() => {
+      expoPushTokenRequest = null;
+    });
+  }
+  return expoPushTokenRequest;
+}
+
+async function getExpoRoutePushTokenOnce(): Promise<PushTokenResult> {
   if (Platform.OS === "web") {
     return {
       status: "unavailable",

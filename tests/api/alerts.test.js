@@ -193,8 +193,10 @@ test("route-watch re-enrolment is idempotent for one anonymous installation", as
     const installation = anonymousInstallation("r");
     const capability = await callAlerts("POST", { action: "client-capability" }, installation);
     const headers = { authorization: `Bearer ${capability.payload.token}` };
-    const first = await callAlerts("POST", { action: "enrol-watch" }, { ...route, ...device }, headers);
-    const second = await callAlerts("POST", { action: "enrol-watch" }, { ...route, ...device }, headers);
+    const [first, second] = await Promise.all([
+      callAlerts("POST", { action: "enrol-watch" }, { ...route, ...device }, headers),
+      callAlerts("POST", { action: "enrol-watch" }, { ...route, ...device }, headers),
+    ]);
 
     assert.equal(first.status, 202);
     assert.equal(second.status, 202);

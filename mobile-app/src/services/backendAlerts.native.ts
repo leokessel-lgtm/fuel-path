@@ -74,8 +74,8 @@ export async function syncSavedRouteAlert({
       expoPushToken,
       appVersion: "1.0.0",
     });
-    // Only record enrolment locally after both remote records have been accepted.
-    // This marker controls privacy deletion after a native reinstall.
+    // This is only a local optimisation marker. A surviving secure identity is
+    // still deletable through Privacy if the marker disappears after reinstall.
     await secureSet(ALERT_BACKEND_ENROLLED_KEY, "1");
     const remoteDeliveryEnabled = routeWatchRemoteDeliveryEnabled(savedRoute);
     if (enabled && remoteDeliveryEnabled === false) {
@@ -108,16 +108,15 @@ export async function syncSavedRouteAlert({
 
 export async function deleteMyAlertData(): Promise<SyncResult> {
   try {
-    const enrolled = await secureGet(ALERT_BACKEND_ENROLLED_KEY);
-    if (enrolled !== "1") {
+    const identity = await loadStoredAlertIdentity();
+    if (!identity) {
       await clearAlertIdentity();
       return {
         status: "synced",
-        message: "No backend alert data was stored. Your saved routes remain on this device with alerts off.",
+        message: "No local alert identity was stored. Your saved routes remain on this device with alerts off.",
         syncedAt: new Date().toISOString(),
       };
     }
-    const identity = await getAlertIdentity();
     const capability = await getAlertCapability(identity);
     if (!capability) {
       return { status: "failed", message: "Alert data could not be deleted while the backend is unavailable." };
@@ -169,20 +168,26 @@ async function getAlertIdentity(): Promise<AlertIdentity> {
   return alertIdentityPromise;
 }
 
+async function loadStoredAlertIdentity(): Promise<AlertIdentity | null> {
+  const raw = await secureGet(ALERT_IDENTITY_KEY);
+  if (!raw) return null;
+  const parsed = JSON.parse(raw) as Partial<AlertIdentity>;
+  if (!parsed.installationId || !parsed.installationSecret) return null;
+  return { installationId: parsed.installationId, installationSecret: parsed.installationSecret };
+}
+
 async function loadAlertIdentity(): Promise<AlertIdentity> {
   try {
     const marker = await AsyncStorage.getItem(ALERT_INSTALL_MARKER_KEY);
-    const raw = await secureGet(ALERT_IDENTITY_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw) as Partial<AlertIdentity>;
-      if (parsed.installationId && parsed.installationSecret) {
-        if (!marker && Platform.OS !== "web") {
-          // Secure storage can survive a native reinstall while AsyncStorage does not.
-          // Reuse the installation identity: Privacy is the only full alert-data deletion action.
-          await AsyncStorage.setItem(ALERT_INSTALL_MARKER_KEY, await randomUuid());
-        }
-        return { installationId: parsed.installationId, installationSecret: parsed.installationSecret };
+    const storedIdentity = await loadStoredAlertIdentity();
+    if (storedIdentity) {
+      if (!marker && Platform.OS !== "web") {
+        // Secure storage can survive a native reinstall while AsyncStorage does not.
+        // This continues the same opaque alert installation only; routine saved
+        // routes remain local and are not recovered. Privacy deletes it explicitly.
+        await AsyncStorage.setItem(ALERT_INSTALL_MARKER_KEY, await randomUuid());
       }
+      return storedIdentity;
     }
   } catch {
     alertIdentityPromise = null;

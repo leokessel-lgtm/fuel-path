@@ -116,36 +116,28 @@ export function useRouteAlerts({
       if (!active) return;
       setNotificationPermission(permission.state);
       setNotificationMessage(permission.message);
-      if (permission.state !== "denied" || !savedCommutes.some((commute) => commute.alertEnabled)) return;
-      const cancellations = await Promise.all(savedCommutes.map((commute) => cancelSavedCommuteAlert(commute)));
-      const failedLocalIds = new Set(savedCommutes
+      const watchedCommutes = savedCommutes.filter((commute) => commute.alertEnabled);
+      if (permission.state !== "denied" || !watchedCommutes.length) return;
+      const cancellations = await Promise.all(watchedCommutes.map((commute) => cancelSavedCommuteAlert(commute)));
+      const failedLocalIds = new Set(watchedCommutes
         .filter((_, index) => cancellations[index]?.status === "failed")
         .map((commute) => commute.id));
-      const backendSyncs = await Promise.all(savedCommutes
-        .filter((commute) => commute.alertEnabled)
+      const backendSyncs = await Promise.all(watchedCommutes
         .map((commute) => syncSavedRouteAlert({
           commute,
           enabled: false,
           preferences,
         })));
-      const failedBackendIds = new Set(savedCommutes
-        .filter((commute) => commute.alertEnabled)
+      const failedBackendIds = new Set(watchedCommutes
         .filter((_, index) => backendSyncs[index]?.status !== "synced")
         .map((commute) => commute.id));
       if (!active) return;
-      setSavedCommutes((current) => current.map((commute) => ({
-        ...commute,
-        alertEnabled: failedBackendIds.has(commute.id),
-        alertStatus: failedBackendIds.has(commute.id) ? "failed" : "needs_permission",
-        alertStatusMessage: failedBackendIds.has(commute.id)
-          ? "Notifications are off. Route watch update still needs retry."
-          : "Notifications are off. Route watch data was kept.",
-        backendSyncedAt: failedBackendIds.has(commute.id) ? commute.backendSyncedAt : new Date().toISOString(),
-        localReminderEnabled: false,
-        nextAlertAt: failedLocalIds.has(commute.id) ? commute.nextAlertAt : undefined,
-        scheduledNotificationId: failedLocalIds.has(commute.id) ? commute.scheduledNotificationId : undefined,
-        scheduledNotificationIds: failedLocalIds.has(commute.id) ? commute.scheduledNotificationIds : undefined,
-      })));
+      setSavedCommutes((current) => reconcileRevokedRouteAlerts(current, {
+        watchedRouteIds: new Set(watchedCommutes.map((commute) => commute.id)),
+        failedBackendIds,
+        failedLocalIds,
+        syncedAt: new Date().toISOString(),
+      }));
     };
 
     let lastPushTokenRefreshAt = 0;
@@ -539,6 +531,44 @@ function smartRouteDeliveryReady(result: { remoteDeliveryEnabled?: boolean; stat
   // A saved backend watch remains enrolled while the global delivery gate is off.
   // The gate controls sending, not whether this device and route were registered.
   return result.status === "synced" || result.status === "skipped";
+}
+
+export function reconcileRevokedRouteAlerts(
+  commutes: SavedCommute[],
+  {
+    watchedRouteIds,
+    failedBackendIds,
+    failedLocalIds,
+    syncedAt,
+  }: {
+    watchedRouteIds: Set<string>;
+    failedBackendIds: Set<string>;
+    failedLocalIds: Set<string>;
+    syncedAt: string;
+  },
+) {
+  return commutes.map((commute) => {
+    // A permission change only reconciles watches that were actually enabled.
+    // Do not rewrite already-off routes or touch their local reminder metadata.
+    if (!watchedRouteIds.has(commute.id)) return commute;
+
+    const backendFailed = failedBackendIds.has(commute.id);
+    const localCancellationFailed = failedLocalIds.has(commute.id);
+    return alertStateUpdate(commute, {
+      alertEnabled: backendFailed,
+      alertStatus: backendFailed || localCancellationFailed ? "failed" : "needs_permission",
+      alertStatusMessage: backendFailed
+        ? "Notifications are off. Route watch update still needs retry."
+        : localCancellationFailed
+          ? "Notifications are off. Local reminder cancellation needs retry."
+          : "Notifications are off. Route watch data was kept.",
+      backendSyncedAt: backendFailed ? commute.backendSyncedAt : syncedAt,
+      localReminderEnabled: false,
+      nextAlertAt: localCancellationFailed ? commute.nextAlertAt : undefined,
+      scheduledNotificationId: localCancellationFailed ? commute.scheduledNotificationId : undefined,
+      scheduledNotificationIds: localCancellationFailed ? commute.scheduledNotificationIds : undefined,
+    });
+  });
 }
 
 const weekdays: Weekday[] = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];

@@ -1,6 +1,6 @@
 # Account-Free Native Data Architecture
 
-Last updated: 12 July 2026, Australia/Sydney
+Last updated: 13 July 2026, Australia/Sydney
 
 ## Purpose And Decision
 
@@ -55,9 +55,13 @@ the add/backfill path because PR #29 establishes a forward-only baseline.
    remain separately authorised.
 4. Capabilities are never database credentials. The device cannot query Neon
    or Postgres directly. API service credentials remain server-only.
-5. Secret loss, SecureStore invalidation or a fresh install creates a new
-   anonymous installation. It must not recover a previous installation merely
-   because an iOS keychain entry happens to persist.
+5. Secret loss or SecureStore invalidation creates a new anonymous
+   installation. If native SecureStore survives a reinstall while its
+   non-secret AsyncStorage marker does not, treat it as the same opaque alert
+   installation so route-watch history is not silently deleted. Recreate only
+   the marker. Do not restore routine local state or saved routes, and make
+   the explicit Privacy action the only way to delete the surviving alert
+   installation's backend data.
 
 Use server-side hashed secret verifiers, key identifiers and rotation metadata,
 not plaintext installation secrets. Rate-limit capability issuance and alert
@@ -70,7 +74,7 @@ are measured and tuned after controlled traffic.
 | --- | --- |
 | First launch | Create the anonymous installation owner before alert opt-in; no backend registration is necessary yet. |
 | Normal update | Retain local routine state and secure identity where the platform does. Refresh capability only when needed. |
-| iOS uninstall/reinstall | Expo SecureStore uses Keychain and may persist for the same bundle ID, but Expo says not to rely on this. On launch, reconcile a surviving secret with a separate non-secret install marker; if state is inconsistent, invalidate and create a new installation. Never promise recovery. |
+| iOS uninstall/reinstall | Expo SecureStore uses Keychain and may persist for the same bundle ID, but Expo says not to rely on this. If its opaque alert identity survives while the non-secret marker does not, recreate the marker and continue that alert installation only. Do not restore routine local state or saved routes. The explicit Privacy action deletes its backend alert records. |
 | Android uninstall/restore | SecureStore data is not preserved on uninstall. Its Android backup entries need exclusion because restored encrypted entries cannot be decrypted. Treat restore/reinstall as new installation. |
 | Device replacement | New installation, new local setup. No automatic transfer. Accounts are a later explicit feature for backup/transfer/sync only. |
 | Notification denied/revoked | Do not register/retain a newly acquired token. Mark existing push device inactive at the next authenticated app contact and stop evaluation/delivery for it. Local saved route remains local. |

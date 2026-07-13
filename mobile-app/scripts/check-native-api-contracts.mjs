@@ -90,6 +90,7 @@ const { planFuelRoute } = loadTsModule(routeApiSourcePath, {
 await checkPlanFuelRouteContract(planFuelRoute);
 await checkSavedRouteAlertContract();
 checkRouteWatchDeletionBoundaries();
+checkRevokedRouteState();
 
 console.log("Native API contract smoke passed.");
 
@@ -337,6 +338,22 @@ async function checkSavedRouteAlertContract() {
   assert.equal(JSON.parse(reinstalled.storage.get("fuel-path-alert-installation-v3")).installationId, `installation_${"a".repeat(32)}`);
   assert.equal(reinstalled.storage.get("fuel-path:install-marker:v1"), "uuid-contract");
 
+  const markerMissingPrivacyDelete = loadBackendAlertContractModule({
+    capabilityBody: { token: "privacy-recovery-token", expiresAt: "2099-01-01T00:00:00.000Z" },
+    initialStorage: {
+      "fuel-path-alert-installation-v3": JSON.stringify({
+        installationId: `installation_${"c".repeat(32)}`,
+        installationSecret: `secret_${"d".repeat(48)}`,
+      }),
+    },
+  });
+  const markerMissingDeleted = await markerMissingPrivacyDelete.deleteMyAlertData();
+  assert.equal(markerMissingDeleted.status, "synced");
+  assert.equal(markerMissingPrivacyDelete.alertFetchCalls.length, 2);
+  assert.equal(markerMissingPrivacyDelete.alertFetchCalls[0].url, "https://fuel-path.test/api/alerts?action=client-capability");
+  assert.equal(markerMissingPrivacyDelete.alertFetchCalls[1].url, "https://fuel-path.test/api/alerts?action=delete-installation-data");
+  assert.equal(markerMissingPrivacyDelete.storage.has("fuel-path-alert-installation-v3"), false);
+
   const neverEnrolled = loadBackendAlertContractModule({ capabilityBody: null });
   const neverEnrolledDelete = await neverEnrolled.deleteMyAlertData();
   assert.equal(neverEnrolledDelete.status, "synced");
@@ -357,6 +374,52 @@ function checkRouteWatchDeletionBoundaries() {
   assert.match(toggleSource, /syncSavedRouteAlert\(\{\s*commute: targetCommute,\s*enabled: false,/);
   assert.doesNotMatch(toggleSource, /deleteBackendAlertData/);
   assert.doesNotMatch(permissionRevocationSource, /deleteBackendAlertData/);
+}
+
+function checkRevokedRouteState() {
+  const { reconcileRevokedRouteAlerts } = loadTsModule(routeAlertsSourcePath, {
+    require(request) {
+      if (request === "react") return { useCallback: (value) => value, useEffect: () => {}, useState: () => [null, () => {}] };
+      if (request === "react-native") return { AppState: { addEventListener: () => ({ remove() {} }) }, Platform: { OS: "android" } };
+      if (request === "../services/backendAlerts") return {};
+      if (request === "../services/routeNotifications") return {};
+      if (request === "../services/routeNotificationSchedule") return { scheduledRouteNotificationIds: () => [] };
+      return {};
+    },
+    context: { Date },
+  });
+  const watched = {
+    id: "watched-route",
+    alertEnabled: true,
+    alertStatus: "backend_synced",
+    alertStatusMessage: "Route watch is on.",
+    backendSyncedAt: "2026-07-13T00:00:00.000Z",
+    localReminderEnabled: true,
+    scheduledNotificationId: "scheduled-watch",
+  };
+  const alreadyOff = {
+    id: "already-off-route",
+    alertEnabled: false,
+    alertStatus: "off",
+    alertStatusMessage: "Route alert is off.",
+    localReminderEnabled: true,
+    scheduledNotificationId: "scheduled-off",
+  };
+
+  const reconciled = reconcileRevokedRouteAlerts([watched, alreadyOff], {
+    watchedRouteIds: new Set([watched.id]),
+    failedBackendIds: new Set(),
+    failedLocalIds: new Set(),
+    syncedAt: "2026-07-13T01:00:00.000Z",
+  });
+
+  assert.equal(reconciled[0].alertEnabled, false);
+  assert.equal(reconciled[0].alertStatus, "needs_permission");
+  assert.equal(reconciled[0].backendSyncedAt, "2026-07-13T01:00:00.000Z");
+  assert.equal(reconciled[0].scheduledNotificationId, undefined);
+  assert.equal(reconciled[1], alreadyOff);
+  assert.equal(reconciled[1].alertStatus, "off");
+  assert.equal(reconciled[1].scheduledNotificationId, "scheduled-off");
 }
 
 function loadBackendAlertContractModule({ capabilityBody, initialStorage = {} }) {

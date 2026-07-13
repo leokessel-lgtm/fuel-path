@@ -1,5 +1,6 @@
 import { Component, Suspense, useEffect, useState, type ReactNode } from "react";
 import {
+  Alert,
   BackHandler,
   Platform,
   Pressable,
@@ -18,6 +19,7 @@ import { useRecentLocations } from "./src/hooks/useRecentLocations";
 import { useRouteAlerts } from "./src/hooks/useRouteAlerts";
 import { useSavedCommutes } from "./src/hooks/useSavedCommutes";
 import { initialiseAnonymousInstallation } from "./src/services/backendAlerts";
+import { clearRoutineLocalData } from "./src/services/localDataLifecycle";
 import { colors, radii, shadow, spacing, surfaces, typeScale, typography } from "./src/theme";
 import { MapPoint, VehicleProfile } from "./src/types";
 
@@ -62,6 +64,7 @@ export default function App() {
   const {
     clearNamedPlace,
     preferences,
+    resetPreferences,
     addVehicle,
     removeVehicle,
     saveNamedPlace,
@@ -107,6 +110,21 @@ export default function App() {
     savedCommutes,
     setSavedCommutes,
   });
+  const deleteAllAppData = async () => {
+    if (Platform.OS !== "web") {
+      const backendDeleted = await deleteAllAlertData();
+      if (!backendDeleted) return;
+    }
+    try {
+      await clearRoutineLocalData();
+      resetPreferences();
+      clearRecentLocations();
+      setSavedCommutes([]);
+      Alert.alert("App data deleted", "Local preferences, places, routes and product-use history were deleted.");
+    } catch {
+      Alert.alert("Local data not fully deleted", "Some local data could not be cleared. Please try again.");
+    }
+  };
   useEffect(() => {
     if (Platform.OS === "web") return;
     void initialiseAnonymousInstallation().catch(() => {
@@ -338,6 +356,7 @@ export default function App() {
               onToggleEvConnector={toggleEvConnector}
               onVehicleProfileChange={updateVehicleProfile}
               onClearVehicleProfile={() => updateVehicleProfile({ vehicleName: "", vehicleRego: "" })}
+              onDeleteAllData={deleteAllAppData}
               onDeleteAlertData={deleteAllAlertData}
               onVehicleEnergyTypeChange={updateVehicleEnergyType}
               onAddVehicle={addVehicle}

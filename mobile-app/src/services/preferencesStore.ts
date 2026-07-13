@@ -15,8 +15,8 @@ import {
   VehicleEnergyType,
 } from "../types";
 import { normalisePreferredStationBrands } from "../utils/stationBrandPreferences";
+import { PREFERENCES_KEY } from "./localDataLifecycle";
 
-const PREFERENCES_KEY = "fuel-path:preferences:v1";
 const DEFAULT_VEHICLE_ID = "vehicle-default";
 const fuelCodes: FuelCode[] = ["E10", "U91", "P95", "P98", "DL", "PDL", "LPG"];
 const evConnectors: EvConnector[] = ["CCS2", "CHADEMO", "TYPE2", "TESLA", "NACS"];

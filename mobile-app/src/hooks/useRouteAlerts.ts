@@ -299,13 +299,13 @@ export function useRouteAlerts({
   }, [alertSyncingCommuteId, preferences, savedCommutes, setSavedCommutes]);
 
   const deleteAllAlertData = useCallback(async () => {
-    if (alertSyncingCommuteId) return;
+    if (alertSyncingCommuteId) return false;
     setAlertSyncingCommuteId("all-alert-data");
     try {
       const result = await deleteBackendAlertData();
       if (result.status !== "synced") {
         setNotificationMessage(result.message);
-        return;
+        return false;
       }
       const cancellations = await Promise.all(savedCommutes.map((commute) => cancelSavedCommuteAlert(commute)));
       const failedLocalIds = new Set(savedCommutes
@@ -325,7 +325,10 @@ export function useRouteAlerts({
         scheduledNotificationIds: failedLocalIds.has(commute.id) ? commute.scheduledNotificationIds : undefined,
         updatedAt: new Date().toISOString(),
       })));
-      setNotificationMessage(result.message);
+      setNotificationMessage(failedLocalIds.size
+        ? "Backend alert data was deleted. Some local reminders could not be cancelled, so local app data was kept. Try again."
+        : result.message);
+      return failedLocalIds.size === 0;
     } finally {
       setAlertSyncingCommuteId(null);
     }

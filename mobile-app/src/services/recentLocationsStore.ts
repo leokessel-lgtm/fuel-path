@@ -1,8 +1,8 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { MapPoint } from "../types";
+import { RECENT_LOCATIONS_KEY } from "./localDataLifecycle";
 
-const RECENT_LOCATIONS_KEY = "fuel-path:recent-locations:v1";
 export const MAX_RECENT_LOCATIONS = 8;
 
 export async function loadRecentLocations(): Promise<MapPoint[]> {

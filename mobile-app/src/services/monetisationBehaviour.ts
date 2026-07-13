@@ -1,7 +1,11 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import {
+  MONETISATION_EVENTS_KEY,
+  MONETISATION_SESSION_KEY,
+} from "./localDataLifecycle";
 
-const EVENTS_KEY = "fuelpath.monetisationBehaviour.events.v1";
-const SESSION_KEY = "fuelpath.monetisationBehaviour.sessionId.v1";
+const EVENTS_KEY = MONETISATION_EVENTS_KEY;
+const SESSION_KEY = MONETISATION_SESSION_KEY;
 const MAX_EVENTS = 500;
 
 export type MonetisationBehaviourEventName =

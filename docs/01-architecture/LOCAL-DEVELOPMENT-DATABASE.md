@@ -13,8 +13,20 @@ Fuel Path has two separate database concerns:
 Docker and the `docker-compose` command must be available.
 
 ```sh
+npm run db:ready
+```
+
+`db:ready` starts Postgres, applies all forward migrations and runs a real
+read/write verification across anonymous installation ownership, atomic route
+watch enrolment and rollback, alert evaluation idempotency, geocoding quota,
+prediction records and privacy deletion. Use the lower-level commands only
+when diagnosing an individual stage:
+
+```sh
 npm run db:up
 npm run db:migrate:local
+npm run db:verify:local
+npm run db:verify:restart
 ```
 
 The local database listens on `127.0.0.1:54329` and uses the development-only
@@ -96,3 +108,17 @@ prediction storage use it directly. Geocoding quota also honours
 The current API keeps its in-memory fallback only when no relevant database URL
 is configured. When a URL is configured but migrations are missing, requests
 fail with a clear migration instruction rather than creating tables at runtime.
+
+## Operational acceptance gate
+
+The local product database is operational only when all of the following are
+true:
+
+- `docker-compose -f docker-compose.yml ps` reports Postgres as healthy.
+- `npm run db:migrate:local` reports no pending migration failure.
+- `npm run db:verify:local` passes without leaving verification rows behind.
+- `npm run db:verify:restart` proves the Docker volume retains data through a
+  normal stop/start cycle and removes its sentinel row afterwards.
+- `npm run test:alert-retention-postgres` passes against real Postgres.
+
+Passing unit tests alone is not sufficient evidence for this gate.

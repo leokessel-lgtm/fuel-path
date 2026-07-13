@@ -1,8 +1,8 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { FuelCode, MapPoint, SavedCommute, Weekday } from "../types";
+import { SAVED_COMMUTES_KEY } from "./localDataLifecycle";
 
-const SAVED_COMMUTES_KEY = "fuel-path:saved-commutes:v1";
 const MAX_SAVED_COMMUTES = 20;
 const fuelCodes: FuelCode[] = ["E10", "U91", "P95", "P98", "DL", "PDL", "LPG"];
 const weekdays: Weekday[] = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];

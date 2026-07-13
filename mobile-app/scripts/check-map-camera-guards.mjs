@@ -836,7 +836,8 @@ const checks = [
       nativeApiContracts.includes("assert.equal(body.fuel, \"PDL\");") &&
       nativeApiContracts.includes("assert.equal(body.tankPercent, 40);") &&
       packageJson.includes('"test:native-api-contracts": "node scripts/check-native-api-contracts.mjs"') &&
-      packageJson.includes("npm run test:native-api-contracts && npm run test:map-camera") &&
+      packageJson.includes("npm run test:native-api-contracts") &&
+      packageJson.includes("npm run test:map-camera") &&
       planScreen.includes("preferences,\n        stationBrands: preferredStationBrands") &&
       routeRecommendationRules.includes("Native live Plan requests must send the active vehicle tank size") &&
       !accountScreen.includes("DecisionRuleCard"),

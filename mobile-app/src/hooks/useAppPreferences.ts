@@ -234,12 +234,17 @@ export function useAppPreferences() {
     setPreferences((current) => ({ ...current, navigationApp }));
   }, []);
 
+  const resetPreferences = useCallback(() => {
+    setPreferences(defaultPreferences);
+  }, []);
+
   return {
     clearNamedPlace,
     loaded,
     preferences,
     addVehicle,
     removeVehicle,
+    resetPreferences,
     saveNamedPlace,
     selectVehicle,
     setPreferredStationBrands,

@@ -17,6 +17,7 @@ export function AccountDetailScreen({
   notificationPermission,
   onBack,
   onClearNamedPlace,
+  onDeleteAllData,
   onDeleteAlertData,
   onFuelChange,
   onHomeChargingAccessChange,
@@ -143,6 +144,24 @@ export function AccountDetailScreen({
           >
             <Text style={styles.dataDeleteButtonText}>
               {alertSyncingCommuteId === "all-alert-data" ? "Deleting alert data…" : "Delete my alert data"}
+            </Text>
+          </Pressable>
+          <Pressable
+            accessibilityLabel="Delete all app data"
+            accessibilityRole="button"
+            disabled={alertSyncingCommuteId != null}
+            onPress={() => Alert.alert(
+              "Delete all app data?",
+              "This permanently deletes your vehicles, preferences, discounts, saved places, saved routes, recent locations and local product-use history. Any anonymous backend alert data is deleted first. This cannot be undone.",
+              [
+                { text: "Cancel", style: "cancel" },
+                { text: "Delete all", style: "destructive", onPress: onDeleteAllData },
+              ],
+            )}
+            style={styles.dataDeleteButton}
+          >
+            <Text style={styles.dataDeleteButtonText}>
+              {alertSyncingCommuteId === "all-alert-data" ? "Deleting app data…" : "Delete all app data"}
             </Text>
           </Pressable>
           <Text accessibilityRole="alert" style={styles.muted}>{notificationMessage}</Text>

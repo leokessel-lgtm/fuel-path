@@ -280,6 +280,8 @@ const checks = [
     label: "account-free alert deletion and local-route loss copy stay user visible",
     ok:
       files.accountDetail.includes('accessibilityLabel="Delete my alert data"') &&
+      files.accountDetail.includes('accessibilityLabel="Delete all app data"') &&
+      files.accountDetail.includes("Any anonymous backend alert data is deleted first.") &&
       files.accountDetail.includes("Your saved routes are stored on this device.") &&
       files.accountDetail.includes("will not automatically move to a new phone") &&
       files.backendAlerts.includes('action=delete-installation-data') &&

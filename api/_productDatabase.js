@@ -13,7 +13,7 @@ let alertInstallationSchemaChecks = new WeakMap();
 function createProductSqlClient(connectionString) {
   if (usesDirectPostgres(connectionString)) {
     const { Pool } = require("pg");
-    const pool = new Pool({ connectionString });
+    const pool = new Pool({ connectionString, allowExitOnIdle: true });
     return async (strings, ...values) => {
       const text = strings.reduce(
         (query, segment, index) => query + segment + (index < values.length ? `$${index + 1}` : ""),

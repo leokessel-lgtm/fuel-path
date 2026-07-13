@@ -26,6 +26,7 @@ export type AccountScreenProps = {
   ) => void;
   onClearVehicleProfile: () => void;
   onDeleteAlertData: () => void;
+  onDeleteAllData: () => void;
   onVehicleEnergyTypeChange: (vehicleEnergyType: VehicleEnergyType) => void;
   onAddVehicle: (vehicleEnergyType?: VehicleEnergyType) => void;
   onRemoveVehicle: (vehicleId: string) => void;

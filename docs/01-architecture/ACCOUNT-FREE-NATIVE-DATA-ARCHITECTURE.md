@@ -162,7 +162,7 @@ the published policy before public use:
 | Disabled route | Stop evaluation immediately; purge after 90 days unless deleted sooner. |
 | Evaluation/delivery audit | Keep 180 days for duplicate/delivery troubleshooting, then purge or aggregate. |
 | Idempotency records | Keep 7 days, then purge. |
-| Revoked installation tombstone and stale rate-limit counter | Keep only for a documented abuse/retry window, then purge the secret verifier and counter. The first foundation slice does not yet schedule this purge. |
+| Revoked installation tombstone and stale rate-limit counter | Keep only for the 90-day abuse/retry window. The retention job then physically removes the revoked anonymous installation and its remaining alert records, and independently removes stale HMAC-derived rate-limit counters; neither secret verifier nor counter may outlive that window. |
 | Aggregated operational metrics | Keep only non-identifying aggregates for capacity and cost decisions. |
 
 The cleanup job must be scheduled, authenticated, observable and covered by a

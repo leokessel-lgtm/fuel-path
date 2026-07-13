@@ -80,7 +80,25 @@ async function deleteOrphanedInstallationAlertData(sql, cutoff) {
   `;
 }
 
+async function staleAlertRateLimitCount(sql, cutoff) {
+  return sql`
+    SELECT COUNT(*)::int AS count
+    FROM fuel_path_alert_rate_limits
+    WHERE window_started_at < ${cutoff}
+  `;
+}
+
+async function deleteStaleAlertRateLimits(sql, cutoff) {
+  return sql`
+    DELETE FROM fuel_path_alert_rate_limits
+    WHERE window_started_at < ${cutoff}
+    RETURNING rate_key
+  `;
+}
+
 module.exports = {
+  deleteStaleAlertRateLimits,
   deleteOrphanedInstallationAlertData,
   orphanedInstallationRetentionCounts,
+  staleAlertRateLimitCount,
 };

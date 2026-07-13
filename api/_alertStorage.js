@@ -7,8 +7,10 @@ const {
 const { rowToDevice, rowToEvaluation, rowToRoute } = require("./_alertRecords");
 const { setAlertInstallationStorageForTests } = require("./_alertInstallationStorage");
 const {
+  deleteStaleAlertRateLimits,
   deleteOrphanedInstallationAlertData,
   orphanedInstallationRetentionCounts,
+  staleAlertRateLimitCount,
 } = require("./_orphanedAlertRetention");
 
 const DEFAULT_MAX_RECORDS = 500;
@@ -494,7 +496,7 @@ async function purgeAlertRetention({
   await ensureTables(sql);
   await assertAlertInstallationSchema(sql);
   if (dryRun) {
-    const [devices, routes, evaluations, orphaned] = await Promise.all([
+    const [devices, routes, evaluations, orphaned, rateLimits] = await Promise.all([
       sql`
         SELECT COUNT(*)::int AS count
         FROM fuel_path_push_devices
@@ -513,6 +515,7 @@ async function purgeAlertRetention({
         WHERE evaluated_at < ${evaluationCutoff}
       `,
       orphanedInstallationRetentionCounts(sql, orphanedInstallationCutoff),
+      staleAlertRateLimitCount(sql, orphanedInstallationCutoff),
     ]);
     return {
       dryRun: true,
@@ -527,13 +530,14 @@ async function purgeAlertRetention({
       deletedOrphanedDeviceCount: Number(orphaned[0]?.device_count || 0),
       deletedOrphanedRouteCount: Number(orphaned[0]?.route_count || 0),
       deletedOrphanedEvaluationCount: Number(orphaned[0]?.evaluation_count || 0),
+      deletedRateLimitCount: Number(rateLimits[0]?.count || 0),
     };
   }
 
   // Remove complete stale anonymous installations first. Its child deletes must not
   // race the narrower retention deletes below.
   const orphaned = await deleteOrphanedInstallationAlertData(sql, orphanedInstallationCutoff);
-  const [devices, routes, evaluations] = await Promise.all([
+  const [devices, routes, evaluations, rateLimits] = await Promise.all([
     sql`
       DELETE FROM fuel_path_push_devices
       WHERE status <> 'active'
@@ -551,6 +555,7 @@ async function purgeAlertRetention({
       WHERE evaluated_at < ${evaluationCutoff}
       RETURNING id
     `,
+    deleteStaleAlertRateLimits(sql, orphanedInstallationCutoff),
   ]);
   return {
     dryRun: false,
@@ -565,6 +570,7 @@ async function purgeAlertRetention({
     deletedOrphanedDeviceCount: Number(orphaned[0]?.device_count || 0),
     deletedOrphanedRouteCount: Number(orphaned[0]?.route_count || 0),
     deletedOrphanedEvaluationCount: Number(orphaned[0]?.evaluation_count || 0),
+    deletedRateLimitCount: rateLimits.length,
   };
 }
 
@@ -662,6 +668,7 @@ function purgeMemoryAlertRetention({
     deletedOrphanedDeviceCount,
     deletedOrphanedRouteCount,
     deletedOrphanedEvaluationCount,
+    deletedRateLimitCount: 0,
   };
 }
 

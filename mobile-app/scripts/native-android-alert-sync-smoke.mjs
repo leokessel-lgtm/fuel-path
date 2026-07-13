@@ -243,12 +243,28 @@ function writeReport(status) {
     "",
     "## Interpretation",
     "",
-    "- This proves the account-free Android route-watch backend contract can issue an installation-scoped capability, accept a push-device registration shape, save and list a route watch, delete the temporary route, atomically delete the installation's alert data, and revoke the capability.",
+    ...reportInterpretation(status),
     "- It does not send a real push notification or prove Expo delivery to a physical device.",
     "- Installation secret, scoped capability and push token values are intentionally omitted from this report.",
     "",
   ];
   writeFileSync(reportPath, `${lines.join("\n")}\n`);
+}
+
+function reportInterpretation(status) {
+  if (status === "passed") {
+    return [
+      "- This proves the account-free Android route-watch backend contract can issue an installation-scoped capability, accept a push-device registration shape, save and list a route watch, delete the temporary route, atomically delete the installation's alert data, and revoke the capability.",
+    ];
+  }
+  if (status === "partial") {
+    return [
+      "- This is partial evidence only. Read each failed or warned check before claiming any route-watch lifecycle coverage.",
+    ];
+  }
+  return [
+    "- This run provides no successful route-watch lifecycle proof. No claim about capability, route, device, evaluation or deletion behaviour may be made from it.",
+  ];
 }
 
 function argumentValue(name) {

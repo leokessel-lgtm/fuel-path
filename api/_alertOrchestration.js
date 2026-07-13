@@ -225,11 +225,14 @@ function createAlertOrchestration({ buildRoute, capabilitiesForPoints, loadStati
         alerts: security,
       };
     }
-    const secretHash = installationSecretHash(safeInstallationSecret);
-    const installation = await (process.env.ALERTS_CLIENT_CAPABILITY_EXISTING_ONLY === "1"
-      ? getAnonymousInstallation(safeInstallationId)
-      : registerAnonymousInstallation({ installationId: safeInstallationId, secretHash }));
-    if (!installation || installation.revokedAt || !timingSafeEqualText(installation.secretHash, secretHash)) {
+    const installation = await registerAnonymousInstallation({
+      installationId: safeInstallationId,
+      secretHash: installationSecretHash(safeInstallationSecret),
+    });
+    if (
+      installation.revokedAt ||
+      !timingSafeEqualText(installation.secretHash, installationSecretHash(safeInstallationSecret))
+    ) {
       return {
         accepted: false,
         error: "Alert client capability is not available for this installation.",

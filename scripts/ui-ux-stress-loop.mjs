@@ -182,7 +182,7 @@ const checks = [
     profiles: ["broad", "full"],
     command: ["npm", "run", "test:plan-route-recommendations:local"],
     env: {
-      FUEL_PATH_ROUTE_RECOMMENDATION_PAIRS: profile === "broad" ? "100" : "500",
+      FUEL_PATH_PLAN_ROUTE_STRESS_PAIRS: profile === "broad" ? "100" : "500",
     },
     timeoutMs: profile === "broad" ? 420_000 : 1_200_000,
   }),

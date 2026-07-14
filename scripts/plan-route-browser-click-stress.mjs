@@ -11,6 +11,10 @@ const clickCount = Number(process.env.FUEL_PATH_PLAN_BROWSER_STRESS_CLICK_STATIO
 const caseTimeoutMs = Number(process.env.FUEL_PATH_PLAN_BROWSER_STRESS_CASE_TIMEOUT_MS || 24000);
 const resultTimeoutMs = Number(process.env.FUEL_PATH_PLAN_BROWSER_STRESS_RESULT_TIMEOUT_MS || 24000);
 const snapshotCount = Number(process.env.FUEL_PATH_PLAN_BROWSER_STRESS_SNAPSHOTS || 0);
+const pairFilter = String(process.env.FUEL_PATH_PLAN_BROWSER_STRESS_PAIR_IDS || "")
+  .split(",")
+  .map((value) => value.trim())
+  .filter(Boolean);
 const runId = new Date().toISOString().replace(/[:.]/g, "-");
 const outputDir = path.resolve("tmp");
 const screenshotDir = path.join(outputDir, `plan-route-browser-click-stress-${runId}-screenshots`);
@@ -36,7 +40,13 @@ const endpoints = [
   ep("alice", "Alice Springs NT", -23.698, 133.8807, "NT", "remote"),
 ];
 
-const pairs = buildRoutePairs(endpoints, pairCount);
+const builtPairs = buildRoutePairs(endpoints, pairCount);
+const pairs = pairFilter.length
+  ? builtPairs.filter((pair) => pairFilter.includes(`${pair.from.id}->${pair.to.id}`))
+  : builtPairs;
+if (pairFilter.length && pairs.length !== pairFilter.length) {
+  throw new Error(`Found ${pairs.length}/${pairFilter.length} requested route-pair regressions`);
+}
 const results = [];
 const apiCalls = [];
 let currentPair = pairs[0];
@@ -130,9 +140,7 @@ async function runBrowserCase(activePage, pair, index) {
   };
   try {
     await activePage.goto(appUrl, { waitUntil: "domcontentloaded" });
-    await activePage.waitForTimeout(600);
-    await clickText(activePage, "Plan");
-    await activePage.waitForTimeout(300);
+    await openPlanTab(activePage);
     await fillPlanField(activePage, 0, pair.from.label);
     await chooseSuggestion(activePage, pair.from.label);
     await fillPlanField(activePage, 1, pair.to.label);
@@ -229,10 +237,22 @@ async function installMocks(activePage) {
 }
 
 async function fillPlanField(activePage, index, value) {
-  const inputs = await activePage.locator("input").count();
-  if (inputs < 2) throw new Error(`expected at least two plan inputs, saw ${inputs}`);
-  await activePage.locator("input").nth(index).fill(value);
+  const label = index === 0 ? "From" : "To";
+  const input = activePage.getByLabel(label, { exact: true });
+  if (await input.count() !== 1) throw new Error(`expected one ${label} plan input`);
+  await input.fill(value);
   await activePage.waitForTimeout(250);
+}
+
+async function openPlanTab(activePage) {
+  const planTab = activePage.getByRole("tab", { name: "Plan", exact: true });
+  await planTab.waitFor({ state: "visible", timeout: 7000 });
+  if (await planTab.count() !== 1) throw new Error("expected one Plan navigation tab");
+  await planTab.click({ timeout: 3000 });
+  await Promise.all([
+    activePage.getByLabel("From", { exact: true }).waitFor({ state: "visible", timeout: 7000 }),
+    activePage.getByLabel("To", { exact: true }).waitFor({ state: "visible", timeout: 7000 }),
+  ]);
 }
 
 async function chooseSuggestion(activePage, label) {

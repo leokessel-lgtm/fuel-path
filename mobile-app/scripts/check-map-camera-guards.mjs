@@ -336,6 +336,7 @@ const checks = [
       nativeMap.includes("return width <= 430 ? compactMarkerDensity : defaultMarkerDensity;") &&
       nativeMap.includes("type ClusterMarker = {") &&
       nativeMap.includes("items: StationViewModel[];") &&
+      nativeMap.includes("minPrice: number;") &&
       nativeMap.includes("fitToCoordinates(") &&
       nativeMap.includes("if (items.length > 1)") &&
       !nativeMap.includes("priceMarkers.push(...singletonMarkers)") &&
@@ -353,6 +354,9 @@ const checks = [
       nativeMap.includes("function boundsForCluster(cluster: ClusterMarker)") &&
       nativeMap.includes("styles.clusterPin") &&
       nativeMap.includes("styles.clusterCount") &&
+      nativeMap.includes("styles.clusterPrice") &&
+      nativeMap.includes("cluster.minPrice.toFixed(1)") &&
+      nativeMap.includes("minPrice: Math.min(current.minPrice, item.adjustedCpl)") &&
       nativeMap.includes("tracksViewChanges={Platform.OS === \"android\"}") &&
       nativeMap.includes("styles.pinBrand") &&
       nativeMap.includes("styles.pinPointer") &&

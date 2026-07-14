@@ -51,6 +51,7 @@ type ClusterMarker = {
   items: StationViewModel[];
   lat: number;
   lon: number;
+  minPrice: number;
 };
 
 const emptyRoutePoints: MapPoint[] = [];
@@ -487,6 +488,9 @@ export function StationMap({
           >
             <View style={styles.clusterPin}>
               <Text style={styles.clusterCount}>{cluster.count}</Text>
+              <Text style={styles.clusterPrice}>
+                {cluster.minPrice.toFixed(1)}
+              </Text>
             </View>
           </Marker>
         ))}
@@ -717,7 +721,10 @@ function visibleMarkerGroups(
 
   const clusterMarkers = clusterItems
     .map(clusterMarkerForItems)
-    .sort((left, right) => right.count - left.count);
+    .sort(
+      (left, right) =>
+        right.count - left.count || left.minPrice - right.minPrice,
+    );
 
   return { priceMarkers, clusterMarkers };
 }
@@ -741,14 +748,16 @@ function clusterMarkerForItems(items: StationViewModel[]): ClusterMarker {
       count: current.count + 1,
       lat: current.lat + item.station.lat,
       lon: current.lon + item.station.lon,
+      minPrice: Math.min(current.minPrice, item.adjustedCpl),
     }),
-    { count: 0, lat: 0, lon: 0 },
+    { count: 0, lat: 0, lon: 0, minPrice: Number.POSITIVE_INFINITY },
   );
   return {
     count: totals.count,
     items,
     lat: totals.lat / totals.count,
     lon: totals.lon / totals.count,
+    minPrice: totals.minPrice,
   };
 }
 
@@ -1194,6 +1203,8 @@ const styles = StyleSheet.create({
     borderColor: colors.white,
     borderRadius: radii.pill,
     borderWidth: 2,
+    flexDirection: "row",
+    gap: 4,
     height: 30,
     justifyContent: "center",
     minWidth: 30,
@@ -1203,6 +1214,11 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontSize: 11,
     fontWeight: "900",
+  },
+  clusterPrice: {
+    color: colors.greenSoft,
+    fontSize: 10,
+    fontWeight: "800",
   },
   evPinAnchor: {
     alignItems: "center",

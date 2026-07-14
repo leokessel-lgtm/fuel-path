@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import MapView, {
   Marker,
@@ -7,6 +7,7 @@ import MapView, {
   type Region,
 } from "react-native-maps";
 
+import { brandStyleForStation } from "../data/brandAssets";
 import { colors, mapSkin, radii, shadow, spacing } from "../theme";
 import { EvCharger, MapPoint, StationViewModel } from "../types";
 import { BrandBadge } from "./BrandBadge";
@@ -536,46 +537,69 @@ export function StationMap({
           const subdued = Boolean(
             routeEndpoints && selectedStationCode && !selected,
           );
+          const brandStyle = brandStyleForStation(item.station);
+          const brandIcon = brandStyle.markerIcon || brandStyle.icon;
+          const nativeBrandIcon =
+            typeof brandIcon === "number" ? brandIcon : undefined;
           return (
-            <Marker
-              {...decorativeStationMarkerAccessibility}
-              coordinate={{
-                latitude: item.station.lat,
-                longitude: item.station.lon,
-              }}
-              key={`${item.station.stationCode}-${markerAssetRefreshVersion}`}
-              onPress={() => handleMarkerPress(item.station.stationCode)}
-              tracksViewChanges={Platform.OS === "android"}
-              zIndex={selected ? 700 : subdued ? 420 : 500}
-            >
-              <View style={styles.pinAnchor}>
-                <View
-                  style={[
-                    styles.pin,
-                    subdued && styles.pinSubdued,
-                    selected && styles.pinSelected,
-                  ]}
-                >
-                  <Text
+            <Fragment key={`${item.station.stationCode}-marker-stack`}>
+              <Marker
+                {...decorativeStationMarkerAccessibility}
+                coordinate={{
+                  latitude: item.station.lat,
+                  longitude: item.station.lon,
+                }}
+                key={`${item.station.stationCode}-${markerAssetRefreshVersion}`}
+                onPress={() => handleMarkerPress(item.station.stationCode)}
+                tracksViewChanges={Platform.OS === "android"}
+                zIndex={selected ? 700 : subdued ? 420 : 500}
+              >
+                <View style={styles.pinAnchor}>
+                  <View
                     style={[
-                      styles.pinPrice,
-                      selected && styles.pinPriceSelected,
+                      styles.pin,
+                      subdued && styles.pinSubdued,
+                      selected && styles.pinSelected,
                     ]}
                   >
-                    {item.adjustedCpl.toFixed(1)}
-                  </Text>
-                  <View style={styles.pinBrand}>
-                    <BrandBadge marker station={item.station} size={22} />
+                    <Text
+                      style={[
+                        styles.pinPrice,
+                        selected && styles.pinPriceSelected,
+                      ]}
+                    >
+                      {item.adjustedCpl.toFixed(1)}
+                    </Text>
+                    <View style={styles.pinBrand}>
+                      {Platform.OS === "android" ? null : (
+                        <BrandBadge marker station={item.station} size={22} />
+                      )}
+                    </View>
                   </View>
+                  <View
+                    style={[
+                      styles.pinPointer,
+                      selected && styles.pinPointerSelected,
+                    ]}
+                  />
                 </View>
-                <View
-                  style={[
-                    styles.pinPointer,
-                    selected && styles.pinPointerSelected,
-                  ]}
+              </Marker>
+              {Platform.OS === "android" && nativeBrandIcon ? (
+                <Marker
+                  {...decorativeStationMarkerAccessibility}
+                  anchor={{ x: 0.5, y: 1.35 }}
+                  coordinate={{
+                    latitude: item.station.lat,
+                    longitude: item.station.lon,
+                  }}
+                  image={nativeBrandIcon}
+                  key={`${item.station.stationCode}-brand-${markerAssetRefreshVersion}`}
+                  onPress={() => handleMarkerPress(item.station.stationCode)}
+                  tracksViewChanges={false}
+                  zIndex={selected ? 720 : subdued ? 440 : 520}
                 />
-              </View>
-            </Marker>
+              ) : null}
+            </Fragment>
           );
         })}
       </MapView>

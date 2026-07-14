@@ -357,10 +357,12 @@ const checks = [
       nativeMap.includes("styles.pinBrand") &&
       nativeMap.includes("styles.pinPointer") &&
       nativeMap.includes("<BrandBadge") &&
-      nativeMap.includes("<BrandBadge marker station={item.station} size={22} />") &&
-      !nativeMap.includes("const nativeBrandIcon =") &&
-      !nativeMap.includes("image={nativeBrandIcon}") &&
-      !nativeMap.includes("marker-stack") &&
+      nativeMap.includes("Platform.OS === \"android\" ? null") &&
+      nativeMap.includes("brandStyle.markerIcon || brandStyle.icon") &&
+      nativeMap.includes("const nativeBrandIcon =") &&
+      nativeMap.includes("image={nativeBrandIcon}") &&
+      nativeMap.includes("anchor={{ x: 0.5, y: 1.35 }}") &&
+      nativeMap.includes("marker-stack") &&
       nativeMap.includes("marker") &&
       nativeMap.includes("station={item.station}") &&
       nativeMap.includes("size={22}") &&

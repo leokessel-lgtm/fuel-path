@@ -59,7 +59,12 @@ export async function persistRecoverableJson<T>({
   backupKey: string;
   value: T;
 }) {
-  const revision = nextRevision();
+  const current = await AsyncStorage.multiGet([primaryKey, backupKey]);
+  const persistedRevision = current.reduce(
+    (highest, [, raw]) => Math.max(highest, envelopeRevision(raw)),
+    0,
+  );
+  const revision = nextRevision(persistedRevision);
   const payloadJson = JSON.stringify(value);
   const envelope: LocalEnvelope<T> = {
     schemaVersion: 1,
@@ -107,14 +112,28 @@ function isEnvelope(value: unknown): value is LocalEnvelope<unknown> {
   const candidate = value as Partial<LocalEnvelope<unknown>>;
   return candidate.schemaVersion === 1
     && Number.isSafeInteger(candidate.revision)
+    && Number(candidate.revision) > 0
+    && Number(candidate.revision) < Number.MAX_SAFE_INTEGER
     && typeof candidate.writtenAt === "string"
     && typeof candidate.checksum === "string"
     && "payload" in candidate;
 }
 
-function nextRevision() {
+function envelopeRevision(raw: string | null) {
+  if (!raw) return 0;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!isEnvelope(parsed)) return 0;
+    if (parsed.checksum !== checksum(JSON.stringify(parsed.payload))) return 0;
+    return parsed.revision;
+  } catch {
+    return 0;
+  }
+}
+
+function nextRevision(persistedRevision = 0) {
   const clockRevision = Date.now() * 1000;
-  lastRevision = Math.max(clockRevision, lastRevision + 1);
+  lastRevision = Math.max(clockRevision, lastRevision + 1, persistedRevision + 1);
   return lastRevision;
 }
 

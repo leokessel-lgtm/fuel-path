@@ -49,7 +49,6 @@ assert.deepEqual(removed, [
 assert.equal(new Set(removed).size, removed.length, "local data keys must not be duplicated");
 assert.equal(removed.some((key) => /alert-installation|capability|secret/i.test(key)), false);
 
-const recoverableModule = { exports: {} };
 const recoverableTranspiled = ts.transpileModule(recoverableSource, {
   compilerOptions: {
     esModuleInterop: true,
@@ -57,15 +56,19 @@ const recoverableTranspiled = ts.transpileModule(recoverableSource, {
     target: ts.ScriptTarget.ES2022,
   },
 }).outputText;
-new Function("require", "module", "exports", recoverableTranspiled)(
-  (id) => {
-    if (id === "@react-native-async-storage/async-storage") return asyncStorage;
-    throw new Error(`Unexpected recoverable local store dependency: ${id}`);
-  },
-  recoverableModule,
-  recoverableModule.exports,
-);
-const recoverable = recoverableModule.exports;
+const loadRecoverableModule = () => {
+  const recoverableModule = { exports: {} };
+  new Function("require", "module", "exports", recoverableTranspiled)(
+    (id) => {
+      if (id === "@react-native-async-storage/async-storage") return asyncStorage;
+      throw new Error(`Unexpected recoverable local store dependency: ${id}`);
+    },
+    recoverableModule,
+    recoverableModule.exports,
+  );
+  return recoverableModule.exports;
+};
+const recoverable = loadRecoverableModule();
 const normalise = (value) => {
   if (!value || typeof value !== "object") throw new Error("invalid fixture");
   return value;
@@ -101,6 +104,36 @@ const newerBackup = await recoverable.loadRecoverableJson({
 });
 assert.equal(newerBackup.source, "backup");
 assert.deepEqual(newerBackup.value, { route: "newest" });
+const highRevisionEnvelope = JSON.parse(stored.get("test:backup"));
+highRevisionEnvelope.revision += 100_000;
+stored.set("test:primary", JSON.stringify(highRevisionEnvelope));
+stored.set("test:backup", JSON.stringify(highRevisionEnvelope));
+const restartedRecoverable = loadRecoverableModule();
+const originalNow = Date.now;
+Date.now = () => 1;
+try {
+  await restartedRecoverable.persistRecoverableJson({
+    primaryKey: "test:primary",
+    backupKey: "test:backup",
+    value: { route: "after-clock-rollback" },
+  });
+} finally {
+  Date.now = originalNow;
+}
+const rollbackSafeEnvelope = JSON.parse(stored.get("test:primary"));
+assert.ok(rollbackSafeEnvelope.revision > highRevisionEnvelope.revision);
+assert.deepEqual(rollbackSafeEnvelope.payload, { route: "after-clock-rollback" });
+const saturatedEnvelope = { ...rollbackSafeEnvelope, revision: Number.MAX_SAFE_INTEGER };
+stored.set("test:primary", JSON.stringify(saturatedEnvelope));
+stored.set("test:backup", JSON.stringify(saturatedEnvelope));
+await restartedRecoverable.persistRecoverableJson({
+  primaryKey: "test:primary",
+  backupKey: "test:backup",
+  value: { route: "after-invalid-saturated-revision" },
+});
+const saturationSafeEnvelope = JSON.parse(stored.get("test:primary"));
+assert.equal(Number.isSafeInteger(saturationSafeEnvelope.revision), true);
+assert.ok(saturationSafeEnvelope.revision < Number.MAX_SAFE_INTEGER);
 stored.set("test:primary", JSON.stringify({ route: "legacy" }));
 stored.delete("test:backup");
 const migrated = await recoverable.loadRecoverableJson({

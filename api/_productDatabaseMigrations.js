@@ -1,5 +1,4 @@
 const { neon } = require("@neondatabase/serverless");
-const { runner } = require("node-pg-migrate");
 const { resolve } = require("node:path");
 const { productDatabaseUrl } = require("./_productDatabase");
 
@@ -47,6 +46,7 @@ async function runProductDatabaseMigrations({
   logger = console,
 } = {}) {
   if (!connectionString) throw new Error("Product database URL is missing.");
+  const { runner } = await import("node-pg-migrate");
   const migrations = await runner({
     dbClient: createNeonHttpMigrationClient(neon(connectionString)),
     dir: migrationsDirectory,

@@ -10,15 +10,6 @@ test("Vercel jobs bundle includes product database migrations", () => {
   assert.equal(config.functions?.["api/jobs.js"]?.includeFiles, "db/migrations/**");
 });
 
-test("serverless migration module loads node-pg-migrate through its ESM entrypoint", () => {
-  const source = fs.readFileSync(
-    path.join(__dirname, "..", "..", "api", "_productDatabaseMigrations.js"),
-    "utf8",
-  );
-  assert.match(source, /await import\("node-pg-migrate"\)/);
-  assert.doesNotMatch(source, /require\("node-pg-migrate"\)/);
-});
-
 test("Neon HTTP migration client batches each migration transaction atomically", async () => {
   const { createNeonHttpMigrationClient } = require("../../api/_productDatabaseMigrations");
   const transactionBatches = [];

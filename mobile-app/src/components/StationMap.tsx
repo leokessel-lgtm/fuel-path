@@ -4,10 +4,10 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { colors, mapSkin, radii, shadow, spacing } from "../theme";
 import { EvCharger, MapPoint, StationViewModel } from "../types";
 import { BrandBadge } from "./BrandBadge";
+import { maxVisibleEvMarkers, prioritiseSelectedChargers } from "./stationMapDensity";
 
 const maxStationMarkers = 240;
 const mixedEnergyMaxStationMarkers = 48;
-const maxEvMarkers = 18;
 const emptyChargers: EvCharger[] = [];
 const emptyRoutePoints: MapPoint[] = [];
 
@@ -82,7 +82,7 @@ export function StationMap({
     stations,
     selectedStationCode,
   ).slice(0, chargers.length ? mixedEnergyMaxStationMarkers : maxStationMarkers);
-  const visibleChargers = prioritiseSelectedChargers(chargers, selectedChargerId).slice(0, maxEvMarkers);
+  const visibleChargers = prioritiseSelectedChargers(chargers, selectedChargerId).slice(0, maxVisibleEvMarkers);
 
   return (
     <View style={styles.map}>
@@ -160,13 +160,6 @@ function prioritiseSelectedStations(stations: StationViewModel[], selectedStatio
   const selected = stations.find((item) => item.station.stationCode === selectedStationCode);
   if (!selected) return stations;
   return [selected, ...stations.filter((item) => item.station.stationCode !== selectedStationCode)];
-}
-
-function prioritiseSelectedChargers(chargers: EvCharger[], selectedChargerId?: string) {
-  if (!selectedChargerId) return chargers;
-  const selected = chargers.find((charger) => charger.id === selectedChargerId);
-  if (!selected) return chargers;
-  return [selected, ...chargers.filter((charger) => charger.id !== selectedChargerId)];
 }
 
 function boundingBox(points: MapPoint[]) {

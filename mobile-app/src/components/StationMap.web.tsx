@@ -5,6 +5,7 @@ import type * as Leaflet from "leaflet";
 import { brandStyleForStation } from "../data/brandAssets";
 import { colors, mapSkin, radii } from "../theme";
 import { EvCharger, MapPoint, StationViewModel } from "../types";
+import { spatiallySeparatedEvChargers } from "./stationMapDensity";
 
 const LEAFLET_CSS_ID = "fuel-path-leaflet-css";
 const LEAFLET_CUSTOM_CSS_ID = "fuel-path-leaflet-custom-css";
@@ -12,7 +13,6 @@ const maxStationMarkers = 420;
 const maxPriceMarkers = 14;
 const routeMaxPriceMarkers = 18;
 const routeCameraStationPointLimit = 12;
-const maxEvMarkers = 18;
 const markerGridSize = 132;
 const mixedEnergyMaxPriceMarkers = 8;
 const mixedEnergyMarkerGridSize = 190;
@@ -351,7 +351,11 @@ export function StationMap({
       fitPoints.push([item.station.lat, item.station.lon]);
     });
 
-    visibleEvChargers(map, chargers, selectedChargerId).forEach((charger) => {
+    spatiallySeparatedEvChargers(chargers, selectedChargerId, (charger) => {
+      if (!map.getBounds().contains([charger.lat, charger.lon])) return null;
+      const point = map.latLngToContainerPoint([charger.lat, charger.lon]);
+      return { x: point.x, y: point.y };
+    }).forEach((charger) => {
       const selected = charger.id === selectedChargerId;
       const marker = L.marker([charger.lat, charger.lon], {
         icon: L.divIcon({
@@ -624,34 +628,6 @@ function prioritiseSelectedStations(stations: StationViewModel[], selectedStatio
   const selected = stations.find((item) => item.station.stationCode === selectedStationCode);
   if (!selected) return stations;
   return [selected, ...stations.filter((item) => item.station.stationCode !== selectedStationCode)];
-}
-
-function prioritiseSelectedChargers(chargers: EvCharger[], selectedChargerId?: string) {
-  if (!selectedChargerId) return chargers;
-  const selected = chargers.find((charger) => charger.id === selectedChargerId);
-  if (!selected) return chargers;
-  return [selected, ...chargers.filter((charger) => charger.id !== selectedChargerId)];
-}
-
-function visibleEvChargers(
-  map: Leaflet.Map,
-  chargers: EvCharger[],
-  selectedChargerId?: string,
-) {
-  const minimumSpacingPx = 58;
-  const selected: Array<{ charger: EvCharger; point: Leaflet.Point }> = [];
-  const bounds = map.getBounds();
-  for (const charger of prioritiseSelectedChargers(chargers, selectedChargerId)) {
-    if (!bounds.contains([charger.lat, charger.lon])) continue;
-    const point = map.latLngToContainerPoint([charger.lat, charger.lon]);
-    const overlaps = selected.some(({ point: existing }) =>
-      point.distanceTo(existing) < minimumSpacingPx,
-    );
-    if (overlaps && charger.id !== selectedChargerId) continue;
-    selected.push({ charger, point });
-    if (selected.length >= maxEvMarkers) break;
-  }
-  return selected.map(({ charger }) => charger);
 }
 
 function visibleMarkerGroups(

@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 const root = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const webMap = read("src/components/StationMap.web.tsx");
 const nativeMap = read("src/components/StationMap.native.tsx");
+const stationMapDensity = read("src/components/stationMapDensity.js");
 const appShell = read("App.tsx");
 const fuelPathLogo = read("src/components/FuelPathLogo.tsx");
 const locationEvidenceChip = read("src/components/LocationEvidenceChip.tsx");
@@ -119,12 +120,11 @@ const checks = [
   {
     label: "dense EV markers stay spatially separated on web and native maps",
     ok:
-      webMap.includes("const maxEvMarkers = 18;") &&
-      webMap.includes("function visibleEvChargers(") &&
-      webMap.includes("point.distanceTo(existing) < minimumSpacingPx") &&
-      nativeMap.includes("const maxEvMarkers = 18;") &&
-      nativeMap.includes("function spatiallySeparatedChargers(") &&
-      nativeMap.includes("Math.hypot(x - existing.x, y - existing.y) < minimumSpacingPx"),
+      webMap.includes("spatiallySeparatedEvChargers(chargers") &&
+      nativeMap.includes("spatiallySeparatedEvChargers(") &&
+      stationMapDensity.includes("const maxVisibleEvMarkers = 18;") &&
+      stationMapDensity.includes("Math.hypot(point.x - existing.x, point.y - existing.y) < minimumSpacingPx") &&
+      stationMapDensity.includes("overlaps && charger.id !== selectedChargerId"),
   },
   {
     label: "native map-area search requires a real pan gesture",
@@ -418,7 +418,7 @@ const checks = [
       nativeMap.includes("selectedChargerId") &&
       nativeMap.includes("onSelectCharger") &&
       nativeMap.includes("visibleChargers.map") &&
-      nativeMap.includes("prioritiseSelectedChargers(chargers, selectedChargerId)") &&
+      nativeMap.includes("const routeChargerCameraPoints = prioritiseSelectedChargers(") &&
       nativeMap.includes("accessibilityLabel={`Select charger ${charger.name}`}") &&
       nativeMap.includes("onPress={() => onSelectCharger?.(charger.id)}") &&
       nativeMap.includes("styles.evPin") &&
@@ -430,7 +430,7 @@ const checks = [
       nativeMap.includes("selected.lat") &&
       nativeMap.includes("selected.lon") &&
       webMap.includes("evChargerMarkerHtml") &&
-      webMap.includes("prioritiseSelectedChargers(chargers, selectedChargerId)"),
+      webMap.includes("spatiallySeparatedEvChargers(chargers, selectedChargerId"),
   },
   {
     label: "nearby cluster pill only drills into the map",

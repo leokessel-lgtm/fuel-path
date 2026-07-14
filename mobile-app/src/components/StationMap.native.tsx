@@ -1,12 +1,5 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import {
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-  useWindowDimensions,
-} from "react-native";
+import { Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import MapView, {
   Marker,
   Polyline,
@@ -18,6 +11,7 @@ import { brandStyleForStation } from "../data/brandAssets";
 import { colors, mapSkin, radii, shadow, spacing } from "../theme";
 import { EvCharger, MapPoint, StationViewModel } from "../types";
 import { BrandBadge } from "./BrandBadge";
+import { prioritiseSelectedChargers, spatiallySeparatedEvChargers } from "./stationMapDensity";
 
 const maxStationMarkers = 420;
 const routeMaxPriceMarkers = 18;
@@ -40,7 +34,6 @@ const compactMarkerDensity = {
 const nearbyInitialRegionDelta = 0.035;
 const nearbyInitialMarkerRadiusKm = 4.2;
 const routeCameraChargerLimit = 16;
-const maxEvMarkers = 18;
 const decorativeStationMarkerAccessibility = {
   accessibilityElementsHidden: true,
   importantForAccessibility: "no-hide-descendants" as const,
@@ -221,12 +214,10 @@ export function StationMap({
   );
   const visibleChargers = useMemo(
     () =>
-      spatiallySeparatedChargers(
+      spatiallySeparatedEvChargers(
         chargers,
-        currentRegion,
-        width,
-        height,
         selectedChargerId,
+        (charger) => chargerScreenPoint(charger, currentRegion, width, height),
       ),
     [chargers, currentRegion, height, selectedChargerId, width],
   );
@@ -855,42 +846,17 @@ function prioritiseSelectedStations(
   ];
 }
 
-function prioritiseSelectedChargers(
-  chargers: EvCharger[],
-  selectedChargerId?: string,
-) {
-  if (!selectedChargerId) return chargers;
-  const selected = chargers.find((charger) => charger.id === selectedChargerId);
-  if (!selected) return chargers;
-  return [
-    selected,
-    ...chargers.filter((charger) => charger.id !== selectedChargerId),
-  ];
-}
-
-function spatiallySeparatedChargers(
-  chargers: EvCharger[],
-  region: Region,
-  width: number,
-  height: number,
-  selectedChargerId?: string,
-) {
-  const minimumSpacingPx = 58;
-  const selected: Array<{ charger: EvCharger; x: number; y: number }> = [];
+function chargerScreenPoint(charger: EvCharger, region: Region, width: number, height: number) {
   const minLat = region.latitude - region.latitudeDelta / 2;
   const maxLat = region.latitude + region.latitudeDelta / 2;
   const minLon = region.longitude - region.longitudeDelta / 2;
   const maxLon = region.longitude + region.longitudeDelta / 2;
-  for (const charger of prioritiseSelectedChargers(chargers, selectedChargerId)) {
-    if (charger.lat < minLat || charger.lat > maxLat || charger.lon < minLon || charger.lon > maxLon) continue;
-    const x = ((charger.lon - minLon) / Math.max(region.longitudeDelta, 0.0001)) * width;
-    const y = ((maxLat - charger.lat) / Math.max(region.latitudeDelta, 0.0001)) * height;
-    const overlaps = selected.some((existing) => Math.hypot(x - existing.x, y - existing.y) < minimumSpacingPx);
-    if (overlaps && charger.id !== selectedChargerId) continue;
-    selected.push({ charger, x, y });
-    if (selected.length >= maxEvMarkers) break;
-  }
-  return selected.map(({ charger }) => charger);
+  const outsideRegion = charger.lat < minLat || charger.lat > maxLat || charger.lon < minLon || charger.lon > maxLon;
+  if (outsideRegion) return null;
+  return {
+    x: ((charger.lon - minLon) / Math.max(region.longitudeDelta, 0.0001)) * width,
+    y: ((maxLat - charger.lat) / Math.max(region.latitudeDelta, 0.0001)) * height,
+  };
 }
 
 function nativeRoutePriceMarkerLimit(width: number) {

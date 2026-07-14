@@ -18,8 +18,10 @@ The remaining release blockers are:
 - real App Store and Google Play listing links plus final listing-disclosure
   evidence
 - signed iOS device/distribution evidence
-- a current-branch physical Android performance packet whose APK and source
-  revision match this repair branch
+- a current lower or mid-range physical Android performance packet before any
+  broad Android performance claim
+- real delivered-notification evidence after an explicitly authorised hosted
+  push-delivery rehearsal
 - dated provider or authority terms evidence for each gated public region
 - an explicit Production database and hosted/global push rollout decision with
   Production-specific least-privilege, backup and rollback evidence
@@ -113,6 +115,24 @@ known production dependency vulnerabilities. Parallel stress work also exposed
 and fixed evidence-file collisions in the iOS cold-start, route-click and map
 density harnesses, with regression tests added.
 
+The source-bound Android `localParity` APK from `9c2c20ba` then passed on the
+physical Pixel 9 Pro. The clean-installed artefact hash is
+`e806ac034b594d8d217db1414741bfda65bbfa31b41397e3a6d367d6514223d8`.
+Plan, Nearby, map pan, Settings, navigation contracts, five cold launches,
+foreground resume, notification permission/channel setup and a physical
+process-death local-persistence check passed. The measured map run recorded 353
+frames, 2.0% jank, p95 12 ms and p99 26 ms. The reviewed map frames showed
+correct logo-to-price association and no earlier BP/Shell marker overlap. See
+[`evidence/ANDROID-PHYSICAL-READINESS-2026-07-14.md`](evidence/ANDROID-PHYSICAL-READINESS-2026-07-14.md).
+
+This clears the missing current-branch Android packet. It does not clear broad
+Android performance because the current packet is high-end-device evidence
+only. Real push delivery also remains unproven while the hosted delivery gate
+is disabled. The Pixel's raw ADB screenshot path alternated clean and black map
+compositor captures on an unchanged screen; runtime, layout and clean-frame
+evidence passed, but raw screenshot completeness is not an automated visual
+assertion until the harness accounts for that platform behaviour.
+
 ## Android evidence cleared for PR #30 scope
 
 - Pixel 9 Pro `49231FDAP0017N` passed the isolated native route-watch and privacy
@@ -163,14 +183,17 @@ real push delivery or public store readiness.
 3. Put the reviewed provider-limitation disclosure into the final App Store and
    Google Play listing materials.
 4. Add signed iOS device evidence when devices are available. Generate a fresh
-   structured native blocker packet when preparing the next automated beta
-   decision so it references the current Android state.
-5. Collect dated provider or authority terms evidence for each gated region,
+  structured native blocker packet when preparing the next automated beta
+  decision so it references the current Android state.
+5. Run the current Android packet on a lower or mid-range physical device, and
+   rehearse real push delivery only after the hosted gate is explicitly enabled
+   for that bounded test.
+6. Collect dated provider or authority terms evidence for each gated region,
    including allowed public use, cache limits and attribution requirements.
-6. Keep Production migration and hosted/global push disabled until a separate
+7. Keep Production migration and hosted/global push disabled until a separate
    explicit rollout decision records Production-specific least privilege,
    backup and rollback evidence.
-7. Rerun the beta-readiness gate with the held provider and support evidence
+8. Rerun the beta-readiness gate with the held provider and support evidence
    inputs before changing this decision.
 
 ## Historical decision

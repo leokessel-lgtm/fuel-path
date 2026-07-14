@@ -13,6 +13,7 @@ const {
   setPredictionStorageForTests,
 } = require("./_predictionStorage");
 const { singleFlight } = require("./_providerRuntime");
+const { logServerError } = require("./_serverDiagnostics");
 const { fetchJson } = require("./_providerHttp");
 const { tokenAuthorised, tokenSecurity } = require("./_securityPolicy");
 const { createPredictionService } = require("./_predictionService");
@@ -28,9 +29,7 @@ const {
   setParam,
   stringParam,
 } = require("./_request");
-const {
-  googleRoutesApiKey,
-} = require("./_providerCredentials");
+const { googleRoutesApiKey } = require("./_providerCredentials");
 const { distanceKm } = require("./_geoMath");
 const {
   routeContextStations,
@@ -252,6 +251,7 @@ module.exports = {
   loadLiveSaStations,
   loadLiveWaStations,
   liveProviderKeysForArea,
+  logServerError,
   methodAllowed,
   normaliseQldPayload,
   normaliseNtPayload,

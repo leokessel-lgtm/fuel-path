@@ -4,6 +4,7 @@
     "db:up": "docker-compose -f docker-compose.yml up -d --wait postgres",
     "db:down": "docker-compose -f docker-compose.yml down",
     "db:migrate": "node-pg-migrate up -m db/migrations --database-url-var DATABASE_URL --check-order",
+    "db:migrate:http": "node scripts/migrate-product-database-http.mjs",
     "db:migrate:local": "DATABASE_URL=postgres://fuel_path:fuel_path@127.0.0.1:54329/fuel_path npm run db:migrate",
     "db:reset": "docker-compose -f docker-compose.yml down -v && npm run db:up && npm run db:migrate:local",
     "db:verify:local": "DATABASE_URL=postgres://fuel_path:fuel_path@127.0.0.1:54329/fuel_path node scripts/verify-product-database.mjs",

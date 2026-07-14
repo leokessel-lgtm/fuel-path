@@ -100,6 +100,20 @@ concurrency, oldest claimed due time and queue age. These are coarse operational
 signals only and must not include route coordinates, labels, tokens or lease
 tokens.
 
+Hosted Neon environments must apply migrations before deploying code that uses
+new scheduling columns. Direct PostgreSQL sessions can use
+`npm run db:migrate`. A Vercel Preview can run the same ordered migration ledger
+through Neon HTTPS without exposing its connection string:
+
+```sh
+vercel env run -e preview --git-branch <branch> -- npm run db:migrate:http
+```
+
+The HTTPS runner does not use session advisory locks because Neon HTTP requests
+do not hold one database session. It batches each migration's `BEGIN` to
+`COMMIT` statements into one Neon HTTP transaction instead. Migrations remain
+forward-only and the existing order check stays enforced.
+
 For each enabled saved route where the local travel window is approaching:
 
 - refresh or reuse route geometry

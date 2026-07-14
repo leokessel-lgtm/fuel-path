@@ -35,6 +35,7 @@
     "listBackendSavedRoutes",
     "listPredictionBacktests",
     "liveProviderKeysForArea",
+    "logServerError",
     "loadLiveSaStations",
     "loadLiveWaStations",
     "loadStationData",

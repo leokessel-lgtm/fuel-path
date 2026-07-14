@@ -9,6 +9,7 @@ const {
   evaluateSavedRouteAlert,
   validateSavedRouteAlertDelivery,
   issueAlertClientCapability,
+  logServerError,
   listBackendAlertEvaluations,
   listBackendPushDevices,
   listBackendSavedRoutes,
@@ -162,6 +163,7 @@ module.exports = async function handler(req, res) {
       alerts: await alertsStatus(),
     });
   } catch (error) {
+    logServerError("alerts", error);
     sendJson(res, 400, {
       error: publicErrorMessage(error, "alerts"),
       alerts: await alertsStatus(),
@@ -216,6 +218,7 @@ async function savedRoutesEndpoint(req, res) {
     if (!input) return sendJson(res, 401, { error: "Saved route sync requires an installation capability." });
     sendJson(res, 202, await saveBackendSavedRoute(input));
   } catch (error) {
+    logServerError("saved-routes", error);
     sendJson(res, 400, {
       error: publicErrorMessage(error, "alerts"),
       alerts: await alertsStatus(),

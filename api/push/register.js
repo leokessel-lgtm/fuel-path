@@ -3,6 +3,7 @@ const {
   alertsAdminWriteAuthorised,
   alertsWriteAuthorised,
   alertsWriteSecurity,
+  logServerError,
   methodAllowed,
   registerPushDevice,
   sendJson,
@@ -34,6 +35,7 @@ module.exports = async function handler(req, res) {
       : (req.body || {});
     sendJson(res, 202, await registerPushDevice(input));
   } catch (error) {
+    logServerError("push-register", error);
     sendJson(res, 400, {
       error: publicErrorMessage(error, "alerts"),
       alerts: await alertsStatus(),

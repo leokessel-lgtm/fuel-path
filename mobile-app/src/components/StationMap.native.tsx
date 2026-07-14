@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import MapView, {
   Marker,
@@ -7,7 +7,6 @@ import MapView, {
   type Region,
 } from "react-native-maps";
 
-import { brandStyleForStation } from "../data/brandAssets";
 import { colors, mapSkin, radii, shadow, spacing } from "../theme";
 import { EvCharger, MapPoint, StationViewModel } from "../types";
 import { BrandBadge } from "./BrandBadge";
@@ -537,73 +536,46 @@ export function StationMap({
           const subdued = Boolean(
             routeEndpoints && selectedStationCode && !selected,
           );
-          const brandStyle = brandStyleForStation(item.station);
-          const brandIcon = brandStyle.markerIcon || brandStyle.icon;
-          const nativeBrandIcon =
-            typeof brandIcon === "number" ? brandIcon : undefined;
           return (
-            <Fragment key={`${item.station.stationCode}-marker-stack`}>
-              <Marker
-                {...decorativeStationMarkerAccessibility}
-                coordinate={{
-                  latitude: item.station.lat,
-                  longitude: item.station.lon,
-                }}
-                key={`${item.station.stationCode}-${markerAssetRefreshVersion}`}
-                onPress={() => handleMarkerPress(item.station.stationCode)}
-                tracksViewChanges={Platform.OS === "android"}
-                zIndex={selected ? 700 : subdued ? 420 : 500}
-              >
-                <View style={styles.pinAnchor}>
-                  <View
+            <Marker
+              {...decorativeStationMarkerAccessibility}
+              coordinate={{
+                latitude: item.station.lat,
+                longitude: item.station.lon,
+              }}
+              key={`${item.station.stationCode}-${markerAssetRefreshVersion}`}
+              onPress={() => handleMarkerPress(item.station.stationCode)}
+              tracksViewChanges={Platform.OS === "android"}
+              zIndex={selected ? 700 : subdued ? 420 : 500}
+            >
+              <View style={styles.pinAnchor}>
+                <View
+                  style={[
+                    styles.pin,
+                    subdued && styles.pinSubdued,
+                    selected && styles.pinSelected,
+                  ]}
+                >
+                  <Text
                     style={[
-                      styles.pin,
-                      subdued && styles.pinSubdued,
-                      selected && styles.pinSelected,
+                      styles.pinPrice,
+                      selected && styles.pinPriceSelected,
                     ]}
                   >
-                    <Text
-                      style={[
-                        styles.pinPrice,
-                        selected && styles.pinPriceSelected,
-                      ]}
-                    >
-                      {item.adjustedCpl.toFixed(1)}
-                    </Text>
-                    <View style={styles.pinBrand}>
-                      {Platform.OS === "android" ? null : (
-                        <BrandBadge
-                          marker
-                          station={item.station}
-                          size={22}
-                        />
-                      )}
-                    </View>
+                    {item.adjustedCpl.toFixed(1)}
+                  </Text>
+                  <View style={styles.pinBrand}>
+                    <BrandBadge marker station={item.station} size={22} />
                   </View>
-                  <View
-                    style={[
-                      styles.pinPointer,
-                      selected && styles.pinPointerSelected,
-                    ]}
-                  />
                 </View>
-              </Marker>
-              {Platform.OS === "android" && nativeBrandIcon ? (
-                <Marker
-                  {...decorativeStationMarkerAccessibility}
-                  anchor={{ x: 0.5, y: 1.35 }}
-                  coordinate={{
-                    latitude: item.station.lat,
-                    longitude: item.station.lon,
-                  }}
-                  image={nativeBrandIcon}
-                  key={`${item.station.stationCode}-brand-${markerAssetRefreshVersion}`}
-                  onPress={() => handleMarkerPress(item.station.stationCode)}
-                  tracksViewChanges={false}
-                  zIndex={selected ? 720 : subdued ? 440 : 520}
+                <View
+                  style={[
+                    styles.pinPointer,
+                    selected && styles.pinPointerSelected,
+                  ]}
                 />
-              ) : null}
-            </Fragment>
+              </View>
+            </Marker>
           );
         })}
       </MapView>
@@ -672,11 +644,14 @@ function visibleMarkerGroups(
   );
 
   const ranked = [...visibleStations].sort((left, right) => {
+    const leftSelected = left.station.stationCode === selectedStationCode ? 0 : 1;
+    const rightSelected = right.station.stationCode === selectedStationCode ? 0 : 1;
     const leftProtected = protectedCodes.has(left.station.stationCode) ? 0 : 1;
     const rightProtected = protectedCodes.has(right.station.stationCode)
       ? 0
       : 1;
     return (
+      leftSelected - rightSelected ||
       leftProtected - rightProtected ||
       markerPriorityScore(left) - markerPriorityScore(right)
     );
@@ -687,11 +662,16 @@ function visibleMarkerGroups(
     const priceCell = markerCell(item, region, density.markerGridSize);
     const compactCell = markerCell(item, region, density.compactMarkerGridSize);
     const protectedMarker = protectedCodes.has(code);
+    const selectedMarker = code === selectedStationCode;
+    const overlapsPriceMarker = priceMarkers.some((visible) =>
+      markersOverlap(item, visible, region, density.compactMarkerGridSize),
+    );
 
     if (
-      protectedMarker ||
-      (priceMarkers.length < density.maxPriceMarkers &&
-        !priceCells.has(priceCell))
+      selectedMarker ||
+      (!priceCells.has(priceCell) &&
+        !overlapsPriceMarker &&
+        (protectedMarker || priceMarkers.length < density.maxPriceMarkers))
     ) {
       priceMarkers.push(item);
       priceCells.add(priceCell);
@@ -704,16 +684,12 @@ function visibleMarkerGroups(
     clusterGroups.set(compactCell, grouped);
   }
 
-  const singletonMarkers: StationViewModel[] = [];
   const clusterItems: StationViewModel[][] = [];
   for (const items of clusterGroups.values()) {
-    if (items.length === 1) {
-      singletonMarkers.push(items[0]);
-    } else {
+    if (items.length > 1) {
       clusterItems.push(items);
     }
   }
-  priceMarkers.push(...singletonMarkers);
 
   const clusterMarkers = clusterItems
     .map(clusterMarkerForItems)
@@ -938,6 +914,35 @@ function markerCell(item: StationViewModel, region: Region, gridSize: number) {
     ((item.station.lat - (region.latitude - safeLatDelta / 2)) / safeLatDelta) *
     1000;
   return `${Math.round(x / gridSize)}:${Math.round(y / gridSize)}`;
+}
+
+function markersOverlap(
+  left: StationViewModel,
+  right: StationViewModel,
+  region: Region,
+  minimumSpacing: number,
+) {
+  const leftPoint = markerScreenPoint(left, region);
+  const rightPoint = markerScreenPoint(right, region);
+  return Math.hypot(
+    leftPoint.x - rightPoint.x,
+    leftPoint.y - rightPoint.y,
+  ) < minimumSpacing;
+}
+
+function markerScreenPoint(item: StationViewModel, region: Region) {
+  const safeLatDelta = Math.max(region.latitudeDelta, 0.005);
+  const safeLonDelta = Math.max(region.longitudeDelta, 0.005);
+  return {
+    x:
+      ((item.station.lon - (region.longitude - safeLonDelta / 2)) /
+        safeLonDelta) *
+      1000,
+    y:
+      ((item.station.lat - (region.latitude - safeLatDelta / 2)) /
+        safeLatDelta) *
+      1000,
+  };
 }
 
 function sampleRoutePoints(points: MapPoint[], maxPoints: number) {

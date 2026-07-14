@@ -337,9 +337,12 @@ const checks = [
       nativeMap.includes("type ClusterMarker = {") &&
       nativeMap.includes("items: StationViewModel[];") &&
       nativeMap.includes("fitToCoordinates(") &&
-      nativeMap.includes("if (items.length === 1)") &&
-      nativeMap.includes("priceMarkers.push(...singletonMarkers)") &&
+      nativeMap.includes("if (items.length > 1)") &&
+      !nativeMap.includes("priceMarkers.push(...singletonMarkers)") &&
       nativeMap.includes("clusterGroups") &&
+      nativeMap.includes("const overlapsPriceMarker = priceMarkers.some") &&
+      nativeMap.includes("markersOverlap(item, visible, region, density.compactMarkerGridSize)") &&
+      nativeMap.includes("const selectedMarker = code === selectedStationCode") &&
       nativeMap.includes("stationInRegion(item, region)") &&
       nativeMap.includes("clusterMarkerForItems") &&
       nativeMap.includes("clusterFitsInteractiveRegion(cluster, currentRegion, activeInsets)") &&
@@ -354,18 +357,17 @@ const checks = [
       nativeMap.includes("styles.pinBrand") &&
       nativeMap.includes("styles.pinPointer") &&
       nativeMap.includes("<BrandBadge") &&
-      nativeMap.includes("Platform.OS === \"android\" ? null") &&
-      nativeMap.includes("brandStyle.markerIcon || brandStyle.icon") &&
-      nativeMap.includes("const nativeBrandIcon =") &&
-      nativeMap.includes("image={nativeBrandIcon}") &&
-      nativeMap.includes("anchor={{ x: 0.5, y: 1.35 }}") &&
+      nativeMap.includes("<BrandBadge marker station={item.station} size={22} />") &&
+      !nativeMap.includes("const nativeBrandIcon =") &&
+      !nativeMap.includes("image={nativeBrandIcon}") &&
+      !nativeMap.includes("marker-stack") &&
       nativeMap.includes("marker") &&
       nativeMap.includes("station={item.station}") &&
       nativeMap.includes("size={22}") &&
       nativeMap.includes("zIndex={selected ? 700 : subdued ? 420 : 500}") &&
       brandBadge.includes("const style = brandStyleForStation(station);") &&
       brandBadge.includes("marker = false") &&
-      brandBadge.includes("const source = style.icon || (marker ? style.markerIcon : undefined);") &&
+      brandBadge.includes("const source = marker ? style.markerIcon || style.icon : style.icon;") &&
       brandBadge.includes("const imageSize = Math.max(12, size - 4);") &&
       brandBadge.includes("resizeMode=\"contain\"") &&
       brandAssets.includes("markerIcon?: ImageSourcePropType;") &&

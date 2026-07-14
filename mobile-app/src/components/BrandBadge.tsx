@@ -14,7 +14,7 @@ export function BrandBadge({
   marker?: boolean;
 }) {
   const style = brandStyleForStation(station);
-  const source = style.icon || (marker ? style.markerIcon : undefined);
+  const source = marker ? style.markerIcon || style.icon : style.icon;
   const imageSize = Math.max(12, size - 4);
   return (
     <View

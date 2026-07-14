@@ -48,7 +48,7 @@ async function runViewport(viewport) {
   try {
     await installMocks(page);
     await page.goto(appUrl, { waitUntil: "domcontentloaded" });
-    await page.getByText("SHOW NEARBY", { exact: false }).first().waitFor({ timeout: 10000 });
+    await page.getByRole("button", { name: "Choose fuel or EV charging", exact: true }).waitFor({ timeout: 10000 });
     await page.waitForFunction(() => document.querySelectorAll("[data-station-code]").length > 4, null, { timeout: 10000 });
     await page.waitForTimeout(700);
     row.metrics.default = await mapState(page);

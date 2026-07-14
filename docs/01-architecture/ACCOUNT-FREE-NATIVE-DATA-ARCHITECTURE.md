@@ -1,6 +1,6 @@
 # Account-Free Native Data Architecture
 
-Last updated: 13 July 2026, Australia/Sydney
+Last updated: 14 July 2026, Australia/Sydney
 
 ## Purpose And Decision
 
@@ -18,7 +18,7 @@ backend. A server record is created only after explicit smart-alert opt-in.
 | Area | Evidence held | Gap to close before public alert use |
 | --- | --- | --- |
 | Product DB | `db/migrations/1762948800000_product_state_baseline.js` creates product-state tables and `api/_productDatabase.js` checks them at runtime. Preview now uses an isolated target, a dedicated least-privilege runtime role and a verified logical backup/restore path. | Keep Production migration blocked until a separate Production-specific least-privilege, backup and rollback decision is recorded. |
-| Local app state | Preferences, recents and saved commutes use `AsyncStorage`; saved commutes are capped at 20. Settings includes explicit loss wording and separate controls for deleting backend alert data or all local app data. | Keep the deletion contract in native regression coverage and verify it on signed iOS builds. |
+| Local app state | Preferences, recents and saved commutes use revisioned, checksummed primary and recovery copies in `AsyncStorage`; writes are serialised, retried and read back before success. Saved commutes are capped at 20. Storage failures remain visible with a retry action instead of silently discarding changes. Settings includes explicit loss wording and separate controls for deleting backend alert data or all local app data. | Keep recovery and deletion contracts in native regression coverage and verify them on signed iOS builds. |
 | Alert identity | `backendAlerts.native.ts` now creates an `installationId` plus secret and keeps it and the capability in SecureStore on native builds. Pixel 7 and Pixel 9 Pro passed the Android watch-off, re-enrolment and Privacy lifecycle. | Signed iOS lifecycle and distribution evidence remain required. |
 | Alert API | Native alert writes derive the owner from a short-lived, server-revocable capability; shared client tokens cannot perform owner-bound mutations or internal evaluation jobs. | Add a general mutation-idempotency table before expanding beyond the current naturally idempotent upserts/deletes. |
 | Push storage | Active push tokens are unique, saved-route keys are owner-scoped, token rotation is reconciled, delete-my-alert-data removes the installation's alert rows atomically, Android physical-device lifecycle evidence is held, and scheduled retention covers revoked installation tombstones and stale rate-limit counters. | Keep global push disabled until a separately authorised rollout has live delivery and receipt evidence. |
@@ -27,7 +27,7 @@ backend. A server record is created only after explicit smart-alert opt-in.
 
 | Class | Examples | Storage and rule |
 | --- | --- | --- |
-| Local routine state | Vehicle/fuel preferences, discounts, saved places, saved routes, recent locations, local alert UI settings | Device storage. Cap and compact it. Never sync by default. |
+| Local routine state | Vehicle/fuel preferences, discounts, saved places, saved routes, recent locations, local alert UI settings | Device storage with primary and recovery copies. Cap and compact it. Serialise and verify writes. Never sync by default. |
 | Secure local secrets | `installation_id`, opaque installation secret, current scoped capability | Secure device storage only. Keep small values only. Never log. |
 | Anonymous backend alert state | Alert-enabled route snapshot, thresholds, time zone, active push token, delivery state | Product database only after explicit opt-in. Owned by `installation_id`; delete or disable on opt-out. |
 | Backend operational data | Price/provider caches, route computation intermediates, evaluation/audit outcomes, quotas | Server-side with bounded retention and no personal route history. |
@@ -182,7 +182,9 @@ backend-owned and use existing freshness/eligibility safeguards unchanged.
 
 1. Select due routes with a time-window index and claim rows using
    `FOR UPDATE SKIP LOCKED` or an equivalent lease. A worker has a bounded
-   batch size and lease expiry.
+   batch size and lease expiry. This is implemented with
+   `alert_next_evaluation_at`, an oldest-due partial index and expiring lease
+   fields on `fuel_path_saved_routes`; fixed newest-route scans are prohibited.
 2. Group due work by region/fuel/route-cache key where this does not alter
    recommendation semantics. Reuse provider/cache results within their
    existing freshness policy.

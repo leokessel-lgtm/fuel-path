@@ -90,7 +90,38 @@ async function verifySchemaAndMigrations() {
   assert.deepEqual(migrations.rows.map((row) => row.name), [
     "1762948800000_product_state_baseline",
     "1763035200000_anonymous_alert_installations",
+    "1783987200000_alert_due_work_leases",
   ]);
+  const schedulingColumns = await client.query(`
+    SELECT column_name FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'fuel_path_saved_routes'
+      AND column_name IN (
+        'alert_next_evaluation_at',
+        'alert_last_evaluated_at',
+        'alert_lease_token',
+        'alert_lease_expires_at'
+      )
+    ORDER BY column_name
+  `);
+  assert.deepEqual(schedulingColumns.rows.map((row) => row.column_name), [
+    "alert_last_evaluated_at",
+    "alert_lease_expires_at",
+    "alert_lease_token",
+    "alert_next_evaluation_at",
+  ]);
+  const schedulingIndexes = await client.query(`
+    SELECT indexname, indexdef FROM pg_indexes
+    WHERE schemaname = 'public'
+      AND indexname IN ('fuel_path_saved_routes_due_alert_idx', 'fuel_path_saved_routes_alert_lease_idx')
+    ORDER BY indexname
+  `);
+  assert.deepEqual(schedulingIndexes.rows.map((row) => row.indexname), [
+    "fuel_path_saved_routes_alert_lease_idx",
+    "fuel_path_saved_routes_due_alert_idx",
+  ]);
+  const dueIndex = schedulingIndexes.rows.find((row) => row.indexname === "fuel_path_saved_routes_due_alert_idx");
+  assert.match(dueIndex?.indexdef || "", /alert_next_evaluation_at NULLS FIRST/);
 }
 
 async function verifyAnonymousInstallationAndRateLimit() {

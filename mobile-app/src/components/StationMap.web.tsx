@@ -12,7 +12,7 @@ const maxStationMarkers = 420;
 const maxPriceMarkers = 14;
 const routeMaxPriceMarkers = 18;
 const routeCameraStationPointLimit = 12;
-const maxEvMarkers = 96;
+const maxEvMarkers = 18;
 const markerGridSize = 132;
 const mixedEnergyMaxPriceMarkers = 8;
 const mixedEnergyMarkerGridSize = 190;
@@ -351,7 +351,7 @@ export function StationMap({
       fitPoints.push([item.station.lat, item.station.lon]);
     });
 
-    prioritiseSelectedChargers(chargers, selectedChargerId).slice(0, maxEvMarkers).forEach((charger) => {
+    visibleEvChargers(map, chargers, selectedChargerId).forEach((charger) => {
       const selected = charger.id === selectedChargerId;
       const marker = L.marker([charger.lat, charger.lon], {
         icon: L.divIcon({
@@ -631,6 +631,27 @@ function prioritiseSelectedChargers(chargers: EvCharger[], selectedChargerId?: s
   const selected = chargers.find((charger) => charger.id === selectedChargerId);
   if (!selected) return chargers;
   return [selected, ...chargers.filter((charger) => charger.id !== selectedChargerId)];
+}
+
+function visibleEvChargers(
+  map: Leaflet.Map,
+  chargers: EvCharger[],
+  selectedChargerId?: string,
+) {
+  const minimumSpacingPx = 58;
+  const selected: Array<{ charger: EvCharger; point: Leaflet.Point }> = [];
+  const bounds = map.getBounds();
+  for (const charger of prioritiseSelectedChargers(chargers, selectedChargerId)) {
+    if (!bounds.contains([charger.lat, charger.lon])) continue;
+    const point = map.latLngToContainerPoint([charger.lat, charger.lon]);
+    const overlaps = selected.some(({ point: existing }) =>
+      point.distanceTo(existing) < minimumSpacingPx,
+    );
+    if (overlaps && charger.id !== selectedChargerId) continue;
+    selected.push({ charger, point });
+    if (selected.length >= maxEvMarkers) break;
+  }
+  return selected.map(({ charger }) => charger);
 }
 
 function visibleMarkerGroups(

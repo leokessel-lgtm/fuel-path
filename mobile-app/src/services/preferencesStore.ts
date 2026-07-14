@@ -1,5 +1,3 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
-
 import { activeDirectDiscountPrograms } from "../data/discountPrograms";
 import {
   AppPreferences,
@@ -15,7 +13,8 @@ import {
   VehicleEnergyType,
 } from "../types";
 import { normalisePreferredStationBrands } from "../utils/stationBrandPreferences";
-import { PREFERENCES_KEY } from "./localDataLifecycle";
+import { PREFERENCES_BACKUP_KEY, PREFERENCES_KEY } from "./localDataLifecycle";
+import { loadRecoverableJson, persistRecoverableJson } from "./recoverableLocalStore";
 
 const DEFAULT_VEHICLE_ID = "vehicle-default";
 const fuelCodes: FuelCode[] = ["E10", "U91", "P95", "P98", "DL", "PDL", "LPG"];
@@ -65,19 +64,29 @@ export const defaultPreferences: AppPreferences = {
 };
 
 export async function loadPreferences(): Promise<AppPreferences> {
-  try {
-    const raw = await AsyncStorage.getItem(PREFERENCES_KEY);
-    if (!raw) return defaultPreferences;
-    const parsed: unknown = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object") return defaultPreferences;
-    return normalisePreferences(parsed as Partial<AppPreferences>);
-  } catch {
-    return defaultPreferences;
-  }
+  return (await loadPreferencesWithStatus()).value;
+}
+
+export function loadPreferencesWithStatus() {
+  return loadRecoverableJson({
+    primaryKey: PREFERENCES_KEY,
+    backupKey: PREFERENCES_BACKUP_KEY,
+    fallback: defaultPreferences,
+    normalise: (value) => {
+      if (!value || typeof value !== "object" || Array.isArray(value)) {
+        throw new Error("Preferences payload is invalid");
+      }
+      return normalisePreferences(value as Partial<AppPreferences>);
+    },
+  });
 }
 
 export async function persistPreferences(preferences: AppPreferences) {
-  await AsyncStorage.setItem(PREFERENCES_KEY, JSON.stringify(normalisePreferences(preferences)));
+  await persistRecoverableJson({
+    primaryKey: PREFERENCES_KEY,
+    backupKey: PREFERENCES_BACKUP_KEY,
+    value: normalisePreferences(preferences),
+  });
 }
 
 function normalisePreferences(preferences: Partial<AppPreferences>): AppPreferences {

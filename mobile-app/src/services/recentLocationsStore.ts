@@ -1,27 +1,31 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
-
 import { MapPoint } from "../types";
-import { RECENT_LOCATIONS_KEY } from "./localDataLifecycle";
+import { RECENT_LOCATIONS_BACKUP_KEY, RECENT_LOCATIONS_KEY } from "./localDataLifecycle";
+import { loadRecoverableJson, persistRecoverableJson } from "./recoverableLocalStore";
 
 export const MAX_RECENT_LOCATIONS = 8;
 
 export async function loadRecentLocations(): Promise<MapPoint[]> {
-  try {
-    const raw = await AsyncStorage.getItem(RECENT_LOCATIONS_KEY);
-    if (!raw) return [];
-    const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return normaliseRecentLocations(parsed.filter(isMapPoint));
-  } catch {
-    return [];
-  }
+  return (await loadRecentLocationsWithStatus()).value;
+}
+
+export function loadRecentLocationsWithStatus() {
+  return loadRecoverableJson({
+    primaryKey: RECENT_LOCATIONS_KEY,
+    backupKey: RECENT_LOCATIONS_BACKUP_KEY,
+    fallback: [] as MapPoint[],
+    normalise: (value) => {
+      if (!Array.isArray(value)) throw new Error("Recent locations payload is invalid");
+      return normaliseRecentLocations(value.filter(isMapPoint));
+    },
+  });
 }
 
 export async function persistRecentLocations(locations: MapPoint[]) {
-  await AsyncStorage.setItem(
-    RECENT_LOCATIONS_KEY,
-    JSON.stringify(normaliseRecentLocations(locations)),
-  );
+  await persistRecoverableJson({
+    primaryKey: RECENT_LOCATIONS_KEY,
+    backupKey: RECENT_LOCATIONS_BACKUP_KEY,
+    value: normaliseRecentLocations(locations),
+  });
 }
 
 export function normaliseRecentLocations(locations: MapPoint[]) {

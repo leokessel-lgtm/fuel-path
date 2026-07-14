@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback } from "react";
 
 import {
   defaultPreferences,
-  loadPreferences,
+  loadPreferencesWithStatus,
   persistPreferences,
 } from "../services/preferencesStore";
 import {
@@ -17,29 +17,23 @@ import {
   VehicleEnergyType,
 } from "../types";
 import { isDiscountRedeemedToday } from "../utils/discountRedemptions";
+import { useRecoverableLocalState } from "./useRecoverableLocalState";
 
 const maxVehicleProfiles = 5;
 
 export function useAppPreferences() {
-  const [preferences, setPreferences] = useState<AppPreferences>(defaultPreferences);
-  const [loaded, setLoaded] = useState(false);
-
-  useEffect(() => {
-    let active = true;
-    loadPreferences().then((storedPreferences) => {
-      if (!active) return;
-      setPreferences(storedPreferences);
-      setLoaded(true);
-    });
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!loaded) return;
-    persistPreferences(preferences).catch(() => {});
-  }, [loaded, preferences]);
+  const {
+    value: preferences,
+    setValue: setPreferences,
+    loaded,
+    persistence,
+    retryPersistence,
+  } = useRecoverableLocalState({
+    fallback: defaultPreferences,
+    label: "Preferences",
+    load: loadPreferencesWithStatus,
+    persist: persistPreferences,
+  });
 
   const updateFuel = useCallback((fuel: FuelCode) => {
     setPreferences((current) => ({
@@ -242,6 +236,8 @@ export function useAppPreferences() {
     clearNamedPlace,
     loaded,
     preferences,
+    persistence,
+    retryPersistence,
     addVehicle,
     removeVehicle,
     resetPreferences,

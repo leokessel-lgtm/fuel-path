@@ -117,6 +117,16 @@ const checks = [
     ok: webMap.includes('lastReportedUserCentreKeyRef.current = "";'),
   },
   {
+    label: "dense EV markers stay spatially separated on web and native maps",
+    ok:
+      webMap.includes("const maxEvMarkers = 18;") &&
+      webMap.includes("function visibleEvChargers(") &&
+      webMap.includes("point.distanceTo(existing) < minimumSpacingPx") &&
+      nativeMap.includes("const maxEvMarkers = 18;") &&
+      nativeMap.includes("function spatiallySeparatedChargers(") &&
+      nativeMap.includes("Math.hypot(x - existing.x, y - existing.y) < minimumSpacingPx"),
+  },
+  {
     label: "native map-area search requires a real pan gesture",
     ok: nativeMap.includes("!programmaticMoveRef.current && userGestureStartedRef.current"),
   },
@@ -982,10 +992,14 @@ const checks = [
     ok:
       recentLocationsStore.includes("export const MAX_RECENT_LOCATIONS = 8;") &&
       recentLocationsStore.includes("return compact.slice(0, MAX_RECENT_LOCATIONS);") &&
-      recentLocationsStore.includes("JSON.stringify(normaliseRecentLocations(locations))") &&
+      recentLocationsStore.includes("persistRecoverableJson") &&
+      recentLocationsStore.includes("value: normaliseRecentLocations(locations)") &&
+      recentLocationsStore.includes("RECENT_LOCATIONS_BACKUP_KEY") &&
       savedCommutesStore.includes("const MAX_SAVED_COMMUTES = 20;") &&
       savedCommutesStore.includes(".slice(0, MAX_SAVED_COMMUTES)") &&
-      savedCommutesStore.includes("JSON.stringify(compactCommutes)") &&
+      savedCommutesStore.includes("persistRecoverableJson") &&
+      savedCommutesStore.includes("value: compactCommutes") &&
+      savedCommutesStore.includes("SAVED_COMMUTES_BACKUP_KEY") &&
       quickPlaceShortcuts.includes('accessibilityLabel="Clear recent route locations"') &&
       quickPlaceShortcuts.includes("onRemoveRecent") &&
       planScreen.includes("onRemoveRecentLocation") &&

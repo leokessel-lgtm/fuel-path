@@ -361,7 +361,12 @@ async function waitForStorage(page, key, predicate) {
 }
 
 async function storageJson(page, key) {
-  return page.evaluate((key) => JSON.parse(localStorage.getItem(key) || "null"), key);
+  return page.evaluate((key) => {
+    const parsed = JSON.parse(localStorage.getItem(key) || "null");
+    return parsed?.schemaVersion === 1 && Object.prototype.hasOwnProperty.call(parsed, "payload")
+      ? parsed.payload
+      : parsed;
+  }, key);
 }
 
 async function visibleText(page) {

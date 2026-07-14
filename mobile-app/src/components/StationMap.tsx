@@ -7,6 +7,7 @@ import { BrandBadge } from "./BrandBadge";
 
 const maxStationMarkers = 240;
 const mixedEnergyMaxStationMarkers = 48;
+const maxEvMarkers = 18;
 const emptyChargers: EvCharger[] = [];
 const emptyRoutePoints: MapPoint[] = [];
 
@@ -81,7 +82,7 @@ export function StationMap({
     stations,
     selectedStationCode,
   ).slice(0, chargers.length ? mixedEnergyMaxStationMarkers : maxStationMarkers);
-  const visibleChargers = prioritiseSelectedChargers(chargers, selectedChargerId).slice(0, maxStationMarkers);
+  const visibleChargers = prioritiseSelectedChargers(chargers, selectedChargerId).slice(0, maxEvMarkers);
 
   return (
     <View style={styles.map}>

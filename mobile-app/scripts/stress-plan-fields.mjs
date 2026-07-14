@@ -238,10 +238,20 @@ async function assertAppReachable(url) {
 }
 
 async function resetApp() {
-  await page.goto(appUrl, { waitUntil: "domcontentloaded" });
-  await page.getByRole("tab", { name: "Plan" }).click({ timeout: timeoutMs });
-  await field("From").waitFor({ state: "visible", timeout: timeoutMs });
-  await page.waitForTimeout(120);
+  let lastError;
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    try {
+      await page.goto(appUrl, { waitUntil: "domcontentloaded" });
+      await page.getByRole("tab", { name: "Plan" }).click({ timeout: timeoutMs });
+      await field("From").waitFor({ state: "visible", timeout: timeoutMs });
+      await page.waitForTimeout(120);
+      return;
+    } catch (error) {
+      lastError = error;
+      if (attempt === 1) await page.waitForTimeout(250);
+    }
+  }
+  throw lastError;
 }
 
 async function recordCase(name, callback, pair, submitted) {

@@ -6,7 +6,12 @@ const cronEvaluateHandler = require("../../api/cron/evaluate-route-alerts");
 const internalJobsHandler = require("../../api/jobs");
 const pushRegisterHandler = require("../../api/push/register");
 const statusHandler = require("../../api/status");
-const { setAlertRouteScorerForTests, setAlertStorageForTests, setPredictionStorageForTests } = require("../../api/_backend");
+const {
+  runScheduledRouteAlertEvaluation,
+  setAlertRouteScorerForTests,
+  setAlertStorageForTests,
+  setPredictionStorageForTests,
+} = require("../../api/_backend");
 const {
   listSavedRoutes: listStoredSavedRoutes,
   updateSavedRouteLastAlert: updateStoredSavedRouteLastAlert,
@@ -1181,6 +1186,177 @@ test("scheduled evaluator is idempotent across cron overlap and retry", async ()
   }
 });
 
+test("scheduled evaluator drains oldest due routes across batches without starving routes beyond 50", async () => {
+  const store = memoryDurableStore();
+  setAlertStorageForTests(store);
+  setAlertRouteScorerForTests(async () => ({
+    status: "scored",
+    regionCapabilities: [{ region: "NSW", capability: "live" }],
+    candidate: freshCandidate(),
+  }));
+  const now = "2026-07-14T07:25:00.000+10:00";
+  try {
+    for (let index = 0; index < 120; index += 1) {
+      const dueAt = new Date(new Date(now).getTime() - (120 - index) * 60_000).toISOString();
+      await store.upsertSavedRoute({
+        ...route,
+        id: `route-${String(index).padStart(3, "0")}`,
+        userId: `user-${String(index).padStart(3, "0")}`,
+        updatedAt: dueAt,
+        alertNextEvaluationAt: dueAt,
+      });
+    }
+
+    const first = await runScheduledRouteAlertEvaluation({ limit: 50, now });
+    const second = await runScheduledRouteAlertEvaluation({ limit: 50, now });
+    const third = await runScheduledRouteAlertEvaluation({ limit: 50, now });
+    const ids = [...first.results, ...second.results, ...third.results].map((item) => item.routeId);
+
+    assert.equal(first.claimedCount, 50);
+    assert.equal(second.claimedCount, 50);
+    assert.equal(third.claimedCount, 20);
+    assert.equal(new Set(ids).size, 120);
+    assert.deepEqual(ids.slice(0, 3), ["route-000", "route-001", "route-002"]);
+    assert.equal(ids.at(-1), "route-119");
+    assert.equal(first.schedulingMode, "oldest_due_leased");
+    assert.equal(first.oldestClaimedQueueAgeMs > 0, true);
+  } finally {
+    setAlertRouteScorerForTests(null);
+    setAlertStorageForTests(null);
+  }
+});
+
+test("overlapping scheduled workers claim disjoint route leases", async () => {
+  const store = memoryDurableStore();
+  setAlertStorageForTests(store);
+  setAlertRouteScorerForTests(async () => ({
+    status: "scored",
+    regionCapabilities: [{ region: "NSW", capability: "live" }],
+    candidate: freshCandidate(),
+  }));
+  const now = "2026-07-14T07:25:00.000+10:00";
+  try {
+    for (let index = 0; index < 80; index += 1) {
+      await store.upsertSavedRoute({
+        ...route,
+        id: `overlap-route-${index}`,
+        userId: `overlap-user-${index}`,
+        updatedAt: "2026-07-01T00:00:00.000Z",
+        alertNextEvaluationAt: "2026-07-01T00:00:00.000Z",
+      });
+    }
+    const [left, right] = await Promise.all([
+      runScheduledRouteAlertEvaluation({ limit: 50, now, ignoreWindow: true }),
+      runScheduledRouteAlertEvaluation({ limit: 50, now, ignoreWindow: true }),
+    ]);
+    const ids = [...left.results, ...right.results].map((item) => item.routeId);
+    assert.equal(ids.length, 80);
+    assert.equal(new Set(ids).size, 80);
+  } finally {
+    setAlertRouteScorerForTests(null);
+    setAlertStorageForTests(null);
+  }
+});
+
+test("scheduled evaluation bounds cross-user concurrency", async () => {
+  const originalConcurrency = process.env.ALERT_WORKER_CONCURRENCY;
+  process.env.ALERT_WORKER_CONCURRENCY = "3";
+  const store = memoryDurableStore();
+  let active = 0;
+  let maximumActive = 0;
+  setAlertStorageForTests(store);
+  setAlertRouteScorerForTests(async () => {
+    active += 1;
+    maximumActive = Math.max(maximumActive, active);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    active -= 1;
+    return {
+      status: "scored",
+      regionCapabilities: [{ region: "NSW", capability: "live" }],
+      candidate: freshCandidate(),
+    };
+  });
+  try {
+    for (let index = 0; index < 12; index += 1) {
+      await store.upsertSavedRoute({ ...route, id: `concurrency-route-${index}`, userId: `concurrency-user-${index}` });
+    }
+    const result = await runScheduledRouteAlertEvaluation({
+      limit: 20,
+      now: "2026-07-14T07:25:00.000+10:00",
+      ignoreWindow: true,
+    });
+    assert.equal(result.workerConcurrency, 3);
+    assert.equal(maximumActive, 3);
+    assert.equal(result.failedCount, 0);
+  } finally {
+    setAlertRouteScorerForTests(null);
+    setAlertStorageForTests(null);
+    if (originalConcurrency === undefined) delete process.env.ALERT_WORKER_CONCURRENCY;
+    else process.env.ALERT_WORKER_CONCURRENCY = originalConcurrency;
+  }
+});
+
+test("failed claimed work releases its lease onto a bounded retry schedule", async () => {
+  const store = memoryDurableStore();
+  setAlertStorageForTests(store);
+  setAlertRouteScorerForTests(async () => {
+    throw new Error("synthetic scoring outage");
+  });
+  const now = "2026-07-14T07:25:00.000+10:00";
+  try {
+    await store.upsertSavedRoute({ ...route, updatedAt: now, alertNextEvaluationAt: now });
+    const failed = await runScheduledRouteAlertEvaluation({ limit: 1, now, ignoreWindow: true });
+    const early = await runScheduledRouteAlertEvaluation({
+      limit: 1,
+      now: "2026-07-14T07:26:00.000+10:00",
+    });
+    const retry = await runScheduledRouteAlertEvaluation({
+      limit: 1,
+      now: "2026-07-14T07:30:00.000+10:00",
+    });
+    assert.equal(failed.results[0].status, "failed");
+    assert.equal(failed.results[0].leaseStatus, "retry_scheduled");
+    assert.equal(early.claimedCount, 0);
+    assert.equal(retry.claimedCount, 1);
+  } finally {
+    setAlertRouteScorerForTests(null);
+    setAlertStorageForTests(null);
+  }
+});
+
+test("route disable during scoring cancels delivery before evaluation", async () => {
+  const store = memoryDurableStore();
+  let signalScoringStarted;
+  let continueScoring;
+  const scoringStarted = new Promise((resolve) => { signalScoringStarted = resolve; });
+  const scoringMayContinue = new Promise((resolve) => { continueScoring = resolve; });
+  setAlertStorageForTests(store);
+  setAlertRouteScorerForTests(async () => {
+    signalScoringStarted();
+    await scoringMayContinue;
+    return {
+      status: "scored",
+      regionCapabilities: [{ region: "NSW", capability: "live" }],
+      candidate: freshCandidate(),
+    };
+  });
+  const now = "2026-07-14T07:25:00.000+10:00";
+  try {
+    await store.upsertSavedRoute({ ...route, updatedAt: now, alertNextEvaluationAt: now });
+    const running = runScheduledRouteAlertEvaluation({ limit: 1, now, ignoreWindow: true });
+    await scoringStarted;
+    await store.upsertSavedRoute({ ...store.routes[0], alertEnabled: false, updatedAt: now });
+    continueScoring();
+    const result = await running;
+    assert.equal(result.results[0].status, "cancelled");
+    assert.equal(result.cancelledCount, 1);
+    assert.equal(store.evaluations.length, 0);
+  } finally {
+    setAlertRouteScorerForTests(null);
+    setAlertStorageForTests(null);
+  }
+});
+
 test("internal evaluator accepts write token without exposing public cron access", async () => {
   const originalToken = process.env.ALERTS_WRITE_TOKEN;
   process.env.ALERTS_WRITE_TOKEN = "alert-token";
@@ -1447,9 +1623,16 @@ function memoryDurableStore() {
     },
     async upsertSavedRoute(record) {
       const index = routes.findIndex((item) => item.id === record.id && item.userId === record.userId);
-      if (index >= 0) routes[index] = record;
-      else routes.push(record);
-      return record;
+      const existing = index >= 0 ? routes[index] : undefined;
+      const scheduled = {
+        ...record,
+        alertNextEvaluationAt: record.alertEnabled ? record.alertNextEvaluationAt || record.updatedAt : undefined,
+        alertLeaseToken: record.alertEnabled ? record.alertLeaseToken || existing?.alertLeaseToken : undefined,
+        alertLeaseExpiresAt: record.alertEnabled ? record.alertLeaseExpiresAt || existing?.alertLeaseExpiresAt : undefined,
+      };
+      if (index >= 0) routes[index] = scheduled;
+      else routes.push(scheduled);
+      return scheduled;
     },
     async enrolPushDeviceAndSavedRoute({ device, route }) {
       const deviceSnapshot = devices.map((record) => ({ ...record }));
@@ -1484,6 +1667,50 @@ function memoryDurableStore() {
     },
     async listSavedRoutes({ userId = "", enabledOnly = false } = {}) {
       return routes.filter((item) => (!userId || item.userId === userId) && (!enabledOnly || item.alertEnabled));
+    },
+    async claimDueSavedRoutes({ limit, now, leaseSeconds, leaseToken, ignoreWindow }) {
+      const available = routes
+        .filter((item) => item.alertEnabled)
+        .filter((item) => !item.alertLeaseExpiresAt || new Date(item.alertLeaseExpiresAt) <= new Date(now))
+        .filter((item) => ignoreWindow || !item.alertNextEvaluationAt || new Date(item.alertNextEvaluationAt) <= new Date(now))
+        .sort((left, right) => {
+          const leftDue = left.alertNextEvaluationAt ? new Date(left.alertNextEvaluationAt).getTime() : 0;
+          const rightDue = right.alertNextEvaluationAt ? new Date(right.alertNextEvaluationAt).getTime() : 0;
+          return leftDue - rightDue || left.id.localeCompare(right.id);
+        })
+        .slice(0, limit);
+      const expiresAt = new Date(new Date(now).getTime() + leaseSeconds * 1000).toISOString();
+      for (const item of available) {
+        item.alertLeaseToken = leaseToken;
+        item.alertLeaseExpiresAt = expiresAt;
+      }
+      return available.map((item) => ({ ...item }));
+    },
+    async completeSavedRouteAlertLease({ routeId, userId, leaseToken, evaluatedAt, nextEvaluationAt }) {
+      const item = routes.find((route) => route.id === routeId && route.userId === userId);
+      if (!item || item.alertLeaseToken !== leaseToken) return null;
+      item.alertLastEvaluatedAt = evaluatedAt;
+      item.alertNextEvaluationAt = nextEvaluationAt;
+      delete item.alertLeaseToken;
+      delete item.alertLeaseExpiresAt;
+      return item;
+    },
+    async retrySavedRouteAlertLease({ routeId, userId, leaseToken, retryAt }) {
+      const item = routes.find((route) => route.id === routeId && route.userId === userId);
+      if (!item || item.alertLeaseToken !== leaseToken) return null;
+      item.alertNextEvaluationAt = retryAt;
+      delete item.alertLeaseToken;
+      delete item.alertLeaseExpiresAt;
+      return item;
+    },
+    async savedRouteAlertLeaseActive({ routeId, userId, leaseToken, now }) {
+      const item = routes.find((route) => route.id === routeId && route.userId === userId);
+      return Boolean(
+        item?.alertEnabled
+        && item.alertLeaseToken === leaseToken
+        && item.alertLeaseExpiresAt
+        && new Date(item.alertLeaseExpiresAt) > new Date(now)
+      );
     },
     async listRouteAlertEvaluations({ routeId = "", userId = "" } = {}) {
       return evaluations.filter((item) => (!routeId || item.routeId === routeId) && (!userId || item.userId === userId));

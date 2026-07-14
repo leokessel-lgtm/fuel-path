@@ -7,6 +7,13 @@ const {
 const { rowToDevice, rowToEvaluation, rowToRoute } = require("./_alertRecords");
 const { setAlertInstallationStorageForTests } = require("./_alertInstallationStorage");
 const {
+  claimDueSavedRoutes,
+  completeSavedRouteAlertLease,
+  retrySavedRouteAlertLease,
+  savedRouteAlertLeaseActive,
+  setAlertSchedulerStorageForTests,
+} = require("./_alertSchedulerStorage");
+const {
   deleteStaleAlertRateLimits,
   deleteOrphanedInstallationAlertData,
   orphanedInstallationRetentionCounts,
@@ -144,12 +151,13 @@ async function enrolPushDeviceAndSavedRoute({ device, route } = {}) {
       INSERT INTO fuel_path_saved_routes (
         id, user_id, name, from_lat, from_lon, from_label, to_lat, to_lon, to_label, fuel,
         alert_enabled, alert_time_local, timezone, min_saving_dollars, max_detour_minutes,
-        paused_until, last_alert_sent_at, created_at, updated_at, raw
+        paused_until, last_alert_sent_at, created_at, updated_at, raw, alert_next_evaluation_at
       ) VALUES (
         ${route.id}, ${route.userId}, ${route.name}, ${route.from.lat}, ${route.from.lon}, ${route.from.label},
         ${route.to.lat}, ${route.to.lon}, ${route.to.label}, ${route.fuel}, ${route.alertEnabled},
         ${route.alertTimeLocal}, ${route.timezone}, ${route.minSavingDollars}, ${route.maxDetourMinutes},
-        ${route.pausedUntil || null}, ${route.lastAlertSentAt || null}, ${route.createdAt}, ${route.updatedAt}, ${JSON.stringify(route)}
+        ${route.pausedUntil || null}, ${route.lastAlertSentAt || null}, ${route.createdAt}, ${route.updatedAt}, ${JSON.stringify(route)},
+        ${route.alertEnabled ? route.updatedAt : null}
       ) ON CONFLICT (user_id, id) DO UPDATE SET
         name = EXCLUDED.name, from_lat = EXCLUDED.from_lat, from_lon = EXCLUDED.from_lon,
         from_label = EXCLUDED.from_label, to_lat = EXCLUDED.to_lat, to_lon = EXCLUDED.to_lon,
@@ -158,6 +166,17 @@ async function enrolPushDeviceAndSavedRoute({ device, route } = {}) {
         min_saving_dollars = EXCLUDED.min_saving_dollars, max_detour_minutes = EXCLUDED.max_detour_minutes,
         paused_until = EXCLUDED.paused_until,
         last_alert_sent_at = COALESCE(EXCLUDED.last_alert_sent_at, fuel_path_saved_routes.last_alert_sent_at),
+        alert_next_evaluation_at = CASE
+          WHEN EXCLUDED.alert_enabled = false THEN NULL
+          WHEN fuel_path_saved_routes.alert_enabled = false
+            OR fuel_path_saved_routes.alert_time_local IS DISTINCT FROM EXCLUDED.alert_time_local
+            OR fuel_path_saved_routes.timezone IS DISTINCT FROM EXCLUDED.timezone
+            OR fuel_path_saved_routes.raw->'alertDays' IS DISTINCT FROM EXCLUDED.raw->'alertDays'
+            THEN EXCLUDED.updated_at
+          ELSE fuel_path_saved_routes.alert_next_evaluation_at
+        END,
+        alert_lease_token = CASE WHEN EXCLUDED.alert_enabled THEN fuel_path_saved_routes.alert_lease_token ELSE NULL END,
+        alert_lease_expires_at = CASE WHEN EXCLUDED.alert_enabled THEN fuel_path_saved_routes.alert_lease_expires_at ELSE NULL END,
         updated_at = EXCLUDED.updated_at, raw = EXCLUDED.raw
     ) SELECT 1
   `;
@@ -174,14 +193,14 @@ async function upsertSavedRoute(record) {
     INSERT INTO fuel_path_saved_routes (
       id, user_id, name, from_lat, from_lon, from_label, to_lat, to_lon, to_label, fuel,
       alert_enabled, alert_time_local, timezone, min_saving_dollars, max_detour_minutes,
-      paused_until, last_alert_sent_at, created_at, updated_at, raw
+      paused_until, last_alert_sent_at, created_at, updated_at, raw, alert_next_evaluation_at
     )
     VALUES (
       ${record.id}, ${record.userId}, ${record.name}, ${record.from.lat}, ${record.from.lon}, ${record.from.label},
       ${record.to.lat}, ${record.to.lon}, ${record.to.label}, ${record.fuel}, ${record.alertEnabled},
       ${record.alertTimeLocal}, ${record.timezone}, ${record.minSavingDollars}, ${record.maxDetourMinutes},
       ${record.pausedUntil || null}, ${record.lastAlertSentAt || null}, ${record.createdAt}, ${record.updatedAt},
-      ${JSON.stringify(record)}
+      ${JSON.stringify(record)}, ${record.alertEnabled ? record.updatedAt : null}
     )
     ON CONFLICT (user_id, id) DO UPDATE SET
       name = EXCLUDED.name,
@@ -199,6 +218,17 @@ async function upsertSavedRoute(record) {
       max_detour_minutes = EXCLUDED.max_detour_minutes,
       paused_until = EXCLUDED.paused_until,
       last_alert_sent_at = COALESCE(EXCLUDED.last_alert_sent_at, fuel_path_saved_routes.last_alert_sent_at),
+      alert_next_evaluation_at = CASE
+        WHEN EXCLUDED.alert_enabled = false THEN NULL
+        WHEN fuel_path_saved_routes.alert_enabled = false
+          OR fuel_path_saved_routes.alert_time_local IS DISTINCT FROM EXCLUDED.alert_time_local
+          OR fuel_path_saved_routes.timezone IS DISTINCT FROM EXCLUDED.timezone
+          OR fuel_path_saved_routes.raw->'alertDays' IS DISTINCT FROM EXCLUDED.raw->'alertDays'
+          THEN EXCLUDED.updated_at
+        ELSE fuel_path_saved_routes.alert_next_evaluation_at
+      END,
+      alert_lease_token = CASE WHEN EXCLUDED.alert_enabled THEN fuel_path_saved_routes.alert_lease_token ELSE NULL END,
+      alert_lease_expires_at = CASE WHEN EXCLUDED.alert_enabled THEN fuel_path_saved_routes.alert_lease_expires_at ELSE NULL END,
       updated_at = EXCLUDED.updated_at,
       raw = EXCLUDED.raw
     RETURNING *
@@ -716,11 +746,14 @@ function nullableNumber(value) {
 function setAlertStorageForTests(storage) {
   testStorage = storage || null;
   setAlertInstallationStorageForTests(storage);
+  setAlertSchedulerStorageForTests(storage);
 }
 
 module.exports = {
   alertStorageStatus,
   appendRouteAlertEvaluation,
+  claimDueSavedRoutes,
+  completeSavedRouteAlertLease,
   counts,
   deleteSavedRoute,
   enrolPushDeviceAndSavedRoute,
@@ -729,6 +762,8 @@ module.exports = {
   listRouteAlertEvaluations,
   listSavedRoutes,
   purgeAlertRetention,
+  retrySavedRouteAlertLease,
+  savedRouteAlertLeaseActive,
   setAlertStorageForTests,
   updatePushDeviceStatus,
   updateRouteAlertDelivery,

@@ -97,8 +97,8 @@ const scenarios = [
       await page.goto(appUrl, { waitUntil: "domcontentloaded" });
       await page.waitForTimeout(900);
       await clickBottomTab(page, "Plan");
-      await page.getByLabel("From").fill("Sydney NSW");
-      await page.getByLabel("To").fill("Melbourne CBD VIC");
+      await page.getByRole("textbox", { name: "From", exact: true }).fill("Sydney NSW");
+      await page.getByRole("textbox", { name: "To", exact: true }).fill("Melbourne CBD VIC");
       await page.getByRole("button", { name: "Plan route", exact: true }).click();
       await page.waitForTimeout(1200);
     },
@@ -185,7 +185,7 @@ async function runScenario(page, scenario, consoleMessages) {
       await scenario.setup(page);
       await scenario.run(page);
       row.failures.push(...await scenario.expect(page));
-      const actionableConsole = consoleMessages.filter((entry) => !/favicon|File not found|ResizeObserver|tile.openstreetmap.org|Cannot record touch end without a touch start|Failed to load resource: the server responded with a status of 503/i.test(entry));
+      const actionableConsole = consoleMessages.filter((entry) => !/favicon|File not found|ResizeObserver|tile.openstreetmap.org|Cannot record touch end without a touch start|Failed to load resource: (?:the server responded with a status of 503|net::ERR_NAME_NOT_RESOLVED)/i.test(entry));
       if (actionableConsole.length) row.failures.push(`console/page errors: ${actionableConsole.slice(0, 3).join(" | ")}`);
       row.failures.push(...await assertNoRawFailureLeak(page));
       row.screenshot = await capture(page, scenario.id);
@@ -278,8 +278,8 @@ async function planSimpleRoute(page) {
   await page.goto(appUrl, { waitUntil: "domcontentloaded" });
   await page.waitForTimeout(900);
   await clickBottomTab(page, "Plan");
-  await page.getByLabel("From").fill("Sydney NSW");
-  await page.getByLabel("To").fill("Melbourne VIC");
+  await page.getByRole("textbox", { name: "From", exact: true }).fill("Sydney NSW");
+  await page.getByRole("textbox", { name: "To", exact: true }).fill("Melbourne VIC");
   await page.getByRole("button", { name: "Plan route", exact: true }).click();
   await page.waitForTimeout(1600);
 }

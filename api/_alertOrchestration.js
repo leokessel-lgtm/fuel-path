@@ -1,12 +1,16 @@
 const {
   alertStorageStatus,
   appendRouteAlertEvaluation,
+  claimDueSavedRoutes,
+  completeSavedRouteAlertLease,
   counts: alertStorageCounts,
   deleteSavedRoute,
   listPendingPushTicketEvaluations,
   listPushDevices,
   listRouteAlertEvaluations,
   listSavedRoutes,
+  retrySavedRouteAlertLease,
+  savedRouteAlertLeaseActive,
   updatePushDeviceStatus,
   updateRouteAlertDelivery,
   updateSavedRouteLastAlert,
@@ -24,13 +28,12 @@ const {
   buildSavedRouteAlertEvaluation,
   isExpoPushToken,
   receiptStatus,
-  routeAlertWindowDue,
-  scheduledRouteAlertIdempotencyKey,
 } = require("./_alertEvaluation");
 const {
   normaliseBackendSavedRoute,
   normalisePushDevice,
 } = require("./_alertRecords");
+const { createScheduledRouteAlertRunner } = require("./_alertScheduler");
 const { providerHealth } = require("./_providerRuntime");
 const { createHash, createHmac, timingSafeEqual } = require("node:crypto");
 const ALERT_MAX_RECORDS = 500;
@@ -38,6 +41,18 @@ const ALERT_CAPABILITY_SCOPE = "alerts-client-write-v1";
 const ALERT_CAPABILITY_TTL_SECONDS = 15 * 60;
 function createAlertOrchestration({ buildRoute, capabilitiesForPoints, loadStationData, predictionStatus, scoreRoute }) {
   let alertRouteScorerForTests;
+  const runScheduledRouteAlertEvaluation = createScheduledRouteAlertRunner({
+    alertsStatus,
+    assertDurableAlertStorage,
+    capabilitiesForPoints,
+    claimDueSavedRoutes,
+    completeSavedRouteAlertLease,
+    evaluateSavedRouteAlert,
+    listPushDevices,
+    retrySavedRouteAlertLease,
+    savedRouteAlertLeaseActive,
+    scoreSavedRouteForAlert,
+  });
   async function alertsStatus() {
     const storage = alertStorageStatus({ maxRecords: ALERT_MAX_RECORDS });
     const cronConfigured = Boolean(process.env.CRON_SECRET);
@@ -541,73 +556,6 @@ function createAlertOrchestration({ buildRoute, capabilitiesForPoints, loadStati
         deliveryError: error instanceof Error ? error.message : "Expo push delivery failed",
       };
     }
-  }
-  async function runScheduledRouteAlertEvaluation({ limit = 50, now, ignoreWindow = false } = {}) {
-    assertDurableAlertStorage();
-    const evaluatedAt = validIsoDate(now) || new Date().toISOString();
-    const routes = await listSavedRoutes({ enabledOnly: true, limit });
-    const results = [];
-    const alertedUserIds = new Set();
-    for (const route of routes) {
-      if (!ignoreWindow && !routeAlertWindowDue(route, evaluatedAt)) {
-        results.push({ routeId: route.id, status: "skipped", reason: "outside_alert_window" });
-        continue;
-      }
-      const devices = await listPushDevices({ userId: route.userId, status: "active", limit: 20 });
-      if (alertedUserIds.has(route.userId)) {
-        const result = await evaluateSavedRouteAlert({
-          route,
-          devices,
-          notificationPermission: devices.length ? "granted" : "unknown",
-          candidate: {},
-          regionCapabilities: capabilitiesForPoints([route.from, route.to]),
-          now: evaluatedAt,
-          idempotencyKey: scheduledRouteAlertIdempotencyKey(route, evaluatedAt),
-          userAlertAlreadySent: true,
-        });
-        results.push({
-          routeId: route.id,
-          evaluationId: result.evaluation.id,
-          status: result.evaluation.status,
-          reason: result.evaluation.reason,
-          deliveryStatus: result.deliveryStatus,
-          idempotencyStatus: result.idempotencyStatus,
-          scoringStatus: "skipped_user_alert_cap",
-        });
-        continue;
-      }
-      const scoredAlert = await scoreSavedRouteForAlert(route, evaluatedAt);
-      const result = await evaluateSavedRouteAlert({
-        route,
-        devices,
-        notificationPermission: devices.length ? "granted" : "unknown",
-        candidate: scoredAlert.candidate,
-        regionCapabilities: scoredAlert.regionCapabilities,
-        now: evaluatedAt,
-        idempotencyKey: scheduledRouteAlertIdempotencyKey(route, evaluatedAt),
-      });
-      results.push({
-        routeId: route.id,
-        evaluationId: result.evaluation.id,
-        status: result.evaluation.status,
-        reason: result.evaluation.reason,
-        deliveryStatus: result.deliveryStatus,
-        idempotencyStatus: result.idempotencyStatus,
-        scoringStatus: scoredAlert.status,
-      });
-      if (result.evaluation.status === "send_alert") alertedUserIds.add(route.userId);
-    }
-    return {
-      accepted: true,
-      mode: "scheduled_saved_route_alert_evaluation",
-      evaluatedAt,
-      routeCount: routes.length,
-      evaluatedCount: results.filter((item) => item.evaluationId).length,
-      skippedCount: results.filter((item) => item.status === "skipped").length,
-      sentCount: results.filter((item) => item.deliveryStatus === "sent_to_expo").length,
-      results,
-      alerts: await alertsStatus(),
-    };
   }
   async function scoreSavedRouteForAlert(route, evaluatedAt) {
     if (alertRouteScorerForTests) return alertRouteScorerForTests(route, evaluatedAt);

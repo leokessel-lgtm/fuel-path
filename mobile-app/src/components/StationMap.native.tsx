@@ -40,7 +40,7 @@ const compactMarkerDensity = {
 const nearbyInitialRegionDelta = 0.035;
 const nearbyInitialMarkerRadiusKm = 4.2;
 const routeCameraChargerLimit = 16;
-const maxEvMarkers = 96;
+const maxEvMarkers = 18;
 const decorativeStationMarkerAccessibility = {
   accessibilityElementsHidden: true,
   importantForAccessibility: "no-hide-descendants" as const,
@@ -101,7 +101,7 @@ export function StationMap({
   userLocation?: MapPoint;
   onMapPress?: () => void;
 }) {
-  const { width } = useWindowDimensions();
+  const { height, width } = useWindowDimensions();
   const mapRef = useRef<MapView | null>(null);
   const lastCameraKeyRef = useRef("");
   const lastReportedUserCentreKeyRef = useRef("");
@@ -221,11 +221,14 @@ export function StationMap({
   );
   const visibleChargers = useMemo(
     () =>
-      prioritiseSelectedChargers(chargers, selectedChargerId).slice(
-        0,
-        maxEvMarkers,
+      spatiallySeparatedChargers(
+        chargers,
+        currentRegion,
+        width,
+        height,
+        selectedChargerId,
       ),
-    [chargers, selectedChargerId],
+    [chargers, currentRegion, height, selectedChargerId, width],
   );
 
   useEffect(() => {
@@ -863,6 +866,31 @@ function prioritiseSelectedChargers(
     selected,
     ...chargers.filter((charger) => charger.id !== selectedChargerId),
   ];
+}
+
+function spatiallySeparatedChargers(
+  chargers: EvCharger[],
+  region: Region,
+  width: number,
+  height: number,
+  selectedChargerId?: string,
+) {
+  const minimumSpacingPx = 58;
+  const selected: Array<{ charger: EvCharger; x: number; y: number }> = [];
+  const minLat = region.latitude - region.latitudeDelta / 2;
+  const maxLat = region.latitude + region.latitudeDelta / 2;
+  const minLon = region.longitude - region.longitudeDelta / 2;
+  const maxLon = region.longitude + region.longitudeDelta / 2;
+  for (const charger of prioritiseSelectedChargers(chargers, selectedChargerId)) {
+    if (charger.lat < minLat || charger.lat > maxLat || charger.lon < minLon || charger.lon > maxLon) continue;
+    const x = ((charger.lon - minLon) / Math.max(region.longitudeDelta, 0.0001)) * width;
+    const y = ((maxLat - charger.lat) / Math.max(region.latitudeDelta, 0.0001)) * height;
+    const overlaps = selected.some((existing) => Math.hypot(x - existing.x, y - existing.y) < minimumSpacingPx);
+    if (overlaps && charger.id !== selectedChargerId) continue;
+    selected.push({ charger, x, y });
+    if (selected.length >= maxEvMarkers) break;
+  }
+  return selected.map(({ charger }) => charger);
 }
 
 function nativeRoutePriceMarkerLimit(width: number) {

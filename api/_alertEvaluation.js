@@ -1,4 +1,5 @@
 const { capabilitiesForPoints } = require("./_capabilities");
+const { routeAlertDaySelected } = require("./_alertSchedule");
 
 const ALERT_FRESHNESS_MAX_MINUTES = 120;
 const ALERT_DUPLICATE_COOLDOWN_HOURS = 72;
@@ -182,6 +183,7 @@ function scheduledRouteAlertIdempotencyKey(route, evaluatedAt) {
 }
 
 function routeAlertWindowDue(route, now) {
+  if (!routeAlertDaySelected(route, now)) return false;
   const target = route.alertTimeLocal || "07:30";
   const local = localTimeParts(now, route.timezone || "Australia/Sydney");
   if (!local) return true;

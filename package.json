@@ -11,6 +11,7 @@
     "db:ready": "npm run db:up && npm run db:migrate:local && npm run db:verify:local",
     "test": "node scripts/run-backend-tests.mjs",
     "test:alert-retention-postgres": "FUEL_PATH_ALERT_RETENTION_TEST_DATABASE_URL=postgres://fuel_path:fuel_path@127.0.0.1:54329/fuel_path node --test tests/api/alert-retention-postgres.integration.test.js",
+    "test:alert-scheduler-postgres": "FUEL_PATH_ALERT_SCHEDULER_TEST_DATABASE_URL=postgres://fuel_path:fuel_path@127.0.0.1:54329/fuel_path node --test tests/api/alert-scheduler-postgres.integration.test.js",
     "test:readiness": "node --test --test-concurrency=1 tests/api/provider-routing.test.js tests/api/provider-terms-readiness.test.js tests/api/store-publishing-readiness.test.js tests/api/support-readiness.test.js tests/api/beta-readiness.test.js tests/api/route-quality-now.test.js tests/api/predictions.test.js tests/api/discount-registry.test.js",
     "check:docs": "node scripts/check-docs.mjs",
     "test:docs": "node --test tests/api/docs-organisation.test.js tests/api/doc-context-budget.test.js",

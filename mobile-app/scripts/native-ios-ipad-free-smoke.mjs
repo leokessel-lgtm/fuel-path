@@ -4,6 +4,8 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
+import { scanNativeIosDependencyDrift } from "./native-ios-dependency-drift.mjs";
+
 const mobileRoot = process.cwd();
 const repoRoot = path.resolve(mobileRoot, "..");
 const outputRoot = path.join(repoRoot, "tmp", "native-smoke");
@@ -50,6 +52,11 @@ const evidence = {
 const selectedDevice = deviceId || firstAvailableIpad();
 if (!selectedDevice) {
   fail("No available paired iPad found. Connect and unlock the iPad, then keep Developer Mode enabled.");
+}
+
+const dependencyDrift = scanNativeIosDependencyDrift({ mobileRoot });
+if (!skipBuild && dependencyDrift.status === "stale") {
+  fail(dependencyDrift.message);
 }
 
 evidence.device = deviceDetails(selectedDevice);

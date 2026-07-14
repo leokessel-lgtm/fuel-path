@@ -157,6 +157,8 @@ function rowToRoute(row) {
     evConnectors: Array.isArray(raw.evConnectors) ? raw.evConnectors : [],
     pausedUntil: row.paused_until ? isoDateTime(row.paused_until) : undefined,
     lastAlertSentAt: row.last_alert_sent_at ? isoDateTime(row.last_alert_sent_at) : undefined,
+    alertNextEvaluationAt: row.alert_next_evaluation_at ? isoDateTime(row.alert_next_evaluation_at) : undefined,
+    alertLastEvaluatedAt: row.alert_last_evaluated_at ? isoDateTime(row.alert_last_evaluated_at) : undefined,
     createdAt: isoDateTime(row.created_at),
     updatedAt: isoDateTime(row.updated_at),
   };

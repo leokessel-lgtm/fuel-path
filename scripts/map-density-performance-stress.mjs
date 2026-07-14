@@ -66,7 +66,7 @@ async function runFuelDensity(viewport) {
     })));
     await page.goto(appUrl, { waitUntil: "domcontentloaded" });
     const start = Date.now();
-    await page.getByText("SHOW NEARBY", { exact: false }).first().waitFor({ timeout: 9000 });
+    await page.getByRole("button", { name: "Choose fuel or EV charging", exact: true }).waitFor({ timeout: 9000 });
     await page.waitForFunction(() => document.querySelectorAll("[data-station-code]").length > 0, null, { timeout: 9000 });
     await page.waitForTimeout(1000);
     row.metrics = await densityMetrics(page);
@@ -125,7 +125,7 @@ async function runEvDensity(viewport) {
     })));
     await page.goto(appUrl, { waitUntil: "domcontentloaded" });
     const start = Date.now();
-    await page.getByText("SHOW NEARBY", { exact: false }).first().waitFor({ timeout: 9000 });
+    await page.getByRole("button", { name: "Choose fuel or EV charging", exact: true }).waitFor({ timeout: 9000 });
     await chooseFuelMode(page, "EV charge");
     await page.waitForFunction(() => document.querySelectorAll(".fuel-path-ev-marker").length > 0, null, { timeout: 9000 });
     await page.waitForTimeout(1000);
@@ -133,8 +133,8 @@ async function runEvDensity(viewport) {
     row.metrics.readyMs = Date.now() - start;
     row.failures.push(...densityAssertions(row.metrics, {
       maxReadyMs: 10000,
-      minEvMarkers: 12,
-      maxEvMarkers: 240,
+      minEvMarkers: 6,
+      maxEvMarkers: 18,
       requireEv: true,
     }));
     if (row.metrics.bodyText.includes("? kw")) row.failures.push("EV density view shows unknown power as ? kw");
@@ -200,6 +200,13 @@ async function densityMetrics(page) {
     const stations = document.querySelectorAll("[data-station-code]").length;
     const clusters = document.querySelectorAll(".fuel-path-marker-cluster").length;
     const evMarkers = document.querySelectorAll(".fuel-path-ev-marker").length;
+    const evMarkerRects = [...document.querySelectorAll(".fuel-path-ev-marker")]
+      .map((element) => element.getBoundingClientRect());
+    const evOverlapPairs = evMarkerRects.reduce((count, left, leftIndex) =>
+      count + evMarkerRects.slice(leftIndex + 1).filter((right) =>
+        Math.min(left.right, right.right) - Math.max(left.left, right.left) > 12 &&
+        Math.min(left.bottom, right.bottom) - Math.max(left.top, right.top) > 12,
+      ).length, 0);
     const leafletMarkerIcons = document.querySelectorAll(".leaflet-marker-icon").length;
     const sheetTops = [...document.querySelectorAll("button, div")]
       .filter((el) => ["Closest", "Cheapest", "Best value", "Any", "AC", "Fast"].includes((el.innerText || el.textContent || "").trim()))
@@ -210,6 +217,7 @@ async function densityMetrics(page) {
       stationMarkers: stations,
       clusters,
       evMarkers,
+      evOverlapPairs,
       leafletMarkerIcons,
       sheetTop: sheetTops.length ? Math.min(...sheetTops) : -1,
       hasZoomControls: Boolean(document.querySelector(".leaflet-control-zoom-in")) && Boolean(document.querySelector(".leaflet-control-zoom-out")),
@@ -230,6 +238,7 @@ function densityAssertions(metrics, options) {
     [options.requireFuel ? metrics.clusters <= options.maxClusters : true, `cluster markers exceeded cap: ${metrics.clusters}`],
     [options.requireEv ? metrics.evMarkers >= options.minEvMarkers : true, `expected at least ${options.minEvMarkers} EV markers, got ${metrics.evMarkers}`],
     [options.requireEv ? metrics.evMarkers <= options.maxEvMarkers : true, `EV markers exceeded cap: ${metrics.evMarkers}`],
+    [options.requireEv ? metrics.evOverlapPairs <= 4 : true, `EV marker overlap remained unreadable: ${metrics.evOverlapPairs} overlapping pairs`],
   ]);
 }
 

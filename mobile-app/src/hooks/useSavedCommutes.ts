@@ -1,36 +1,30 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback } from "react";
 
 import {
   defaultCommuteAlertDays,
-  loadSavedCommutes,
+  loadSavedCommutesWithStatus,
   persistSavedCommutes,
 } from "../services/savedCommutesStore";
 import { FuelCode, MapPoint, SavedCommute } from "../types";
+import { useRecoverableLocalState } from "./useRecoverableLocalState";
 
 type SaveCommuteInput = Pick<SavedCommute, "from" | "fuel" | "name" | "to"> & {
   vehicleId?: string;
 };
 
 export function useSavedCommutes() {
-  const [savedCommutes, setSavedCommutes] = useState<SavedCommute[]>([]);
-  const [loaded, setLoaded] = useState(false);
-
-  useEffect(() => {
-    let active = true;
-    loadSavedCommutes().then((commutes) => {
-      if (!active) return;
-      setSavedCommutes(commutes);
-      setLoaded(true);
-    });
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!loaded) return;
-    persistSavedCommutes(savedCommutes).catch(() => {});
-  }, [loaded, savedCommutes]);
+  const {
+    value: savedCommutes,
+    setValue: setSavedCommutes,
+    loaded,
+    persistence,
+    retryPersistence,
+  } = useRecoverableLocalState<SavedCommute[]>({
+    fallback: [],
+    label: "Saved routes",
+    load: loadSavedCommutesWithStatus,
+    persist: persistSavedCommutes,
+  });
 
   const saveCommute = useCallback(({ from, fuel, name, to, vehicleId }: SaveCommuteInput) => {
     setSavedCommutes((current) => {
@@ -81,7 +75,9 @@ export function useSavedCommutes() {
 
   return {
     loaded,
+    persistence,
     renameCommute,
+    retryPersistence,
     saveCommute,
     savedCommutes,
     setSavedCommutes,

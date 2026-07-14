@@ -81,6 +81,25 @@ The current AsyncStorage saved-commute model is good enough for local prototype 
 
 Run every 5 to 15 minutes.
 
+The implemented worker does not scan the newest fixed set of routes. It stores
+the next due evaluation time on each alert-enabled route and atomically claims
+the oldest due rows with `FOR UPDATE SKIP LOCKED`. Each claim receives an
+expiring lease. A crashed worker therefore cannot strand the route, and an
+overlapping cron invocation cannot process the same live lease.
+
+Work is grouped by anonymous installation. Routes for one installation run in
+sequence so the one-alert-per-user cap remains deterministic. Different
+installations run with bounded concurrency, controlled by
+`ALERT_WORKER_CONCURRENCY` (default 4, maximum 10). Failed route work releases
+its lease onto a five-minute retry schedule. Successful and intentionally
+skipped work advances to the next selected local alert day and window, including
+timezone and daylight-saving conversion.
+
+Each run reports claimed count, failed count, lease duration, worker
+concurrency, oldest claimed due time and queue age. These are coarse operational
+signals only and must not include route coordinates, labels, tokens or lease
+tokens.
+
 For each enabled saved route where the local travel window is approaching:
 
 - refresh or reuse route geometry

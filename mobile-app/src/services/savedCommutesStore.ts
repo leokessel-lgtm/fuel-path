@@ -1,7 +1,6 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
-
 import { FuelCode, MapPoint, SavedCommute, Weekday } from "../types";
-import { SAVED_COMMUTES_KEY } from "./localDataLifecycle";
+import { SAVED_COMMUTES_BACKUP_KEY, SAVED_COMMUTES_KEY } from "./localDataLifecycle";
+import { loadRecoverableJson, persistRecoverableJson } from "./recoverableLocalStore";
 
 const MAX_SAVED_COMMUTES = 20;
 const fuelCodes: FuelCode[] = ["E10", "U91", "P95", "P98", "DL", "PDL", "LPG"];
@@ -10,23 +9,28 @@ export const defaultCommuteAlertDays: Weekday[] = ["mon", "tue", "wed", "thu", "
 export const migratedCommuteAlertDays: Weekday[] = weekdays;
 
 export async function loadSavedCommutes(): Promise<SavedCommute[]> {
-  try {
-    const raw = await AsyncStorage.getItem(SAVED_COMMUTES_KEY);
-    if (!raw) return [];
-    const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed
-      .filter(isSavedCommute)
-      .map(normaliseSavedCommute)
-      .slice(0, MAX_SAVED_COMMUTES);
-  } catch {
-    return [];
-  }
+  return (await loadSavedCommutesWithStatus()).value;
+}
+
+export function loadSavedCommutesWithStatus() {
+  return loadRecoverableJson({
+    primaryKey: SAVED_COMMUTES_KEY,
+    backupKey: SAVED_COMMUTES_BACKUP_KEY,
+    fallback: [] as SavedCommute[],
+    normalise: (value) => {
+      if (!Array.isArray(value)) throw new Error("Saved routes payload is invalid");
+      return value.filter(isSavedCommute).map(normaliseSavedCommute).slice(0, MAX_SAVED_COMMUTES);
+    },
+  });
 }
 
 export async function persistSavedCommutes(commutes: SavedCommute[]) {
   const compactCommutes = commutes.slice(0, MAX_SAVED_COMMUTES).map(normaliseSavedCommute);
-  await AsyncStorage.setItem(SAVED_COMMUTES_KEY, JSON.stringify(compactCommutes));
+  await persistRecoverableJson({
+    primaryKey: SAVED_COMMUTES_KEY,
+    backupKey: SAVED_COMMUTES_BACKUP_KEY,
+    value: compactCommutes,
+  });
 }
 
 function normaliseSavedCommute(commute: SavedCommute): SavedCommute {

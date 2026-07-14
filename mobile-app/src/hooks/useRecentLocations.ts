@@ -1,32 +1,26 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback } from "react";
 
 import {
-  loadRecentLocations,
+  loadRecentLocationsWithStatus,
   normaliseRecentLocations,
   persistRecentLocations,
 } from "../services/recentLocationsStore";
 import { MapPoint } from "../types";
+import { useRecoverableLocalState } from "./useRecoverableLocalState";
 
 export function useRecentLocations() {
-  const [recentLocations, setRecentLocations] = useState<MapPoint[]>([]);
-  const [loaded, setLoaded] = useState(false);
-
-  useEffect(() => {
-    let active = true;
-    loadRecentLocations().then((locations) => {
-      if (!active) return;
-      setRecentLocations(locations);
-      setLoaded(true);
-    });
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!loaded) return;
-    persistRecentLocations(recentLocations).catch(() => {});
-  }, [loaded, recentLocations]);
+  const {
+    value: recentLocations,
+    setValue: setRecentLocations,
+    loaded,
+    persistence,
+    retryPersistence,
+  } = useRecoverableLocalState<MapPoint[]>({
+    fallback: [],
+    label: "Recent locations",
+    load: loadRecentLocationsWithStatus,
+    persist: persistRecentLocations,
+  });
 
   const addRecentLocation = useCallback((point: MapPoint) => {
     setRecentLocations((current) => normaliseRecentLocations([point, ...current]));
@@ -49,8 +43,10 @@ export function useRecentLocations() {
     addRecentLocation,
     clearRecentLocations,
     loaded,
+    persistence,
     recentLocations,
     removeRecentLocation,
+    retryPersistence,
   };
 }
 

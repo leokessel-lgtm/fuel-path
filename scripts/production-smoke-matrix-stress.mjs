@@ -77,7 +77,7 @@ async function smokeNearbyFuel(page, row) {
     context: { fuel: "PDL", source: "live", provider: "smoke_mock", radiusKm: 16, stationCount: 42, returnedCount: 42, generatedAt: new Date().toISOString() },
   })));
   await page.goto(appUrl, { waitUntil: "domcontentloaded" });
-  await page.getByText("SHOW NEARBY", { exact: false }).first().waitFor({ timeout: 10000 });
+  await page.getByRole("button", { name: "Choose fuel or EV charging", exact: true }).waitFor({ timeout: 10000 });
   await page.waitForFunction(() => document.querySelectorAll("[data-station-code]").length > 0, null, { timeout: 10000 });
   await page.waitForTimeout(800);
   const state = await uiState(page);
@@ -101,7 +101,7 @@ async function smokeNearbyEv(page, row) {
     context: { provider: "api_ninjas", source: "smoke_mock", capability: "directory", radiusKm: 24, chargerCount: 48, returnedCount: 48, provenance: { source: "smoke_mock", label: "Charger data from smoke mock", realTimeAvailability: false } },
   })));
   await page.goto(appUrl, { waitUntil: "domcontentloaded" });
-  await page.getByText("SHOW NEARBY", { exact: false }).first().waitFor({ timeout: 10000 });
+  await page.getByRole("button", { name: "Choose fuel or EV charging", exact: true }).waitFor({ timeout: 10000 });
   await chooseFuelMode(page, "EV charge");
   await page.waitForFunction(() => document.querySelectorAll(".fuel-path-ev-marker").length > 0, null, { timeout: 10000 });
   await page.waitForTimeout(800);

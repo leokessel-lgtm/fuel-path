@@ -76,3 +76,15 @@ test("anonymous alert migration scopes route keys and capability issuance", () =
   assert.match(source, /DELETE FROM fuel_path_saved_routes[\s\S]*LEFT\(user_id, 6\) = 'local_'/);
   assert.match(source, /PRIMARY KEY \(user_id, id\)/);
 });
+
+test("alert scheduler migration adds indexed due work and expiring leases", () => {
+  const source = fs.readFileSync(
+    path.join(__dirname, "../../db/migrations/1783987200000_alert_due_work_leases.js"),
+    "utf8",
+  );
+  assert.match(source, /alert_next_evaluation_at TIMESTAMPTZ/);
+  assert.match(source, /alert_lease_token TEXT/);
+  assert.match(source, /alert_lease_expires_at TIMESTAMPTZ/);
+  assert.match(source, /fuel_path_saved_routes_due_alert_idx/);
+  assert.match(source, /WHERE alert_enabled = true/);
+});

@@ -64,7 +64,9 @@ export default function App() {
   const {
     clearNamedPlace,
     preferences,
+    persistence: preferencesPersistence,
     resetPreferences,
+    retryPersistence: retryPreferencesPersistence,
     addVehicle,
     removeVehicle,
     saveNamedPlace,
@@ -86,11 +88,15 @@ export default function App() {
   const {
     addRecentLocation,
     clearRecentLocations,
+    persistence: recentLocationsPersistence,
     recentLocations,
     removeRecentLocation,
+    retryPersistence: retryRecentLocationsPersistence,
   } = useRecentLocations();
   const {
     renameCommute,
+    persistence: savedCommutesPersistence,
+    retryPersistence: retrySavedCommutesPersistence,
     saveCommute,
     savedCommutes,
     setSavedCommutes,
@@ -180,6 +186,12 @@ export default function App() {
     ? vehicleProfileShortLabel(activeVehicle)
     : vehicleProfileShortLabel(preferences);
   const canSwitchVehicles = preferences.vehicles.length > 1;
+  const localPersistenceIssues = [
+    { state: preferencesPersistence, retry: retryPreferencesPersistence },
+    { state: savedCommutesPersistence, retry: retrySavedCommutesPersistence },
+    { state: recentLocationsPersistence, retry: retryRecentLocationsPersistence },
+  ].filter((item) => item.state.status === "error");
+  const localPersistenceIssue = localPersistenceIssues[0];
 
   const openVehicleProfile = () => {
     setVehicleSwitcherOpen(false);
@@ -307,6 +319,21 @@ export default function App() {
               style={styles.releaseButton}
             >
               <Text style={styles.releaseButtonText}>Refresh</Text>
+            </Pressable>
+          </View>
+        ) : null}
+        {localPersistenceIssue ? (
+          <View accessibilityLiveRegion="assertive" role="alert" style={styles.localDataBanner}>
+            <Text style={styles.localDataBannerText}>{localPersistenceIssue.state.message}</Text>
+            <Pressable
+              accessibilityLabel="Retry saving local data"
+              accessibilityRole="button"
+              onPress={() => {
+                void Promise.all(localPersistenceIssues.map((item) => item.retry()));
+              }}
+              style={styles.localDataRetryButton}
+            >
+              <Text style={styles.localDataRetryText}>Retry</Text>
             </Pressable>
           </View>
         ) : null}
@@ -686,6 +713,37 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs,
   },
   releaseButtonText: {
+    color: colors.white,
+    fontSize: typeScale.caption,
+    fontWeight: "700",
+  },
+  localDataBanner: {
+    alignItems: "center",
+    backgroundColor: colors.amberSoft,
+    borderBottomColor: colors.amber,
+    borderBottomWidth: 1,
+    flexDirection: "row",
+    gap: spacing.sm,
+    justifyContent: "space-between",
+    minHeight: 44,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+  },
+  localDataBannerText: {
+    color: colors.ink,
+    flex: 1,
+    fontSize: typeScale.caption,
+    fontWeight: "600",
+  },
+  localDataRetryButton: {
+    alignItems: "center",
+    backgroundColor: colors.black,
+    borderRadius: radii.pill,
+    justifyContent: "center",
+    minHeight: 34,
+    paddingHorizontal: spacing.md,
+  },
+  localDataRetryText: {
     color: colors.white,
     fontSize: typeScale.caption,
     fontWeight: "700",

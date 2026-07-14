@@ -1,17 +1,8 @@
 const assert = require("node:assert/strict");
-const fs = require("node:fs");
-const path = require("node:path");
 const test = require("node:test");
 
-test("Vercel jobs bundle includes product database migrations", () => {
-  const config = JSON.parse(
-    fs.readFileSync(path.join(__dirname, "..", "..", "vercel.json"), "utf8"),
-  );
-  assert.equal(config.functions?.["api/jobs.js"]?.includeFiles, "db/migrations/**");
-});
-
 test("Neon HTTP migration client batches each migration transaction atomically", async () => {
-  const { createNeonHttpMigrationClient } = require("../../api/_productDatabaseMigrations");
+  const { createNeonHttpMigrationClient } = await import("../../scripts/migrate-product-database-http.mjs");
   const transactionBatches = [];
   const directQueries = [];
   const sql = {
@@ -40,7 +31,7 @@ test("Neon HTTP migration client batches each migration transaction atomically",
 });
 
 test("Neon HTTP migration client discards queued work on rollback", async () => {
-  const { createNeonHttpMigrationClient } = require("../../api/_productDatabaseMigrations");
+  const { createNeonHttpMigrationClient } = await import("../../scripts/migrate-product-database-http.mjs");
   let transactionCalls = 0;
   const sql = {
     query: async () => [],

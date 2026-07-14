@@ -7,9 +7,7 @@ const {
   cronAuthorised,
   methodAllowed,
   numberParam,
-  logServerError,
   retentionCleanupAuthorised,
-  runProductDatabaseMigrations,
   runRetentionCleanup,
   runScheduledRouteAlertEvaluation,
   sendJson,
@@ -21,11 +19,10 @@ module.exports = async function handler(req, res) {
   if (job === "evaluate-route-alerts") return evaluateRouteAlerts(req, res);
   if (job === "check-push-receipts") return checkPushReceiptsJob(req, res);
   if (job === "retention-cleanup") return retentionCleanupJob(req, res);
-  if (job === "migrate-product-database") return migrateProductDatabaseJob(req, res);
 
   sendJson(res, 404, {
     error: "Unknown internal job.",
-    supportedJobs: ["evaluate-route-alerts", "check-push-receipts", "retention-cleanup", "migrate-product-database"],
+    supportedJobs: ["evaluate-route-alerts", "check-push-receipts", "retention-cleanup"],
   });
 };
 
@@ -56,20 +53,6 @@ async function evaluateRouteAlerts(req, res) {
       error: error instanceof Error ? error.message : "Alert evaluation job failed",
       alerts: await alertsStatus(),
     });
-  }
-}
-
-async function migrateProductDatabaseJob(req, res) {
-  if (!methodAllowed(req, res, ["POST"])) return;
-  if (!alertsAdminWriteAuthorised(req)) {
-    sendJson(res, 401, { error: "Product database migration requires operator authorisation." });
-    return;
-  }
-  try {
-    sendJson(res, 202, await runProductDatabaseMigrations());
-  } catch (error) {
-    logServerError("product-database-migration", error);
-    sendJson(res, 500, { error: "Product database migration failed." });
   }
 }
 

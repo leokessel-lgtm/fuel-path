@@ -599,15 +599,8 @@ test("client capability cannot invoke evaluation or internal jobs", async () => 
       body: {},
       headers,
     });
-    const migration = await callHandler(internalJobsHandler, {
-      method: "POST",
-      query: { job: "migrate-product-database" },
-      body: {},
-      headers,
-    });
     assert.equal(evaluation.status, 401);
     assert.equal(job.status, 401);
-    assert.equal(migration.status, 401);
   } finally {
     setAlertStorageForTests(null);
     if (originalEnabled === undefined) delete process.env.ALERTS_CLIENT_WRITE_ENABLED;

@@ -63,7 +63,15 @@ function sleep(ms) {
 const appBundle = args.get("--app") || newestAppBundle();
 const generatedAt = new Date().toISOString();
 const safeStamp = generatedAt.replaceAll(":", "-");
-const report = path.join(smokeDir, `ios-cold-start-smoke-${safeStamp}.md`);
+const requestedDeviceSlug = (requestedDevice || "auto")
+  .toLowerCase()
+  .replace(/[^a-z0-9]+/g, "-")
+  .replace(/^-|-$/g, "")
+  .slice(0, 48) || "auto";
+// Include both the requested target and process id so parallel simulator jobs
+// can never overwrite one another when they start in the same millisecond.
+const evidenceStem = `ios-cold-start-smoke-${safeStamp}-${requestedDeviceSlug}-${process.pid}`;
+const report = path.join(smokeDir, `${evidenceStem}.md`);
 
 const lines = [
   `# iOS cold-start smoke - ${generatedAt}`,
@@ -123,7 +131,7 @@ for (let run = 1; run <= runs; run += 1) {
     const launchMs = Date.now() - start;
     launchDurations.push(launchMs);
     sleep(settleMs);
-    const screenshot = path.join(smokeDir, `ios-cold-start-smoke-${safeStamp}-run-${run}.png`);
+    const screenshot = path.join(smokeDir, `${evidenceStem}-run-${run}.png`);
     sh("xcrun", ["simctl", "io", device.udid, "screenshot", screenshot]);
     const size = statSync(screenshot).size;
     screenshots.push({ run, screenshot, size, launchMs });

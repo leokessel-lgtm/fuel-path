@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
-import { basename, join, resolve } from "node:path";
+import { basename, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const mobileAppRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
@@ -44,12 +44,12 @@ function buildReport() {
   return {
     platform: "ios",
     sourceCommit: argumentValue("--source-commit"),
-    appBundle: argumentValue("--app-bundle"),
+    appBundle: portableEvidencePath(argumentValue("--app-bundle")),
     simulator: target("simulator"),
     device: target("device"),
     renderedScreens: requiredScreens.map((screen) => ({
       name: screen,
-      screenshot: argumentValue(`--${screen}-screenshot`),
+      screenshot: portableEvidencePath(argumentValue(`--${screen}-screenshot`)),
     })),
     failureLines: failureLines(),
   };
@@ -80,10 +80,10 @@ function validationBlockers(report) {
   const missingScreens = requiredScreens.filter((screen) => !screenNames.includes(screen));
   const missingScreenshots = requiredScreens.filter((screen) => {
     const item = screens.find((candidate) => String(candidate.name || candidate.screen || "").toLowerCase() === screen);
-    return !item?.screenshot || !existsSync(resolve(item.screenshot));
+    return !item?.screenshot || !existsSync(resolveEvidencePath(item.screenshot));
   });
   const screenshotPaths = screens
-    .map((screen) => screen.screenshot ? resolve(screen.screenshot) : "")
+    .map((screen) => screen.screenshot ? resolveEvidencePath(screen.screenshot) : "")
     .filter(Boolean);
   const duplicateScreenshots = new Set(screenshotPaths).size !== screenshotPaths.length;
   const screenshotHashes = screenshotPaths
@@ -95,7 +95,7 @@ function validationBlockers(report) {
     ...(String(report.platform || "").toLowerCase() !== "ios" ? ["Report platform must be ios."] : []),
     ...(!report.simulator?.name && !report.device?.name ? ["Report needs a simulator or device target name."] : []),
     ...(!report.sourceCommit ? ["Report needs the validated source commit."] : []),
-    ...(!report.appBundle || !existsSync(resolve(report.appBundle)) ? ["Report needs an existing iOS app bundle."] : []),
+    ...(!report.appBundle || !existsSync(resolveEvidencePath(report.appBundle)) ? ["Report needs an existing iOS app bundle."] : []),
     ...(missingScreens.length ? [`Missing rendered screens: ${missingScreens.join(", ")}.`] : []),
     ...(missingScreenshots.length ? [`Missing screenshot evidence: ${missingScreenshots.join(", ")}.`] : []),
     ...(duplicateScreenshots ? ["Plan, Nearby and Account must use distinct screenshot files."] : []),
@@ -103,6 +103,22 @@ function validationBlockers(report) {
     ...(androidNamedScreenshots.length ? ["iOS evidence cannot reference Android or Pixel-named screenshots."] : []),
     ...((report.failureLines || []).length ? [`Runtime failure lines were captured: ${report.failureLines.length}.`] : []),
   ];
+}
+
+function portableEvidencePath(value) {
+  if (!value) return "";
+  const absolutePath = resolve(value);
+  const projectRelative = relative(projectRoot, absolutePath);
+  return !projectRelative.startsWith("..") && !isAbsolute(projectRelative)
+    ? projectRelative
+    : absolutePath;
+}
+
+function resolveEvidencePath(value) {
+  if (!value) return "";
+  if (isAbsolute(value)) return value;
+  const projectRelative = resolve(projectRoot, value);
+  return existsSync(projectRelative) ? projectRelative : resolve(value);
 }
 
 function markdown(report) {

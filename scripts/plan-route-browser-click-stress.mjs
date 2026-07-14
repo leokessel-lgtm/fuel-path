@@ -15,7 +15,7 @@ const pairFilter = String(process.env.FUEL_PATH_PLAN_BROWSER_STRESS_PAIR_IDS || 
   .split(",")
   .map((value) => value.trim())
   .filter(Boolean);
-const runId = new Date().toISOString().replace(/[:.]/g, "-");
+const runId = `${new Date().toISOString().replace(/[:.]/g, "-")}-${process.pid}`;
 const outputDir = path.resolve("tmp");
 const screenshotDir = path.join(outputDir, `plan-route-browser-click-stress-${runId}-screenshots`);
 

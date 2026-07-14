@@ -83,7 +83,7 @@
     "baseline:eas": "node scripts/record-preview-baseline.mjs",
     "perf:deps": "npm ls --depth=0",
     "test:map-camera": "node scripts/check-map-camera-guards.mjs",
-    "test:source-contracts": "node --test ../tests/mobile/map-marker-state-guard.test.js ../tests/mobile/plan-autocomplete-session-guard.test.js ../tests/mobile/native-validation-preflight.test.js ../tests/mobile/native-ios-dependency-drift.test.js ../tests/mobile/durable-write-queue.test.js ../tests/mobile/web-export-clean.test.js ../tests/mobile/web-bundle-boundaries.test.js",
+    "test:source-contracts": "node --test ../tests/mobile/map-marker-state-guard.test.js ../tests/mobile/plan-autocomplete-session-guard.test.js ../tests/mobile/native-validation-preflight.test.js ../tests/mobile/native-ios-dependency-drift.test.js ../tests/mobile/native-ios-cold-start-evidence.test.js ../tests/mobile/durable-write-queue.test.js ../tests/mobile/web-export-clean.test.js ../tests/mobile/web-bundle-boundaries.test.js",
     "test:native-api-contracts": "node scripts/check-native-api-contracts.mjs",
     "test:local-data-lifecycle": "node scripts/check-local-data-lifecycle.mjs",
     "test:settings-ux": "node scripts/check-settings-ux-guards.mjs",

@@ -8,6 +8,7 @@ const { promisify } = require("node:util");
 
 const execFileAsync = promisify(execFile);
 const ROOT = path.resolve(__dirname, "../..");
+const MOBILE_ROOT = path.join(ROOT, "mobile-app");
 
 test("iOS validation report passes with target and screen evidence", async () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "fuel-path-ios-validation-"));
@@ -37,6 +38,41 @@ test("iOS validation report passes with target and screen evidence", async () =>
   );
 
   assert.match(stdout, /iOS validation report passed:/);
+});
+
+test("iOS validation report emits project-relative evidence paths from the mobile directory", async () => {
+  const tmpRoot = path.join(ROOT, "tmp");
+  fs.mkdirSync(tmpRoot, { recursive: true });
+  const tmp = fs.mkdtempSync(path.join(tmpRoot, "fuel-path-ios-portable-"));
+
+  try {
+    const screenshots = writeScreenshots(tmp);
+    const appBundle = writeAppBundle(tmp);
+    const mobileRelative = (value) => path.relative(MOBILE_ROOT, value);
+
+    await execFileAsync(
+      process.execPath,
+      [
+        "scripts/native-ios-validation-report.mjs",
+        "--simulator-name", "iPhone 16",
+        "--simulator-runtime", "iOS 18.5",
+        "--output-dir", mobileRelative(tmp),
+        "--source-commit", "abc1234",
+        "--app-bundle", mobileRelative(appBundle),
+        "--plan-screenshot", mobileRelative(screenshots.plan),
+        "--nearby-screenshot", mobileRelative(screenshots.nearby),
+        "--account-screenshot", mobileRelative(screenshots.account),
+      ],
+      { cwd: MOBILE_ROOT, timeout: 10_000 },
+    );
+
+    const reportName = fs.readdirSync(tmp).find((name) => /^ios-validation-.*\.json$/.test(name));
+    const report = JSON.parse(fs.readFileSync(path.join(tmp, reportName), "utf8"));
+    assert.match(report.appBundle, /^tmp\//);
+    for (const screen of report.renderedScreens) assert.match(screen.screenshot, /^tmp\//);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
 });
 
 test("iOS validation report blocks without complete screen evidence", async () => {

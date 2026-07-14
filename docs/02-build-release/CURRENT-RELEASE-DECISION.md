@@ -1,6 +1,6 @@
 # Fuel Path release decision
 
-Reviewed: 2026-07-13 (Australia/Sydney)
+Reviewed: 2026-07-14 (Australia/Sydney)
 
 ## Decision
 
@@ -18,6 +18,8 @@ The remaining release blockers are:
 - real App Store and Google Play listing links plus final listing-disclosure
   evidence
 - signed iOS device/distribution evidence
+- a current-branch physical Android performance packet whose APK and source
+  revision match this repair branch
 - dated provider or authority terms evidence for each gated public region
 - an explicit Production database and hosted/global push rollout decision with
   Production-specific least-privilege, backup and rollback evidence
@@ -54,6 +56,50 @@ The App Store and Google Play URLs previously recorded in store evidence both
 returned HTTP 404 on 2026-07-10. They have been removed from current evidence.
 The corrected evidence is
 [`evidence/STORE-PUBLISHING-EVIDENCE-2026-07-10.json`](evidence/STORE-PUBLISHING-EVIDENCE-2026-07-10.json).
+
+## 14 July repair branch assessment
+
+The local product database and anonymous data lifecycle are complete for the
+repair branch. Local PostgreSQL migrations are idempotent, restart persistence
+passed, alert retention passed against PostgreSQL, and the alert scheduler
+claimed 500 rows from a 10,000-route due set within its two-second budget while
+concurrent workers remained disjoint and expired leases recovered. Mobile local
+state uses recoverable primary and backup envelopes with monotonic revisions,
+bounded retention, restart and backwards-clock recovery, durable write retry,
+and explicit Privacy deletion.
+
+The current-source Xcode simulator validation passed Plan, Nearby and Settings
+as three distinct rendered screens. Five cold starts passed on both iPhone 17
+and iPad mini (A17 Pro), with p50 launch-command times of 165 ms and 182 ms
+respectively. The iPad evidence is compatibility-mode evidence only: the current
+app config is portrait-only and has `supportsTablet` set to `false`. A signed
+physical iPad pass is still required when the device is available and must not
+be replaced by these simulator results.
+
+The combined beta gate now accepts the portable iOS screenshot evidence. Its
+automated blockers are limited to `provider_terms_not_confirmed`,
+`native_performance_not_claimable` and `store_listing_links_missing`. Support,
+privacy review and provider-limitation disclosure evidence pass. The broader
+manual release decision remains NO-GO because signed physical iOS evidence and
+a separate Production database and hosted/global push decision are also still
+required.
+
+Current-branch local dense-map stress passed all four fuel and EV cases, with
+the EV overlay capped at 18 markers on both tested phone sizes. Production still
+served the older 96-marker EV behaviour during the hosted stress run, so a
+current Preview or Production deployment and post-deploy verification are
+required before claiming that repair live. The hosted 300-route click-through
+run had one Brisbane-to-Canberra marker-click failure; the exact case passed
+locally on the current branch. This is treated as a deployment-version gap until
+the branch is deployed and verified, not as evidence that Production is ready.
+
+The final branch quality run passed 581 of 583 root tests with two intentional
+database-gated skips and no failures. Both skipped PostgreSQL contracts passed
+when run separately against the local database. Mobile verification, web build,
+bundle budgets, architecture guards and dependency audit passed, with zero
+known production dependency vulnerabilities. Parallel stress work also exposed
+and fixed evidence-file collisions in the iOS cold-start, route-click and map
+density harnesses, with regression tests added.
 
 ## Android evidence cleared for PR #30 scope
 

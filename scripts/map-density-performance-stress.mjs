@@ -7,7 +7,7 @@ const require = createRequire(import.meta.url);
 const { chromium } = require("../mobile-app/node_modules/playwright");
 
 const appUrl = process.env.FUEL_PATH_DENSITY_URL || "https://fuel-path.vercel.app/";
-const runId = new Date().toISOString().replace(/[:.]/g, "-");
+const runId = `${new Date().toISOString().replace(/[:.]/g, "-")}-${process.pid}`;
 const outputDir = path.resolve("tmp");
 const screenshotDir = path.join(outputDir, `map-density-performance-stress-${runId}-screenshots`);
 const viewports = [

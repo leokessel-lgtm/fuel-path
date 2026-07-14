@@ -1,8 +1,5 @@
 const sample = require("./_sample");
-const {
-  purgeAlertRetention,
-  setAlertStorageForTests,
-} = require("./_alertStorage");
+const { purgeAlertRetention, setAlertStorageForTests } = require("./_alertStorage");
 const {
   appendPredictionBacktestRecord,
   appendPredictionMarketSnapshotRecord,
@@ -14,6 +11,7 @@ const {
 } = require("./_predictionStorage");
 const { singleFlight } = require("./_providerRuntime");
 const { logServerError } = require("./_serverDiagnostics");
+const { runProductDatabaseMigrations } = require("./_productDatabaseMigrations");
 const { fetchJson } = require("./_providerHttp");
 const { tokenAuthorised, tokenSecurity } = require("./_securityPolicy");
 const { createPredictionService } = require("./_predictionService");
@@ -283,6 +281,7 @@ module.exports = {
   routeFromPayload,
   routeProviderStatus,
   runPredictionMarketBacktestJob,
+  runProductDatabaseMigrations,
   runRetentionCleanup,
   runScheduledRouteAlertEvaluation,
   saveBackendSavedRoute,

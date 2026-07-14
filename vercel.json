@@ -4,6 +4,11 @@
   "buildCommand": "npm run check:architecture && npm run test:poi-autocomplete-budget && sh scripts/build-vercel-static.sh",
   "outputDirectory": "public",
   "cleanUrls": true,
+  "functions": {
+    "api/jobs.js": {
+      "includeFiles": "db/migrations/**"
+    }
+  },
   "rewrites": [
     {
       "source": "/api/route",

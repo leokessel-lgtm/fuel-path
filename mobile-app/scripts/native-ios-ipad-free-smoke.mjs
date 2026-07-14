@@ -19,27 +19,33 @@ const productDir = isDebugBuild ? "Debug-iphoneos" : "Release-iphoneos";
 const deviceId = args.get("--device") || process.env.FUEL_PATH_IOS_DEVICE_ID || "";
 const bundleId = args.get("--bundle-id") || "com.leokesselring.fuelpath.local";
 const runs = Number(args.get("--runs") || 5);
-const skipBuild = args.has("--skip-build");
+const providedAppPath = args.get("--app") ? path.resolve(args.get("--app")) : "";
+const skipBuild = args.has("--skip-build") || Boolean(providedAppPath);
 const skipMemoryWarning = args.has("--skip-memory-warning");
 const reuseDerivedData = args.has("--reuse-derived-data");
 const consoleSeconds = Number(args.get("--console-seconds") || 10);
+const sourceCommit = args.get("--source-commit") || "";
+const externalBuildId = args.get("--build-id") || "";
 const generatedAt = new Date().toISOString();
 const stamp = generatedAt.replace(/[:.]/g, "-");
 const reportJson = path.join(outputRoot, `ipad-free-smoke-${stamp}.json`);
 const reportMd = path.join(outputRoot, `ipad-free-smoke-${stamp}.md`);
 const derivedDataPath = path.join(mobileRoot, "tmp", derivedDataName);
-const appPath = path.join(derivedDataPath, "Build", "Products", productDir, "FuelPath.app");
+const appPath = providedAppPath || path.join(derivedDataPath, "Build", "Products", productDir, "FuelPath.app");
 
 const evidence = {
   generatedAt,
   status: "running",
   device: null,
   configuration,
-  buildMode: isDebugBuild ? "debug_metro" : "release_embedded_js",
+  buildMode: providedAppPath ? "provided_signed_app" : isDebugBuild ? "debug_metro" : "release_embedded_js",
   bundleId,
   appPath,
+  sourceCommit,
+  externalBuildId,
   build: null,
   embeddedJs: null,
+  uninstall: null,
   install: null,
   launch: null,
   consoleLaunch: null,
@@ -48,6 +54,10 @@ const evidence = {
   relaunches: [],
   blockers: [],
 };
+
+if (providedAppPath && !sourceCommit) {
+  fail("A supplied physical-device app must include --source-commit so the evidence stays source-bound.");
+}
 
 const selectedDevice = deviceId || firstAvailableIpad();
 if (!selectedDevice) {
@@ -62,7 +72,14 @@ if (!skipBuild && dependencyDrift.status === "stale") {
 evidence.device = deviceDetails(selectedDevice);
 if (!evidence.device) fail(`Could not read iPad details for ${selectedDevice}.`);
 
-if (skipBuild) {
+if (providedAppPath) {
+  evidence.build = {
+    status: "provided",
+    detail: "Using the supplied signed physical-device app without rebuilding the stale local workspace.",
+    sourceCommit,
+    externalBuildId,
+  };
+} else if (skipBuild) {
   evidence.build = { status: "skipped", detail: "Skipped by --skip-build." };
 } else {
   evidence.build = buildApp(selectedDevice);
@@ -75,6 +92,9 @@ if (!existsSync(appPath)) {
 
 evidence.embeddedJs = inspectEmbeddedJs();
 if (!isDebugBuild && evidence.embeddedJs.status !== "passed") evidence.blockers.push(evidence.embeddedJs.detail);
+
+evidence.uninstall = uninstallApp(selectedDevice);
+if (evidence.uninstall.status !== "passed") fail(evidence.uninstall.detail);
 
 evidence.install = installApp(selectedDevice);
 if (evidence.install.status !== "passed") fail(evidence.install.detail);
@@ -103,6 +123,7 @@ const failedRelaunches = evidence.relaunches.filter((item) => item.status !== "p
 if (failedRelaunches.length) evidence.blockers.push(`${failedRelaunches.length}/${runs} relaunch cycles failed.`);
 
 const hardFailure = evidence.build?.status === "failed"
+  || evidence.uninstall?.status === "failed"
   || evidence.install?.status === "failed"
   || evidence.launch?.status === "failed"
   || evidence.suspendResume?.status === "failed"
@@ -218,6 +239,35 @@ function installApp(activeDeviceId) {
     return { status: "passed", detail: output };
   } catch (error) {
     return { status: "failed", detail: `Install failed: ${compactError(error)}` };
+  }
+}
+
+function uninstallApp(activeDeviceId) {
+  const jsonPath = path.join(outputRoot, `ipad-free-uninstall-${stamp}.json`);
+  try {
+    sh("xcrun", [
+      "devicectl",
+      "device",
+      "uninstall",
+      "app",
+      "--device",
+      activeDeviceId,
+      "--json-output",
+      jsonPath,
+      bundleId,
+    ]);
+    const payload = existsSync(jsonPath) ? JSON.parse(readFileSync(jsonPath, "utf8")) : {};
+    return {
+      status: payload.info?.outcome && payload.info.outcome !== "success" ? "failed" : "passed",
+      detail: payload.info?.outcome || "Existing app removed before the clean install.",
+      evidence: jsonPath,
+    };
+  } catch (error) {
+    const detail = compactError(error);
+    if (/not installed|application.*not found|no application|NSPOSIXErrorDomain error 2/i.test(detail)) {
+      return { status: "passed", detail: "App was already absent before the clean install.", evidence: jsonPath };
+    }
+    return { status: "failed", detail: `Uninstall failed: ${detail}`, evidence: jsonPath };
   }
 }
 
@@ -340,12 +390,15 @@ function markdown() {
     `Configuration: ${configuration}`,
     `Bundle: ${bundleId}`,
     `App: ${appPath}`,
+    sourceCommit ? `Source commit: ${sourceCommit}` : "",
+    externalBuildId ? `External build: ${externalBuildId}` : "",
     "",
     "## Checks",
     "",
     `- Build: ${evidence.build?.status || "not run"}`,
     evidence.build?.logPath ? `- Build log: ${evidence.build.logPath}` : "",
     `- Embedded JS: ${evidence.embeddedJs?.status || "not run"}${evidence.embeddedJs?.size ? ` (${(evidence.embeddedJs.size / 1024).toFixed(0)} KB)` : ""}`,
+    `- Clean uninstall: ${evidence.uninstall?.status || "not run"}`,
     `- Install: ${evidence.install?.status || "not run"}`,
     `- Launch: ${evidence.launch?.status || "not run"}${evidence.launch?.pid ? ` (pid ${evidence.launch.pid})` : ""}`,
     `- Console launch: ${evidence.consoleLaunch?.status || "not run"}${evidence.consoleLaunch?.bundleEvaluated ? " (JS bundle evaluated)" : ""}`,
@@ -366,10 +419,12 @@ function markdown() {
     "",
     "## Notes",
     "",
-    isDebugBuild
-      ? "- This is a free-account local Debug build. It may require Metro to show the full app."
-      : "- This is a free-account local Release build with embedded JS, so it does not require Metro to show the full app.",
-    "- It does not validate APNs, TestFlight, ad hoc distribution or the production bundle ID.",
+    providedAppPath
+      ? "- This uses a supplied signed physical-device app with embedded JS; its distribution scope comes from the recorded build evidence."
+      : isDebugBuild
+        ? "- This is a free-account local Debug build. It may require Metro to show the full app."
+        : "- This is a free-account local Release build with embedded JS, so it does not require Metro to show the full app.",
+    "- It does not validate APNs delivery or TestFlight distribution.",
     evidence.memoryWarning?.status === "unsupported"
       ? `- Memory-warning injection is unsupported by this CoreDevice/device combination: ${evidence.memoryWarning.detail}`
       : "",

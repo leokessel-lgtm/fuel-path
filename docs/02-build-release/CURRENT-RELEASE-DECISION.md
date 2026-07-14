@@ -68,13 +68,25 @@ state uses recoverable primary and backup envelopes with monotonic revisions,
 bounded retention, restart and backwards-clock recovery, durable write retry,
 and explicit Privacy deletion.
 
-The current-source Xcode simulator validation passed Plan, Nearby and Settings
-as three distinct rendered screens. Five cold starts passed on both iPhone 17
-and iPad mini (A17 Pro), with p50 launch-command times of 165 ms and 182 ms
-respectively. The iPad evidence is compatibility-mode evidence only: the current
-app config is portrait-only and has `supportsTablet` set to `false`. A signed
-physical iPad pass is still required when the device is available and must not
-be replaced by these simulator results.
+Clean current-source Xcode/EAS simulator builds from `b4db2a15` passed Plan,
+Nearby and Settings as three distinct rendered screens. The default, Plan and
+Settings build IDs are `218ed82f-e864-4625-b5d3-7c639cfc9beb`,
+`1c2857ed-0292-4695-80ad-2ee1548d499e` and
+`55c53ba9-2e9e-46ed-b1fd-25b5f255f9ba`. The default universal simulator binary
+passed signature verification and contained a 2.35 MB embedded JS bundle. Five
+cold starts passed on both iPhone 17 and iPad mini (A17 Pro), with p50
+launch-command times of 164 ms and 202 ms respectively.
+
+The iPad evidence is compatibility-mode evidence only: the built binary has
+`UIDeviceFamily [1]`, and the current app config is portrait-only with
+`supportsTablet` set to `false`. A signed physical iPad pass is still required
+when the device is available and must not be replaced by these simulator
+results. The physical smoke command now requires a clean uninstall before
+installation and can consume a source-bound prebuilt signed app. The ignored
+local iOS workspace remains stale because its Pod lock references the removed
+`expo-image` package; it must be cleanly regenerated through the supported
+native dependency path rather than restoring the removed package or editing
+the Xcode project by hand.
 
 The combined beta gate now accepts the portable iOS screenshot evidence. Its
 automated blockers are limited to `provider_terms_not_confirmed`,

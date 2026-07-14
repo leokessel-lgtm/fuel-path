@@ -104,6 +104,7 @@ function readReportSignals(file) {
 mkdirSync(outDir, { recursive: true });
 
 const latestAndroidApks = listFilesAcross(artifactsDirs, (file) => /fuel-path-preview-android.*\.apk$/.test(path.basename(file))).slice(0, 3);
+const latestAndroidParityApks = listFilesAcross(artifactsDirs, (file) => /fuel-path-localParity-.*\.apk$/.test(path.basename(file))).slice(0, 3);
 const latestAndroidStandaloneApks = listFilesAcross(artifactsDirs, (file) => /fuel-path-local-standalone.*\.apk$/.test(path.basename(file))).slice(0, 3);
 const latestAndroidDebugApks = existsSync(localDebugApk) ? [localDebugApk] : [];
 const latestIosTarballs = listFilesAcross(artifactsDirs, (file) => /fuel-path-ios-simulator.*\.tar\.gz$/.test(path.basename(file))).slice(0, 5);
@@ -143,7 +144,7 @@ const latestIosColdStarts = listFilesAcross(smokeDirs, (file) =>
 
 const generatedAt = new Date().toISOString();
 const outFile = path.join(outDir, `native-current-evidence-audit-${generatedAt.replaceAll(":", "-")}.md`);
-const artefactInterpretation = latestAndroidApks.length || latestAndroidStandaloneApks.length || latestIosTarballs.length
+const artefactInterpretation = latestAndroidApks.length || latestAndroidParityApks.length || latestAndroidStandaloneApks.length || latestIosTarballs.length
   ? "- Latest local standalone, preview or simulator native artefacts are discoverable and hashable."
   : latestAndroidDebugApks.length
     ? "- A local Android debug APK is discoverable and hashable, but no preview APK or iOS simulator tarball is present; release/build-artifact claims still need a fresh preview or simulator artefact."
@@ -158,6 +159,7 @@ const lines = [
   "",
   "| Item | Path | Size | SHA-256 |",
   "| --- | --- | ---: | --- |",
+  ...(latestAndroidParityApks.length ? latestAndroidParityApks.map((file, index) => fileRow(`Android local parity APK ${index + 1}`, file)) : [fileRow("Android local parity APK", null)]),
   ...(latestAndroidApks.length ? latestAndroidApks.map((file, index) => fileRow(`Android preview APK ${index + 1}`, file)) : [fileRow("Android preview APK", null)]),
   ...(latestAndroidStandaloneApks.length ? latestAndroidStandaloneApks.map((file, index) => fileRow(`Android local standalone APK ${index + 1}`, file)) : [fileRow("Android local standalone APK", null)]),
   ...(latestAndroidDebugApks.length ? latestAndroidDebugApks.map((file) => fileRow("Android debug APK", file)) : [fileRow("Android debug APK", null)]),

@@ -1548,6 +1548,8 @@ const checks = [
       nativeEvidenceAudit.includes("const artifactsDirs = [") &&
       nativeEvidenceAudit.includes('const localDebugApk = path.resolve(mobileRoot, "android/app/build/outputs/apk/debug/app-debug.apk");') &&
       nativeEvidenceAudit.includes("const latestAndroidDebugApks = existsSync(localDebugApk) ? [localDebugApk] : [];") &&
+      nativeEvidenceAudit.includes("fuel-path-localParity-") &&
+      nativeEvidenceAudit.includes("Android local parity APK") &&
       nativeEvidenceAudit.includes("Android preview APK") &&
       nativeEvidenceAudit.includes("Android local standalone APK") &&
       nativeEvidenceAudit.includes("Android notification readiness") &&
